@@ -1,0 +1,48 @@
+# ---- OpenCode / tooling internals ----
+.omo/
+.playwright-mcp/
+
+# ---- OS files ----
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ---- Editors / IDEs ----
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ---- Logs & temp ----
+*.log
+*.tmp
+tmp/
+
+# ---- Secrets / environment ----
+.env
+.env.*
+!.env.example
+
+# ---- Node / frontend (React + Vite, per PRD §21) ----
+node_modules/
+dist/
+build/
+.vite/
+coverage/
+*.local
+
+# ---- .NET / backend (ASP.NET Core, per PRD §21) ----
+bin/
+obj/
+*.user
+appsettings.*.Local.json
+
+# ---- QA / screenshot artifacts ----
+page-*.png
+*-desktop.png
+*-mobile.png
