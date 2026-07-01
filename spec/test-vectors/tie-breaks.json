@@ -1,0 +1,81 @@
+{
+  "$comment": "Golden oracle for round-robin standings + tie-break resolution (FR-052, FR-057, FR-090, FR-095, BR-109, NFR-018). Tie-breakers are an ORDERED list applied only among currently-tied participants until the tie resolves; the final fallback MUST be deterministic given a stored rng_seed.",
+  "scoringSystem": {
+    "$comment": "Football preset (PRD §12.1).",
+    "winPoints": 3,
+    "drawPoints": 1,
+    "lossPoints": 0,
+    "byePoints": 0,
+    "allowDraws": true,
+    "tieBreakers": ["headToHead", "pointsScored", "wins", "random"]
+  },
+  "invariants": [
+    "standings points are computed from results via score(result, config) per participant",
+    "tie-breakers apply ONLY within the set of participants tied on the prior criterion",
+    "headToHead builds a mini-table using ONLY matches among the tied participants",
+    "pointsScored = sum of a participant's own scores across ALL their matches",
+    "'random' is the last resort and MUST be reproducible from the stored rng_seed (NFR-018)",
+    "final ranks are dense and total-ordered (no unresolved ties after the ordered list is exhausted)"
+  ],
+  "cases": [
+    {
+      "name": "3-way tie on points; headToHead is a cycle (unresolved) -> pointsScored resolves",
+      "participants": ["A", "B", "C", "D"],
+      "matches": [
+        { "home": "A", "away": "B", "homeScore": 21, "awayScore": 15, "winner": "A" },
+        { "home": "B", "away": "C", "homeScore": 21, "awayScore": 10, "winner": "B" },
+        { "home": "C", "away": "A", "homeScore": 21, "awayScore": 18, "winner": "C" },
+        { "home": "A", "away": "D", "homeScore": 21, "awayScore": 5, "winner": "A" },
+        { "home": "B", "away": "D", "homeScore": 21, "awayScore": 8, "winner": "B" },
+        { "home": "C", "away": "D", "homeScore": 21, "awayScore": 12, "winner": "C" }
+      ],
+      "computedPoints": { "A": 6, "B": 6, "C": 6, "D": 0 },
+      "tieGroups": [
+        {
+          "tiedOnPoints": 6,
+          "members": ["A", "B", "C"],
+          "resolution": [
+            {
+              "step": "headToHead",
+              "$comment": "Mini-table among A,B,C only: A beat B, B beat C, C beat A -> each 1 win / 1 loss = 3 pts. Cycle: UNRESOLVED.",
+              "miniTablePoints": { "A": 3, "B": 3, "C": 3 },
+              "resolved": false
+            },
+            {
+              "step": "pointsScored",
+              "$comment": "Sum of each participant's own scores across all matches.",
+              "values": { "A": 60, "B": 57, "C": 52 },
+              "resolved": true,
+              "orderedDesc": ["A", "B", "C"]
+            }
+          ]
+        }
+      ],
+      "expectedStandings": [
+        { "rank": 1, "participant": "A", "points": 6, "pointsScored": 60 },
+        { "rank": 2, "participant": "B", "points": 6, "pointsScored": 57 },
+        { "rank": 3, "participant": "C", "points": 6, "pointsScored": 52 },
+        { "rank": 4, "participant": "D", "points": 0, "pointsScored": 25 }
+      ]
+    },
+    {
+      "name": "2-way tie resolved directly by headToHead",
+      "participants": ["E", "F", "G"],
+      "matches": [
+        { "home": "E", "away": "F", "homeScore": 15, "awayScore": 21, "winner": "F" },
+        { "home": "E", "away": "G", "homeScore": 21, "awayScore": 9, "winner": "E" },
+        { "home": "F", "away": "G", "homeScore": 21, "awayScore": 9, "winner": "F" }
+      ],
+      "computedPoints": { "E": 3, "F": 6, "G": 0 },
+      "$comment": "No tie among E/F/G on points here; included as the simple case where, when two players ARE level on points, the head-to-head result between them alone decides (the winner ranks above).",
+      "expectedStandings": [
+        { "rank": 1, "participant": "F", "points": 6 },
+        { "rank": 2, "participant": "E", "points": 3 },
+        { "rank": 3, "participant": "G", "points": 0 }
+      ]
+    }
+  ],
+  "randomFallback": {
+    "$comment": "When ALL configured tie-breakers before 'random' leave participants level, order is decided by a deterministic PRNG seeded with the tournament's stored rng_seed. The specific ordering is implementation-defined by the seed algorithm, but MUST be identical across repeated runs with the same seed (property test: determinism), and MUST be a strict total order (no residual ties)."
+  }
+}

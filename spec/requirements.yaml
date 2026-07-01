@@ -1,0 +1,1158 @@
+# TourneyHub — Requirements Traceability Index
+# ---------------------------------------------------------------------------
+# Machine-readable coverage tracker. Source of truth for the requirement text
+# is PRD.md; this file tracks IMPLEMENTATION coverage. As you build a slice
+# (AGENTS.md §6), update each touched requirement:
+#   status: not_started | in_progress | done | deferred
+#   files:  [ relative paths implementing it ]
+#   tests:  [ relative paths proving it ]
+# Keep IDs identical to PRD.md. Do not delete requirements; mark deferred.
+#
+# Legend:
+#   scope:    MVP | V1 | Future
+#   priority: P0 (must) | P1 (should) | P2 (could)
+#   module:   Identity | Platform | Competition | Finance | Reporting | GDPR
+# ---------------------------------------------------------------------------
+meta:
+  prd: PRD.md
+  decisions: DECISIONS.md
+  api_contract: api/openapi.yaml
+  test_vectors_dir: spec/test-vectors/
+  statuses: [not_started, in_progress, done, deferred]
+
+functional:
+  # ----------------------------------------------------------- User Management (§6.1)
+  - id: FR-001
+    title: Self-registration with email + password
+    module: Identity
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-002
+    title: Password policy (min 12, breached-password check R-001)
+    module: Identity
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-003
+    title: Authenticate via email + password; issue session/token
+    module: Identity
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-004
+    title: Email verification; unverified accounts limited (BR-009)
+    module: Identity
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-005
+    title: Password reset via time-limited single-use token
+    module: Identity
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-006
+    title: View/edit profile (name, avatar, locale, timezone, visibility)
+    module: Identity
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-007
+    title: Role assignment scoped to org and league/tournament + global admin
+    module: Identity
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-008
+    title: Account deletion (anonymization/retention flow §13)
+    module: GDPR
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-009
+    title: Admin ban/suspend user (revoke sessions, preserve for audit)
+    module: Platform
+    scope: MVP
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-009a
+    title: Self-host env-configured bootstrap admin
+    module: Platform
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-009b
+    title: First-user-admin only behind explicit opt-in on empty instance
+    module: Platform
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-009c
+    title: Bootstrap one-shot, audited, always >=1 InstanceAdmin
+    module: Platform
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-009d
+    title: Hosted platform-operator admin + per-org Owner (self-host secondary)
+    module: Platform
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-010
+    title: Account states (pending_verification..deleted)
+    module: Identity
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-011
+    title: Social/OAuth login (Google, GitHub)
+    module: Identity
+    scope: V1
+    priority: P2
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-012
+    title: Optional TOTP 2FA
+    module: Identity
+    scope: V1
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-013
+    title: Inactivity flag (default 540 days, flag only)
+    module: Identity
+    scope: V1
+    priority: P2
+    status: not_started
+    files: []
+    tests: []
+
+  # ------------------------------------------------- Organizations & Tenancy (§6.1a)
+  - id: FR-150
+    title: Self-serve org creation at onboarding; creator becomes OrgOwner
+    module: Platform
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-151
+    title: Every tenant-scoped entity has non-null organization_id
+    module: Platform
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-152
+    title: Tenant isolation on every access path (cross-org = P0 defect)
+    module: Platform
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-153
+    title: OrgOwner edits settings + transfers ownership; always >=1 OrgOwner
+    module: Platform
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-154
+    title: User may belong to multiple orgs; one active org resolved server-side
+    module: Platform
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-155
+    title: Platform operator suspends/reactivates org (suspended = read-only)
+    module: Platform
+    scope: MVP
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-156
+    title: Organization.plan + entitlement seam (no billing UX at MVP)
+    module: Platform
+    scope: MVP
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+
+  # ------------------------------------------------------------- Invitations (§6.2)
+  - id: FR-014
+    title: Invite users to a league by email or shareable link
+    module: Identity
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-015
+    title: Invitation states (pending..expired, TTL 14d)
+    module: Identity
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-016
+    title: Accepting invite grants invited role; decline/expiry does not
+    module: Identity
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-017
+    title: Invite non-registered email resolvable on signup
+    module: Identity
+    scope: MVP
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-018
+    title: Single/multi-use invite links with optional max-acceptances
+    module: Identity
+    scope: V1
+    priority: P2
+    status: not_started
+    files: []
+    tests: []
+
+  # ------------------------------------------------------- League Management (§6.3)
+  - id: FR-020
+    title: Create/edit/delete leagues within an Organization
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-021
+    title: Transfer league ownership to another member
+    module: Competition
+    scope: MVP
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-022
+    title: Multiple seasons; exactly one active at a time (BR-002)
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-023
+    title: Players join/leave a league/season
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-024
+    title: New season resets standings; historical seasons immutable
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-025
+    title: Configurable scoring system per league (§12)
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-026
+    title: League visibility (public/unlisted/private)
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-026a
+    title: Public discovery/listing of public leagues (no auth)
+    module: Competition
+    scope: MVP
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-027
+    title: League player invitations (per §6.2)
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-028
+    title: Public league page (info, standings, schedule) no auth
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-028a
+    title: Spectator is a capability level, not an assignable role
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-028b
+    title: Logged-in users follow/favourite a league or tournament
+    module: Competition
+    scope: MVP
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-029
+    title: Archive/unarchive a league (read-only history)
+    module: Competition
+    scope: MVP
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-030
+    title: Automatic league/season rankings from results
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-031
+    title: League-level statistics (participation, leaders)
+    module: Competition
+    scope: MVP
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-032
+    title: Leaving mid-season retains earned results (A-007)
+    module: Competition
+    scope: MVP
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+
+  # --------------------------------------------------- Tournament Management (§6.4)
+  - id: FR-040
+    title: Create tournaments standalone or under a league season
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-040a
+    title: Configurable teamSize 1-10; participant has exactly teamSize members
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-040b
+    title: Discipline (free-text) + resultModel winner/score with scoreConfig
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-040c
+    title: bestOf N flag; MVP records aggregate result only
+    module: Competition
+    scope: MVP
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-040d
+    title: Head-to-head via ordered participant slots (N-slot additive)
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-041
+    title: Support Single Elimination and Round Robin
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: [spec/test-vectors/single-elimination.json, spec/test-vectors/round-robin.json]
+  - id: FR-042
+    title: Pluggable formats (Strategy/registry, no core changes)
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-043
+    title: Registration window (open/close, capacity, deadline)
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-044
+    title: Register participant; captain assembles roster if teamSize>1
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-044a
+    title: Participant incomplete until exactly teamSize accepted members
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-045
+    title: A player appears in at most one Participant per tournament
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-046
+    title: Seeding random (stored rng_seed) / manual / ranking-based (V1)
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-047
+    title: Deterministic bracket/schedule generation from seeds
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: [spec/test-vectors/single-elimination.json, spec/test-vectors/round-robin.json]
+  - id: FR-048
+    title: Bracket generation idempotent until start; forced regen audited
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-049
+    title: Per-match scheduling metadata (round, table, planned time)
+    module: Competition
+    scope: MVP
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-050
+    title: Enter match results per resultModel
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-051
+    title: resultEntryMode organizer (default) / playerSelfReport
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-051a
+    title: Self-report submit + opposing-captain confirm; dispute/timeout->organizer
+    module: Competition
+    scope: MVP
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-051b
+    title: Organizers can always override results (audited)
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-052
+    title: Validate results vs resultModel/scoreConfig
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: [spec/test-vectors/tie-breaks.json]
+    tests: []
+  - id: FR-053
+    title: Auto-assign byes for non-power-of-two (byes to top seeds)
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: [spec/test-vectors/single-elimination.json]
+  - id: FR-054
+    title: Forfeits (participant loses a specific match)
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-055
+    title: Withdrawals (exit whole tournament; auto-forfeit remaining)
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-056
+    title: Cancel a tournament (terminal, with reason)
+    module: Competition
+    scope: MVP
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-057
+    title: Configurable tie-break rules (defaults MVP / configurable V1)
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: [spec/test-vectors/tie-breaks.json]
+  - id: FR-058
+    title: Detect completion; compute final standings + payouts
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-059
+    title: Re-open a completed tournament for correction (audited)
+    module: Competition
+    scope: V1
+    priority: P2
+    status: not_started
+    files: []
+    tests: []
+
+  # ------------------------------------------------------- Live Tournament (§6.5)
+  - id: FR-060
+    title: Push live updates (bracket, standings, match states)
+    module: Platform
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-061
+    title: Public spectators receive live updates without auth
+    module: Platform
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-062
+    title: Server authoritative for results; optimistic UI reconciles
+    module: Platform
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-063
+    title: Graceful degrade to polling if live transport unavailable
+    module: Platform
+    scope: MVP
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-064
+    title: Live updates scoped/authorised (no private leak on public channels)
+    module: Platform
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+
+  # -------------------------------------------------- Registration & Finance (§6.6)
+  - id: FR-070
+    title: Optional entry fee (currency + integer minor units)
+    module: Finance
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-071
+    title: Record payment status per registration
+    module: Finance
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-072
+    title: Compute prize pool = sum(paid fees) - organizer fee
+    module: Finance
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: [spec/test-vectors/payout-split.json]
+  - id: FR-073
+    title: Configurable prize distribution (presets MVP / custom V1)
+    module: Finance
+    scope: V1
+    priority: P0
+    status: not_started
+    files: []
+    tests: [spec/test-vectors/payout-split.json]
+  - id: FR-074
+    title: Organizer fee percentage OR fixed (mutually exclusive)
+    module: Finance
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: [spec/test-vectors/payout-split.json]
+  - id: FR-075
+    title: Generate payout records per final standing; track status
+    module: Finance
+    scope: MVP
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-075a
+    title: Team payout split equally; remainder to captain (PayoutShare)
+    module: Finance
+    scope: MVP
+    priority: P1
+    status: not_started
+    files: []
+    tests: [spec/test-vectors/payout-split.json]
+  - id: FR-076
+    title: Refunds (full/partial) with audit and reason
+    module: Finance
+    scope: V1
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-077
+    title: Unpaid-registration policy (forfeit/auto-remove)
+    module: Finance
+    scope: V1
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-078
+    title: Financial report per tournament/season
+    module: Finance
+    scope: V1
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-079
+    title: Manual money handling at MVP; no gateway
+    module: Finance
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-080
+    title: One currency per financial scope (BR-007)
+    module: Finance
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-081
+    title: Integer minor units + defined rounding policy
+    module: Finance
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: [spec/test-vectors/payout-split.json]
+  - id: FR-082
+    title: IPaymentProvider seam with ManualProvider at MVP
+    module: Finance
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-083
+    title: Hosted inbound entry-fee gateway (V1); outbound payouts (Future+)
+    module: Finance
+    scope: V1
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+
+  # ------------------------------------------------- Rankings & Statistics (§6.7)
+  - id: FR-090
+    title: Compute league/season rankings automatically
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: [spec/test-vectors/tie-breaks.json]
+  - id: FR-090a
+    title: Team play awards points per player; standings per-User
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-091
+    title: Preserve historical rankings per finished season (snapshot)
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-092
+    title: Per-player match history
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-093
+    title: Win/loss/draw statistics per player (overall/league/discipline)
+    module: Competition
+    scope: MVP
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-094
+    title: Tournament history per player
+    module: Competition
+    scope: MVP
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-095
+    title: Recompute rankings deterministically on relevant events
+    module: Competition
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: [spec/test-vectors/tie-breaks.json]
+  - id: FR-096
+    title: Cache derived rankings/stats; invalidate on source change
+    module: Competition
+    scope: V1
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-097
+    title: Head-to-head records
+    module: Competition
+    scope: Future
+    priority: P2
+    status: deferred
+    files: []
+    tests: []
+  - id: FR-098
+    title: Elo/rating computation
+    module: Competition
+    scope: Future
+    priority: P2
+    status: deferred
+    files: []
+    tests: []
+
+  # ---------------------------------------------------------------- Reporting (§6.8)
+  - id: FR-100
+    title: Tournament, league, and player report views
+    module: Reporting
+    scope: MVP
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-101
+    title: CSV export of standings, schedules, financial reports
+    module: Reporting
+    scope: V1
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-102
+    title: PDF export of reports
+    module: Reporting
+    scope: Future
+    priority: P2
+    status: deferred
+    files: []
+    tests: []
+  - id: FR-103
+    title: Async report generation for large datasets
+    module: Reporting
+    scope: V1
+    priority: P2
+    status: not_started
+    files: []
+    tests: []
+
+  # ----------------------------------------------------------- Security & Audit (§6.9)
+  - id: FR-120
+    title: Audit log for security/finance/admin events
+    module: Platform
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-121
+    title: Audit logs append-only and tamper-evident
+    module: Platform
+    scope: MVP
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-122
+    title: Record consent events (privacy policy version)
+    module: GDPR
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+
+  # ------------------------------------------------------------- GDPR / Privacy (§6.10)
+  - id: FR-130
+    title: Account deletion with anonymization; retain competition facts
+    module: GDPR
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-131
+    title: Export personal data (machine-readable JSON)
+    module: GDPR
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-132
+    title: Present privacy policy; capture consent at registration
+    module: GDPR
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-133
+    title: Configurable data-retention policy
+    module: GDPR
+    scope: V1
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-134
+    title: Minimise personal data collected
+    module: GDPR
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-135
+    title: Profile visibility control (public/members-only/private)
+    module: GDPR
+    scope: MVP
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+
+  # -------------------------------------------------------------- Notifications (§6.11)
+  - id: FR-140
+    title: Transactional notifications for core flows
+    module: Platform
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-141
+    title: INotificationChannel abstraction + EmailChannel; event-triggered (outbox)
+    module: Platform
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-142
+    title: Hosted managed email primary; self-host SMTP secondary; validated at startup
+    module: Platform
+    scope: MVP
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-143
+    title: Transactional vs engagement distinction (opt-out only for engagement)
+    module: Platform
+    scope: MVP
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-144
+    title: Engagement notifications, extra channels, preferences
+    module: Platform
+    scope: Future
+    priority: P2
+    status: deferred
+    files: []
+    tests: []
+
+non_functional:
+  - id: NFR-001
+    title: Modularity by domain module; no circular deps
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: NFR-002
+    title: API-first; UI consumes same API as third parties
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: NFR-003
+    title: Extensibility (formats/scoring pluggable via interfaces)
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: NFR-004
+    title: Multi-tenancy core; non-null organization_id, server-side scoping
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: NFR-005
+    title: Performance (P95 read <300ms, write <600ms at MVP scale)
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: NFR-006
+    title: Live latency < 2s of server commit
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: NFR-007
+    title: Scalability (stateless app; shared pub/sub backplane)
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: NFR-008
+    title: Availability target 99.5%; no restart-blocking in-memory state
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: NFR-009
+    title: Security (Argon2id/PBKDF2, OWASP, CSRF, rate limiting)
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: NFR-010
+    title: Accessibility (WCAG 2.1 AA V1; keyboard/SR core MVP)
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: NFR-011
+    title: Responsive/mobile-first (usable at 360px)
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: NFR-012
+    title: i18n-ready (no hardcoded strings; localisable formatting)
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: NFR-013
+    title: Testability (unit/integration/e2e; CI gate)
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: NFR-014
+    title: Observability (structured logging, health, metrics)
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: NFR-015
+    title: Documentation (OpenAPI, self-host install, config ref)
+    priority: P0
+    status: not_started
+    files: [api/openapi.yaml]
+    tests: []
+  - id: NFR-016
+    title: Data portability (backup/restore; no lock-in)
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: NFR-017
+    title: Auditability (state-changing events reconstructable)
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: NFR-018
+    title: Determinism (bracket/seed/ranking from inputs + stored seed)
+    priority: P0
+    status: not_started
+    files: []
+    tests: [spec/test-vectors/single-elimination.json, spec/test-vectors/round-robin.json, spec/test-vectors/tie-breaks.json]
+  - id: NFR-019
+    title: Licensing AGPL-3.0 + CLA
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: NFR-020
+    title: Configuration over code (scoring/formats/fees data-driven)
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: NFR-021
+    title: Privacy by design (minimise PII, TLS, no secret logging)
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: NFR-022
+    title: Time correctness (store UTC; localize at presentation)
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: NFR-023
+    title: Concurrency safety (optimistic locking via version/ETag)
+    priority: P0
+    status: not_started
+    files: [api/openapi.yaml]
+    tests: []
+  - id: NFR-024
+    title: Tenant isolation across all surfaces; automated isolation tests
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: NFR-025
+    title: Hosted email deliverability (managed provider, retry/bounce)
+    priority: P1
+    status: not_started
+    files: []
+    tests: []

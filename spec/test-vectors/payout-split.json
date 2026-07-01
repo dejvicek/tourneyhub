@@ -1,0 +1,136 @@
+{
+  "$comment": "Golden oracle for money math (BR-005, BR-008, FR-072, FR-074, FR-075a, FR-081). ALL amounts are integer MINOR units (e.g. cents). Never use double/float. Two distinct mechanisms: (1) prize distribution across ranks, (2) team payout split among members.",
+  "rules": {
+    "prizePool": "prizePool = sum(paid entry fees) - organizerFee (BR-005, FR-072). Organizer fee is EITHER a percentage OR a fixed amount, never both (BR-006, FR-074).",
+    "rankDistribution": "share_i = round(prizePool * pct_i) using banker's rounding (round-half-to-even) to integer minor units; then reconcile any residual so that sum(shares) == prizePool by assigning the leftover minor unit(s) to the TOP rank(s) first (BR-008).",
+    "teamSplit": "For teamSize > 1, split a Payout equally among members: base = floor(amount / teamSize) to every member; the remainder (amount - base*teamSize) goes ENTIRELY to the captain (FR-075a). For teamSize == 1, a single PayoutShare equals the whole amount.",
+    "invariants": [
+      "sum(rank shares) == prizePool exactly",
+      "sum(PayoutShares) == payout amount exactly",
+      "no share is negative",
+      "single currency per financial scope (BR-007, FR-080)"
+    ]
+  },
+  "prizePoolComputation": [
+    {
+      "name": "10 paid entries, 10% organizer fee",
+      "currency": "EUR",
+      "paidEntries": 10,
+      "entryFeeMinor": 500,
+      "grossMinor": 5000,
+      "organizerFee": { "type": "percentage", "value": 10 },
+      "organizerFeeMinor": 500,
+      "prizePoolMinor": 4500
+    },
+    {
+      "name": "20 paid entries, fixed 2500 organizer fee",
+      "currency": "EUR",
+      "paidEntries": 20,
+      "entryFeeMinor": 1000,
+      "grossMinor": 20000,
+      "organizerFee": { "type": "fixed", "value": 2500 },
+      "organizerFeeMinor": 2500,
+      "prizePoolMinor": 17500
+    }
+  ],
+  "rankDistribution": [
+    {
+      "name": "Clean 70/20/10 of 4500 (no rounding)",
+      "prizePoolMinor": 4500,
+      "distributionPct": [70, 20, 10],
+      "expectedSharesMinor": [3150, 900, 450],
+      "sumMinor": 4500,
+      "remainderToTopRank": 0
+    },
+    {
+      "name": "Thirds of 100 -> remainder to top rank",
+      "prizePoolMinor": 100,
+      "distributionPct": [33.333333, 33.333333, 33.333333],
+      "rawSharesMinor": [33.33, 33.33, 33.33],
+      "roundedMinor": [33, 33, 33],
+      "residualMinor": 1,
+      "expectedSharesMinor": [34, 33, 33],
+      "sumMinor": 100,
+      "remainderToTopRank": 1
+    },
+    {
+      "name": "Banker's rounding half-to-even: 37.5/37.5/12.5/12.5 of 100",
+      "prizePoolMinor": 100,
+      "distributionPct": [37.5, 37.5, 12.5, 12.5],
+      "rawSharesMinor": [37.5, 37.5, 12.5, 12.5],
+      "$comment": "Half-to-even: 37.5 -> 38 (even), 12.5 -> 12 (even). Sum already equals pool; no residual.",
+      "expectedSharesMinor": [38, 38, 12, 12],
+      "sumMinor": 100,
+      "remainderToTopRank": 0
+    },
+    {
+      "name": "70/20/10 of 1001 (nearest rounding, sum exact)",
+      "prizePoolMinor": 1001,
+      "distributionPct": [70, 20, 10],
+      "rawSharesMinor": [700.7, 200.2, 100.1],
+      "expectedSharesMinor": [701, 200, 100],
+      "sumMinor": 1001,
+      "remainderToTopRank": 0
+    },
+    {
+      "name": "Winner-takes-all",
+      "prizePoolMinor": 12345,
+      "distributionPct": [100],
+      "expectedSharesMinor": [12345],
+      "sumMinor": 12345,
+      "remainderToTopRank": 0
+    }
+  ],
+  "teamSplit": [
+    {
+      "name": "10000 among team of 3 (remainder to captain)",
+      "payoutMinor": 10000,
+      "teamSize": 3,
+      "captainIndex": 0,
+      "baseShareMinor": 3333,
+      "remainderMinor": 1,
+      "expectedSharesMinor": [3334, 3333, 3333],
+      "sumMinor": 10000
+    },
+    {
+      "name": "100 among team of 3",
+      "payoutMinor": 100,
+      "teamSize": 3,
+      "captainIndex": 0,
+      "baseShareMinor": 33,
+      "remainderMinor": 1,
+      "expectedSharesMinor": [34, 33, 33],
+      "sumMinor": 100
+    },
+    {
+      "name": "10 among team of 4 (remainder 2 all to captain)",
+      "payoutMinor": 10,
+      "teamSize": 4,
+      "captainIndex": 0,
+      "baseShareMinor": 2,
+      "remainderMinor": 2,
+      "expectedSharesMinor": [4, 2, 2, 2],
+      "sumMinor": 10
+    },
+    {
+      "name": "7 among team of 2",
+      "payoutMinor": 7,
+      "teamSize": 2,
+      "captainIndex": 0,
+      "baseShareMinor": 3,
+      "remainderMinor": 1,
+      "expectedSharesMinor": [4, 3],
+      "sumMinor": 7
+    },
+    {
+      "name": "Individual (teamSize 1) gets the whole payout",
+      "payoutMinor": 5000,
+      "teamSize": 1,
+      "captainIndex": 0,
+      "baseShareMinor": 5000,
+      "remainderMinor": 0,
+      "expectedSharesMinor": [5000],
+      "sumMinor": 5000
+    }
+  ]
+}
