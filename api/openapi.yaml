@@ -1,0 +1,789 @@
+openapi: 3.1.0
+info:
+  title: TourneyHub API
+  version: 1.0.0-draft
+  description: >-
+    REST + JSON contract for TourneyHub (PRD §17). This is a **skeleton** authored
+    contract-first: extend it BEFORE writing controllers or the TS client, and
+    generate both sides from it (AGENTS.md §7). REST-only through V1 (Q-003).
+
+    Conventions:
+      - Versioned under /api/v1.
+      - Tenant scope (organization) is resolved SERVER-SIDE from the caller's identity,
+        never from a path/query param (NFR-004, FR-152). Most resources are already
+        scoped to the caller's active organization.
+      - Errors: RFC 7807 Problem Details with stable error codes (§17).
+      - Concurrency: ETag + If-Match on mutable competition/finance entities (NFR-023).
+      - Idempotency: Idempotency-Key on create endpoints that must not duplicate (FR-045).
+      - Money: integer minor units + currency, never floats (BR-008).
+      - Time: UTC ISO-8601 (NFR-022).
+  license:
+    name: AGPL-3.0-or-later
+    identifier: AGPL-3.0-or-later
+servers:
+  - url: /api/v1
+    description: Version 1
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Auth
+    description: Registration, login, email verification, password reset.
+  - name: Organizations
+    description: Tenant lifecycle — create org, ownership, suspension (multi-tenant core).
+  - name: Leagues
+    description: Leagues within an organization.
+  - name: Seasons
+    description: Seasons within a league (one active at a time).
+  - name: Invitations
+    description: League/organization invitations.
+  - name: Tournaments
+    description: Tournament creation, seeding, bracket generation.
+  - name: Registrations
+    description: Participant registration and roster assembly.
+  - name: Matches
+    description: Match result entry with optimistic locking.
+  - name: Standings
+    description: Computed standings and rankings.
+  - name: Users (GDPR)
+    description: Self-service data export and account deletion.
+  - name: Public
+    description: Unauthenticated public read endpoints.
+
+paths:
+  # ---------------------------------------------------------------- Auth
+  /auth/register:
+    post:
+      operationId: registerUser
+      tags: [Auth]
+      summary: Self-register with email + password (FR-001)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201': { description: 'Created; account is pending_verification (FR-004, FR-010)' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /auth/login:
+    post:
+      operationId: login
+      tags: [Auth]
+      summary: Authenticate, issue access + refresh tokens (FR-003)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenPair' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /auth/verify-email:
+    post:
+      operationId: verifyEmail
+      tags: [Auth]
+      summary: Verify email via single-use token (FR-004)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        '204': { description: Verified }
+        '410': { $ref: '#/components/responses/Problem' }
+  /auth/password-reset:
+    post:
+      operationId: passwordReset
+      tags: [Auth]
+      summary: Request or complete a password reset (FR-005)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PasswordResetRequest' }
+      responses:
+        '202': { description: 'Accepted (always 202 to avoid account enumeration)' }
+        '429': { $ref: '#/components/responses/Problem' }
+
+  # ---------------------------------------------------------- Organizations
+  /organizations:
+    post:
+      operationId: createOrganization
+      tags: [Organizations]
+      summary: Create an organization; caller becomes OrgOwner (FR-150)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrganizationCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Organization' }
+        '403': { $ref: '#/components/responses/Problem' }
+    get:
+      operationId: listOrganizations
+      tags: [Organizations]
+      summary: List organizations the caller belongs to (FR-154)
+      responses:
+        '401': { $ref: '#/components/responses/Problem' }
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Organization' }
+  /organizations/{orgId}:
+    parameters:
+      - $ref: '#/components/parameters/OrgId'
+    get:
+      operationId: getOrganization
+      tags: [Organizations]
+      summary: Get an organization
+      responses:
+        '200':
+          description: OK
+          headers: { ETag: { $ref: '#/components/headers/ETag' } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Organization' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /organizations/{orgId}/transfer-ownership:
+    parameters:
+      - $ref: '#/components/parameters/OrgId'
+    post:
+      operationId: transferOrganizationOwnership
+      tags: [Organizations]
+      summary: Transfer org ownership to another member (FR-153)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [newOwnerUserId]
+              properties:
+                newOwnerUserId: { type: string, format: uuid }
+      responses:
+        '204': { description: Ownership transferred }
+        '403': { $ref: '#/components/responses/Problem' }
+  /organizations/{orgId}/suspension:
+    parameters:
+      - $ref: '#/components/parameters/OrgId'
+    put:
+      operationId: setOrganizationSuspension
+      tags: [Organizations]
+      summary: Suspend/reactivate an organization (platform operator only, FR-155)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [suspended]
+              properties:
+                suspended: { type: boolean }
+                reason: { type: string }
+      responses:
+        '204': { description: Updated }
+        '403': { $ref: '#/components/responses/Problem' }
+
+  # ---------------------------------------------------------------- Leagues
+  /leagues:
+    get:
+      operationId: listLeagues
+      tags: [Leagues]
+      summary: List leagues in the caller's active organization (FR-020)
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '401': { $ref: '#/components/responses/Problem' }
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LeaguePage' }
+    post:
+      operationId: createLeague
+      tags: [Leagues]
+      summary: Create a league within the org (FR-020)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LeagueCreate' }
+      responses:
+        '401': { $ref: '#/components/responses/Problem' }
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/League' }
+  /leagues/{leagueId}:
+    parameters:
+      - $ref: '#/components/parameters/LeagueId'
+    get:
+      operationId: getLeague
+      tags: [Leagues]
+      summary: Get a league
+      responses:
+        '200':
+          description: OK
+          headers: { ETag: { $ref: '#/components/headers/ETag' } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/League' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /leagues/{leagueId}/seasons:
+    parameters:
+      - $ref: '#/components/parameters/LeagueId'
+    post:
+      operationId: createSeason
+      tags: [Seasons]
+      summary: Start a new season (only one active at a time, FR-022/024)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SeasonCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Season' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /leagues/{leagueId}/invitations:
+    parameters:
+      - $ref: '#/components/parameters/LeagueId'
+    post:
+      operationId: createLeagueInvitation
+      tags: [Invitations]
+      summary: Invite a user to a league by email or link (FR-014)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InvitationCreate' }
+      responses:
+        '404': { $ref: '#/components/responses/Problem' }
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Invitation' }
+
+  # ------------------------------------------------------------ Tournaments
+  /tournaments:
+    get:
+      operationId: listTournaments
+      tags: [Tournaments]
+      summary: List tournaments (FR-040)
+      parameters:
+        - { name: leagueId, in: query, schema: { type: string, format: uuid } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/TournamentState' } }
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '401': { $ref: '#/components/responses/Problem' }
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TournamentPage' }
+    post:
+      operationId: createTournament
+      tags: [Tournaments]
+      summary: Create a tournament, standalone or under a league season (FR-040/040a/040b)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TournamentCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tournament' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /tournaments/{tournamentId}:
+    parameters:
+      - $ref: '#/components/parameters/TournamentId'
+    get:
+      operationId: getTournament
+      tags: [Tournaments]
+      summary: Get a tournament
+      responses:
+        '200':
+          description: OK
+          headers: { ETag: { $ref: '#/components/headers/ETag' } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tournament' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /tournaments/{tournamentId}/registrations:
+    parameters:
+      - $ref: '#/components/parameters/TournamentId'
+    post:
+      operationId: createRegistration
+      tags: [Registrations]
+      summary: Register a participant (captain assembles roster if teamSize > 1) (FR-044)
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegistrationCreate' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Registration' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /tournaments/{tournamentId}/seed:
+    parameters:
+      - $ref: '#/components/parameters/TournamentId'
+    post:
+      operationId: seedTournament
+      tags: [Tournaments]
+      summary: Assign seeds — random (stored rng_seed) or manual (FR-046)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SeedRequest' }
+      responses:
+        '200': { description: Seeded }
+        '409': { $ref: '#/components/responses/Problem' }
+  /tournaments/{tournamentId}/generate-bracket:
+    parameters:
+      - $ref: '#/components/parameters/TournamentId'
+    post:
+      operationId: generateBracket
+      tags: [Tournaments]
+      summary: Deterministically generate bracket/schedule from seeds (FR-047/048)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                force: { type: boolean, default: false, description: 'Force regeneration after start (audited, FR-048)' }
+      responses:
+        '200':
+          description: Generated
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Match' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /tournaments/{tournamentId}/overview:
+    parameters:
+      - $ref: '#/components/parameters/TournamentId'
+    get:
+      operationId: getTournamentOverview
+      tags: [Public]
+      summary: Composite public read — bracket + standings + meta in one call (§17)
+      security: []
+      responses:
+        '404': { $ref: '#/components/responses/Problem' }
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TournamentOverview' }
+  /tournaments/{tournamentId}/standings:
+    parameters:
+      - $ref: '#/components/parameters/TournamentId'
+    get:
+      operationId: getTournamentStandings
+      tags: [Standings]
+      summary: Tournament standings (FR-058)
+      responses:
+        '404': { $ref: '#/components/responses/Problem' }
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Standing' }
+
+  # --------------------------------------------------------------- Matches
+  /matches/{matchId}/result:
+    parameters:
+      - $ref: '#/components/parameters/MatchId'
+    patch:
+      operationId: updateMatchResult
+      tags: [Matches]
+      summary: Enter/edit a match result per resultModel (FR-050/052); optimistic-locked
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Result' }
+      responses:
+        '200':
+          description: Applied
+          headers: { ETag: { $ref: '#/components/headers/ETag' } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Match' }
+        '409':
+          description: 'Version conflict (NFR-023)'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+
+  # -------------------------------------------------------------- Public
+  /public/leagues/{slug}:
+    parameters:
+      - { name: slug, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getPublicLeague
+      tags: [Public]
+      summary: Public league page — no auth (FR-028)
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/League' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  # ---------------------------------------------------------- Users (GDPR)
+  /users/me/export:
+    get:
+      operationId: exportMyData
+      tags: [Users (GDPR)]
+      summary: Export caller's personal data as JSON (FR-131)
+      responses:
+        '401': { $ref: '#/components/responses/Problem' }
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /users/me:
+    delete:
+      operationId: deleteMyAccount
+      tags: [Users (GDPR)]
+      summary: Delete account — anonymize, retain competition facts (FR-130)
+      responses:
+        '204': { description: Deletion accepted; identity tombstoned }
+        '409':
+          description: 'Sole OrgOwner/League Owner must transfer first (BR-106)'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    OrgId: { name: orgId, in: path, required: true, schema: { type: string, format: uuid } }
+    LeagueId: { name: leagueId, in: path, required: true, schema: { type: string, format: uuid } }
+    TournamentId: { name: tournamentId, in: path, required: true, schema: { type: string, format: uuid } }
+    MatchId: { name: matchId, in: path, required: true, schema: { type: string, format: uuid } }
+    Cursor: { name: cursor, in: query, required: false, schema: { type: string }, description: Opaque cursor for pagination }
+    Limit: { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string }
+      description: Prevents duplicate creates (FR-045).
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      schema: { type: string }
+      description: Entity version/ETag for optimistic locking (NFR-023).
+
+  headers:
+    ETag:
+      description: Opaque version for optimistic concurrency (NFR-023).
+      schema: { type: string }
+
+  responses:
+    Problem:
+      description: RFC 7807 Problem Details
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+    Problem:
+      type: object
+      description: RFC 7807 Problem Details with a stable error code (§17).
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        code: { type: string, description: Stable machine-readable error code }
+        errors:
+          type: object
+          additionalProperties: { type: array, items: { type: string } }
+      required: [title, status, code]
+
+    RegisterRequest:
+      type: object
+      required: [email, password, consentPolicyVersion]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 12, description: Policy per FR-002 }
+        displayName: { type: string }
+        consentPolicyVersion: { type: string, description: Privacy policy version accepted (FR-132) }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+    TokenPair:
+      type: object
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        expiresIn: { type: integer, description: seconds }
+    PasswordResetRequest:
+      type: object
+      properties:
+        email: { type: string, format: email, description: request phase }
+        token: { type: string, description: completion phase }
+        newPassword: { type: string, minLength: 12 }
+
+    Money:
+      type: object
+      description: Integer minor units + ISO-4217 currency (BR-008). Never floats.
+      required: [amountMinor, currency]
+      properties:
+        amountMinor: { type: integer, format: int64 }
+        currency: { type: string, minLength: 3, maxLength: 3, example: EUR }
+
+    Organization:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        slug: { type: string }
+        ownerId: { type: string, format: uuid }
+        state: { type: string, enum: [active, suspended, archived, deleted] }
+        plan: { type: string, description: Entitlement seam; no billing UX at MVP (FR-156) }
+        version: { type: integer }
+      required: [id, name, slug, ownerId, state]
+    OrganizationCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        slug: { type: string, description: Optional; server generates if omitted }
+
+    League:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        organizationId: { type: string, format: uuid, description: Non-null tenant scope (NFR-004) }
+        name: { type: string }
+        slug: { type: string }
+        visibility: { type: string, enum: [public, unlisted, private] }
+        scoringSystemId: { type: string, format: uuid }
+        ownerId: { type: string, format: uuid }
+        state: { type: string, enum: [active, archived, deleted] }
+        version: { type: integer }
+      required: [id, organizationId, name, visibility, ownerId, state]
+    LeagueCreate:
+      type: object
+      required: [name, visibility]
+      properties:
+        name: { type: string }
+        visibility: { type: string, enum: [public, unlisted, private], default: private }
+        scoringSystemId: { type: string, format: uuid }
+    LeaguePage:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/League' } }
+        nextCursor: { type: [string, 'null'] }
+
+    Season:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        leagueId: { type: string, format: uuid }
+        name: { type: string }
+        state: { type: string, enum: [upcoming, active, closed, cancelled] }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+      required: [id, leagueId, name, state]
+    SeasonCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+
+    Invitation:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        scope: { type: string, enum: [organization, league, tournament] }
+        role: { type: string }
+        state: { type: string, enum: [pending, accepted, declined, revoked, expired] }
+        expiresAt: { type: string, format: date-time }
+      required: [id, scope, role, state]
+    InvitationCreate:
+      type: object
+      required: [role]
+      properties:
+        email: { type: string, format: email }
+        role: { type: string }
+
+    TournamentState:
+      type: string
+      enum: [Draft, RegistrationOpen, RegistrationClosed, Seeded, InProgress, Completed, Cancelled]
+    Tournament:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        organizationId: { type: string, format: uuid }
+        leagueId: { type: [string, 'null'], format: uuid }
+        seasonId: { type: [string, 'null'], format: uuid }
+        disciplineName: { type: string, description: Free-text at MVP (FR-040b) }
+        resultModel: { type: string, enum: [winner, score] }
+        teamSize: { type: integer, minimum: 1, maximum: 10 }
+        formatType: { type: string, enum: [SingleElimination, RoundRobin] }
+        resultEntryMode: { type: string, enum: [organizer, playerSelfReport] }
+        state: { $ref: '#/components/schemas/TournamentState' }
+        rngSeed: { type: [string, 'null'], description: 'Stored for determinism (NFR-018)' }
+        currency: { type: [string, 'null'] }
+        entryFee: { $ref: '#/components/schemas/Money' }
+        version: { type: integer }
+      required: [id, organizationId, disciplineName, resultModel, teamSize, formatType, resultEntryMode, state]
+    TournamentCreate:
+      type: object
+      required: [disciplineName, resultModel, teamSize, formatType]
+      properties:
+        leagueId: { type: [string, 'null'], format: uuid }
+        seasonId: { type: [string, 'null'], format: uuid }
+        disciplineName: { type: string }
+        resultModel: { type: string, enum: [winner, score] }
+        scoreConfig:
+          type: object
+          properties:
+            minScore: { type: integer }
+            maxScore: { type: integer }
+            allowDraws: { type: boolean, default: false }
+        teamSize: { type: integer, minimum: 1, maximum: 10, default: 1 }
+        formatType: { type: string, enum: [SingleElimination, RoundRobin] }
+        resultEntryMode: { type: string, enum: [organizer, playerSelfReport], default: organizer }
+        bestOf: { type: [integer, 'null'] }
+        entryFee: { $ref: '#/components/schemas/Money' }
+    TournamentPage:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Tournament' } }
+        nextCursor: { type: [string, 'null'] }
+    TournamentOverview:
+      type: object
+      description: Composite read for public pages (bracket + standings + meta).
+      properties:
+        tournament: { $ref: '#/components/schemas/Tournament' }
+        matches: { type: array, items: { $ref: '#/components/schemas/Match' } }
+        standings: { type: array, items: { $ref: '#/components/schemas/Standing' } }
+
+    RegistrationCreate:
+      type: object
+      description: For teamSize>1 the caller is captain and lists roster invitees (FR-044).
+      properties:
+        participantDisplayName: { type: string }
+        rosterInviteEmails:
+          type: array
+          items: { type: string, format: email }
+    Registration:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tournamentId: { type: string, format: uuid }
+        participantId: { type: string, format: uuid }
+        submittedByUserId: { type: string, format: uuid }
+        state: { type: string, enum: [Pending, Confirmed, Waitlisted, Withdrawn, Forfeited, Rejected] }
+        seed: { type: [integer, 'null'] }
+        paymentStatus: { type: string, enum: [none, pending, paid, refunded, waived, failed] }
+      required: [id, tournamentId, participantId, state]
+
+    SeedRequest:
+      type: object
+      required: [method]
+      properties:
+        method: { type: string, enum: [random, manual] }
+        # manual: ordered participant ids; random: server stores rng_seed
+        order:
+          type: array
+          items: { type: string, format: uuid }
+
+    Match:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tournamentId: { type: string, format: uuid }
+        round: { type: integer }
+        slot: { type: integer }
+        participantA: { type: [string, 'null'], format: uuid }
+        participantB: { type: [string, 'null'], format: uuid }
+        state: { type: string, enum: [Pending, Ready, InProgress, AwaitingConfirmation, Walkover, Completed] }
+        result: { $ref: '#/components/schemas/Result' }
+        version: { type: integer }
+      required: [id, tournamentId, round, slot, state]
+    Result:
+      type: object
+      description: Aggregate outcome; validated against resultModel/scoreConfig (FR-052).
+      properties:
+        winnerId: { type: [string, 'null'], format: uuid }
+        scoreA: { type: [integer, 'null'] }
+        scoreB: { type: [integer, 'null'] }
+        isDraw: { type: boolean, default: false }
+        isForfeit: { type: boolean, default: false }
+
+    Standing:
+      type: object
+      properties:
+        scopeId: { type: string, format: uuid, description: tournamentId or seasonId }
+        participantId: { type: [string, 'null'], format: uuid }
+        rank: { type: integer }
+        points: { type: integer }
+        tieBreakData: { type: object, additionalProperties: true }
+      required: [scopeId, rank, points]

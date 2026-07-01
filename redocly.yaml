@@ -1,0 +1,21 @@
+# Redocly configuration for the TourneyHub API contract.
+#
+# The spec (api/openapi.yaml) is authored contract-first as a SKELETON (AGENTS.md §7).
+# Policy:
+#   - Structural / correctness rules stay ERRORS (invalid schema, broken $ref, bad types).
+#   - Opinionated "completeness" rules are WARNINGS until endpoints are fully fleshed
+#     out during implementation (e.g. every GET does not yet enumerate 401/404/429).
+# Keep this file in sync as the contract matures; promote warnings back to errors
+# once the corresponding surface is implemented.
+extends:
+  - recommended
+
+rules:
+  struct: error                     # structural validity — never relax
+  no-unresolved-refs: error         # broken $ref — never relax
+  no-ambiguous-paths: error
+  # --- opinionated completeness (skeleton) → warn ---
+  operation-4xx-response: warn      # list/GET endpoints not yet enumerating 4xx
+  operation-2xx-response: warn
+  operation-summary: warn
+  no-empty-servers: warn
