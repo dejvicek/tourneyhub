@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-fg: var(--primary-fg);
+  --color-accent: var(--accent);
+  --color-bg-base: var(--bg);
+  --color-bg-subtle: var(--bg-subtle);
+  --color-bg-card: var(--bg-card);
+  --color-bg-surface: var(--bg-surface);
+  --color-fg-base: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-border-base: var(--border);
+  --color-border-hover: var(--border-hover);
+  
+  --font-heading: var(--font-heading);
+  --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
+}
+
+@layer base {
+  :root {
+    /* Light Theme (Default) */
+    --bg: #ffffff;
+    --bg-subtle: #f8fafc;
+    --bg-card: #ffffff;
+    --bg-surface: #f1f5f9;
+    --fg: #0f172a;
+    --fg-muted: #64748b;
+    --border: #e2e8f0;
+    --border-hover: #cbd5e1;
+    
+    --primary: #4f46e5;
+    --primary-hover: #4338ca;
+    --primary-fg: #ffffff;
+    --primary-alpha: rgba(79, 70, 229, 0.1);
+    
+    --accent: #ec4899;
+    --accent-alpha: rgba(236, 72, 153, 0.1);
+    
+    --radius-sm: 6px;
+    --radius-md: 12px;
+    --radius-lg: 20px;
+    --radius-full: 9999px;
+    
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-12: 48px;
+    --space-16: 64px;
+    --space-24: 96px;
+    --space-32: 128px;
+    
+    --font-heading: 'Outfit', sans-serif;
+    --font-body: 'DM Sans', sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
+    --shadow-glow: 0 0 40px rgba(79, 70, 229, 0.15);
+    
+    --layout-max-width: 1200px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #020617;
+      --bg-subtle: #0f172a;
+      --bg-card: #0b1120;
+      --bg-surface: #1e293b;
+      --fg: #f8fafc;
+      --fg-muted: #94a3b8;
+      --border: #1e293b;
+      --border-hover: #334155;
+      
+      --primary: #6366f1;
+      --primary-hover: #818cf8;
+      --primary-fg: #ffffff;
+      --primary-alpha: rgba(99, 102, 241, 0.15);
+      
+      --accent: #f472b6;
+      --accent-alpha: rgba(244, 114, 182, 0.15);
+      
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+      --shadow-glow: 0 0 60px rgba(99, 102, 241, 0.2);
+    }
+  }
+
+  body {
+    font-family: var(--font-body);
+    background-color: var(--bg);
+    color: var(--fg);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+}
