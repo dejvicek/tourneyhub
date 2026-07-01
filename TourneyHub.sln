@@ -16,6 +16,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{327B8A68
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TourneyHub.Integration.Tests", "tests\TourneyHub.Integration.Tests\TourneyHub.Integration.Tests.csproj", "{D5AA5975-302F-4EC6-A864-3C1B735A2EB0}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TourneyHub.Architecture.Tests", "tests\TourneyHub.Architecture.Tests\TourneyHub.Architecture.Tests.csproj", "{BEFA37DA-08B7-4019-BD60-A34A2B117148}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -46,11 +48,16 @@ Global
 		{D5AA5975-302F-4EC6-A864-3C1B735A2EB0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D5AA5975-302F-4EC6-A864-3C1B735A2EB0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D5AA5975-302F-4EC6-A864-3C1B735A2EB0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BEFA37DA-08B7-4019-BD60-A34A2B117148}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BEFA37DA-08B7-4019-BD60-A34A2B117148}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BEFA37DA-08B7-4019-BD60-A34A2B117148}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BEFA37DA-08B7-4019-BD60-A34A2B117148}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{D5AA5975-302F-4EC6-A864-3C1B735A2EB0} = {327B8A68-E78E-4553-9A13-EB3FBBC7B3F5}
+		{BEFA37DA-08B7-4019-BD60-A34A2B117148} = {327B8A68-E78E-4553-9A13-EB3FBBC7B3F5}
 	EndGlobalSection
 EndGlobal
