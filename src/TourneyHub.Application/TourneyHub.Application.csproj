@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Application layer: use cases, ports (interfaces), DTOs.
+    Depends ONLY on Domain (NFR-001). No EF/ASP.NET here.
+  -->
+  <PropertyGroup>
+    <RootNamespace>TourneyHub.Application</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\TourneyHub.Domain\TourneyHub.Domain.csproj" />
+  </ItemGroup>
+</Project>

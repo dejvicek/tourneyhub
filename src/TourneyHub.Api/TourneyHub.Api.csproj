@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!--
+    API host: ASP.NET Core controllers + SignalR hubs.
+    Depends on Application + Infrastructure (NFR-001). Composition root only.
+  -->
+  <PropertyGroup>
+    <RootNamespace>TourneyHub.Api</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\TourneyHub.Application\TourneyHub.Application.csproj" />
+    <ProjectReference Include="..\TourneyHub.Infrastructure\TourneyHub.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.8" />
+  </ItemGroup>
+</Project>
