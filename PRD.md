@@ -1,6 +1,6 @@
 # Product Requirements Document — TourneyHub
 
-**An open-source platform for managing leagues and tournaments for any competitive discipline** — board games, racket and table sports (badminton, table tennis), bar/pub games (foosball, darts, pool), esports (League of Legends, CS, …), and more.
+**An open-source, hosted platform for managing leagues and tournaments for any competitive discipline** — board games, racket and table sports (badminton, table tennis), bar/pub games (foosball, darts, pool), esports (League of Legends, CS, …), and more. Use it as a ready-to-go hosted service, or self-host the same open-source codebase.
 
 ---
 
@@ -39,9 +39,9 @@ The **13 resolved product/architecture decisions** (Q-001–Q-013) and their rat
 
 ### 1.1 Summary
 
-TourneyHub is an open-source, self-hostable web application that lets hobby groups, clubs, and communities run **recurring leagues** and **one-off tournaments** for **any competitive discipline** — board games, racket/table sports, bar/pub games, esports, and beyond. It manages the full lifecycle: registration, seeding, bracket/schedule generation, live result entry, rankings, statistics, and optional money handling (entry fees, prize pools, organizer fees). Matches are **head-to-head** (two sides per match, individuals or teams of any size); free-for-all/placement formats are a planned Future extension.
+TourneyHub is an open-source web application that lets hobby groups, clubs, and communities run **recurring leagues** and **one-off tournaments** for **any competitive discipline** — board games, racket/table sports, bar/pub games, esports, and beyond. It is delivered primarily as a **hosted service** people sign up for and use online, and is equally **self-hostable** from the same open-source codebase. It manages the full lifecycle: registration, seeding, bracket/schedule generation, live result entry, rankings, statistics, and optional money handling (entry fees, prize pools, organizer fees). Matches are **head-to-head** (two sides per match, individuals or teams of any size); free-for-all/placement formats are a planned Future extension.
 
-The product is **configuration-first**: scoring systems, formats, fees, and visibility are data, not hardcoded logic. It begins as a single-instance self-hosted tool but is architected so the **same codebase** can later run as a **multi-tenant SaaS** without a structural rewrite.
+The product is **multi-tenant from day one** and **configuration-first**: every league/tournament lives under an explicit **Organization** (tenant), and scoring systems, formats, fees, and visibility are data, not hardcoded logic. The hosted service runs many organizations on one instance; a self-hosted deployment runs the **same codebase** seeded with a single default organization — no structural difference, no rewrite to scale up.
 
 ### 1.2 Problems Solved
 
@@ -55,16 +55,16 @@ The product is **configuration-first**: scoring systems, formats, fees, and visi
 
 ### 1.3 Value Proposition
 
-- **For organizers:** less administrative overhead, fewer disputes, professional public pages.
+- **For organizers:** start running competitions online in minutes — less administrative overhead, fewer disputes, professional public pages, no setup or servers required.
 - **For players:** transparency, persistent history, recognition (rankings/stats).
-- **For communities:** a shared, owned, free tool with no vendor lock-in.
-- **For future operators:** a path to a hosted SaaS business on top of the same code.
+- **For communities:** a shared tool with no vendor lock-in — use the hosted service, or self-host the same open-source code and own your data.
+- **For the project:** the hosted service is the primary product and sustainability path, built on the same open-source codebase anyone can run.
 
 ### 1.4 Non-Goals (explicit)
 
 - TourneyHub is **not** a live game-play engine; it tracks *results*, not in-game moves or live scoreboards of the match itself.
 - It does **not** provide matchmaking across the internet between strangers (MVP).
-- It is **not** a payment processor; it *tracks* payments and (later) integrates with processors. *(See A-010.)*
+- It is **not** a payment processor. It *tracks* payments; the **hosted** service may integrate with a third-party processor to collect inbound entry fees (V1), but TourneyHub itself never becomes the processor and never holds/moves funds on a self-hosted instance. *(See A-010, FR-083.)*
 - It does **not** host discipline rules, rulebooks, or game servers (no esports server hosting / no anti-cheat).
 
 ---
@@ -92,11 +92,14 @@ Joins leagues/tournaments. Wants to register easily, see their schedule, report/
 #### P4 — Spectator ("Robin")
 Not registered (or just browsing). Wants to view public standings, brackets, and live updates without an account.
 
-#### P5 — Administrator / Instance Operator ("Morgan")
-Self-hosts the instance (or, later, operates the SaaS). Cares about backups, security, GDPR compliance, configuration, upgrades, and (future) tenant/billing management.
+#### P5 — Platform Operator / Instance Operator ("Morgan")
+**Primary (hosted):** operates the hosted TourneyHub service that many organizations use. Cares about tenant isolation, uptime, email deliverability, abuse prevention, backups, security, GDPR (as data processor), and platform-level admin (suspend/reactivate orgs). **Secondary (self-host):** the same responsibilities for a single self-hosted instance (backups, upgrades, env configuration, bootstrap admin).
 
 #### P6 — League Owner ("Jordan") *(role distinct from organizer — see §10 permissions)*
 The accountable party for a league; can transfer ownership, delete the league, manage organizers.
+
+#### P7 — Organization Owner ("Riley") *(tenant-level, distinct from League Owner)*
+Signs up and creates an **Organization** on the hosted service (or is the seeded owner on self-host). Owns the tenant boundary: manages org settings, org membership, and can transfer org ownership. All the org's leagues and tournaments live under this account. On self-host, this is typically the same person as the Platform Operator; on hosted they are different parties.
 
 ---
 
@@ -104,8 +107,10 @@ The accountable party for a league; can transfer ownership, delete the league, m
 
 | Term | Definition |
 |---|---|
-| **Instance** | A single deployment of TourneyHub. In SaaS mode, one instance hosts many tenants. |
-| **Tenant / Organization** | (SaaS) An isolated account boundary owning leagues. In self-hosted MVP, a single implicit tenant. *(A-002)* |
+| **Instance** | A single deployment of TourneyHub. The **hosted service** is one instance hosting **many organizations**; a **self-host** deployment is an instance hosting a **single default organization**. |
+| **Tenant / Organization** | The explicit account & isolation boundary that owns leagues. Present in **every** deployment (never implicit): hosted holds many, self-host holds one seeded default org. All tenant-scoped data carries a non-null `organization_id`. *(A-002, NFR-004)* |
+| **Organization Owner (OrgOwner)** | The accountable party for an Organization (tenant). Manages org settings and membership, and can transfer org ownership. Distinct from **League Owner** (league-scoped) and **Platform Operator** (instance/platform-scoped). |
+| **Platform Operator** | (Hosted) The party running the hosted service across all tenants; holds instance/platform admin out-of-band via deployment. On self-host this maps to the **InstanceAdmin** (§11). |
 | **League** | A long-lived competition container holding seasons and members. |
 | **Season** | A bounded competitive period within a league with its own rankings. |
 | **Tournament** | A bounded event with a format (e.g. single elimination), optionally inside a league/season, optionally standalone. |
@@ -134,6 +139,9 @@ The product is delivered in increments. Each requirement in §7–§8 is tagged 
 
 - Authentication, email verification, password reset.
 - User profiles.
+- **Organizations (multi-tenancy): self-serve organization creation at onboarding; the creator becomes OrgOwner; org settings + ownership transfer. Every league/tournament/registration/payment/audit event lives under exactly one Organization. Hosted runs many orgs; self-host seeds a single default org. *(A-002)***
+- **Tenant isolation enforced everywhere (API, realtime, background jobs, exports, caches, audit views) — cross-org access is a P0 security defect. *(NFR-004)***
+- **Platform-operator admin model: hosted platform operator + per-org Owner (self-host: env-configured bootstrap admin). *(Q-011)***
 - League CRUD, visibility, single + multiple seasons.
 - League invitations.
 - Tournament creation: **Single Elimination** and **Round Robin** only (**head-to-head** matches).
@@ -146,15 +154,18 @@ The product is delivered in increments. Each requirement in §7–§8 is tagged 
 - Automatic rankings (league season + tournament standings).
 - Public read-only standings and bracket pages.
 - Live tournament updates (live bracket/standings).
-- Basic financial tracking (entry fee, payment status, prize pool, payout records) — **manual** money handling, no payment gateway. *(A-010)*
+- Basic financial tracking (entry fee, payment status, prize pool, payout records) — **manual** money handling, no payment gateway at MVP (hosted inbound entry-fee collection is V1). *(A-010, Q-005)*
 - Responsive, mobile-first UI; light theme.
 - Role-based permissions (Owner, Organizer, Player, Spectator).
 - Audit logging (security-relevant events).
 - GDPR basics: data export, account deletion, privacy policy.
-- Transactional email notifications (verification, reset, invitations, roster invites, self-report confirmations) via an `INotificationChannel`/`EmailChannel` seam. *(A-021)*
+- Transactional email notifications (verification, reset, invitations, roster invites, self-report confirmations) via an `INotificationChannel`/`EmailChannel` seam; **hosted uses a managed transactional-email provider (deliverability/retries/bounce visibility) as the primary path, self-host SMTP is the supported secondary path**. *(A-021)*
 
 ### 4.2 V1 (post-MVP hardening / depth)
 
+- **Hosted inbound entry-fee collection via one payment provider** (e.g. Stripe Checkout); provider webhooks are authoritative for `paid`/`failed`/`refunded`. `ManualProvider` remains for self-host and free events. *(Q-005, FR-083)*
+- **Per-tenant rate limiting / quotas** (auth, public API, live channels).
+- **Basic org plan/entitlement enforcement** (the `Organization.plan` + entitlement seam exists at MVP; enforcement/limits land here) — only if monetization/usage limits are needed.
 - Configurable scoring systems (advanced presets + custom).
 - Configurable prize distribution and organizer fee (percentage + fixed).
 - Refund handling, unpaid-registration policies.
@@ -176,8 +187,8 @@ The product is delivered in increments. Each requirement in §7–§8 is tagged 
 - **Private spectators** (an assignable `viewer` membership role granting view-only access to a `private` league without playing) and **social features** (follower counts, comments/chat). *(MVP: Spectator is a capability level + follow/favourite, Q-012.)*
 - Head-to-head analytics, Elo / rating systems.
 - PDF export.
-- Payment gateway integration (Stripe et al.).
-- Multi-tenant SaaS: subscriptions, billing, tenant isolation, custom branding, feature flags, organization management.
+- **Automated outbound payouts** (KYC-gated, Stripe Connect / marketplace-style disbursements). *(Inbound entry-fee gateway is V1, not Future — Q-005.)*
+- **Commercial SaaS depth** (multi-tenancy itself is now core/MVP — see §4.1): self-serve subscription checkout, billing/invoicing, tax/VAT handling, dunning; custom branding / white-label; custom domains; plan-based feature flags; per-region data residency; enterprise SSO/SCIM; multiple payment providers.
 - Plugin/module system (custom formats, custom scoring as plugins).
 - Engagement notifications (match-ready, season-started, digests), additional channels (web push, in-app center, Discord/Slack/webhooks), and granular per-user preferences. *(MVP ships transactional email only, FR-140–143.)*
 - Internationalisation (i18n) of UI.
@@ -196,6 +207,13 @@ The product is delivered in increments. Each requirement in §7–§8 is tagged 
 - **US-A4** As a user, I want to edit my profile (display name, avatar, locale, visibility), so that others recognise me. → FR-006
 - **US-A5** As a user, I want to delete my account, so that my data is removed/anonymised. → FR-008, FR-130
 - **US-A6** As a user, I want to export my data, so that I keep a copy. → FR-131
+
+### 5.1a Organization (tenancy)
+- **US-O1** As a new user, I want to create an organization when I sign up, so that I have my own space to run competitions. → FR-150
+- **US-O2** As an org owner, I want to manage org membership and assign league owners/organizers, so that my team can help run events. → FR-007, FR-153
+- **US-O3** As an org owner, I want to transfer organization ownership, so that the org survives my departure. → FR-153
+- **US-O4** As a platform operator, I want to suspend an abusive organization, so that the hosted service stays safe for everyone. → FR-155
+- **US-O5** As a self-hoster, I want my instance to start with one ready-to-use organization, so that I can run events immediately without any multi-tenant overhead. → FR-150, A-002
 
 ### 5.2 League
 - **US-L1** As an organizer, I want to create a league, so that I can run recurring competition. → FR-020
@@ -278,17 +296,29 @@ The product is delivered in increments. Each requirement in §7–§8 is tagged 
 | FR-004 | The system MUST require email verification; unverified accounts have limited capability (cannot organize or pay). *(A-003)* | MVP | P0 |
 | FR-005 | The system MUST support password reset via time-limited single-use token. | MVP | P0 |
 | FR-006 | Users MUST be able to view/edit profile: display name, avatar, locale, timezone, bio, profile visibility. | MVP | P0 |
-| FR-007 | The system MUST support role assignment scoped to a league/tournament (not global), plus a global instance-admin role. | MVP | P0 |
+| FR-007 | The system MUST support role assignment scoped to an **organization** and to a **league/tournament** (not global), plus a global **instance-admin / platform-operator** role. | MVP | P0 |
 | FR-008 | Users MUST be able to delete their account (triggers anonymization/retention flow, §13). | MVP | P0 |
 | FR-009 | Instance admins MUST be able to ban/suspend a user (revokes sessions, blocks login, preserves data for audit). | MVP | P1 |
 | FR-009a | **Self-host admin bootstrap (Q-011):** the default mechanism MUST be **env-configured** — on first boot the instance creates/elevates the user matching `TOURNEYHUB_ADMIN_EMAIL` (pre-seeded; password set via the normal reset flow), with optional one-time `TOURNEYHUB_ADMIN_BOOTSTRAP_TOKEN`. | MVP | P0 |
 | FR-009b | First-user-becomes-admin MUST be permitted **only** when `TOURNEYHUB_ALLOW_FIRST_USER_ADMIN=true` is explicitly set **and** the instance has zero users (opt-in, never the default). | MVP | P0 |
 | FR-009c | Bootstrap MUST be **one-shot** (disabled once an InstanceAdmin exists) and **audited** (FR-120: established via env/token/first-user). The system MUST always retain **≥1 InstanceAdmin** and block any action that would remove the last one. *(R-020)* | MVP | P0 |
-| FR-009d | In **SaaS** mode the platform operator is admin via deployment; each new organization's creator becomes that **org's Owner** (not InstanceAdmin). The self-host bootstrap (FR-009a–c) is a self-host concern. | Future (design) | P1 |
+| FR-009d | **Hosted (primary):** the platform operator holds platform/instance admin via deployment; each new Organization's creator becomes that **org's Owner** (not InstanceAdmin). **Self-host (secondary):** bootstrap admin per FR-009a–c. | MVP | P0 |
 | FR-010 | The system MUST track account states: `pending_verification`, `active`, `inactive`, `suspended`, `banned`, `deleted`. | MVP | P0 |
 | FR-011 | The system SHOULD support social/OAuth login (Google, GitHub). | V1 | P2 |
 | FR-012 | The system SHOULD support optional TOTP 2FA. | V1 | P1 |
 | FR-013 | The system MUST define inactivity: an account with no login for N days (default 540) is flagged `inactive` but not deleted. *(A-004)* | V1 | P2 |
+
+### 6.1a Organizations & Tenancy (multi-tenant core)
+
+| ID | Requirement | Scope | Pri |
+|---|---|---|---|
+| FR-150 | An authenticated user MUST be able to create an **Organization** during onboarding; the creator becomes its **OrgOwner**. Hosted supports many organizations per instance; self-host seeds a single default organization at setup. *(A-002)* | MVP | P0 |
+| FR-151 | Every tenant-scoped entity (league, season, tournament, registration, participant, match, standing, payment, payout, invitation, audit event) MUST belong to exactly one Organization via a **non-null `organization_id`**. *(NFR-004)* | MVP | P0 |
+| FR-152 | The system MUST enforce **tenant isolation** on every access path — API, realtime channels, background jobs, exports, caches, and admin tooling. Cross-organization data access is a **P0 security defect**. *(NFR-004, §14)* | MVP | P0 |
+| FR-153 | OrgOwner MUST be able to edit basic org settings (name, slug) and **transfer org ownership** to another member; the system MUST always retain **≥1 OrgOwner** per organization. | MVP | P0 |
+| FR-154 | A User MAY belong to multiple Organizations; every state-changing request MUST resolve to exactly **one active organization context server-side** (never trusting a client-supplied scope). | MVP | P0 |
+| FR-155 | Platform operators MUST be able to **suspend/reactivate** an Organization; a suspended org is **read-only** (writes blocked) and excluded from public discovery. | MVP | P1 |
+| FR-156 | The system MUST reserve an `Organization.plan` + **entitlement seam** (`IEntitlementService` or equivalent). **No self-serve billing UX is required at MVP**; entitlement enforcement/limits are V1. | MVP (design) | P1 |
 
 ### 6.2 Invitations
 
@@ -304,7 +334,7 @@ The product is delivered in increments. Each requirement in §7–§8 is tagged 
 
 | ID | Requirement | Scope | Pri |
 |---|---|---|---|
-| FR-020 | Organizers MUST be able to create, edit, and delete leagues. | MVP | P0 |
+| FR-020 | Organizers MUST be able to create, edit, and delete leagues **within an Organization** (every league belongs to exactly one org, FR-151). | MVP | P0 |
 | FR-021 | Owners MUST be able to transfer ownership to another member. | MVP | P1 |
 | FR-022 | Leagues MUST support multiple seasons; exactly one season MAY be `active` at a time. *(A-006)* | MVP | P0 |
 | FR-023 | Players MUST be able to join (if allowed) and leave a league/season. | MVP | P0 |
@@ -377,11 +407,11 @@ The product is delivered in increments. Each requirement in §7–§8 is tagged 
 | FR-076 | The system MUST support refunds (full/partial) with audit and reason. | V1 | P1 |
 | FR-077 | The system MUST define unpaid-registration policy: unpaid by deadline → `forfeited` or auto-removed (configurable). *(A-009)* | V1 | P1 |
 | FR-078 | The system MUST produce a financial report (income, fees, prize pool, payouts, balance) per tournament/season. | V1 | P1 |
-| FR-079 | Money handling at MVP is **manual** (organizer records reality); no payment gateway. *(A-010, Q-005 confirmed)* | MVP | P0 |
+| FR-079 | Money handling at MVP is **manual** (organizer records reality) for both hosted and self-host; no payment gateway at MVP. Hosted inbound entry-fee collection is V1 (FR-083). *(A-010, Q-005)* | MVP | P0 |
 | FR-080 | Currency MUST be per-tournament/league; mixing currencies in one financial scope MUST be disallowed. *(A-011)* | MVP | P0 |
 | FR-081 | All monetary math MUST use integer minor units and a defined rounding policy (banker's rounding for splits; remainder to top rank). *(R-003)* | MVP | P0 |
 | FR-082 | The Finance module MUST define an `IPaymentProvider` seam with a single `ManualProvider` implementation at MVP, so an inbound payment gateway can be added later as a drop-in adapter without redesign. *(R-018)* | MVP | P0 |
-| FR-083 | **Phasing (Q-005):** inbound entry-fee gateway lands in the **SaaS phase**; outbound prize-payout automation (KYC-gated, e.g. Stripe Connect) is **Future+**. Self-hosted instances: the organizer is solely responsible for real money movement (disclaimer MUST be shown). | Future | P1 |
+| FR-083 | **Phasing (Q-005):** **hosted inbound entry-fee** collection via one provider is **V1** (provider webhooks authoritative for `paid`/`failed`/`refunded`); **outbound payout automation** (KYC-gated, e.g. Stripe Connect) is **Future+**. Self-hosted instances: the organizer is solely responsible for real money movement (disclaimer MUST be shown). | V1 (inbound) / Future (payouts) | P1 |
 
 ### 6.7 Rankings & Statistics
 
@@ -432,7 +462,7 @@ The product is delivered in increments. Each requirement in §7–§8 is tagged 
 |---|---|---|---|
 | FR-140 | The system MUST deliver **transactional** notifications required for core flows: email verification, password reset, league/tournament invitations (FR-014), team roster invites (FR-044), and result-confirmation requests in `playerSelfReport` mode (FR-051a). | MVP | P0 |
 | FR-141 | Notifications MUST be sent through an `INotificationChannel` abstraction with a single `EmailChannel` (SMTP/transactional provider) at MVP, so additional channels are additive. Notification sends MUST be triggered by domain events (reuse the outbox, §16/§18). *(R-019)* | MVP | P0 |
-| FR-142 | Self-host SMTP/email configuration MUST be first-class (env-based) and validated at startup, since email underpins verification and invitations. | MVP | P0 |
+| FR-142 | **Hosted** MUST use a managed transactional-email provider as the **primary** delivery path (deliverability, retries, bounce visibility). **Self-host** SMTP/email configuration MUST remain first-class (env-based) and validated at startup, since email underpins verification and invitations. | MVP | P0 |
 | FR-143 | Transactional notifications are distinguished from engagement notifications; engagement notifications (Future) MUST honour opt-out, while transactional ones are necessary and not subject to marketing opt-out. *(GDPR)* | MVP (design) | P1 |
 | FR-144 | Engagement notifications ("match ready", "seeded", "season started", digests), additional channels (web push, in-app center, Discord/Slack/webhooks), and granular per-user preferences are **Future**. | Future | P2 |
 
@@ -445,7 +475,7 @@ The product is delivered in increments. Each requirement in §7–§8 is tagged 
 | NFR-001 | **Modularity:** code MUST be organised by domain module (users, leagues, tournaments, finance, rankings, identity) with explicit boundaries and no circular dependencies. | P0 |
 | NFR-002 | **API-first:** every UI capability MUST be backed by a documented API; the frontend consumes the same API as third parties. | P0 |
 | NFR-003 | **Extensibility:** tournament formats and scoring systems MUST be pluggable via interfaces (Strategy/registry), not conditionals. | P0 |
-| NFR-004 | **SaaS-readiness:** every tenant-scoped entity MUST carry an `organization_id` (nullable/implicit in self-host) from day one. *(R-007)* | P0 |
+| NFR-004 | **Multi-tenancy (core):** every tenant-scoped entity MUST carry a **non-null `organization_id`** from day one; there is no implicit/nullable tenancy. Hosted runs many organizations; self-host seeds a single default organization at setup. Tenant scope MUST be resolved and enforced server-side through a central scoping layer, never from client input. *(R-007, A-002)* | P0 |
 | NFR-005 | **Performance:** P95 API latency < 300 ms for reads, < 600 ms for writes at MVP scale (≤ 50 concurrent tournaments, ≤ 10k users per instance). *(A-012)* | P1 |
 | NFR-006 | **Live latency:** live updates delivered to clients within 2 s of server commit. | P1 |
 | NFR-007 | **Scalability:** stateless app servers; horizontal scaling supported; live transport must work across multiple instances (shared pub/sub, e.g. Redis). | P1 |
@@ -460,11 +490,13 @@ The product is delivered in increments. Each requirement in §7–§8 is tagged 
 | NFR-016 | **Data portability:** full instance backup/restore (DB dump) documented; no proprietary lock-in. | P0 |
 | NFR-017 | **Auditability:** all state-changing domain events recorded sufficiently to reconstruct history. | P1 |
 | NFR-018 | **Determinism:** bracket generation, seeding, and ranking computation MUST be deterministic given the same inputs and a stored seed value. | P0 |
-| NFR-019 | **Licensing:** **AGPL-3.0** (protects future SaaS rights) **+ a Contributor License Agreement (CLA)** to preserve dual-licensing optionality. *(Resolved Q-001)* | P0 |
+| NFR-019 | **Licensing:** **AGPL-3.0** (network copyleft — protects the hosted-service commons) **+ a Contributor License Agreement (CLA)** to preserve dual-licensing/commercial-hosting optionality. *(Resolved Q-001)* | P0 |
 | NFR-020 | **Configuration over code:** scoring, formats, fees, visibility, tie-breaks MUST be data-driven, editable without code changes. | P0 |
 | NFR-021 | **Privacy by design:** personal data minimised, encrypted in transit (TLS), secrets never logged. | P0 |
 | NFR-022 | **Time correctness:** store UTC; handle timezones at presentation; no naive local-time storage. | P0 |
 | NFR-023 | **Concurrency safety:** concurrent edits to the same match/registration MUST be detected (optimistic locking via version/ETag). | P0 |
+| NFR-024 | **Tenant isolation:** cross-organization data access MUST be impossible across every surface — API, realtime channels, background jobs, exports, caches, and admin tooling. A cross-tenant leak is a P0 security defect; isolation MUST be covered by automated tests. *(FR-152, §14)* | P0 |
+| NFR-025 | **Hosted email deliverability:** the hosted deployment MUST send transactional email through a managed provider with retry and bounce/failure visibility; self-host MUST retain a validated SMTP path. Email is a critical-path dependency for verification and invitations. *(FR-142)* | P1 |
 
 ---
 
@@ -485,6 +517,10 @@ The product is delivered in increments. Each requirement in §7–§8 is tagged 
 - **BR-009** Email must be verified before a user can organize or handle money (A-003).
 - **BR-010** Server is authoritative for match results (FR-062).
 - **BR-011** Bracket regeneration is blocked after a tournament starts unless force-overridden with audit (FR-048).
+- **BR-012** Every league, season, tournament, registration, participant, match, payment, payout, invitation, and audit event belongs to **exactly one Organization** (FR-151).
+- **BR-013** An Organization MUST have **≥1 OrgOwner** at all times; the last OrgOwner cannot be removed or leave without transferring ownership (FR-153).
+- **BR-014** A **suspended** Organization is read-only: all writes within it are blocked and it is excluded from public discovery (FR-155).
+- **BR-015** Tenant scope is **server-resolved**; no request may read or write across organizations, regardless of client-supplied identifiers (FR-152, FR-154).
 
 ### 8.2 Implicit (should exist — recommended)
 
@@ -510,9 +546,9 @@ The product is delivered in increments. Each requirement in §7–§8 is tagged 
 
 | Entity | Responsibility / Key attributes |
 |---|---|
-| **Organization** *(SaaS boundary; implicit in self-host)* | Tenant root. `id`, `name`, `branding`, `plan`. Owns leagues. *(NFR-004)* |
+| **Organization** *(primary tenant root — present in all deployments)* | Tenant boundary that owns all competition data. `id`, `name`, `slug`, `ownerId` (OrgOwner), `state` (`active`/`suspended`/`archived`), `plan` (entitlement seam, FR-156), `branding` (Future). Hosted holds many; self-host seeds one default org. *(NFR-004, A-002, FR-150)* |
 | **User** | Identity & profile. `id`, `email`, `passwordHash`, `state`, `displayName`, `avatar`, `locale`, `timezone`, `visibility`. |
-| **Membership** | Links User↔League(/Org) with a role. `userId`, `leagueId`, `role`, `state`. |
+| **Membership** | Links User↔scope with a role. `userId`, `organizationId`, `leagueId?`, `role`, `state`. A row with no `leagueId` is an **org-level** membership (e.g. OrgOwner); a row with `leagueId` is league-scoped. *(FR-007, FR-150)* |
 | **Invitation** | Pending access grant. `id`, `email/userId`, `scope`, `role`, `token`, `state`, `expiresAt`. |
 | **League** | Long-lived competition. `id`, `orgId`, `name`, `visibility`, `scoringSystemId`, `ownerId`, `state`. |
 | **Season** | Bounded period. `id`, `leagueId`, `name`, `startsAt`, `endsAt`, `state`. |
@@ -733,13 +769,48 @@ stateDiagram-v2
     Deleted --> [*]
 ```
 
+### 10.9 Organization *(tenant lifecycle)*
+
+```mermaid
+stateDiagram-v2
+    [*] --> Active: created (creator becomes OrgOwner) / seeded on self-host
+    Active --> Suspended: platform operator suspends (read-only)
+    Suspended --> Active: platform operator reactivates
+    Active --> Archived: OrgOwner archives (read-only history)
+    Archived --> Active: unarchive
+    Active --> Deleted: delete (soft, cascades per retention)
+    Archived --> Deleted: delete (soft)
+    Suspended --> Deleted: delete (soft)
+    Deleted --> [*]
+```
+
 ---
 
 ## 11. Permissions Matrix
 
-Roles are **scoped to a league/tournament** unless noted. `InstanceAdmin` is global. Owner ⊃ Organizer ⊃ Player ⊃ Spectator in capability, but Owner is unique per league.
+The role model spans three scopes:
+
+- **Platform scope** — **Platform Operator** (hosted) / **InstanceAdmin** (self-host): global to the deployment; manages instance config and organization lifecycle (suspend/reactivate).
+- **Organization scope** — **OrgOwner**: owns a tenant; manages org settings, org membership, and org-ownership transfer. Every league lives under an org.
+- **League/tournament scope** — **League Owner ⊃ Organizer ⊃ Player ⊃ Spectator** in capability; League Owner is unique per league.
+
+`OrgOwner` is distinct from `League Owner`: an OrgOwner owns the tenant, a League Owner owns one league inside it. On self-host they are often the same person; on hosted they are typically different parties.
 
 **Spectator is a capability level, not an assignable account type (Q-012):** the `Spectator` column represents both anonymous visitors *and* any logged-in user who is not a member of that particular league. No grant or invitation creates a Spectator.
+
+### 11.1 Organization-scoped capabilities
+
+| Capability | OrgOwner | Platform Operator / InstanceAdmin |
+|---|:--:|:--:|
+| Create an organization (self-serve signup) | ✅ (becomes OrgOwner) | ✅ |
+| Edit org settings (name, slug) | ✅ | ✅ |
+| Manage org membership / assign League Owners | ✅ | ✅ |
+| Transfer org ownership | ✅ | ✅ |
+| Create leagues within the org | ✅ | ✅ |
+| Suspend/reactivate an organization | ❌ | ✅ |
+| Manage instance/platform config & tenancy | ❌ | ✅ |
+
+### 11.2 League/tournament-scoped capabilities
 
 | Capability | Spectator | Player | Organizer | Owner | InstanceAdmin |
 |---|:--:|:--:|:--:|:--:|:--:|
@@ -833,7 +904,8 @@ interface TournamentFormat {
 | Deletion (FR-130) | Soft-delete + anonymize: replace PII with tombstone, keep results attributed to "Deleted player #id" to preserve competition integrity (BR-105 analog). |
 | Retention (FR-133) | Configurable: audit logs default 365 days; deleted-account purge after grace period (default 30 days). *(A-014)* |
 | Right to object/restrict | Profile visibility controls (FR-135); suspend processing on request. |
-| Data residency (SaaS) | Per-tenant region (Future); documented for self-host. |
+| Controller/Processor (hosted) | On the **hosted** service the operator acts as **data processor** for each Organization (the org is controller for its members' data); a DPA and sub-processor list are required before hosted launch (Q-002a). On **self-host**, the operator is the sole controller/processor. |
+| Data residency | Per-tenant region pinning is **Future**; documented for self-host. Hosted MVP runs a single documented region. |
 
 **Conflict note (R-006):** "Right to erasure" vs "competition integrity / others' results". **Resolution (Q-002, confirmed):** On erasure, **sever the `User`↔`Participant` link and hard-delete identity PII** (email, password hash, real name, avatar, bio, IP); **retain match and financial facts** attributed to an anonymized tombstone (`"Deleted player #id"`). Once de-linked from a natural person, retained match data is anonymous historical fact and outside GDPR scope (Recital 26). Audit/IP logs containing PII purge on a configurable retention timer (default 365 days, **pausable during an active dispute/legal claim**). Tombstoning is **irreversible** (no identity re-link). This policy MUST be stated explicitly in the privacy policy. **Residual action: legal counsel review before EU public launch (tracked as Q-002a).**
 
@@ -846,6 +918,7 @@ interface TournamentFormat {
 | Credential theft | Strong password hashing (Argon2id preferred, or ASP.NET Core Identity PBKDF2 with high iterations); breached-password check (R-001); rate limiting; lockout/backoff on auth (NFR-009). |
 | Session hijacking | Secure, HttpOnly, SameSite cookies or short-lived JWT + refresh; rotate on privilege change. |
 | Broken access control | Centralised authorization layer (policy/guard per resource); deny-by-default; tenant scoping checks (NFR-004). |
+| Cross-tenant data leak (multi-tenancy) | **P0.** Server-resolved `organization_id` on every query via the central scoping layer; deny-by-default tenant guard on API, realtime channels, background jobs, exports, caches, and admin tooling; automated isolation tests. A cross-org leak is a release-blocking defect (NFR-024, FR-152). |
 | IDOR | Object-level authorization on every read/write; never trust client-supplied scope. |
 | CSRF | CSRF tokens for cookie auth; SameSite. |
 | XSS | Output encoding; CSP; sanitise user content (league names, bios). |
@@ -876,7 +949,7 @@ interface TournamentFormat {
 **Recommendation (R-013) — implemented with SignalR (Q-004):**
 
 - Transport: **SignalR** (WebSocket primary, with automatic Server-Sent Events / Long-Polling fallback, FR-063).
-- **Server-authoritative** state; clients join SignalR **groups** scoped by resource + visibility: `tournament:{id}:public`, `tournament:{id}:organizer`. Group authorization enforces FR-064.
+- **Server-authoritative** state; clients join SignalR **groups** scoped by **organization + resource + visibility**: `org:{orgId}:tournament:{id}:public`, `org:{orgId}:tournament:{id}:organizer`. Group authorization enforces both tenant isolation (NFR-024) and visibility (FR-064) — a client can never subscribe to another org's channels.
 - Cross-instance fan-out via the **SignalR Redis backplane** so horizontal scaling works (NFR-007).
 - Events are **domain events** emitted after DB commit (outbox pattern recommended) to avoid lost/duplicate updates.
 - Clients reconcile via event versioning; on reconnect, fetch a snapshot then resume the stream.
@@ -905,7 +978,7 @@ sequenceDiagram
 - **Style (R-014, Q-003 resolved):** **REST + JSON only through MVP and V1.** GraphQL is explicitly **not** adopted — the app has a small, stable set of well-known views, so REST keeps HTTP caching, idempotency, and ETags simple. To prevent over/under-fetching without GraphQL, REST MUST support **sparse fieldsets/expansion** (`?include=`, `?fields=`) on key resources and provide **composite read endpoints** for heavy public views (e.g. `GET /tournaments/{id}/overview` returning bracket + standings + meta in one call). GraphQL MAY be added later as an additive, non-breaking layer over the same domain services if a third-party ecosystem with unpredictable query shapes emerges.
 - **Versioning:** URI versioning `/api/v1/...`; never break v1 without bumping.
 - **Auth:** Bearer tokens (JWT access + refresh) or session cookies for the first-party web app; **API keys/PAT** for third-party/self-host automation (Future).
-- **Authorization:** policy checks per endpoint; tenant scope enforced server-side.
+- **Authorization & tenancy:** policy checks per endpoint; the active **organization context is resolved server-side** (from the authenticated user's membership / active org), never from client input. Every tenant-scoped read/write is filtered by `organization_id`; cross-org access returns 404/403 (NFR-024, FR-152).
 - **Pagination:** cursor-based for large/append-heavy lists (matches, audit); page/limit acceptable for small lists.
 - **Filtering/Sorting:** explicit allow-listed query params (`?status=&sort=-createdAt`); reject unknown params.
 - **Idempotency:** `Idempotency-Key` header on POST for registration/payment/payout to prevent duplicates (FR-045 support).
@@ -913,7 +986,7 @@ sequenceDiagram
 - **Errors:** RFC 7807 Problem Details; stable error codes.
 - **Rate limiting:** per-IP and per-user; stricter on auth/finance.
 - **Docs:** OpenAPI 3 generated from code; published (NFR-015).
-- **Webhooks (Future):** for SaaS integrations (registration created, tournament completed).
+- **Webhooks (Future):** for third-party/hosted integrations (registration created, tournament completed).
 
 ### 17.1 Representative Endpoints (illustrative, not exhaustive)
 
@@ -943,7 +1016,7 @@ DELETE /api/v1/users/me                                 (GDPR)
 
 ## 18. Data Model Considerations
 
-- **Tenant column:** `organization_id` on all tenant-scoped tables from day one (NFR-004); enforce in queries via a scoping layer.
+- **Tenant column:** **non-null** `organization_id` on all tenant-scoped tables from day one (NFR-004); enforced in every query via a central scoping layer. Self-host seeds a **single default organization row** at setup — there is no nullable/implicit tenancy. Index `(organization_id, ...)` composites for tenant-scoped lookups.
 - **Soft deletion:** `deleted_at` for leagues/tournaments/users; queries filter by default; hard purge per retention.
 - **Immutability/history:** closed seasons store **ranking snapshots**; match results keep an edit history (or rely on audit + event log).
 - **Event logging / outbox:** domain events table for live fan-out and auditability (NFR-017).
@@ -956,21 +1029,32 @@ DELETE /api/v1/users/me                                 (GDPR)
 
 ---
 
-## 19. Future SaaS Readiness
+## 19. Hosted Platform: Core Now vs Deferred
 
-Designing now to avoid later rewrite:
+The product is **hosted-first and multi-tenant from day one**, so most of what was once "SaaS readiness" is now **core MVP** (see §4.1). This section separates what ships as core from what stays deliberately deferred (RK-01 guards against pulling the deferred column into MVP).
 
-| SaaS capability | Built-in foundation today |
+### 19.1 Core now (MVP)
+
+| Capability | How it is delivered at MVP |
 |---|---|
-| Multi-tenancy | `organization_id` on all scoped entities (NFR-004); scoping enforced centrally. Self-host = single implicit org. |
-| Subscriptions/Billing | Finance module isolated; `Organization.plan` field reserved; entitlements behind a service interface. |
-| Tenant isolation | Row-level scoping now; can migrate to schema/db-per-tenant later because access goes through a scoping layer, not raw queries. |
-| Custom branding | `Organization.branding` (logo, colors) consumed by theming tokens. |
-| Feature flags | Central flag service; gate features per plan/org/instance. |
-| Organization management | Membership already role-based and scopeable to org. |
-| Onboarding/self-signup | Auth + invitation systems already tenant-aware. |
+| Multi-tenancy | **Non-null** `organization_id` on all scoped entities (NFR-004); scoping enforced centrally. Self-host = one seeded default org (no implicit tenancy). |
+| Tenant isolation | Server-resolved org scope + deny-by-default guards across API, realtime, jobs, exports (NFR-024, FR-152); automated isolation tests. |
+| Organization management | Self-serve org creation, OrgOwner, org settings, ownership transfer (FR-150–154). |
+| Onboarding / self-signup | Auth + invitations are tenant-aware; sign up → create org → run competitions. |
+| Platform operations | Platform operator can suspend/reactivate orgs (FR-155); managed transactional email (NFR-025). |
 
-**Principle:** never query a tenant-scoped table without going through the scoping layer; never assume "one tenant" in domain code, even in self-host.
+### 19.2 Deferred (V1 / Future)
+
+| Capability | Phase | Foundation reserved today |
+|---|---|---|
+| Inbound entry-fee payments | V1 | `IPaymentProvider` seam (FR-082); `ManualProvider` at MVP. |
+| Plan entitlements / quotas | V1 | `Organization.plan` + `IEntitlementService` seam (FR-156); per-tenant rate limiting. |
+| Subscriptions / billing / invoicing / tax | Future | Finance module isolated; entitlements behind a service interface. |
+| Custom branding / white-label / custom domains | Future | `Organization.branding` field reserved; theming tokens. |
+| Automated outbound payouts / KYC | Future | Payout/PayoutShare model; provider seam. |
+| Per-region data residency, enterprise SSO/SCIM | Future | Central scoping layer allows schema/db-per-tenant migration later. |
+
+**Principle:** never query a tenant-scoped table without going through the scoping layer; **never assume "one tenant" in domain code**, even on self-host (self-host simply has exactly one org).
 
 ---
 
@@ -1017,7 +1101,7 @@ Designing now to avoid later rewrite:
 
 ## 21. Technology Stack *(Resolved Q-004)*
 
-The stack below is **confirmed**, chosen for fit to the realtime + finance + SaaS requirements and for the Prague hiring market (strong, well-paid .NET pool driven by SaaS + cybersecurity demand).
+The stack below is **confirmed**, chosen for fit to the realtime + finance + hosted multi-tenant requirements and for the Prague hiring market (strong, well-paid .NET pool driven by SaaS + cybersecurity demand).
 
 | Layer | Decision | Rationale |
 |---|---|---|
@@ -1030,10 +1114,10 @@ The stack below is **confirmed**, chosen for fit to the realtime + finance + Saa
 | Cache / Backplane | **Redis** | Caching (R-004) + SignalR backplane (NFR-007). |
 | Frontend | **React + Vite + TypeScript** (SPA) | Per stakeholder decision; large React pool. |
 | Public-page SEO | **Prerender / SSG for public read-only routes** *(R-017)* | Recovers SSR/SEO lost by dropping Next.js; public league/tournament pages emit pre-rendered HTML + OpenGraph meta. |
-| Styling | Tailwind + CSS variables (design tokens) | Dark mode (V1), future SaaS per-tenant branding. |
+| Styling | Tailwind + CSS variables (design tokens) | Dark mode (V1), per-tenant branding/white-label (Future). |
 | Auth | **ASP.NET Core Identity** (argon2id/PBKDF2) + optional OAuth | NFR-009. |
 | Testing | **xUnit** (unit) + **Testcontainers** (integration) + **Playwright** (e2e) | NFR-013. |
-| Deploy | Docker Compose (self-host) + 12-factor config | NFR-016, NFR-007. |
+| Deploy | **Primary:** hosted, managed services (managed PostgreSQL, Redis, transactional-email provider, later a payment provider), 12-factor config, horizontal app scaling. **Secondary:** Docker Compose for self-host, same codebase. | NFR-016, NFR-007. |
 
 **Note on money type:** use .NET `decimal` for computation but persist as integer minor units + currency (§11, BR-008); never `double`/`float`.
 
@@ -1055,13 +1139,13 @@ The stack below is **confirmed**, chosen for fit to the realtime + finance + Saa
 
 | ID | Risk | Type | Impact | Likelihood | Mitigation |
 |---|---|---|---|---|---|
-| RK-01 | Over-engineering for SaaS delays MVP | Product | High | Medium | Keep SaaS as *thin seams* (org_id, interfaces), defer billing/branding to Future. |
+| RK-01 | Hosted-first pulls commercial SaaS scope (billing, branding, enterprise, payouts) into MVP | Product | High | High | MVP = **tenancy + isolation + onboarding only**; keep subscriptions/billing/branding/custom-domains/outbound-payouts/SSO deferred to V1/Future (§4.3, §19.2). Multi-tenancy itself is core, but commercial mechanics are not. |
 | RK-02 | Format/scoring config complexity explodes | Technical | Med | High | Start with 2 formats + presets; pluggable interface; defer custom. |
 | RK-03 | Money handling disputes/legal | Product/Legal | High | Med | MVP is manual tracking only (no processing); clear audit; disclaimers (A-010, Q-005). |
 | RK-04 | GDPR erasure vs competition integrity conflict | Legal | Med | Med | Anonymize person, retain match facts; document policy (R-006, Q-002). |
 | RK-05 | Realtime scaling / lost updates | Technical/Scale | Med | Med | Outbox + SignalR Redis backplane; snapshot-on-reconnect; degrade to polling. |
 | RK-06 | Concurrent result edits corrupt standings | Technical | High | Med | Optimistic locking; deterministic recompute; audit (NFR-023). |
-| RK-07 | Security breach (auth/finance) | Security | High | Low/Med | OWASP mitigations, strong password hashing (NFR-009), rate limits, audit, pen-test before SaaS. |
+| RK-07 | Security breach (auth/finance) | Security | High | Low/Med | OWASP mitigations, strong password hashing (NFR-009), rate limits, audit, tenant-isolation tests (NFR-024), pen-test before hosted launch. |
 | RK-08 | Open-source adoption/maintenance burden | Product | Med | Med | Strong docs, clear contribution guide, modular code, tests. |
 | RK-09 | Bracket algorithm bugs damage trust | Technical | High | Med | Property-based + exhaustive unit tests; deterministic seeds. |
 | RK-10 | Scope creep from "configurable everything" | Product | High | High | Configuration limited at MVP to scoring/format/fees/visibility/`teamSize`/`resultModel`/`resultEntryMode`; everything else hardcoded sensible defaults. |
@@ -1074,18 +1158,18 @@ The stack below is **confirmed**, chosen for fit to the realtime + finance + Saa
 |---|---|---|---|
 | Q-001 | ✅ **RESOLVED:** AGPL-3.0 + CLA (preserves dual-licensing). | Product/Legal | Resolved |
 | Q-002 | ✅ **RESOLVED:** Sever User↔Participant link, hard-delete identity PII, retain anonymized match/financial facts (Recital 26); audit/IP logs purge on retention timer (default 365d, pausable during disputes); policy stated in privacy policy; tombstoning irreversible. | Legal | Resolved |
-| Q-002a | **Residual:** Legal counsel review of the §13 erasure policy before EU public launch. | Legal | Before EU public release |
+| Q-002a | **Residual:** Legal counsel review of the §13 erasure policy before EU **hosted** launch (the hosted service processes EU personal data as an operator). | Legal | Before EU hosted launch |
 | Q-003 | ✅ **RESOLVED:** REST-only through V1 with `?include=`/`?fields=` expansion + composite read endpoints; GraphQL deferred (additive if ever needed). | Architecture | Resolved |
 | Q-004 | ✅ **RESOLVED:** Backend **C#/.NET 8 + ASP.NET Core** (SignalR, EF Core, PostgreSQL, Redis backplane, ASP.NET Identity); Frontend **React + Vite + TS**, public pages prerendered/SSG for SEO (R-017). | Architecture | Resolved |
-| Q-005 | ✅ **RESOLVED:** Manual-only ledger for MVP+V1 via `IPaymentProvider`/`ManualProvider` seam (FR-082); inbound gateway in SaaS phase, outbound payouts Future+ (KYC-gated); self-host disclaimer (FR-083). | Product | Resolved |
-| Q-005a | **Residual:** Legal review of money-tracking/transmission implications for the **SaaS** phase. | Product/Legal | Before SaaS launch |
+| Q-005 | ✅ **RESOLVED (hosted-first):** **Manual ledger remains the MVP** for both hosted and self-host via the `IPaymentProvider`/`ManualProvider` seam (FR-082). **Hosted inbound entry-fee collection through one payment provider moves to V1** (FR-083). **Outbound payouts, KYC/Connect-style flows, and automated disbursement remain Future+.** Self-host stays manual (organizer owns real money movement; disclaimer shown). | Product | Resolved |
+| Q-005a | **Residual:** Legal review of money-tracking/transmission implications before the **hosted paid-entry rollout** (V1 inbound entry-fee collection). Free hosted use and self-host ship before this. | Product/Legal | Before hosted paid-entry rollout |
 | Q-006 | ✅ **RESOLVED:** Teams **in MVP** via tournament `teamSize` (configurable **1–10**; `>10` Future). **Ad-hoc** rosters (persistent named teams = Future), **captain** role, equal-split team payouts, and **per-player** league points / per-User standings (FR-040a/044/044a/045/075a/090a). | Product | Resolved |
 | Q-007 | ✅ **RESOLVED:** Strictly **one `active` season per league** (A-006 kept); one `upcoming` + many `closed` may coexist. Parallel competitions = separate leagues; per-league **divisions** are a possible Future addition (invariant stays). | Product | Resolved |
 | Q-008 | ✅ **RESOLVED:** Multi-discipline product (`Game`→`Discipline`). MVP result models = **`winner` + `score`** (2-sided), free-text discipline name, no catalog; **`placement`/free-for-all + Discipline catalog = Future** (FR-040b/040d). | Product | Resolved |
 | Q-013 | ✅ **RESOLVED:** Best-of-N matches record **aggregate result only** at MVP (winner + e.g. `2–1`); per-set/map/leg `MatchGame` capture = Future (FR-040c). | Product | Resolved |
 | Q-009 | ✅ **RESOLVED:** Per-tournament `resultEntryMode` ∈ {`organizer` (default, P0), `playerSelfReport` (P1)}; self-report = captain submits + opposing captain confirms, dispute/timeout → organizer, organizer can always override (FR-051/051a/051b). | Product | Resolved |
-| Q-010 | ✅ **RESOLVED:** MVP ships **transactional** notifications only (verification, reset, invitations, roster invites, self-report confirmations) via `INotificationChannel`/`EmailChannel` seam + first-class self-host SMTP (FR-140–143, R-019); engagement notifications, extra channels (web push, Discord/webhooks), digests, preferences = Future. | Product | Resolved |
-| Q-011 | ✅ **RESOLVED:** Default = **env-configured bootstrap admin** (`TOURNEYHUB_ADMIN_EMAIL` pre-seed + optional one-time token); first-user-becomes-admin only behind explicit `ALLOW_FIRST_USER_ADMIN` on an empty instance; one-shot, audited, always ≥1 InstanceAdmin (FR-009a–d, R-020). SaaS: platform-operator admin + per-org Owner. | Architecture | Resolved |
+| Q-010 | ✅ **RESOLVED (hosted-first):** MVP ships **transactional** notifications only (verification, reset, invitations, roster invites, self-report confirmations) via the `INotificationChannel`/`EmailChannel` seam (FR-140–143, R-019). **Hosted uses a managed transactional-email provider as the primary delivery path** (deliverability, retries, bounce visibility); **self-host SMTP remains a fully supported secondary path** (FR-142). Engagement notifications, extra channels (web push, Discord/webhooks), digests, preferences = Future. | Product | Resolved |
+| Q-011 | ✅ **RESOLVED (hosted-first):** **Primary (hosted) model** — the platform operator holds platform/instance admin out-of-band (via deployment), and each new **Organization's creator becomes that org's Owner** (FR-009d). **Secondary (self-host) model** — env-configured bootstrap admin is the default (`TOURNEYHUB_ADMIN_EMAIL` pre-seed + optional one-time token); first-user-becomes-admin only behind explicit `ALLOW_FIRST_USER_ADMIN` on an empty instance; one-shot, audited, always ≥1 InstanceAdmin (FR-009a–c, R-020). | Architecture | Resolved |
 | Q-012 | ✅ **RESOLVED:** Spectator is a **capability level, not an assignable role** (anonymous visitors + logged-in non-members); MVP adds **follow/favourite** for logged-in users (FR-028a/028b). A private-`viewer` membership role and social features are Future. | Product | Resolved |
 
 ---
@@ -1095,7 +1179,7 @@ The stack below is **confirmed**, chosen for fit to the realtime + finance + Saa
 | ID | Assumption | Can override? |
 |---|---|---|
 | A-001 | Product name is "TourneyHub" (placeholder). | Yes |
-| A-002 | Self-host MVP = single implicit organization/tenant. | Yes |
+| A-002 | **All deployments use an explicit Organization from day one.** Hosted runs multi-tenant (many orgs per instance); self-host seeds a single default organization at setup and normally operates as a one-org deployment. No "implicit tenant" / nullable `organization_id`. *(Reframed hosted-first)* | Yes |
 | A-003 | Email verification required before organizing/handling money. | Yes |
 | A-004 | Inactivity threshold default 540 days (flag only, no delete). | Yes |
 | A-005 | Invitation TTL default 14 days. | Yes |
@@ -1103,9 +1187,9 @@ The stack below is **confirmed**, chosen for fit to the realtime + finance + Saa
 | A-007 | Mid-season joiners start at zero; leavers keep earned results, forfeit future. | Yes |
 | A-008 | Default result authority = organizer-authoritative; `playerSelfReport` is an opt-in per-tournament mode. *(Confirmed Q-009)* | Yes |
 | A-009 | Unpaid-by-deadline default → forfeited (configurable). | Yes |
-| A-010 | MVP money handling is manual; no payment gateway. | Yes (Q-005) |
+| A-010 | **MVP money handling remains manual** (organizer records reality) for both hosted and self-host. **Hosted V1** may collect inbound tournament entry fees through **one payment provider**; payouts stay manual at MVP/V1 and automated outbound payouts remain Future+. *(Reframed hosted-first, Q-005)* | Yes (Q-005) |
 | A-011 | One currency per financial scope; no mixing. | Yes |
-| A-012 | MVP scale target: ≤ 10k users, ≤ 50 concurrent tournaments per instance. | Yes |
+| A-012 | Reference-deployment scale target: ≤ 10k users, ≤ 50 concurrent tournaments (per hosted cluster or per self-host instance). | Yes |
 | A-013 | Organizer refund rights may be limited by Owner config. | Yes |
 | A-014 | Deleted-account purge grace = 30 days; audit retention 365 days. | Yes |
 | A-015 | MVP teams are **ad-hoc** (roster defined per tournament at registration); persistent named teams are Future. | Yes |
@@ -1114,17 +1198,17 @@ The stack below is **confirmed**, chosen for fit to the realtime + finance + Saa
 | A-018 | MVP is **multi-discipline** and **head-to-head only**; `teamSize` configurable 1–10. Free-for-all/`placement` and `>10`-player teams are Future. *(Confirmed Q-008)* | Yes |
 | A-019 | MVP uses a **free-text discipline name** per tournament; a managed Discipline catalog is Future. | Yes |
 | A-020 | Best-of-N matches store only the **aggregate** result at MVP; per-set/map/leg detail is Future. *(Confirmed Q-013)* | Yes |
-| A-021 | MVP notifications are **transactional email only** (via `INotificationChannel`/`EmailChannel`); engagement notifications and extra channels are Future. *(Confirmed Q-010)* | Yes |
-| A-022 | Self-host instance admin is **env-configured** by default; first-user-becomes-admin is opt-in only. *(Confirmed Q-011)* | Yes |
+| A-021 | MVP notifications are **transactional email only** (via `INotificationChannel`/`EmailChannel`). **Hosted uses a managed email-delivery provider as the primary path**; **self-host SMTP remains supported secondary**. Engagement notifications and extra channels are Future. *(Reframed hosted-first, Q-010)* | Yes |
+| A-022 | **Hosted (primary):** platform-operator admin is provisioned out-of-band and each Organization's creator becomes **OrgOwner**. **Self-host (secondary):** instance admin is **env-configured** by default; first-user-becomes-admin is opt-in only. *(Reframed hosted-first, Q-011)* | Yes |
 | A-023 | Spectator is a **capability level, not an assignable role**; MVP adds follow/favourite for logged-in users. Private-`viewer` role and social features are Future. *(Confirmed Q-012)* | Yes |
 
 ---
 
 ## 26. Implementation Sequencing (suggested for AI coding agents)
 
-1. **Foundation:** project scaffolding, modular structure (NFR-001), DB + migrations, tenant scoping seam (org_id), auth (FR-001–005), audit (FR-120).
-2. **Users & profiles** (FR-006–010) + GDPR export/delete seams (FR-130–132) + **notification seam** (`INotificationChannel`/`EmailChannel`, self-host SMTP config, FR-140–142).
-3. **Leagues & seasons** (FR-020–029) + invitations (FR-014–017, transactional emails) + permissions layer (§11).
+1. **Foundation & tenancy:** project scaffolding, modular structure (NFR-001), DB + migrations, **Organization model + non-null `organization_id` + central tenant scoping/isolation layer** (NFR-004, NFR-024, FR-151–152), auth (FR-001–005), audit (FR-120). Self-host seeds one default org; hosted supports many.
+2. **Organizations, users & profiles** (FR-006–010, FR-150–156) — org self-signup, OrgOwner, ownership transfer, platform-operator suspend; hosted admin model (FR-009d) + self-host bootstrap (FR-009a–c); GDPR export/delete seams (FR-130–132) + **notification seam** (`INotificationChannel`/`EmailChannel`, managed hosted email + self-host SMTP, FR-140–142).
+3. **Leagues & seasons** (FR-020–029, all org-scoped) + invitations (FR-014–017, transactional emails) + permissions layer (§11).
 4. **Scoring system config** (FR-025, §12.1).
 5. **Tournaments + `teamSize`/Participant+roster model + Single Elimination format** (FR-040–053, §12.2) — including bracket gen tests and roster-completeness (FR-044a).
 6. **Round Robin format** (FR-041, BR-102) + tie-breaks (FR-057).
