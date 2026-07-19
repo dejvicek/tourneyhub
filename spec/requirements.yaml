@@ -1081,27 +1081,27 @@ non_functional:
   - id: NFR-013
     title: Testability (unit/integration/e2e; CI gate)
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [.github/workflows/ci.yml, .editorconfig, Directory.Build.props, Directory.Packages.props]
+    tests: [tests/TourneyHub.Integration.Tests/TenantIsolationTests.cs, tests/TourneyHub.Domain.Tests/PayoutSplitterTests.cs, tests/TourneyHub.Architecture.Tests/]
   - id: NFR-014
     title: Observability (structured logging, health, metrics)
     priority: P1
-    status: not_started
-    files: []
+    status: in_progress
+    files: [src/TourneyHub.Api/Program.cs]
     tests: []
   - id: NFR-015
     title: Documentation (OpenAPI, self-host install, config ref)
     priority: P0
-    status: not_started
-    files: [api/openapi.yaml]
-    tests: []
+    status: done
+    files: [api/openapi.yaml, CONTRIBUTING.md, .editorconfig, .env.example]
+    tests: [.github/workflows/ci.yml (openapi lint)]
   - id: NFR-016
     title: Data portability (backup/restore; no lock-in)
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [Directory.Packages.props, docker-compose.yml, .env.example]
+    tests: [.github/workflows/ci.yml (migration-apply)]
   - id: NFR-017
     title: Auditability (state-changing events reconstructable)
     priority: P1
@@ -1117,8 +1117,8 @@ non_functional:
   - id: NFR-019
     title: Licensing AGPL-3.0 + CLA
     priority: P0
-    status: not_started
-    files: []
+    status: done
+    files: [LICENSE, CONTRIBUTING.md]
     tests: []
   - id: NFR-020
     title: Configuration over code (scoring/formats/fees data-driven)

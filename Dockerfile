@@ -2,7 +2,7 @@
 # Build: `docker build -t tourneyhub-api .`
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
-COPY global.json Directory.Build.props ./
+COPY global.json Directory.Build.props Directory.Packages.props ./
 COPY src/ ./src/
 RUN dotnet restore src/TourneyHub.Api/TourneyHub.Api.csproj
 RUN dotnet publish src/TourneyHub.Api/TourneyHub.Api.csproj -c Release -o /app --no-restore

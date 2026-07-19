@@ -37,7 +37,23 @@ jobs:
           dotnet-version: "8.0.x"
       - run: dotnet restore
       - run: dotnet build --no-restore -c Release
-      - run: dotnet test --no-build -c Release --verbosity normal
+      # Apply EF Core migrations against the CI Postgres to prove they work (AGENTS.md §8).
+      - name: Install EF Core tool
+        run: dotnet tool install --global dotnet-ef || dotnet tool update --global dotnet-ef
+      - name: Apply EF migrations
+        run: dotnet ef database update --project src/TourneyHub.Infrastructure --startup-project src/TourneyHub.Api --connection "$ConnectionStrings__Postgres"
+      - name: Run tests
+        run: dotnet test --no-build -c Release --verbosity normal
+      # Security: fail on high/critical vulnerable packages (NFR-021).
+      - name: Audit NuGet packages for vulnerabilities
+        shell: bash
+        run: |
+          dotnet list package --vulnerable --include-transitive 2>&1 | tee vulnerability-report.txt
+          if grep -qi 'critical\|high' vulnerability-report.txt; then
+            echo "::error::Critical or high severity NuGet vulnerabilities found"
+            exit 1
+          fi
+          echo "No critical/high severity NuGet vulnerabilities."
 
   # ---- Frontend: typecheck + lint + build (contract-typed client) ----
   frontend:
@@ -57,6 +73,9 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run build
+      # Security: fail on high/critical npm vulnerabilities.
+      - name: npm audit
+        run: npm audit --audit-level=high
 
   # ---- Contract: OpenAPI must lint clean ----
   openapi:
@@ -67,3 +86,15 @@ jobs:
         with:
           node-version: "20"
       - run: npx --yes @redocly/cli@latest lint api/openapi.yaml
+
+  # ---- Secret scanning: never committed secrets (NFR-021) ----
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}

@@ -1,0 +1,154 @@
+# TourneyHub — EditorConfig & Analyzer Configuration
+#
+# Mirrors AGENTS.md §8 DoD: "analyzers/format pass" must have teeth.
+# Keep TreatWarningsAsErrors=true in Directory.Build.props — this file
+# adds the naming, formatting, and style rules that analyzers enforce.
+
+# ---------------------------------------------------------------------------
+# Root: universal editor settings (applies to all files)
+# ---------------------------------------------------------------------------
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# ---------------------------------------------------------------------------
+# XML / MSBuild / config files
+# ---------------------------------------------------------------------------
+[*.{csproj,xml,xaml,props,targets,config,json,jsonc}]
+indent_size = 2
+
+# ---------------------------------------------------------------------------
+# YAML (OpenAPI, CI workflows, etc.)
+# ---------------------------------------------------------------------------
+[*.{yml,yaml}]
+indent_size = 2
+
+# ---------------------------------------------------------------------------
+# Markdown (PRD, DECISIONS, AGENTS, plan/*, etc.)
+# ---------------------------------------------------------------------------
+[*.md]
+trim_trailing_whitespace = false
+
+# ---------------------------------------------------------------------------
+# C# — Analyzer severity & naming conventions
+# ---------------------------------------------------------------------------
+[*.{cs,csx}]
+
+# Roslyn analyzer severities (these become build errors when TreatWarningsAsErrors=true)
+dotnet_analyzer_diagnostic.severity = error
+
+# Naming conventions: PascalCase for types, methods, properties; camelCase for locals/params
+dotnet_naming_rule.types_and_namespaces_should_be_pascalcase.severity = error
+dotnet_naming_rule.types_and_namespaces_should_be_pascalcase.symbols = types_and_namespaces
+dotnet_naming_rule.types_and_namespaces_should_be_pascalcase.style = pascalcase
+
+dotnet_naming_rule.interfaces_should_be_prefixed_with_i.severity = error
+dotnet_naming_rule.interfaces_should_be_prefixed_with_i.symbols = interface_types
+dotnet_naming_rule.interfaces_should_be_prefixed_with_i.style = iprefix
+
+dotnet_naming_rule.private_fields_underscore_camelcase.severity = error
+dotnet_naming_rule.private_fields_underscore_camelcase.symbols = private_fields
+dotnet_naming_rule.private_fields_underscore_camelcase.style = _camelcase
+
+dotnet_naming_rule.methods_should_be_pascalcase.severity = error
+dotnet_naming_rule.methods_should_be_pascalcase.symbols = methods
+dotnet_naming_rule.methods_should_be_pascalcase.style = pascalcase
+
+dotnet_naming_rule.constants_should_be_pascalcase.severity = error
+dotnet_naming_rule.constants_should_be_pascalcase.symbols = constants
+dotnet_naming_rule.constants_should_be_pascalcase.style = pascalcase
+
+dotnet_naming_rule.public_properties_should_be_pascalcase.severity = error
+dotnet_naming_rule.public_properties_should_be_pascalcase.symbols = public_properties
+dotnet_naming_rule.public_properties_should_be_pascalcase.style = pascalcase
+
+dotnet_naming_rule.locals_camelcase.severity = error
+dotnet_naming_rule.locals_camelcase.symbols = locals_parameters
+dotnet_naming_rule.locals_camelcase.style = camelcase
+
+# Symbol groups
+dotnet_naming_symbols.types_and_namespaces.applicable_kinds = namespace, class, struct, enum, delegate, record
+dotnet_naming_symbols.types_and_namespaces.applicable_accessibilities = *
+
+dotnet_naming_symbols.interface_types.applicable_kinds = interface
+dotnet_naming_symbols.interface_types.applicable_accessibilities = *
+
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+
+dotnet_naming_symbols.methods.applicable_kinds = method
+dotnet_naming_symbols.methods.applicable_accessibilities = *
+
+dotnet_naming_symbols.constants.applicable_kinds = field
+dotnet_naming_symbols.constants.applicable_accessibilities = *
+dotnet_naming_symbols.constants.required_modifiers = const
+
+dotnet_naming_symbols.public_properties.applicable_kinds = property
+dotnet_naming_symbols.public_properties.applicable_accessibilities = public, internal
+
+dotnet_naming_symbols.locals_parameters.applicable_kinds = local, parameter
+dotnet_naming_symbols.locals_parameters.applicable_accessibilities = *
+
+# Naming styles
+dotnet_naming_style.pascalcase.capitalization = pascal_case
+dotnet_naming_style.pascalcase.required_prefix =
+dotnet_naming_style.pascalcase.required_suffix =
+dotnet_naming_style.pascalcase.word_separator =
+
+dotnet_naming_style.camelcase.capitalization = camel_case
+dotnet_naming_style.camelcase.required_prefix =
+dotnet_naming_style.camelcase.required_suffix =
+dotnet_naming_style.camelcase.word_separator =
+
+dotnet_naming_style._camelcase.capitalization = camel_case
+dotnet_naming_style._camelcase.required_prefix = _
+dotnet_naming_style._camelcase.required_suffix =
+dotnet_naming_style._camelcase.word_separator =
+
+dotnet_naming_style.iprefix.capitalization = pascal_case
+dotnet_naming_style.iprefix.required_prefix = I
+dotnet_naming_style.iprefix.required_suffix =
+dotnet_naming_style.iprefix.word_separator =
+
+# Code style preferences
+csharp_style_var_for_built_in_types = true:error
+csharp_style_var_when_type_is_apparent = true:error
+csharp_style_var_elsewhere = true:error
+csharp_prefer_braces = true:error
+csharp_style_expression_bodied_methods = when_on_single_line:error
+csharp_style_expression_bodied_constructors = when_on_single_line:error
+csharp_style_expression_bodied_properties = when_on_single_line:error
+csharp_style_expression_bodied_indexers = when_on_single_line:error
+csharp_style_expression_bodied_accessors = when_on_single_line:error
+csharp_style_expression_bodied_lambdas = when_on_single_line:error
+csharp_style_pattern_matching_over_is_with_cast_check = true:error
+csharp_style_pattern_matching_over_as_with_null_check = true:error
+csharp_style_throw_expression = true:error
+csharp_style_conditional_delegate_call = true:error
+csharp_prefer_simple_default_expression = true:error
+csharp_style_unused_value_expression_statement_preference = discard_variable:error
+
+# Nullable reference type usage
+dotnet_style_require_accessibility_modifiers = always:error
+dotnet_diagnostic.CA1062.severity = error
+dotnet_diagnostic.CA1303.severity = error
+dotnet_diagnostic.CA1822.severity = error
+
+# ---------------------------------------------------------------------------
+# Web / Frontend files
+# ---------------------------------------------------------------------------
+[*.{ts,tsx,js,jsx,css,html,json,jsonc}]
+indent_size = 2
+
+[*.{ts,tsx}]
+# Use the TypeScript/JavaScript conventions
+quote_type = single
+
+[*.css]
+indent_size = 2
