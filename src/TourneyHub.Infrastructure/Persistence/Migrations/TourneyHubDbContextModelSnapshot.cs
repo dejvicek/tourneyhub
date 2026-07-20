@@ -275,6 +275,54 @@ namespace TourneyHub.Infrastructure.Persistence.Migrations
                     b.ToTable("consent_records", (string)null);
                 });
 
+            modelBuilder.Entity("TourneyHub.Domain.Identity.Invitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("InvitedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ScopeType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email");
+
+                    b.HasIndex("OrganizationId", "State");
+
+                    b.ToTable("invitations", (string)null);
+                });
+
             modelBuilder.Entity("TourneyHub.Domain.Identity.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -604,6 +652,15 @@ namespace TourneyHub.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("TourneyHub.Domain.Competition.League", b =>
+                {
+                    b.HasOne("TourneyHub.Domain.Organizations.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("TourneyHub.Domain.Identity.Invitation", b =>
                 {
                     b.HasOne("TourneyHub.Domain.Organizations.Organization", null)
                         .WithMany()

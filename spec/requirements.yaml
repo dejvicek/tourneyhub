@@ -223,33 +223,33 @@ functional:
     module: Identity
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Identity/Invitation.cs, src/TourneyHub.Application/Identity/IInvitationService.cs, src/TourneyHub.Application/Identity/Commands/CreateInvitationCommand.cs, src/TourneyHub.Infrastructure/Identity/InvitationService.cs, src/TourneyHub.Api/Extensions/InvitationsEndpoints.cs]
+    tests: [tests/TourneyHub.Domain.Tests/InvitationStateMachineTests.cs, tests/TourneyHub.Integration.Tests/InvitationIntegrationTests.cs]
   - id: FR-015
     title: Invitation states (pending..expired, TTL 14d)
     module: Identity
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Identity/Invitation.cs]
+    tests: [tests/TourneyHub.Domain.Tests/InvitationStateMachineTests.cs, tests/TourneyHub.Integration.Tests/InvitationIntegrationTests.cs]
   - id: FR-016
     title: Accepting invite grants invited role; decline/expiry does not
     module: Identity
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Identity/Invitation.cs, src/TourneyHub.Infrastructure/Identity/InvitationService.cs, src/TourneyHub.Api/Extensions/InvitationsEndpoints.cs]
+    tests: [tests/TourneyHub.Integration.Tests/InvitationIntegrationTests.cs]
   - id: FR-017
     title: Invite non-registered email resolvable on signup
     module: Identity
     scope: MVP
     priority: P1
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Infrastructure/Identity/InvitationService.cs, src/TourneyHub.Application/Identity/IInvitationService.cs]
+    tests: [tests/TourneyHub.Integration.Tests/InvitationIntegrationTests.cs]
   - id: FR-018
     title: Single/multi-use invite links with optional max-acceptances
     module: Identity

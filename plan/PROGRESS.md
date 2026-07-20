@@ -16,7 +16,7 @@
 | 05  | Auth & accounts                    | ✅      | MVP          | 00, 01, 02 | 2026-07-20 | 2026-07-20 |
 | 06  | Organizations & membership         | ✅      | MVP          | 01, 05     | 2026-07-20 | 2026-07-20 |
 | 07  | Platform admin & self-host bootstrap | ✅    | MVP          | 06         | 2026-07-20 | 2026-07-20 |
-| 08  | Invitations                        | ⬜      | MVP          | 06, 04     | —        | —         |
+| 08  | Invitations                        | ✅      | MVP          | 06, 04     | 2026-07-20 | 2026-07-20 |
 | 09  | Transactional notifications        | ⬜      | MVP          | 04, 05, 08 | —        | —         |
 | 10  | Leagues & seasons                  | ⬜      | MVP          | 06         | —        | —         |
 | 11  | Scoring system config              | ⬜      | MVP          | 10         | —        | —         |

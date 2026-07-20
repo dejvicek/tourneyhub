@@ -43,6 +43,8 @@ public class TourneyHubDbContext : IdentityDbContext<User, IdentityRole<Guid>, G
 
     public DbSet<Membership> Memberships => Set<Membership>();
 
+    public DbSet<Invitation> Invitations => Set<Invitation>();
+
     internal DbSet<IdempotencyEntry> IdempotencyEntries => Set<IdempotencyEntry>();
 
     /// <summary>
@@ -120,6 +122,27 @@ public class TourneyHubDbContext : IdentityDbContext<User, IdentityRole<Guid>, G
             b.Property(e => e.State).HasConversion<string>().IsRequired();
             b.Property(e => e.JoinedAt).IsRequired();
             b.HasIndex(e => new { e.UserId, e.OrganizationId }).IsUnique();
+            b.HasOne<Organization>()
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<Invitation>(b =>
+        {
+            b.ToTable("invitations");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.OrganizationId).IsRequired();
+            b.Property(e => e.Email).IsRequired().HasMaxLength(256);
+            b.Property(e => e.ScopeType).HasConversion<string>().IsRequired();
+            b.Property(e => e.ScopeId).IsRequired();
+            b.Property(e => e.Role).HasConversion<string>().IsRequired();
+            b.Property(e => e.State).HasConversion<string>().IsRequired();
+            b.Property(e => e.InvitedByUserId).IsRequired();
+            b.Property(e => e.ExpiresAt).IsRequired();
+            b.Property(e => e.Version).IsConcurrencyToken();
+            b.HasIndex(e => e.Email);
+            b.HasIndex(e => new { e.OrganizationId, e.State });
             b.HasOne<Organization>()
                 .WithMany()
                 .HasForeignKey(e => e.OrganizationId)

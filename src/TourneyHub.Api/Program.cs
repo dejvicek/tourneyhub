@@ -91,6 +91,7 @@ builder.Services.AddHostedService<BootstrapService>();
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddScoped<IIdentityService, IdentityService>();
 builder.Services.AddScoped<IOrganizationService, OrganizationService>();
+builder.Services.AddScoped<IInvitationService, InvitationService>();
 
 builder.Services.AddHttpClient<BreachedPasswordValidator<User>>();
 
@@ -152,6 +153,8 @@ app.UseMiddleware<TenantResolutionMiddleware>();
 
 app.MapAuthEndpoints();
 app.MapOrganizationsEndpoints();
+app.MapInvitationsEndpoints();
+app.MapLeagueInvitationsEndpoints();
 
 var leagues = app.MapGroup("/api/v1/leagues");
 

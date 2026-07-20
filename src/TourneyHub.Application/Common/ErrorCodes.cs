@@ -59,4 +59,8 @@ public static class ErrorCodes
     // ── Invitations ──────────────────────────────────────────────
     public const string InvitationExpired = "invitation_expired";
     public const string InvitationAlreadyAccepted = "invitation_already_accepted";
+    public const string InvitationRevoked = "invitation_revoked";
+    public const string InvitationDeclined = "invitation_declined";
+    public const string InvitationNotFound = "invitation_not_found";
+    public const string InvitationEmailMismatch = "invitation_email_mismatch";
 }
