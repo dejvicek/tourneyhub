@@ -265,25 +265,25 @@ functional:
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Competition/League.cs, src/TourneyHub.Application/Competition/ILeagueService.cs, src/TourneyHub.Application/Competition/LeagueCommands.cs, src/TourneyHub.Infrastructure/Competition/LeagueService.cs, src/TourneyHub.Api/Extensions/LeaguesEndpoints.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs, src/TourneyHub.Infrastructure/Persistence/Migrations/20260720230726_AddLeaguesAndSeasons.cs]
+    tests: [tests/TourneyHub.Domain.Tests/LeagueStateMachineTests.cs, tests/TourneyHub.Integration.Tests/LeagueSeasonIntegrationTests.cs]
   - id: FR-021
     title: Transfer league ownership to another member
     module: Competition
     scope: MVP
     priority: P1
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Competition/League.cs, src/TourneyHub.Infrastructure/Competition/LeagueService.cs, src/TourneyHub.Api/Extensions/LeaguesEndpoints.cs]
+    tests: [tests/TourneyHub.Domain.Tests/LeagueStateMachineTests.cs]
   - id: FR-022
     title: Multiple seasons; exactly one active at a time (BR-002)
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Competition/Season.cs, src/TourneyHub.Infrastructure/Competition/LeagueService.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs, src/TourneyHub.Infrastructure/Persistence/Migrations/20260720230726_AddLeaguesAndSeasons.cs]
+    tests: [tests/TourneyHub.Domain.Tests/SeasonStateMachineTests.cs, tests/TourneyHub.Integration.Tests/LeagueSeasonIntegrationTests.cs]
   - id: FR-023
     title: Players join/leave a league/season
     module: Competition
@@ -297,9 +297,9 @@ functional:
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Competition/Season.cs]
+    tests: [tests/TourneyHub.Domain.Tests/SeasonStateMachineTests.cs]
   - id: FR-025
     title: Configurable scoring system per league (§12)
     module: Competition
@@ -313,9 +313,9 @@ functional:
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Competition/League.cs, src/TourneyHub.Application/Competition/ILeagueService.cs, src/TourneyHub.Infrastructure/Competition/LeagueService.cs, src/TourneyHub.Api/Extensions/LeaguesEndpoints.cs]
+    tests: [tests/TourneyHub.Integration.Tests/LeagueSeasonIntegrationTests.cs]
   - id: FR-026a
     title: Public discovery/listing of public leagues (no auth)
     module: Competition
@@ -337,9 +337,9 @@ functional:
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Api/Extensions/LeaguesEndpoints.cs, src/TourneyHub.Application/Competition/ILeagueService.cs, src/TourneyHub.Infrastructure/Competition/LeagueService.cs]
+    tests: [tests/TourneyHub.Integration.Tests/LeagueSeasonIntegrationTests.cs]
   - id: FR-028a
     title: Spectator is a capability level, not an assignable role
     module: Competition
@@ -361,9 +361,9 @@ functional:
     module: Competition
     scope: MVP
     priority: P1
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Competition/League.cs, src/TourneyHub.Infrastructure/Competition/LeagueService.cs, src/TourneyHub.Api/Extensions/LeaguesEndpoints.cs]
+    tests: [tests/TourneyHub.Domain.Tests/LeagueStateMachineTests.cs, tests/TourneyHub.Integration.Tests/LeagueSeasonIntegrationTests.cs]
   - id: FR-030
     title: Automatic league/season rankings from results
     module: Competition

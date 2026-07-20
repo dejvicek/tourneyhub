@@ -65,7 +65,7 @@ public sealed class TenantIsolationTests : IAsyncLifetime
         await using (var ctx = NewContext(_orgA))
         {
             ctx.Organizations.AddRange(orgA, orgB);
-            var leagueA = new League("League A");
+            var leagueA = new League("League A", "league-a", LeagueVisibility.Private, Guid.NewGuid());
             ctx.Leagues.Add(leagueA); // stamped org A on save
             await ctx.SaveChangesAsync();
             _leagueA = leagueA.Id;
@@ -73,7 +73,7 @@ public sealed class TenantIsolationTests : IAsyncLifetime
 
         await using (var ctx = NewContext(_orgB))
         {
-            var leagueB = new League("League B");
+            var leagueB = new League("League B", "league-b", LeagueVisibility.Private, Guid.NewGuid());
             ctx.Leagues.Add(leagueB); // stamped org B on save
             await ctx.SaveChangesAsync();
             _leagueB = leagueB.Id;
@@ -111,7 +111,7 @@ public sealed class TenantIsolationTests : IAsyncLifetime
         Guid newId;
         await using (var ctxA = NewContext(_orgA))
         {
-            var league = new League("Another A");
+            var league = new League("Another A", "another-a", LeagueVisibility.Private, Guid.NewGuid());
             ctxA.Leagues.Add(league);
             await ctxA.SaveChangesAsync();
             newId = league.Id;
@@ -145,7 +145,7 @@ public sealed class TenantIsolationTests : IAsyncLifetime
     {
         await using var ctx = NewContext(Guid.Empty);
 
-        ctx.Leagues.Add(new League("Unscoped"));
+        ctx.Leagues.Add(new League("Unscoped", "unscoped", LeagueVisibility.Private, Guid.NewGuid()));
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(
             () => ctx.SaveChangesAsync());

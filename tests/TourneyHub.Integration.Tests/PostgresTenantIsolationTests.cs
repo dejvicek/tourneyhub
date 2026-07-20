@@ -1,9 +1,12 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Json;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
 using Testcontainers.PostgreSql;
 using TourneyHub.Domain.Competition;
 using TourneyHub.Domain.Organizations;
@@ -15,11 +18,13 @@ namespace TourneyHub.Integration.Tests;
 /// <summary>
 /// Postgres-backed end-to-end tenant-isolation tests hitting real HTTP endpoints
 /// via <see cref="WebApplicationFactory{TEntryPoint}"/>. Two organizations are seeded;
-/// each request carries an <c>X-Organization-Id</c> header to resolve the tenant.
+/// each request carries an <c>X-Organization-Id</c> header and JWT auth.
 /// Asserts no cross-org read/write through the API (NFR-004, NFR-024, FR-152).
 /// </summary>
 public sealed class PostgresTenantIsolationTests : IAsyncLifetime
 {
+    private const string DevSigningKey = "dev-test-key-at-least-32-bytes-long!!";
+
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
         .WithDatabase("tourneyhub_test")
         .WithUsername("tourneyhub")
@@ -32,6 +37,7 @@ public sealed class PostgresTenantIsolationTests : IAsyncLifetime
     private Guid _orgA;
     private Guid _orgB;
     private Guid _leagueA;
+    private Guid _userId;
 
     public async Task InitializeAsync()
     {
@@ -43,18 +49,20 @@ public sealed class PostgresTenantIsolationTests : IAsyncLifetime
                 builder.UseSetting("ConnectionStrings:Postgres", _postgres.GetConnectionString());
             });
 
-        // Apply migrations.
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<TourneyHubDbContext>();
         await db.Database.MigrateAsync();
 
-        // Seed two organizations.
+        _userId = Guid.NewGuid();
+
         var orgA = new Organization("Org A", "org-a");
         var orgB = new Organization("Org B", "org-b");
         _orgA = orgA.Id;
         _orgB = orgB.Id;
 
         db.Organizations.AddRange(orgA, orgB);
+        db.Memberships.Add(new Membership(_userId, _orgA, MembershipRole.OrgOwner));
+        db.Memberships.Add(new Membership(_userId, _orgB, MembershipRole.OrgOwner));
         await db.SaveChangesAsync();
 
         _client = _factory.CreateClient();
@@ -71,9 +79,33 @@ public sealed class PostgresTenantIsolationTests : IAsyncLifetime
         await _postgres.DisposeAsync();
     }
 
-    private static HttpRequestMessage CreateRequest(HttpMethod method, string url, Guid orgId, object? body = null)
+    private static string GenerateToken(Guid userId)
+    {
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(DevSigningKey));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var claims = new[]
+        {
+            new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
+            new Claim(JwtRegisteredClaimNames.Email, $"{userId}@test.com"),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new Claim("state", "Active"),
+        };
+
+        var token = new JwtSecurityToken(
+            issuer: "tourneyhub",
+            audience: "tourneyhub",
+            claims: claims,
+            expires: DateTime.UtcNow.AddHours(1),
+            signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    private HttpRequestMessage CreateRequest(HttpMethod method, string url, Guid orgId, object? body = null)
     {
         var request = new HttpRequestMessage(method, url);
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", GenerateToken(_userId));
         request.Headers.Add("X-Organization-Id", orgId.ToString());
 
         if (body is not null)
@@ -89,7 +121,7 @@ public sealed class PostgresTenantIsolationTests : IAsyncLifetime
     public async Task Create_league_with_org_header_stamps_and_returns_correct_org()
     {
         var response = await _client.SendAsync(
-            CreateRequest(HttpMethod.Post, "/api/v1/leagues", _orgA, new { name = "League A" }));
+            CreateRequest(HttpMethod.Post, "/api/v1/leagues", _orgA, new { name = "League A", visibility = "public" }));
 
         response.EnsureSuccessStatusCode();
         var content = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -103,7 +135,7 @@ public sealed class PostgresTenantIsolationTests : IAsyncLifetime
     {
         // Create league in Org A first.
         var createResponse = await _client.SendAsync(
-            CreateRequest(HttpMethod.Post, "/api/v1/leagues", _orgA, new { name = "League A" }));
+            CreateRequest(HttpMethod.Post, "/api/v1/leagues", _orgA, new { name = "League A", visibility = "public" }));
         createResponse.EnsureSuccessStatusCode();
         var league = await createResponse.Content.ReadFromJsonAsync<JsonElement>();
         var leagueId = league.GetProperty("id").GetGuid();
@@ -119,9 +151,9 @@ public sealed class PostgresTenantIsolationTests : IAsyncLifetime
     public async Task List_leagues_returns_only_calling_tenants_rows()
     {
         await _client.SendAsync(
-            CreateRequest(HttpMethod.Post, "/api/v1/leagues", _orgA, new { name = "League A" }));
+            CreateRequest(HttpMethod.Post, "/api/v1/leagues", _orgA, new { name = "League A", visibility = "public" }));
         await _client.SendAsync(
-            CreateRequest(HttpMethod.Post, "/api/v1/leagues", _orgB, new { name = "League B" }));
+            CreateRequest(HttpMethod.Post, "/api/v1/leagues", _orgB, new { name = "League B", visibility = "public" }));
 
         var listA = await _client.SendAsync(
             CreateRequest(HttpMethod.Get, "/api/v1/leagues", _orgA));
@@ -140,10 +172,11 @@ public sealed class PostgresTenantIsolationTests : IAsyncLifetime
         var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/leagues")
         {
             Content = new StringContent(
-                JsonSerializer.Serialize(new { name = "No Org" }),
+                JsonSerializer.Serialize(new { name = "No Org", visibility = "public" }),
                 Encoding.UTF8,
                 "application/json")
         };
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", GenerateToken(_userId));
 
         var response = await _client.SendAsync(request);
 
