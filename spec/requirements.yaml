@@ -395,40 +395,40 @@ functional:
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Competition/Tournament.cs, src/TourneyHub.Application/Competition/ITournamentService.cs, src/TourneyHub.Application/Competition/TournamentCommands.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Api/Extensions/TournamentsEndpoints.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs, src/TourneyHub.Infrastructure/Persistence/Migrations/20260720234653_AddTournamentsAndParticipants.cs]
+    tests: [tests/TourneyHub.Integration.Tests/TournamentRegistrationIntegrationTests.cs]
   - id: FR-040a
     title: Configurable teamSize 1-10; participant has exactly teamSize members
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Competition/Tournament.cs, src/TourneyHub.Domain/Competition/Participant.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs]
+    tests: [tests/TourneyHub.Integration.Tests/TournamentRegistrationIntegrationTests.cs]
   - id: FR-040b
     title: Discipline (free-text) + resultModel winner/score with scoreConfig
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Competition/Tournament.cs, src/TourneyHub.Application/Competition/TournamentCommands.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs]
+    tests: [tests/TourneyHub.Integration.Tests/TournamentRegistrationIntegrationTests.cs]
   - id: FR-040c
     title: bestOf N flag; MVP records aggregate result only
     module: Competition
     scope: MVP
     priority: P1
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Competition/Tournament.cs, src/TourneyHub.Application/Competition/TournamentCommands.cs]
+    tests: [tests/TourneyHub.Integration.Tests/TournamentRegistrationIntegrationTests.cs]
   - id: FR-040d
     title: Head-to-head via ordered participant slots (N-slot additive)
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
+    status: done
+    files: [src/TourneyHub.Domain/Competition/Tournament.cs]
     tests: []
   - id: FR-041
     title: Support Single Elimination and Round Robin
@@ -451,33 +451,33 @@ functional:
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Competition/Tournament.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs]
+    tests: [tests/TourneyHub.Integration.Tests/TournamentRegistrationIntegrationTests.cs]
   - id: FR-044
     title: Register participant; captain assembles roster if teamSize>1
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Competition/Participant.cs, src/TourneyHub.Domain/Competition/ParticipantMember.cs, src/TourneyHub.Application/Competition/ITournamentService.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Api/Extensions/TournamentsEndpoints.cs]
+    tests: [tests/TourneyHub.Integration.Tests/TournamentRegistrationIntegrationTests.cs]
   - id: FR-044a
     title: Participant incomplete until exactly teamSize accepted members
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Competition/Participant.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs]
+    tests: [tests/TourneyHub.Integration.Tests/TournamentRegistrationIntegrationTests.cs]
   - id: FR-045
     title: A player appears in at most one Participant per tournament
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Competition/ParticipantMember.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs, src/TourneyHub.Infrastructure/Persistence/Migrations/20260720234653_AddTournamentsAndParticipants.cs]
+    tests: [tests/TourneyHub.Integration.Tests/TournamentRegistrationIntegrationTests.cs]
   - id: FR-046
     title: Seeding random (stored rng_seed) / manual / ranking-based (V1)
     module: Competition

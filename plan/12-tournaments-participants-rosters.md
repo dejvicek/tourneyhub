@@ -1,7 +1,7 @@
 # Step 12 — Tournaments, participants & rosters
 
 - **Scope:** MVP
-- **Status:** ⬜ not started
+- **Status:** ✅ done
 - **Depends on:** 10
 - **Unblocks:** 13, 15, 18
 - **Requirements:** FR-040, FR-040a-d, FR-043, FR-044, FR-044a, FR-045, FR-090a, BR-004, BR-004a, §10.3

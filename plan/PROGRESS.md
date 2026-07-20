@@ -20,7 +20,7 @@
 | 09  | Transactional notifications        | ✅      | MVP          | 04, 05, 08 | 2026-07-21 | 2026-07-21 |
 | 10  | Leagues & seasons                  | ✅      | MVP          | 06         | 2026-07-21 | 2026-07-21 |
 | 11  | Scoring system config              | ✅      | MVP          | 10         | 2026-07-21 | 2026-07-21 |
-| 12  | Tournaments, participants & rosters | ⬜     | MVP          | 10         | —        | —         |
+| 12  | Tournaments, participants & rosters | ✅      | MVP          | 10         | 2026-07-21 | 2026-07-21 |
 | 13  | Single-elimination bracket         | ⬜      | MVP          | 12         | —        | —         |
 | 14  | Round-robin & tie-breaks           | ⬜      | MVP*         | 11, 12     | —        | —         |
 | 15  | Match results, validation & recompute | ⬜   | MVP          | 02, 03, 13 | —        | —         |
