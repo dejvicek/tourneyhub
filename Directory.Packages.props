@@ -46,5 +46,6 @@
     <PackageVersion Include="Testcontainers.PostgreSql" Version="3.10.0" />
     <PackageVersion Include="xunit" Version="2.9.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageVersion Include="FsCheck.Xunit" Version="2.16.6" />
   </ItemGroup>
 </Project>

@@ -8,6 +8,7 @@
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="FsCheck.Xunit" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\TourneyHub.Domain\TourneyHub.Domain.csproj" />
@@ -16,5 +17,6 @@
   <ItemGroup>
     <!-- Golden oracle copied next to the test binary so tests read it by file name. -->
     <None Include="..\..\spec\test-vectors\payout-split.json" Link="payout-split.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\spec\test-vectors\tie-breaks.json" Link="tie-breaks.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
