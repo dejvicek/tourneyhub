@@ -9,13 +9,17 @@ using System.Threading.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using TourneyHub.Api.Extensions;
+using TourneyHub.Api.Health;
 using TourneyHub.Api.Middleware;
+using TourneyHub.Application.Abstractions;
 using TourneyHub.Application.Identity;
 using TourneyHub.Application.Tenancy;
 using TourneyHub.Domain.Competition;
 using TourneyHub.Domain.Identity;
 using TourneyHub.Application.Organizations;
 using TourneyHub.Infrastructure.Identity;
+using TourneyHub.Infrastructure.Messaging;
+using TourneyHub.Infrastructure.Notifications;
 using TourneyHub.Infrastructure.Organizations;
 using TourneyHub.Infrastructure.Persistence;
 using TourneyHub.Infrastructure.Tenancy;
@@ -93,6 +97,11 @@ builder.Services.AddScoped<IIdentityService, IdentityService>();
 builder.Services.AddScoped<IOrganizationService, OrganizationService>();
 builder.Services.AddScoped<IInvitationService, InvitationService>();
 
+builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.Section));
+builder.Services.AddSingleton<INotificationChannel, EmailChannel>();
+builder.Services.AddSingleton<LiquidTemplateRenderer>();
+builder.Services.AddHostedService<NotificationOutboxConsumer>();
+
 builder.Services.AddHttpClient<BreachedPasswordValidator<User>>();
 
 builder.Services.AddHealthChecks()
@@ -103,7 +112,8 @@ builder.Services.AddHealthChecks()
     .AddRedis(
         redisConnectionString: builder.Configuration.GetConnectionString("Redis")!,
         name: "redis",
-        tags: ["ready"]);
+        tags: ["ready"])
+    .AddCheck<SmtpHealthCheck>("smtp", tags: ["ready"]);
 
 builder.Services.AddRateLimiter(options =>
 {
