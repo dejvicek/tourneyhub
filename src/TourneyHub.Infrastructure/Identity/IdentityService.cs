@@ -1,8 +1,12 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using TourneyHub.Application.Identity;
+using TourneyHub.Domain.Common;
 using TourneyHub.Domain.Identity;
+using TourneyHub.Domain.Identity.Events;
+using TourneyHub.Infrastructure.Persistence;
 
 namespace TourneyHub.Infrastructure.Identity;
 
@@ -12,19 +16,27 @@ internal sealed partial class IdentityService : IIdentityService
     private readonly SignInManager<User> _signInManager;
     private readonly JwtTokenService _jwtTokenService;
     private readonly IConfiguration _configuration;
+    private readonly TourneyHubDbContext _db;
     private readonly ILogger<IdentityService> _logger;
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
 
     public IdentityService(
         UserManager<User> userManager,
         SignInManager<User> signInManager,
         JwtTokenService jwtTokenService,
         IConfiguration configuration,
+        TourneyHubDbContext db,
         ILogger<IdentityService> logger)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _jwtTokenService = jwtTokenService;
         _configuration = configuration;
+        _db = db;
         _logger = logger;
     }
 
@@ -42,22 +54,51 @@ internal sealed partial class IdentityService : IIdentityService
         var isFirstUser = !_userManager.Users.Any();
         var firstUserAdminEnabled = BootstrapService.IsFirstUserAdminEnabled(_configuration);
 
-        var result = await _userManager.CreateAsync(user, command.Password);
-        if (!result.Succeeded)
-        {
-            var errors = result.Errors.Select(e => e.Description);
-            throw new IdentityOperationException(
-                string.Join("; ", errors), result.Errors.Select(e => e.Code));
-        }
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
 
-        if (isFirstUser && firstUserAdminEnabled)
+        try
         {
-            var admins = await _userManager.GetUsersInRoleAsync("InstanceAdmin");
-            if (admins.Count == 0)
+            var result = await _userManager.CreateAsync(user, command.Password);
+            if (!result.Succeeded)
             {
-                await _userManager.AddToRoleAsync(user, "InstanceAdmin");
-                LogFirstUserPromotedToAdmin(user.Id);
+                var errors = result.Errors.Select(e => e.Description);
+                throw new IdentityOperationException(
+                    string.Join("; ", errors), result.Errors.Select(e => e.Code));
             }
+
+            if (isFirstUser && firstUserAdminEnabled)
+            {
+                var admins = await _userManager.GetUsersInRoleAsync("InstanceAdmin");
+                if (admins.Count == 0)
+                {
+                    await _userManager.AddToRoleAsync(user, "InstanceAdmin");
+                    LogFirstUserPromotedToAdmin(user.Id);
+                }
+            }
+
+            var verificationToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+            var domainEvent = new UserRegisteredEvent(
+                user.Id,
+                user.Email!,
+                user.DisplayName ?? user.Email!,
+                verificationToken);
+
+            var outboxMessage = new OutboxMessage(
+                nameof(User),
+                user.Id,
+                0,
+                domainEvent.GetType().FullName!,
+                JsonSerializer.Serialize(domainEvent, domainEvent.GetType(), JsonOptions),
+                domainEvent.OccurredAt);
+
+            _db.OutboxMessages.Add(outboxMessage);
+            await _db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
         }
 
         LogUserRegistered(user.Id);
@@ -128,6 +169,22 @@ internal sealed partial class IdentityService : IIdentityService
         }
 
         var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+        var domainEvent = new PasswordResetRequestedEvent(
+            user.Id,
+            user.Email!,
+            token);
+
+        var outboxMessage = new OutboxMessage(
+            nameof(User),
+            user.Id,
+            0,
+            domainEvent.GetType().FullName!,
+            JsonSerializer.Serialize(domainEvent, domainEvent.GetType(), JsonOptions),
+            domainEvent.OccurredAt);
+
+        _db.OutboxMessages.Add(outboxMessage);
+        await _db.SaveChangesAsync(cancellationToken);
+
         LogPasswordResetTokenGenerated(user.Id, token);
     }
 

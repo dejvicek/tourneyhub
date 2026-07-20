@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using TourneyHub.Application.Tenancy;
 using TourneyHub.Domain.Common;
 using TourneyHub.Domain.Competition;
@@ -44,6 +45,8 @@ public class TourneyHubDbContext : IdentityDbContext<User, IdentityRole<Guid>, G
     public DbSet<Membership> Memberships => Set<Membership>();
 
     public DbSet<Invitation> Invitations => Set<Invitation>();
+
+    public DbSet<SentNotification> SentNotifications => Set<SentNotification>();
 
     internal DbSet<IdempotencyEntry> IdempotencyEntries => Set<IdempotencyEntry>();
 
@@ -181,11 +184,6 @@ public class TourneyHubDbContext : IdentityDbContext<User, IdentityRole<Guid>, G
             b.Property(e => e.RetryCount).IsRequired();
             b.HasIndex(e => e.PublishedAt).HasFilter("\"PublishedAt\" IS NULL");
             b.HasIndex(e => new { e.OrganizationId, e.AggregateType, e.AggregateId, e.AggregateVersion });
-            b.HasQueryFilter(e => e.OrganizationId == _tenant.OrganizationId);
-            b.HasOne<Organization>()
-                .WithMany()
-                .HasForeignKey(e => e.OrganizationId)
-                .OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<AuditEvent>(b =>
@@ -218,6 +216,17 @@ public class TourneyHubDbContext : IdentityDbContext<User, IdentityRole<Guid>, G
             b.Property(e => e.PolicyVersion).IsRequired().HasMaxLength(128);
             b.Property(e => e.AcceptedAt).IsRequired();
             b.HasIndex(e => e.UserId);
+        });
+
+        builder.Entity<SentNotification>(b =>
+        {
+            b.ToTable("sent_notifications");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.OutboxMessageId).IsRequired();
+            b.Property(e => e.Recipient).IsRequired().HasMaxLength(256);
+            b.Property(e => e.Subject).IsRequired().HasMaxLength(256);
+            b.Property(e => e.SentAt).IsRequired();
+            b.HasIndex(e => new { e.OutboxMessageId, e.Recipient }).IsUnique();
         });
 
         // TestEntity configured only in integration tests via a test-specific
@@ -358,6 +367,7 @@ public class TourneyHubDbContext : IdentityDbContext<User, IdentityRole<Guid>, G
             var aggregateType = entry.Entity.GetType().Name;
             var aggregateId = entity.Id;
             var aggregateVersion = entity.Version;
+            var organizationId = GetEntityOrganizationId(entry, entity);
 
             foreach (var domainEvent in entity.DomainEvents)
             {
@@ -371,12 +381,25 @@ public class TourneyHubDbContext : IdentityDbContext<User, IdentityRole<Guid>, G
                     aggregateVersion,
                     eventType,
                     payload,
-                    occurredAt);
+                    occurredAt,
+                    organizationId);
 
                 OutboxMessages.Add(outboxMessage);
             }
 
             entity.ClearDomainEvents();
         }
+    }
+
+    private Guid GetEntityOrganizationId(EntityEntry entry, Entity entity)
+    {
+        if (entity is not TenantEntity te) return Guid.Empty;
+
+        if (entry.State == EntityState.Added && _tenant.HasTenant)
+        {
+            return _tenant.OrganizationId;
+        }
+
+        return te.OrganizationId;
     }
 }
