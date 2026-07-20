@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using TourneyHub.Application.Tenancy;
 using TourneyHub.Domain.Common;
@@ -19,7 +21,7 @@ namespace TourneyHub.Infrastructure.Persistence;
 /// The active organization is resolved server-side via <see cref="ITenantContext"/>,
 /// never from client input.
 /// </summary>
-public class TourneyHubDbContext : DbContext
+public class TourneyHubDbContext : IdentityDbContext<User, IdentityRole<Guid>, Guid>
 {
     private readonly ITenantContext _tenant;
 
@@ -47,13 +49,54 @@ public class TourneyHubDbContext : DbContext
     /// </summary>
     // internal DbSet<TestEntity> TestEntities => Set<TestEntity>();
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    protected override void OnModelCreating(ModelBuilder builder)
     {
-        ArgumentNullException.ThrowIfNull(modelBuilder);
+        ArgumentNullException.ThrowIfNull(builder);
 
-        base.OnModelCreating(modelBuilder);
+        base.OnModelCreating(builder);
 
-        modelBuilder.Entity<Organization>(b =>
+        builder.Entity<User>(b =>
+        {
+            b.ToTable("users");
+            b.Property(u => u.State).HasConversion<string>().IsRequired();
+            b.Property(u => u.DisplayName).HasMaxLength(256);
+            b.Property(u => u.AvatarUrl).HasMaxLength(2048);
+            b.Property(u => u.Locale).HasMaxLength(16);
+            b.Property(u => u.Timezone).HasMaxLength(64);
+            b.Property(u => u.LastLoginAt);
+        });
+
+        builder.Entity<IdentityRole<Guid>>(b =>
+        {
+            b.ToTable("roles");
+        });
+
+        builder.Entity<IdentityUserRole<Guid>>(b =>
+        {
+            b.ToTable("user_roles");
+        });
+
+        builder.Entity<IdentityUserClaim<Guid>>(b =>
+        {
+            b.ToTable("user_claims");
+        });
+
+        builder.Entity<IdentityUserLogin<Guid>>(b =>
+        {
+            b.ToTable("user_logins");
+        });
+
+        builder.Entity<IdentityRoleClaim<Guid>>(b =>
+        {
+            b.ToTable("role_claims");
+        });
+
+        builder.Entity<IdentityUserToken<Guid>>(b =>
+        {
+            b.ToTable("user_tokens");
+        });
+
+        builder.Entity<Organization>(b =>
         {
             b.ToTable("organizations");
             b.HasKey(e => e.Id);
@@ -64,7 +107,7 @@ public class TourneyHubDbContext : DbContext
             b.Property(e => e.Version).IsConcurrencyToken();
         });
 
-        modelBuilder.Entity<League>(b =>
+        builder.Entity<League>(b =>
         {
             b.ToTable("leagues");
             b.HasKey(e => e.Id);
@@ -79,9 +122,9 @@ public class TourneyHubDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        IdempotencyConfiguration.ConfigureIdempotencyKeys(modelBuilder);
+        IdempotencyConfiguration.ConfigureIdempotencyKeys(builder);
 
-        modelBuilder.Entity<OutboxMessage>(b =>
+        builder.Entity<OutboxMessage>(b =>
         {
             b.ToTable("outbox_messages");
             b.HasKey(e => e.Id);
@@ -103,7 +146,7 @@ public class TourneyHubDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        modelBuilder.Entity<AuditEvent>(b =>
+        builder.Entity<AuditEvent>(b =>
         {
             b.ToTable("audit_events");
             b.HasKey(e => e.Id);
@@ -125,7 +168,7 @@ public class TourneyHubDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
-        modelBuilder.Entity<ConsentRecord>(b =>
+        builder.Entity<ConsentRecord>(b =>
         {
             b.ToTable("consent_records");
             b.HasKey(e => e.Id);
@@ -137,18 +180,18 @@ public class TourneyHubDbContext : DbContext
 
         // TestEntity configured only in integration tests via a test-specific
         // DbContext; not part of the production model.
-        // modelBuilder.Entity<TestEntity>(b =>
-        // {
-        //     b.ToTable("test_entities");
-        //     b.HasKey(e => e.Id);
-        //     b.Property(e => e.OrganizationId).IsRequired();
-        //     b.Property(e => e.Name).IsRequired().HasMaxLength(256);
-        //     b.HasQueryFilter(e => e.OrganizationId == _tenant.OrganizationId);
-        //     b.HasOne<Organization>()
-        //         .WithMany()
-        //         .HasForeignKey(e => e.OrganizationId)
-        //         .OnDelete(DeleteBehavior.Restrict);
-        // });
+        builder.Entity<TestEntity>(b =>
+        {
+            b.ToTable("test_entities");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.OrganizationId).IsRequired();
+            b.Property(e => e.Name).IsRequired().HasMaxLength(256);
+            b.HasQueryFilter(e => e.OrganizationId == _tenant.OrganizationId);
+            b.HasOne<Organization>()
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
     }
 
     public override int SaveChanges()
