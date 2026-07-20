@@ -36,6 +36,8 @@ public class TourneyHubDbContext : IdentityDbContext<User, IdentityRole<Guid>, G
 
     public DbSet<League> Leagues => Set<League>();
 
+    public DbSet<Season> Seasons => Set<Season>();
+
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
@@ -157,10 +159,41 @@ public class TourneyHubDbContext : IdentityDbContext<User, IdentityRole<Guid>, G
             b.ToTable("leagues");
             b.HasKey(e => e.Id);
             b.Property(e => e.OrganizationId).IsRequired();
-            b.Property(e => e.Name).IsRequired();
+            b.Property(e => e.Name).IsRequired().HasMaxLength(256);
+            b.Property(e => e.Slug).IsRequired().HasMaxLength(128);
+            b.Property(e => e.Description).HasMaxLength(2000);
+            b.Property(e => e.Visibility).HasConversion<string>().IsRequired();
+            b.Property(e => e.OwnerId).IsRequired();
+            b.Property(e => e.State).HasConversion<string>().IsRequired();
             b.Property(e => e.Version).IsConcurrencyToken();
+            b.HasIndex(e => new { e.OrganizationId, e.Slug }).IsUnique();
             b.HasIndex(e => new { e.OrganizationId, e.Id });
             b.HasQueryFilter(e => e.OrganizationId == _tenant.OrganizationId);
+            b.HasOne<Organization>()
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<Season>(b =>
+        {
+            b.ToTable("seasons");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.OrganizationId).IsRequired();
+            b.Property(e => e.LeagueId).IsRequired();
+            b.Property(e => e.Name).IsRequired().HasMaxLength(256);
+            b.Property(e => e.State).HasConversion<string>().IsRequired();
+            b.Property(e => e.StartedAt);
+            b.Property(e => e.CompletedAt);
+            b.Property(e => e.RngSeed).HasMaxLength(64);
+            b.Property(e => e.Version).IsConcurrencyToken();
+            b.HasIndex(e => new { e.OrganizationId, e.Id });
+            b.HasIndex(e => new { e.LeagueId, e.State }).HasFilter("\"State\" = 'Active'");
+            b.HasQueryFilter(e => e.OrganizationId == _tenant.OrganizationId);
+            b.HasOne<League>()
+                .WithMany()
+                .HasForeignKey(e => e.LeagueId)
+                .OnDelete(DeleteBehavior.Cascade);
             b.HasOne<Organization>()
                 .WithMany()
                 .HasForeignKey(e => e.OrganizationId)

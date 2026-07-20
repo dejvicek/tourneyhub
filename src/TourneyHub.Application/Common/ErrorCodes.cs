@@ -44,6 +44,10 @@ public static class ErrorCodes
     public const string BracketAlreadyGenerated = "bracket_already_generated";
     public const string InsufficientParticipants = "insufficient_participants";
     public const string SeasonAlreadyActive = "season_already_active";
+    public const string LeagueArchived = "league_archived";
+    public const string LeagueNotFound = "league_not_found";
+    public const string SeasonImmutable = "season_immutable";
+    public const string SlugAlreadyTakenInOrg = "slug_already_taken_in_org";
 
     // ── Finance ──────────────────────────────────────────────────
     public const string InvalidCurrency = "invalid_currency";
