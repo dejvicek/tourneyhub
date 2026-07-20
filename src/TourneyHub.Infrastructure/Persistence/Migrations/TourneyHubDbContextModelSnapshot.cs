@@ -275,6 +275,36 @@ namespace TourneyHub.Infrastructure.Persistence.Migrations
                     b.ToTable("leagues", (string)null);
                 });
 
+            modelBuilder.Entity("TourneyHub.Domain.Competition.ScoringSystem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Config")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("scoring_systems", (string)null);
+                });
+
             modelBuilder.Entity("TourneyHub.Domain.Competition.Season", b =>
                 {
                     b.Property<Guid>("Id")
@@ -742,6 +772,15 @@ namespace TourneyHub.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("TourneyHub.Domain.Competition.League", b =>
+                {
+                    b.HasOne("TourneyHub.Domain.Organizations.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("TourneyHub.Domain.Competition.ScoringSystem", b =>
                 {
                     b.HasOne("TourneyHub.Domain.Organizations.Organization", null)
                         .WithMany()

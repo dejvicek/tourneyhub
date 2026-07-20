@@ -38,6 +38,8 @@ public class TourneyHubDbContext : IdentityDbContext<User, IdentityRole<Guid>, G
 
     public DbSet<Season> Seasons => Set<Season>();
 
+    public DbSet<ScoringSystem> ScoringSystems => Set<ScoringSystem>();
+
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
@@ -194,6 +196,25 @@ public class TourneyHubDbContext : IdentityDbContext<User, IdentityRole<Guid>, G
                 .WithMany()
                 .HasForeignKey(e => e.LeagueId)
                 .OnDelete(DeleteBehavior.Cascade);
+            b.HasOne<Organization>()
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        builder.Entity<ScoringSystem>(b =>
+        {
+            b.ToTable("scoring_systems");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.OrganizationId).IsRequired();
+            b.Property(e => e.Name).IsRequired().HasMaxLength(256);
+            b.Property(e => e.Config).IsRequired().HasColumnType("jsonb")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, JsonSerializerOptions.Default),
+                    v => JsonSerializer.Deserialize<ScoringConfig>(v, JsonSerializerOptions.Default) ?? new ScoringConfig());
+            b.Property(e => e.Version).IsConcurrencyToken();
+            b.HasIndex(e => new { e.OrganizationId, e.Name }).IsUnique();
+            b.HasQueryFilter(e => e.OrganizationId == _tenant.OrganizationId);
             b.HasOne<Organization>()
                 .WithMany()
                 .HasForeignKey(e => e.OrganizationId)
