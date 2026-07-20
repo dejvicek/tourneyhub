@@ -1,8 +1,11 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using TourneyHub.Application.Tenancy;
 using TourneyHub.Domain.Common;
 using TourneyHub.Domain.Competition;
+using TourneyHub.Domain.Identity;
 using TourneyHub.Domain.Organizations;
+using TourneyHub.Domain.Platform;
 
 namespace TourneyHub.Infrastructure.Persistence;
 
@@ -30,7 +33,19 @@ public class TourneyHubDbContext : DbContext
 
     public DbSet<League> Leagues => Set<League>();
 
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+
+    public DbSet<ConsentRecord> ConsentRecords => Set<ConsentRecord>();
+
     internal DbSet<IdempotencyEntry> IdempotencyEntries => Set<IdempotencyEntry>();
+
+    /// <summary>
+    /// Test entity used by integration tests to exercise the domain-event capture +
+    /// transactional-outbox path end-to-end. Not part of the production domain model.
+    /// </summary>
+    // internal DbSet<TestEntity> TestEntities => Set<TestEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -65,10 +80,80 @@ public class TourneyHubDbContext : DbContext
         });
 
         IdempotencyConfiguration.ConfigureIdempotencyKeys(modelBuilder);
+
+        modelBuilder.Entity<OutboxMessage>(b =>
+        {
+            b.ToTable("outbox_messages");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.OrganizationId).IsRequired();
+            b.Property(e => e.AggregateType).IsRequired().HasMaxLength(256);
+            b.Property(e => e.AggregateId).IsRequired();
+            b.Property(e => e.AggregateVersion).IsRequired();
+            b.Property(e => e.EventType).IsRequired().HasMaxLength(256);
+            b.Property(e => e.Payload).IsRequired().HasColumnType("jsonb");
+            b.Property(e => e.OccurredAt).IsRequired();
+            b.Property(e => e.PublishedAt);
+            b.Property(e => e.RetryCount).IsRequired();
+            b.HasIndex(e => e.PublishedAt).HasFilter("\"PublishedAt\" IS NULL");
+            b.HasIndex(e => new { e.OrganizationId, e.AggregateType, e.AggregateId, e.AggregateVersion });
+            b.HasQueryFilter(e => e.OrganizationId == _tenant.OrganizationId);
+            b.HasOne<Organization>()
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<AuditEvent>(b =>
+        {
+            b.ToTable("audit_events");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.OrganizationId).IsRequired();
+            b.Property(e => e.ActorId).IsRequired().HasMaxLength(256);
+            b.Property(e => e.Action).IsRequired().HasMaxLength(256);
+            b.Property(e => e.TargetType).IsRequired().HasMaxLength(256);
+            b.Property(e => e.TargetId).IsRequired().HasMaxLength(256);
+            b.Property(e => e.Before).HasColumnType("jsonb");
+            b.Property(e => e.After).HasColumnType("jsonb");
+            b.Property(e => e.IpAddress).HasMaxLength(64);
+            b.Property(e => e.UserAgent).HasMaxLength(512);
+            b.Property(e => e.OccurredAt).IsRequired();
+            b.HasIndex(e => new { e.OrganizationId, e.TargetType, e.TargetId });
+            b.HasQueryFilter(e => e.OrganizationId == _tenant.OrganizationId);
+            b.HasOne<Organization>()
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ConsentRecord>(b =>
+        {
+            b.ToTable("consent_records");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.UserId).IsRequired();
+            b.Property(e => e.PolicyVersion).IsRequired().HasMaxLength(128);
+            b.Property(e => e.AcceptedAt).IsRequired();
+            b.HasIndex(e => e.UserId);
+        });
+
+        // TestEntity configured only in integration tests via a test-specific
+        // DbContext; not part of the production model.
+        // modelBuilder.Entity<TestEntity>(b =>
+        // {
+        //     b.ToTable("test_entities");
+        //     b.HasKey(e => e.Id);
+        //     b.Property(e => e.OrganizationId).IsRequired();
+        //     b.Property(e => e.Name).IsRequired().HasMaxLength(256);
+        //     b.HasQueryFilter(e => e.OrganizationId == _tenant.OrganizationId);
+        //     b.HasOne<Organization>()
+        //         .WithMany()
+        //         .HasForeignKey(e => e.OrganizationId)
+        //         .OnDelete(DeleteBehavior.Restrict);
+        // });
     }
 
     public override int SaveChanges()
     {
+        CaptureDomainEvents();
         StampAndGuardTenant();
         IncrementEntityVersions();
         return base.SaveChanges();
@@ -76,6 +161,7 @@ public class TourneyHubDbContext : DbContext
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
+        CaptureDomainEvents();
         StampAndGuardTenant();
         IncrementEntityVersions();
         return base.SaveChanges(acceptAllChangesOnSuccess);
@@ -83,6 +169,7 @@ public class TourneyHubDbContext : DbContext
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        CaptureDomainEvents();
         StampAndGuardTenant();
         IncrementEntityVersions();
         return base.SaveChangesAsync(cancellationToken);
@@ -90,6 +177,7 @@ public class TourneyHubDbContext : DbContext
 
     public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
+        CaptureDomainEvents();
         StampAndGuardTenant();
         IncrementEntityVersions();
         return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
@@ -157,6 +245,53 @@ public class TourneyHubDbContext : DbContext
                 default:
                     break;
             }
+        }
+    }
+
+    /// <summary>
+    /// Captures domain events raised by tracked entities and writes corresponding
+    /// <see cref="OutboxMessage"/> rows in the same transaction (no dual-write).
+    /// Events are serialised as JSON and stored with aggregate metadata for ordering
+    /// and deduplication (ADR-0001 §3).
+    /// </summary>
+    private void CaptureDomainEvents()
+    {
+        var entitiesWithEvents = ChangeTracker.Entries<Entity>()
+            .Where(e => e.Entity.DomainEvents.Count > 0)
+            .ToList();
+
+        if (entitiesWithEvents.Count == 0)
+        {
+            return;
+        }
+
+        var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
+        foreach (var entry in entitiesWithEvents)
+        {
+            var entity = entry.Entity;
+            var aggregateType = entry.Entity.GetType().Name;
+            var aggregateId = entity.Id;
+            var aggregateVersion = entity.Version;
+
+            foreach (var domainEvent in entity.DomainEvents)
+            {
+                var eventType = domainEvent.GetType().FullName!;
+                var payload = JsonSerializer.Serialize(domainEvent, domainEvent.GetType(), jsonOptions);
+                var occurredAt = domainEvent is DomainEvent de ? de.OccurredAt : DateTime.UtcNow;
+
+                var outboxMessage = new OutboxMessage(
+                    aggregateType,
+                    aggregateId,
+                    aggregateVersion,
+                    eventType,
+                    payload,
+                    occurredAt);
+
+                OutboxMessages.Add(outboxMessage);
+            }
+
+            entity.ClearDomainEvents();
         }
     }
 }
