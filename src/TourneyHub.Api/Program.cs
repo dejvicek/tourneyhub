@@ -14,13 +14,14 @@ using TourneyHub.Api.Middleware;
 using TourneyHub.Application.Abstractions;
 using TourneyHub.Application.Identity;
 using TourneyHub.Application.Tenancy;
-using TourneyHub.Domain.Competition;
-using TourneyHub.Domain.Identity;
 using TourneyHub.Application.Organizations;
+using TourneyHub.Application.Competition;
+using TourneyHub.Domain.Identity;
 using TourneyHub.Infrastructure.Identity;
 using TourneyHub.Infrastructure.Messaging;
 using TourneyHub.Infrastructure.Notifications;
 using TourneyHub.Infrastructure.Organizations;
+using TourneyHub.Infrastructure.Competition;
 using TourneyHub.Infrastructure.Persistence;
 using TourneyHub.Infrastructure.Tenancy;
 
@@ -96,6 +97,7 @@ builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddScoped<IIdentityService, IdentityService>();
 builder.Services.AddScoped<IOrganizationService, OrganizationService>();
 builder.Services.AddScoped<IInvitationService, InvitationService>();
+builder.Services.AddScoped<ILeagueService, LeagueService>();
 
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.Section));
 builder.Services.AddSingleton<INotificationChannel, EmailChannel>();
@@ -165,60 +167,11 @@ app.MapAuthEndpoints();
 app.MapOrganizationsEndpoints();
 app.MapInvitationsEndpoints();
 app.MapLeagueInvitationsEndpoints();
-
-var leagues = app.MapGroup("/api/v1/leagues");
-
-leagues.MapGet("/", async (TourneyHubDbContext db, CancellationToken ct) =>
-{
-    var items = await db.Leagues.ToListAsync(ct);
-    return ProgramHelpers.JsonOk(items.Select(l => new LeagueResponse(l.Id, l.OrganizationId, l.Name)).ToList());
-});
-
-leagues.MapGet("/{leagueId:guid}", async (Guid leagueId, TourneyHubDbContext db, HttpContext httpContext, CancellationToken ct) =>
-{
-    var league = await db.Leagues.FirstOrDefaultAsync(l => l.Id == leagueId, ct);
-    if (league is null)
-    {
-        return Results.NotFound();
-    }
-
-    httpContext.Response.Headers.ETag = $"\"{league.Version}\"";
-return ProgramHelpers.JsonOk(new LeagueResponse(league.Id, league.OrganizationId, league.Name));
-    });
-
-    leagues.MapPost("/", async (CreateLeagueRequest request, TourneyHubDbContext db, CancellationToken ct) =>
-    {
-        var league = new League(request.Name);
-        db.Leagues.Add(league);
-    await db.SaveChangesAsync(ct);
-    return ProgramHelpers.JsonCreated($"/api/v1/leagues/{league.Id}",
-        new LeagueResponse(league.Id, league.OrganizationId, league.Name));
-});
+app.MapLeaguesEndpoints();
+app.MapPublicEndpoints();
 
 app.MapGet("/api/v1/ping", () => Results.Text("pong", statusCode: 200));
 
 app.Run();
 
 public partial class Program { }
-
-internal sealed record CreateLeagueRequest(string Name);
-
-internal sealed record LeagueResponse(Guid Id, Guid OrganizationId, string Name);
-
-internal static class ProgramHelpers
-{
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-    };
-
-    internal static IResult JsonOk(object? value) => Results.Text(
-        JsonSerializer.Serialize(value, JsonOptions),
-        MediaTypeNames.Application.Json,
-        statusCode: 200);
-
-    internal static IResult JsonCreated(string uri, object? value) => Results.Text(
-        JsonSerializer.Serialize(value, JsonOptions),
-        MediaTypeNames.Application.Json,
-        statusCode: 201);
-}
