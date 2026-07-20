@@ -970,24 +970,24 @@ functional:
     scope: MVP
     priority: P0
     status: done
-    files: [src/TourneyHub.Application/Abstractions/INotificationChannel.cs, src/TourneyHub.Infrastructure/Notifications/EmailChannel.cs, src/TourneyHub.Infrastructure/Messaging/OutboxDispatcher.cs]
-    tests: [tests/TourneyHub.Integration.Tests/OutboxIntegrationTests.cs]
+    files: [src/TourneyHub.Application/Abstractions/INotificationChannel.cs, src/TourneyHub.Infrastructure/Notifications/EmailChannel.cs, src/TourneyHub.Infrastructure/Messaging/NotificationOutboxConsumer.cs, src/TourneyHub.Infrastructure/Notifications/LiquidTemplateRenderer.cs, src/TourneyHub.Infrastructure/Notifications/EmailTemplates/UserRegistered.liquid, src/TourneyHub.Infrastructure/Notifications/EmailTemplates/PasswordReset.liquid, src/TourneyHub.Infrastructure/Notifications/EmailTemplates/InvitationCreated.liquid, src/TourneyHub.Domain/Identity/Events/UserRegisteredEvent.cs, src/TourneyHub.Domain/Identity/Events/PasswordResetRequestedEvent.cs, src/TourneyHub.Domain/Identity/Events/InvitationCreatedEvent.cs, src/TourneyHub.Infrastructure/Identity/IdentityService.cs, src/TourneyHub.Domain/Platform/SentNotification.cs]
+    tests: [tests/TourneyHub.Integration.Tests/NotificationIntegrationTests.cs, tests/TourneyHub.Architecture.Tests/NotificationDomainEventMappingTests.cs]
   - id: FR-141
     title: INotificationChannel abstraction + EmailChannel; event-triggered (outbox)
     module: Platform
     scope: MVP
     priority: P0
     status: done
-    files: [src/TourneyHub.Application/Abstractions/INotificationChannel.cs, src/TourneyHub.Application/Abstractions/IOutbox.cs, src/TourneyHub.Infrastructure/Notifications/EmailChannel.cs, src/TourneyHub.Infrastructure/Messaging/OutboxDispatcher.cs, src/TourneyHub.Domain/Common/OutboxMessage.cs, src/TourneyHub.Application/Notifications/Notification.cs, src/TourneyHub.Application/Notifications/NotificationCategory.cs]
-    tests: [tests/TourneyHub.Integration.Tests/OutboxIntegrationTests.cs]
+    files: [src/TourneyHub.Application/Abstractions/INotificationChannel.cs, src/TourneyHub.Application/Abstractions/IOutbox.cs, src/TourneyHub.Infrastructure/Notifications/EmailChannel.cs, src/TourneyHub.Infrastructure/Messaging/NotificationOutboxConsumer.cs, src/TourneyHub.Domain/Common/OutboxMessage.cs, src/TourneyHub.Application/Notifications/Notification.cs, src/TourneyHub.Application/Notifications/NotificationCategory.cs]
+    tests: [tests/TourneyHub.Integration.Tests/NotificationIntegrationTests.cs, tests/TourneyHub.Architecture.Tests/NotificationDomainEventMappingTests.cs]
   - id: FR-142
     title: Hosted managed email primary; self-host SMTP secondary; validated at startup
     module: Platform
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Api/Health/SmtpHealthCheck.cs, src/TourneyHub.Infrastructure/Notifications/EmailChannel.cs, src/TourneyHub.Infrastructure/Notifications/EmailOptions.cs, src/TourneyHub.Api/Program.cs, .env.example]
+    tests: [tests/TourneyHub.Integration.Tests/NotificationIntegrationTests.cs]
   - id: FR-143
     title: Transactional vs engagement distinction (opt-out only for engagement)
     module: Platform
@@ -1153,6 +1153,6 @@ non_functional:
   - id: NFR-025
     title: Hosted email deliverability (managed provider, retry/bounce)
     priority: P1
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Infrastructure/Notifications/EmailChannel.cs, src/TourneyHub.Infrastructure/Messaging/NotificationOutboxConsumer.cs, src/TourneyHub.Domain/Platform/SentNotification.cs, src/TourneyHub.Api/Health/SmtpHealthCheck.cs, src/TourneyHub.Api/Program.cs]
+    tests: [tests/TourneyHub.Integration.Tests/NotificationIntegrationTests.cs]

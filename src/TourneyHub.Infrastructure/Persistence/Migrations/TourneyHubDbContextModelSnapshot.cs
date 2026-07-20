@@ -538,6 +538,36 @@ namespace TourneyHub.Infrastructure.Persistence.Migrations
                     b.ToTable("audit_events", (string)null);
                 });
 
+            modelBuilder.Entity("TourneyHub.Domain.Platform.SentNotification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OutboxMessageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Recipient")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime>("SentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OutboxMessageId", "Recipient")
+                        .IsUnique();
+
+                    b.ToTable("sent_notifications", (string)null);
+                });
+
             modelBuilder.Entity("TourneyHub.Infrastructure.Persistence.IdempotencyEntry", b =>
                 {
                     b.Property<long>("Id")
@@ -630,15 +660,6 @@ namespace TourneyHub.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("TourneyHub.Domain.Common.OutboxMessage", b =>
-                {
-                    b.HasOne("TourneyHub.Domain.Organizations.Organization", null)
-                        .WithMany()
-                        .HasForeignKey("OrganizationId")
-                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 
