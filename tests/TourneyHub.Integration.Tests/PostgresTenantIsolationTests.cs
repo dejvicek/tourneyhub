@@ -147,6 +147,6 @@ public sealed class PostgresTenantIsolationTests : IAsyncLifetime
 
         var response = await _client.SendAsync(request);
 
-        Assert.Equal(System.Net.HttpStatusCode.InternalServerError, response.StatusCode);
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, response.StatusCode);
     }
 }

@@ -7,6 +7,9 @@
     <RootNamespace>TourneyHub.Infrastructure</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="TourneyHub.Api" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\TourneyHub.Application\TourneyHub.Application.csproj" />
   </ItemGroup>
   <ItemGroup>

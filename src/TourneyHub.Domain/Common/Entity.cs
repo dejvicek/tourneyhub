@@ -10,4 +10,6 @@ public abstract class Entity
 
     /// <summary>Optimistic-locking token (ETag / If-Match maps to this). NFR-023.</summary>
     public int Version { get; protected set; }
+
+    public void IncrementVersion() => Version++;
 }

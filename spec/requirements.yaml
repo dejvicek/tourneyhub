@@ -1015,9 +1015,9 @@ non_functional:
   - id: NFR-002
     title: API-first; UI consumes same API as third parties
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: in_progress
+    files: [api/openapi.yaml, src/TourneyHub.Api/Middleware/CorrelationIdMiddleware.cs, src/TourneyHub.Api/Middleware/ProblemDetailsMiddleware.cs, src/TourneyHub.Api/Middleware/IdempotencyMiddleware.cs, spec/error-catalog.md]
+    tests: [tests/TourneyHub.Integration.Tests/ApiConventionsTests.cs]
   - id: NFR-003
     title: Extensibility (formats/scoring pluggable via interfaces)
     priority: P0
@@ -1088,8 +1088,8 @@ non_functional:
     title: Observability (structured logging, health, metrics)
     priority: P1
     status: in_progress
-    files: [src/TourneyHub.Api/Program.cs]
-    tests: []
+    files: [src/TourneyHub.Api/Program.cs, src/TourneyHub.Api/Middleware/CorrelationIdMiddleware.cs, src/TourneyHub.Api/Middleware/ProblemDetailsMiddleware.cs]
+    tests: [tests/TourneyHub.Integration.Tests/ApiConventionsTests.cs]
   - id: NFR-015
     title: Documentation (OpenAPI, self-host install, config ref)
     priority: P0
@@ -1141,9 +1141,9 @@ non_functional:
   - id: NFR-023
     title: Concurrency safety (optimistic locking via version/ETag)
     priority: P0
-    status: not_started
-    files: [api/openapi.yaml]
-    tests: []
+    status: in_progress
+    files: [api/openapi.yaml, src/TourneyHub.Domain/Common/Entity.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs, src/TourneyHub.Api/Middleware/ProblemDetailsMiddleware.cs, src/TourneyHub.Api/Extensions/PaginationExtensions.cs]
+    tests: [tests/TourneyHub.Integration.Tests/ApiConventionsTests.cs]
   - id: NFR-024
     title: Tenant isolation across all surfaces; automated isolation tests
     priority: P0

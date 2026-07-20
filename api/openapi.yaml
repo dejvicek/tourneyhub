@@ -15,11 +15,17 @@ info:
       - The X-Organization-Id header provides the active organization context. When auth
         is wired (Step 05), the header is validated against the authenticated user's
         membership. Until then, it serves as the stub/test tenant selector.
-      - Errors: RFC 7807 Problem Details with stable error codes (§17).
+      - Errors: RFC 7807 Problem Details with stable error codes (§17). See
+        spec/error-catalog.md for the full catalog.
       - Concurrency: ETag + If-Match on mutable competition/finance entities (NFR-023).
+        Mutating requests on versioned resources MUST include If-Match; missing header
+        returns 428 Precondition Required. Stale version returns 409 Conflict.
       - Idempotency: Idempotency-Key on create endpoints that must not duplicate (FR-045).
       - Money: integer minor units + currency, never floats (BR-008).
       - Time: UTC ISO-8601 (NFR-022).
+      - Observability: Every response carries X-Correlation-Id; client may supply its own.
+      - Rate Limiting: Default 300 req/min; auth endpoints 20 req/min;
+        finance endpoints 10 req/min. Exceedance returns 429 with Retry-After.
   license:
     name: AGPL-3.0-or-later
     identifier: AGPL-3.0-or-later
@@ -545,6 +551,9 @@ components:
     ETag:
       description: Opaque version for optimistic concurrency (NFR-023).
       schema: { type: string }
+    XCorrelationId:
+      description: Request correlation id for tracing (NFR-014). Generated if not supplied.
+      schema: { type: string }
 
   responses:
     Problem:
@@ -552,18 +561,70 @@ components:
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
+    PreconditionRequired:
+      description: If-Match header required for versioned resource mutation (NFR-023)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    RateLimited:
+      description: Rate limit exceeded (NFR-009)
+      headers:
+        Retry-After: { schema: { type: integer }, description: Seconds until next allowed request }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
 
   schemas:
     Problem:
       type: object
-      description: RFC 7807 Problem Details with a stable error code (§17).
+      description: RFC 7807 Problem Details with a stable error code (§17). Full catalog at spec/error-catalog.md.
       properties:
         type: { type: string, format: uri }
         title: { type: string }
         status: { type: integer }
         detail: { type: string }
         instance: { type: string }
-        code: { type: string, description: Stable machine-readable error code }
+        traceId: { type: string, description: Server-side request trace identifier }
+        code:
+          type: string
+          description: Stable machine-readable error code
+          enum:
+            - unknown_error
+            - validation_failed
+            - not_supported
+            - no_tenant_resolved
+            - cross_tenant_access
+            - unauthorized
+            - forbidden
+            - email_already_registered
+            - email_not_verified
+            - invalid_credentials
+            - token_expired
+            - not_found
+            - already_exists
+            - slug_already_taken
+            - concurrency_conflict
+            - precondition_required
+            - idempotency_replay
+            - rate_limited
+            - invalid_tournament_state
+            - registration_closed
+            - registration_full
+            - participant_already_registered
+            - duplicate_player_in_tournament
+            - invalid_result
+            - bracket_already_generated
+            - insufficient_participants
+            - season_already_active
+            - invalid_currency
+            - payment_already_recorded
+            - payout_already_paid
+            - insufficient_funds
+            - invalid_money_operation
+            - organization_suspended
+            - sole_owner_cannot_leave
+            - invitation_expired
+            - invitation_already_accepted
         errors:
           type: object
           additionalProperties: { type: array, items: { type: string } }

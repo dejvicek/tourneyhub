@@ -30,6 +30,8 @@ public class TourneyHubDbContext : DbContext
 
     public DbSet<League> Leagues => Set<League>();
 
+    internal DbSet<IdempotencyEntry> IdempotencyEntries => Set<IdempotencyEntry>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
@@ -44,6 +46,7 @@ public class TourneyHubDbContext : DbContext
             b.Property(e => e.Slug).IsRequired();
             b.Property(e => e.State).HasConversion<string>().IsRequired();
             b.HasIndex(e => e.Slug).IsUnique();
+            b.Property(e => e.Version).IsConcurrencyToken();
         });
 
         modelBuilder.Entity<League>(b =>
@@ -52,40 +55,55 @@ public class TourneyHubDbContext : DbContext
             b.HasKey(e => e.Id);
             b.Property(e => e.OrganizationId).IsRequired();
             b.Property(e => e.Name).IsRequired();
-            // Composite tenant index for scoped lookups (§18).
+            b.Property(e => e.Version).IsConcurrencyToken();
             b.HasIndex(e => new { e.OrganizationId, e.Id });
-            // Tenant isolation: no read can escape the current organization.
             b.HasQueryFilter(e => e.OrganizationId == _tenant.OrganizationId);
-            // FK + immutability: organization_id references organizations.id; ON DELETE RESTRICT.
             b.HasOne<Organization>()
                 .WithMany()
                 .HasForeignKey(e => e.OrganizationId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
+
+        IdempotencyConfiguration.ConfigureIdempotencyKeys(modelBuilder);
     }
 
     public override int SaveChanges()
     {
         StampAndGuardTenant();
+        IncrementEntityVersions();
         return base.SaveChanges();
     }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         StampAndGuardTenant();
+        IncrementEntityVersions();
         return base.SaveChanges(acceptAllChangesOnSuccess);
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         StampAndGuardTenant();
+        IncrementEntityVersions();
         return base.SaveChangesAsync(cancellationToken);
     }
 
     public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
     {
         StampAndGuardTenant();
+        IncrementEntityVersions();
         return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private void IncrementEntityVersions()
+    {
+        foreach (var entry in ChangeTracker.Entries<Entity>())
+        {
+            if (entry.State == EntityState.Modified)
+            {
+                entry.Entity.IncrementVersion();
+            }
+        }
     }
 
     /// <summary>

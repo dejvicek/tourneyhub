@@ -11,6 +11,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\TourneyHub.Domain\TourneyHub.Domain.csproj" />
+    <ProjectReference Include="..\..\src\TourneyHub.Application\TourneyHub.Application.csproj" />
   </ItemGroup>
   <ItemGroup>
     <!-- Golden oracle copied next to the test binary so tests read it by file name. -->
