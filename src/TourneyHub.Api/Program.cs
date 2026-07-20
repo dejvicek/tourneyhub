@@ -13,7 +13,9 @@ using TourneyHub.Application.Identity;
 using TourneyHub.Application.Tenancy;
 using TourneyHub.Domain.Competition;
 using TourneyHub.Domain.Identity;
+using TourneyHub.Application.Organizations;
 using TourneyHub.Infrastructure.Identity;
+using TourneyHub.Infrastructure.Organizations;
 using TourneyHub.Infrastructure.Persistence;
 using TourneyHub.Infrastructure.Tenancy;
 
@@ -82,6 +84,7 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddScoped<IIdentityService, IdentityService>();
+builder.Services.AddScoped<IOrganizationService, OrganizationService>();
 
 builder.Services.AddHttpClient<BreachedPasswordValidator<User>>();
 
@@ -141,6 +144,7 @@ app.UseAuthorization();
 app.UseMiddleware<TenantResolutionMiddleware>();
 
 app.MapAuthEndpoints();
+app.MapOrganizationsEndpoints();
 
 var leagues = app.MapGroup("/api/v1/leagues");
 

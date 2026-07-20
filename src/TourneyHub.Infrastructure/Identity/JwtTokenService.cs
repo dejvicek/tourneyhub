@@ -18,9 +18,9 @@ internal sealed class JwtTokenService
         _options = options.Value;
     }
 
-    public TokenPairDto GenerateTokenPair(User user)
+    public TokenPairDto GenerateTokenPair(User user, Guid? activeOrganizationId = null)
     {
-        var accessToken = GenerateAccessToken(user);
+        var accessToken = GenerateAccessToken(user, activeOrganizationId);
         var refreshToken = GenerateRefreshToken();
 
         return new TokenPairDto(
@@ -29,18 +29,23 @@ internal sealed class JwtTokenService
             ExpiresIn: (int)_options.AccessTokenLifetime.TotalSeconds);
     }
 
-    private string GenerateAccessToken(User user)
+    private string GenerateAccessToken(User user, Guid? activeOrganizationId)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
-            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new Claim(JwtRegisteredClaimNames.Email, user.Email!),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            new Claim("state", user.State.ToString()),
+            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new(JwtRegisteredClaimNames.Email, user.Email!),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new("state", user.State.ToString()),
         };
+
+        if (activeOrganizationId.HasValue)
+        {
+            claims.Add(new Claim("active_organization_id", activeOrganizationId.Value.ToString()));
+        }
 
         var token = new JwtSecurityToken(
             issuer: _options.Issuer,
