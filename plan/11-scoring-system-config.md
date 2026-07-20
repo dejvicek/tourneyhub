@@ -1,7 +1,7 @@
 # Step 11 — Scoring system config
 
 - **Scope:** MVP
-- **Status:** ⬜ not started
+- **Status:** ✅ done
 - **Depends on:** 10
 - **Unblocks:** 14, 16
 - **Requirements:** FR-025, FR-030, FR-057, NFR-020, §12.1

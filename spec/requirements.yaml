@@ -305,9 +305,9 @@ functional:
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Competition/ScoringConfig.cs, src/TourneyHub.Domain/Competition/ScoringSystem.cs, src/TourneyHub.Domain/Logic/Scoring/ScoringCalculator.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs, src/TourneyHub.Infrastructure/Persistence/Migrations/20260720232205_AddScoringSystem.cs]
+    tests: [tests/TourneyHub.Domain.Tests/ScoringCalculatorTests.cs, tests/TourneyHub.Domain.Tests/ScoringSystemEntityTests.cs, tests/TourneyHub.Domain.Tests/ScoringCalculatorPropertyTests.cs]
   - id: FR-026
     title: League visibility (public/unlisted/private)
     module: Competition
@@ -587,9 +587,9 @@ functional:
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: [spec/test-vectors/tie-breaks.json]
+    status: done
+    files: [src/TourneyHub.Domain/Competition/ScoringConfig.cs, src/TourneyHub.Domain/Logic/Scoring/ScoringCalculator.cs]
+    tests: [tests/TourneyHub.Domain.Tests/ScoringCalculatorTests.cs]
   - id: FR-058
     title: Detect completion; compute final standings + payouts
     module: Competition
@@ -1123,9 +1123,9 @@ non_functional:
   - id: NFR-020
     title: Configuration over code (scoring/formats/fees data-driven)
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Competition/ScoringConfig.cs, src/TourneyHub.Domain/Competition/ScoringSystem.cs, src/TourneyHub.Domain/Logic/Scoring/ScoringCalculator.cs, src/TourneyHub.Infrastructure/Persistence/Migrations/20260720232205_AddScoringSystem.cs]
+    tests: [tests/TourneyHub.Domain.Tests/ScoringCalculatorTests.cs, tests/TourneyHub.Domain.Tests/ScoringCalculatorPropertyTests.cs, spec/test-vectors/tie-breaks.json]
   - id: NFR-021
     title: Privacy by design (minimise PII, TLS, no secret logging)
     priority: P0
