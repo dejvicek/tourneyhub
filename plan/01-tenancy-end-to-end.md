@@ -1,7 +1,7 @@
 # Step 01 — Tenancy as a real boundary
 
 - **Scope:** MVP
-- **Status:** ⬜ not started
+- **Status:** ✅ done
 - **Depends on:** 00
 - **Unblocks:** 05, 06, and every tenant-scoped feature
 - **Requirements:** NFR-004, NFR-024, FR-151, FR-152, FR-154, BR-012, BR-015
