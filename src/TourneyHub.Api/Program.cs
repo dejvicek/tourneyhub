@@ -2,6 +2,7 @@ using System.Net.Mime;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
@@ -80,7 +81,12 @@ builder.Services.AddAuthentication(options =>
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy(InstanceAdminRequirement.PolicyName,
+        policy => policy.Requirements.Add(new InstanceAdminRequirement()));
+
+builder.Services.AddSingleton<IAuthorizationHandler, InstanceAdminHandler>();
+builder.Services.AddHostedService<BootstrapService>();
 
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddScoped<IIdentityService, IdentityService>();
@@ -141,6 +147,7 @@ app.UseMiddleware<IdempotencyMiddleware>();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<SuspensionGuardMiddleware>();
 app.UseMiddleware<TenantResolutionMiddleware>();
 
 app.MapAuthEndpoints();

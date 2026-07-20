@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using TourneyHub.Application.Identity;
 using TourneyHub.Domain.Identity;
@@ -10,17 +11,20 @@ internal sealed partial class IdentityService : IIdentityService
     private readonly UserManager<User> _userManager;
     private readonly SignInManager<User> _signInManager;
     private readonly JwtTokenService _jwtTokenService;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<IdentityService> _logger;
 
     public IdentityService(
         UserManager<User> userManager,
         SignInManager<User> signInManager,
         JwtTokenService jwtTokenService,
+        IConfiguration configuration,
         ILogger<IdentityService> logger)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _jwtTokenService = jwtTokenService;
+        _configuration = configuration;
         _logger = logger;
     }
 
@@ -35,12 +39,25 @@ internal sealed partial class IdentityService : IIdentityService
             State = AccountState.PendingVerification,
         };
 
+        var isFirstUser = !_userManager.Users.Any();
+        var firstUserAdminEnabled = BootstrapService.IsFirstUserAdminEnabled(_configuration);
+
         var result = await _userManager.CreateAsync(user, command.Password);
         if (!result.Succeeded)
         {
             var errors = result.Errors.Select(e => e.Description);
             throw new IdentityOperationException(
                 string.Join("; ", errors), result.Errors.Select(e => e.Code));
+        }
+
+        if (isFirstUser && firstUserAdminEnabled)
+        {
+            var admins = await _userManager.GetUsersInRoleAsync("InstanceAdmin");
+            if (admins.Count == 0)
+            {
+                await _userManager.AddToRoleAsync(user, "InstanceAdmin");
+                LogFirstUserPromotedToAdmin(user.Id);
+            }
         }
 
         LogUserRegistered(user.Id);
@@ -151,6 +168,10 @@ internal sealed partial class IdentityService : IIdentityService
 
     [LoggerMessage(EventId = 6, Level = LogLevel.Information, Message = "User {UserId} reset password")]
     private partial void LogPasswordReset(Guid userId);
+
+    [LoggerMessage(EventId = 7, Level = LogLevel.Information,
+        Message = "First-registered user {UserId} auto-promoted to InstanceAdmin (FR-009b)")]
+    private partial void LogFirstUserPromotedToAdmin(Guid userId);
 }
 
 public class IdentityOperationException : Exception
