@@ -52,6 +52,12 @@ public class TourneyHubDbContext : IdentityDbContext<User, IdentityRole<Guid>, G
 
     public DbSet<SentNotification> SentNotifications => Set<SentNotification>();
 
+    public DbSet<Tournament> Tournaments => Set<Tournament>();
+
+    public DbSet<Participant> Participants => Set<Participant>();
+
+    public DbSet<ParticipantMember> ParticipantMembers => Set<ParticipantMember>();
+
     internal DbSet<IdempotencyEntry> IdempotencyEntries => Set<IdempotencyEntry>();
 
     /// <summary>
@@ -285,6 +291,92 @@ public class TourneyHubDbContext : IdentityDbContext<User, IdentityRole<Guid>, G
 
         // TestEntity configured only in integration tests via a test-specific
         // DbContext; not part of the production model.
+
+        builder.Entity<Tournament>(b =>
+        {
+            b.ToTable("tournaments");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.OrganizationId).IsRequired();
+            b.Property(e => e.LeagueId);
+            b.Property(e => e.SeasonId);
+            b.Property(e => e.DisciplineName).IsRequired().HasMaxLength(256);
+            b.Property(e => e.ResultModel).HasConversion<string>().IsRequired();
+            b.Property(e => e.ScoreConfig).HasColumnType("jsonb")
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, JsonSerializerOptions.Default),
+                    v => JsonSerializer.Deserialize<TournamentScoreConfig>(v, JsonSerializerOptions.Default));
+            b.Property(e => e.TeamSize).IsRequired();
+            b.Property(e => e.FormatType).HasConversion<string>().IsRequired();
+            b.Property(e => e.ResultEntryMode).HasConversion<string>().IsRequired();
+            b.Property(e => e.BestOf);
+            b.Property(e => e.State).HasConversion<string>().IsRequired();
+            b.Property(e => e.RngSeed).HasMaxLength(64);
+            b.Property(e => e.Currency).HasMaxLength(3);
+            b.Property(e => e.EntryFeeAmountMinor);
+            b.Property(e => e.RegOpenAt);
+            b.Property(e => e.RegCloseAt);
+            b.Property(e => e.MaxParticipants);
+            b.Property(e => e.Version).IsConcurrencyToken();
+            b.HasIndex(e => new { e.OrganizationId, e.Id });
+            b.HasIndex(e => new { e.LeagueId, e.State });
+            b.HasQueryFilter(e => e.OrganizationId == _tenant.OrganizationId);
+            b.HasOne<Organization>()
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<League>()
+                .WithMany()
+                .HasForeignKey(e => e.LeagueId)
+                .OnDelete(DeleteBehavior.SetNull);
+            b.HasOne<Season>()
+                .WithMany()
+                .HasForeignKey(e => e.SeasonId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        builder.Entity<Participant>(b =>
+        {
+            b.ToTable("participants");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.OrganizationId).IsRequired();
+            b.Property(e => e.TournamentId).IsRequired();
+            b.Property(e => e.CaptainUserId).IsRequired();
+            b.Property(e => e.DisplayName).HasMaxLength(256);
+            b.Property(e => e.Status).HasConversion<string>().IsRequired();
+            b.Property(e => e.Version).IsConcurrencyToken();
+            b.HasIndex(e => new { e.OrganizationId, e.Id });
+            b.HasIndex(e => new { e.TournamentId, e.Status });
+            b.HasQueryFilter(e => e.OrganizationId == _tenant.OrganizationId);
+            b.HasOne<Organization>()
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<Tournament>()
+                .WithMany()
+                .HasForeignKey(e => e.TournamentId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<ParticipantMember>(b =>
+        {
+            b.ToTable("participant_members");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.ParticipantId).IsRequired();
+            b.Property(e => e.TournamentId).IsRequired();
+            b.Property(e => e.UserId).IsRequired();
+            b.Property(e => e.Status).HasConversion<string>().IsRequired();
+            b.HasIndex(e => new { e.TournamentId, e.UserId }).IsUnique();
+            b.HasIndex(e => new { e.ParticipantId, e.UserId }).IsUnique();
+            b.HasOne<Participant>()
+                .WithMany()
+                .HasForeignKey(e => e.ParticipantId)
+                .OnDelete(DeleteBehavior.Cascade);
+            b.HasOne<Tournament>()
+                .WithMany()
+                .HasForeignKey(e => e.TournamentId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         builder.Entity<TestEntity>(b =>
         {
             b.ToTable("test_entities");
