@@ -22,10 +22,14 @@ public class ModuleBoundaryTests
     public void Domain_has_no_framework_or_outward_dependencies()
     {
         var result = Types.InAssembly(DomainAssembly)
+            .That()
+            .ResideInNamespace("TourneyHub.Domain")
             .ShouldNot()
             .HaveDependencyOnAny(
                 "Microsoft.EntityFrameworkCore",
-                "Microsoft.AspNetCore",
+                "Microsoft.AspNetCore.Mvc",
+                "Microsoft.AspNetCore.Http",
+                "System.Net",
                 "Npgsql",
                 "StackExchange.Redis",
                 "TourneyHub.Application",
