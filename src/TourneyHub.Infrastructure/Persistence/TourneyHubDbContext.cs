@@ -41,6 +41,8 @@ public class TourneyHubDbContext : IdentityDbContext<User, IdentityRole<Guid>, G
 
     public DbSet<ConsentRecord> ConsentRecords => Set<ConsentRecord>();
 
+    public DbSet<Membership> Memberships => Set<Membership>();
+
     internal DbSet<IdempotencyEntry> IdempotencyEntries => Set<IdempotencyEntry>();
 
     /// <summary>
@@ -103,8 +105,25 @@ public class TourneyHubDbContext : IdentityDbContext<User, IdentityRole<Guid>, G
             b.Property(e => e.Name).IsRequired();
             b.Property(e => e.Slug).IsRequired();
             b.Property(e => e.State).HasConversion<string>().IsRequired();
+            b.Property(e => e.Plan).HasMaxLength(128).IsRequired();
             b.HasIndex(e => e.Slug).IsUnique();
             b.Property(e => e.Version).IsConcurrencyToken();
+        });
+
+        builder.Entity<Membership>(b =>
+        {
+            b.ToTable("memberships");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.UserId).IsRequired();
+            b.Property(e => e.OrganizationId).IsRequired();
+            b.Property(e => e.Role).HasConversion<string>().IsRequired();
+            b.Property(e => e.State).HasConversion<string>().IsRequired();
+            b.Property(e => e.JoinedAt).IsRequired();
+            b.HasIndex(e => new { e.UserId, e.OrganizationId }).IsUnique();
+            b.HasOne<Organization>()
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<League>(b =>

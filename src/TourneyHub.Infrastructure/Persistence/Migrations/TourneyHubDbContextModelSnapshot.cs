@@ -363,6 +363,42 @@ namespace TourneyHub.Infrastructure.Persistence.Migrations
                     b.ToTable("users", (string)null);
                 });
 
+            modelBuilder.Entity("TourneyHub.Domain.Organizations.Membership", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("JoinedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("UserId", "OrganizationId")
+                        .IsUnique();
+
+                    b.ToTable("memberships", (string)null);
+                });
+
             modelBuilder.Entity("TourneyHub.Domain.Organizations.Organization", b =>
                 {
                     b.Property<Guid>("Id")
@@ -372,6 +408,11 @@ namespace TourneyHub.Infrastructure.Persistence.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<string>("Plan")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
 
                     b.Property<string>("Slug")
                         .IsRequired()
@@ -563,6 +604,15 @@ namespace TourneyHub.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("TourneyHub.Domain.Competition.League", b =>
+                {
+                    b.HasOne("TourneyHub.Domain.Organizations.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("TourneyHub.Domain.Organizations.Membership", b =>
                 {
                     b.HasOne("TourneyHub.Domain.Organizations.Organization", null)
                         .WithMany()
