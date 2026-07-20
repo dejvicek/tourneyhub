@@ -1,0 +1,6 @@
+[*.cs]
+# Test naming conventions use underscores (Given_When_Then pattern).
+dotnet_diagnostic.CA1707.severity = none
+# Test classes may have owned disposable fields managed via IAsyncLifetime.
+dotnet_diagnostic.CA1001.severity = none
+dotnet_diagnostic.CA1062.severity = none

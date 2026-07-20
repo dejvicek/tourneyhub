@@ -139,4 +139,38 @@ public sealed class TenantIsolationTests : IAsyncLifetime
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => ctxB.SaveChangesAsync());
     }
+
+    [Fact]
+    public async Task No_tenant_resolved_fails_closed()
+    {
+        await using var ctx = NewContext(Guid.Empty);
+
+        ctx.Leagues.Add(new League("Unscoped"));
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => ctx.SaveChangesAsync());
+
+        Assert.Contains("no organization resolved", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Organization_id_is_immutable_after_insert()
+    {
+        League league;
+        await using (var ctxLoad = NewContext(_orgA))
+        {
+            league = await ctxLoad.Leagues.SingleAsync(l => l.Id == _leagueA);
+        }
+
+        // Attach to a fresh context and simulate an OrganizationId change via the tracker.
+        await using var ctxModify = NewContext(_orgA);
+        ctxModify.Attach(league);
+        ctxModify.Entry(league).State = EntityState.Modified;
+        ctxModify.Entry(league).Property(nameof(League.OrganizationId)).CurrentValue = _orgB;
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => ctxModify.SaveChangesAsync());
+
+        Assert.Contains("immutable", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
 }
