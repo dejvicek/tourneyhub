@@ -32,6 +32,8 @@ public class TourneyHubDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        ArgumentNullException.ThrowIfNull(modelBuilder);
+
         base.OnModelCreating(modelBuilder);
 
         modelBuilder.Entity<Organization>(b =>
@@ -54,6 +56,11 @@ public class TourneyHubDbContext : DbContext
             b.HasIndex(e => new { e.OrganizationId, e.Id });
             // Tenant isolation: no read can escape the current organization.
             b.HasQueryFilter(e => e.OrganizationId == _tenant.OrganizationId);
+            // FK + immutability: organization_id references organizations.id; ON DELETE RESTRICT.
+            b.HasOne<Organization>()
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 
@@ -83,10 +90,24 @@ public class TourneyHubDbContext : DbContext
 
     /// <summary>
     /// Inserts: stamp the current organization. Updates/deletes: reject if the row belongs
-    /// to a different organization. This is the write-side half of tenant isolation (FR-152).
+    /// to a different organization, or if the OrganizationId has changed (immutable).
+    /// Fails closed when no tenant is resolved (NFR-004, FR-152).
     /// </summary>
     private void StampAndGuardTenant()
     {
+        var hasTenantScopedChanges = ChangeTracker.Entries<TenantEntity>().Any();
+        if (!hasTenantScopedChanges)
+        {
+            return;
+        }
+
+        if (!_tenant.HasTenant)
+        {
+            throw new InvalidOperationException(
+                "Tenant-scoped write blocked: no organization resolved for the current scope. " +
+                "All tenant-scoped writes require an active organization (NFR-004, FR-152, FR-154).");
+        }
+
         foreach (var entry in ChangeTracker.Entries<TenantEntity>())
         {
             var property = entry.Property(nameof(TenantEntity.OrganizationId));
@@ -99,8 +120,15 @@ public class TourneyHubDbContext : DbContext
 
                 case EntityState.Modified:
                 case EntityState.Deleted:
-                    var owner = (Guid)property.CurrentValue!;
-                    if (owner != _tenant.OrganizationId)
+                    var originalOrgId = (Guid)property.OriginalValue!;
+                    var currentOrgId = (Guid)property.CurrentValue!;
+                    if (originalOrgId != currentOrgId)
+                    {
+                        throw new InvalidOperationException(
+                            "OrganizationId is immutable and cannot be changed after insert.");
+                    }
+
+                    if (currentOrgId != _tenant.OrganizationId)
                     {
                         throw new InvalidOperationException(
                             "Cross-tenant write blocked: the entity belongs to a different organization (FR-152, NFR-024).");
