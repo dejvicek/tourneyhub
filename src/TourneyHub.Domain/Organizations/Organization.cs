@@ -15,17 +15,35 @@ public class Organization : Entity
 
     public OrganizationState State { get; private set; }
 
-    // EF materialization constructor.
+    public string Plan { get; private set; }
+
     private Organization()
     {
         Name = string.Empty;
         Slug = string.Empty;
+        Plan = string.Empty;
     }
 
     public Organization(string name, string slug)
     {
         Name = name;
         Slug = slug;
+        State = OrganizationState.Active;
+        Plan = string.Empty;
+    }
+
+    public void SetPlan(string plan)
+    {
+        Plan = plan;
+    }
+
+    public void Suspend()
+    {
+        State = OrganizationState.Suspended;
+    }
+
+    public void Reactivate()
+    {
         State = OrganizationState.Active;
     }
 }
