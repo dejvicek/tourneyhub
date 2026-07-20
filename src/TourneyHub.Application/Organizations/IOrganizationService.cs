@@ -11,4 +11,6 @@ public interface IOrganizationService
     Task<Organization?> GetByIdAsync(Guid organizationId, CancellationToken cancellationToken = default);
 
     Task TransferOwnershipAsync(Guid organizationId, Guid currentOwnerId, Guid newOwnerUserId, CancellationToken cancellationToken = default);
+
+    Task SetSuspensionAsync(Guid organizationId, bool suspended, string? reason, Guid actorId, CancellationToken cancellationToken = default);
 }

@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Routing;
 using TourneyHub.Application.Common;
 using TourneyHub.Application.Organizations;
 using TourneyHub.Domain.Organizations;
+using TourneyHub.Infrastructure.Identity;
 using TourneyHub.Infrastructure.Organizations;
 
 namespace TourneyHub.Api.Extensions;
@@ -26,6 +27,9 @@ internal static class OrganizationsEndpoints
         orgs.MapGet("/", ListAsync).WithOpenApi();
         orgs.MapGet("/{orgId:guid}", GetByIdAsync).WithOpenApi();
         orgs.MapPost("/{orgId:guid}/transfer-ownership", TransferOwnershipAsync).WithOpenApi();
+        orgs.MapPut("/{orgId:guid}/suspension", SetSuspensionAsync)
+            .WithOpenApi()
+            .RequireAuthorization(InstanceAdminRequirement.PolicyName);
 
         return orgs;
     }
@@ -130,6 +134,42 @@ internal static class OrganizationsEndpoints
         }
     }
 
+    private static async Task<IResult> SetSuspensionAsync(
+        Guid orgId,
+        [FromBody] SetSuspensionRequest request,
+        IOrganizationService orgService,
+        HttpContext httpContext,
+        CancellationToken ct)
+    {
+        var userId = GetUserId(httpContext);
+        if (userId is null)
+        {
+            return WriteProblem(401, ErrorCodes.Unauthorized, "Authentication required.");
+        }
+
+        try
+        {
+            await orgService.SetSuspensionAsync(orgId, request.Suspended, request.Reason, userId.Value, ct);
+            return Results.NoContent();
+        }
+        catch (OrganizationOperationException ex)
+        {
+            var status = ex.Code switch
+            {
+                "not_found" => 404,
+                _ => 400,
+            };
+
+            var errorCode = ex.Code switch
+            {
+                "not_found" => ErrorCodes.NotFound,
+                _ => ErrorCodes.UnknownError,
+            };
+
+            return WriteProblem(status, errorCode, ex.Message);
+        }
+    }
+
     private static Guid? GetUserId(HttpContext httpContext)
     {
         var subClaim = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)
@@ -188,3 +228,5 @@ internal static class OrganizationsEndpoints
 internal sealed record TransferOwnershipRequest(Guid NewOwnerUserId);
 
 internal sealed record OrganizationResponse(Guid Id, string Name, string Slug, string State, string Plan, int Version);
+
+internal sealed record SetSuspensionRequest(bool Suspended, string? Reason);

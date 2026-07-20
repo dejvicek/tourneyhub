@@ -1,17 +1,20 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using TourneyHub.Application.Organizations;
 using TourneyHub.Domain.Organizations;
 using TourneyHub.Infrastructure.Persistence;
 
 namespace TourneyHub.Infrastructure.Organizations;
 
-internal sealed class OrganizationService : IOrganizationService
+internal sealed partial class OrganizationService : IOrganizationService
 {
     private readonly TourneyHubDbContext _db;
+    private readonly ILogger<OrganizationService> _logger;
 
-    public OrganizationService(TourneyHubDbContext db)
+    public OrganizationService(TourneyHubDbContext db, ILogger<OrganizationService> logger)
     {
         _db = db;
+        _logger = logger;
     }
 
     public async Task<Organization> CreateAsync(
@@ -92,6 +95,33 @@ internal sealed class OrganizationService : IOrganizationService
 
         await _db.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task SetSuspensionAsync(
+        Guid organizationId, bool suspended, string? reason, Guid actorId, CancellationToken cancellationToken = default)
+    {
+        var org = await _db.Organizations.FirstOrDefaultAsync(o => o.Id == organizationId, cancellationToken);
+        if (org is null)
+        {
+            throw new OrganizationOperationException("not_found", $"Organization '{organizationId}' not found.");
+        }
+
+        if (suspended)
+        {
+            org.Suspend();
+        }
+        else
+        {
+            org.Reactivate();
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        LogSuspensionChanged(org.Id, suspended, reason, actorId);
+    }
+
+    [LoggerMessage(EventId = 10, Level = LogLevel.Warning,
+        Message = "Organization {OrgId} suspended={Suspended} by {ActorId}. Reason: {Reason}")]
+    private partial void LogSuspensionChanged(Guid orgId, bool suspended, string? reason, Guid actorId);
 
     private static string GenerateSlug(string name)
     {
