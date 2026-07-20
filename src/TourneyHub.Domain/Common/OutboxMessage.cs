@@ -4,32 +4,27 @@ namespace TourneyHub.Domain.Common;
 /// Persisted domain event awaiting publication (transactional outbox).
 /// Written in the same DB transaction as the state change that produced it;
 /// a background dispatcher delivers it at-least-once (ADR-0001 §3).
-/// Tenant-scoped per Step 01 (NFR-004, NFR-024).
+/// Carries an optional OrganizationId for tenant-scoped events; non-tenant-scoped
+/// events (e.g. registration) use Guid.Empty.
 /// </summary>
-public class OutboxMessage : TenantEntity
+public class OutboxMessage : Entity
 {
-    /// <summary>Aggregate type name (e.g. "Tournament", "League").</summary>
+    public Guid OrganizationId { get; private set; }
+
     public string AggregateType { get; private set; } = null!;
 
-    /// <summary>The aggregate root's ID.</summary>
     public Guid AggregateId { get; private set; }
 
-    /// <summary>Monotonic version of the aggregate at the time this event was raised.</summary>
     public int AggregateVersion { get; private set; }
 
-    /// <summary>Fully-qualified event type name.</summary>
     public string EventType { get; private set; } = null!;
 
-    /// <summary>Serialised event payload (JSON).</summary>
     public string Payload { get; private set; } = null!;
 
-    /// <summary>UTC timestamp when the event occurred.</summary>
     public DateTime OccurredAt { get; private set; }
 
-    /// <summary>UTC timestamp when the event was successfully published; null if pending.</summary>
     public DateTime? PublishedAt { get; private set; }
 
-    /// <summary>Number of delivery attempts so far.</summary>
     public int RetryCount { get; private set; }
 
     private OutboxMessage() { }
@@ -40,8 +35,10 @@ public class OutboxMessage : TenantEntity
         int aggregateVersion,
         string eventType,
         string payload,
-        DateTime occurredAt)
+        DateTime occurredAt,
+        Guid organizationId = default)
     {
+        OrganizationId = organizationId;
         AggregateType = aggregateType;
         AggregateId = aggregateId;
         AggregateVersion = aggregateVersion;
