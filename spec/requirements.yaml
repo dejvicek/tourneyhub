@@ -893,25 +893,25 @@ functional:
     module: Platform
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Platform/AuditEvent.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs, src/TourneyHub.Infrastructure/Persistence/Migrations/]
+    tests: [tests/TourneyHub.Integration.Tests/OutboxIntegrationTests.cs, tests/TourneyHub.Architecture.Tests/AuditAppendOnlyTests.cs]
   - id: FR-121
     title: Audit logs append-only and tamper-evident
     module: Platform
     scope: MVP
     priority: P1
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Platform/AuditEvent.cs]
+    tests: [tests/TourneyHub.Architecture.Tests/AuditAppendOnlyTests.cs]
   - id: FR-122
     title: Record consent events (privacy policy version)
     module: GDPR
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Identity/ConsentRecord.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs, src/TourneyHub.Infrastructure/Persistence/Migrations/]
+    tests: [tests/TourneyHub.Integration.Tests/OutboxIntegrationTests.cs]
 
   # ------------------------------------------------------------- GDPR / Privacy (§6.10)
   - id: FR-130
@@ -969,17 +969,17 @@ functional:
     module: Platform
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Application/Abstractions/INotificationChannel.cs, src/TourneyHub.Infrastructure/Notifications/EmailChannel.cs, src/TourneyHub.Infrastructure/Messaging/OutboxDispatcher.cs]
+    tests: [tests/TourneyHub.Integration.Tests/OutboxIntegrationTests.cs]
   - id: FR-141
     title: INotificationChannel abstraction + EmailChannel; event-triggered (outbox)
     module: Platform
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Application/Abstractions/INotificationChannel.cs, src/TourneyHub.Application/Abstractions/IOutbox.cs, src/TourneyHub.Infrastructure/Notifications/EmailChannel.cs, src/TourneyHub.Infrastructure/Messaging/OutboxDispatcher.cs, src/TourneyHub.Domain/Common/OutboxMessage.cs, src/TourneyHub.Application/Notifications/Notification.cs, src/TourneyHub.Application/Notifications/NotificationCategory.cs]
+    tests: [tests/TourneyHub.Integration.Tests/OutboxIntegrationTests.cs]
   - id: FR-142
     title: Hosted managed email primary; self-host SMTP secondary; validated at startup
     module: Platform
@@ -993,8 +993,8 @@ functional:
     module: Platform
     scope: MVP
     priority: P1
-    status: not_started
-    files: []
+    status: done
+    files: [src/TourneyHub.Application/Notifications/NotificationCategory.cs, src/TourneyHub.Application/Notifications/Notification.cs]
     tests: []
   - id: FR-144
     title: Engagement notifications, extra channels, preferences
@@ -1105,9 +1105,9 @@ non_functional:
   - id: NFR-017
     title: Auditability (state-changing events reconstructable)
     priority: P1
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Common/DomainEvent.cs, src/TourneyHub.Domain/Common/OutboxMessage.cs, src/TourneyHub.Domain/Platform/AuditEvent.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs, src/TourneyHub.Infrastructure/Messaging/OutboxDispatcher.cs, src/TourneyHub.Infrastructure/Persistence/Migrations/]
+    tests: [tests/TourneyHub.Integration.Tests/OutboxIntegrationTests.cs]
   - id: NFR-018
     title: Determinism (bracket/seed/ranking from inputs + stored seed)
     priority: P0
