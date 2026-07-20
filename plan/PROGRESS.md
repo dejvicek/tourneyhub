@@ -11,7 +11,7 @@
 | 00  | Project meta & tooling hardening   | ✅      | MVP          | —          | 2026-07-18 | 2026-07-18 |
 | 01  | Tenancy as a real boundary         | ✅      | MVP          | 00         | 2026-07-20 | 2026-07-20 |
 | 02  | API conventions & optimistic concurrency | ✅ | MVP          | 01         | 2026-07-20 | 2026-07-20 |
-| 03  | ADR: recompute/concurrency/outbox/PRNG | ⬜  | MVP          | —          | —        | —         |
+| 03  | ADR: recompute/concurrency/outbox/PRNG | ✅      | MVP          | —          | 2026-07-20 | 2026-07-20 |
 | 04  | Audit log + outbox + notification seam | ⬜ | MVP          | 01, 03     | —        | —         |
 | 05  | Auth & accounts                    | ⬜      | MVP          | 00, 01, 02 | —        | —         |
 | 06  | Organizations & membership         | ⬜      | MVP          | 01, 05     | —        | —         |

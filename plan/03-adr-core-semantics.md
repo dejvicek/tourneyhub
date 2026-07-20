@@ -1,7 +1,7 @@
 # Step 03 — ADR: recompute, concurrency, outbox & tie-break semantics
 
 - **Scope:** MVP
-- **Status:** ⬜ not started
+- **Status:** ✅ done
 - **Depends on:** —
 - **Unblocks:** 04, 15, 16, 17 (and de-risks 18–19)
 - **Requirements:** BR-104, FR-095, FR-058, FR-062, NFR-018, NFR-023, §16; edge-cases E-08, E-21
