@@ -12,6 +12,9 @@ info:
       - Tenant scope (organization) is resolved SERVER-SIDE from the caller's identity,
         never from a path/query param (NFR-004, FR-152). Most resources are already
         scoped to the caller's active organization.
+      - The X-Organization-Id header provides the active organization context. When auth
+        is wired (Step 05), the header is validated against the authenticated user's
+        membership. Until then, it serves as the stub/test tenant selector.
       - Errors: RFC 7807 Problem Details with stable error codes (§17).
       - Concurrency: ETag + If-Match on mutable competition/finance entities (NFR-023).
       - Idempotency: Idempotency-Key on create endpoints that must not duplicate (FR-045).
@@ -515,6 +518,14 @@ components:
     LeagueId: { name: leagueId, in: path, required: true, schema: { type: string, format: uuid } }
     TournamentId: { name: tournamentId, in: path, required: true, schema: { type: string, format: uuid } }
     MatchId: { name: matchId, in: path, required: true, schema: { type: string, format: uuid } }
+    OrganizationIdHeader:
+      name: X-Organization-Id
+      in: header
+      required: false
+      schema: { type: string, format: uuid }
+      description: Active organization (tenant) context. Resolved server-side from the authenticated
+        principal's membership; this header is the stub/test bridge until auth is wired (Step 05).
+        Ignored when the principal already carries an active_organization_id claim.
     Cursor: { name: cursor, in: query, required: false, schema: { type: string }, description: Opaque cursor for pagination }
     Limit: { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
     IdempotencyKey:

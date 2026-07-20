@@ -173,7 +173,7 @@ functional:
     module: Platform
     scope: MVP
     priority: P0
-    status: in_progress
+    status: done
     files: [src/TourneyHub.Domain/Common/TenantEntity.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs, src/TourneyHub.Infrastructure/Persistence/Migrations/]
     tests: [tests/TourneyHub.Integration.Tests/TenantIsolationTests.cs]
   - id: FR-152
@@ -181,9 +181,9 @@ functional:
     module: Platform
     scope: MVP
     priority: P0
-    status: in_progress
-    files: [src/TourneyHub.Application/Tenancy/ITenantContext.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs]
-    tests: [tests/TourneyHub.Integration.Tests/TenantIsolationTests.cs]
+    status: done
+    files: [src/TourneyHub.Application/Tenancy/ITenantContext.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs, src/TourneyHub.Infrastructure/Tenancy/HttpTenantContext.cs, src/TourneyHub.Api/Middleware/TenantResolutionMiddleware.cs, src/TourneyHub.Api/Program.cs]
+    tests: [tests/TourneyHub.Integration.Tests/TenantIsolationTests.cs, tests/TourneyHub.Integration.Tests/PostgresTenantIsolationTests.cs]
   - id: FR-153
     title: OrgOwner edits settings + transfers ownership; always >=1 OrgOwner
     module: Platform
@@ -197,9 +197,9 @@ functional:
     module: Platform
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Infrastructure/Tenancy/HttpTenantContext.cs, src/TourneyHub.Api/Middleware/TenantResolutionMiddleware.cs, src/TourneyHub.Api/Program.cs, api/openapi.yaml]
+    tests: [tests/TourneyHub.Integration.Tests/TenantIsolationTests.cs, tests/TourneyHub.Integration.Tests/PostgresTenantIsolationTests.cs]
   - id: FR-155
     title: Platform operator suspends/reactivates org (suspended = read-only)
     module: Platform
@@ -1027,9 +1027,9 @@ non_functional:
   - id: NFR-004
     title: Multi-tenancy core; non-null organization_id, server-side scoping
     priority: P0
-    status: in_progress
-    files: [src/TourneyHub.Domain/Common/TenantEntity.cs, src/TourneyHub.Application/Tenancy/ITenantContext.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs]
-    tests: [tests/TourneyHub.Integration.Tests/TenantIsolationTests.cs]
+    status: done
+    files: [src/TourneyHub.Domain/Common/TenantEntity.cs, src/TourneyHub.Application/Tenancy/ITenantContext.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs, src/TourneyHub.Infrastructure/Tenancy/HttpTenantContext.cs, src/TourneyHub.Api/Middleware/TenantResolutionMiddleware.cs, src/TourneyHub.Api/Program.cs]
+    tests: [tests/TourneyHub.Integration.Tests/TenantIsolationTests.cs, tests/TourneyHub.Integration.Tests/PostgresTenantIsolationTests.cs]
   - id: NFR-005
     title: Performance (P95 read <300ms, write <600ms at MVP scale)
     priority: P1
@@ -1147,9 +1147,9 @@ non_functional:
   - id: NFR-024
     title: Tenant isolation across all surfaces; automated isolation tests
     priority: P0
-    status: in_progress
-    files: [src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs]
-    tests: [tests/TourneyHub.Integration.Tests/TenantIsolationTests.cs]
+    status: done
+    files: [src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs, src/TourneyHub.Infrastructure/Tenancy/HttpTenantContext.cs, src/TourneyHub.Api/Middleware/TenantResolutionMiddleware.cs, src/TourneyHub.Api/Program.cs]
+    tests: [tests/TourneyHub.Integration.Tests/TenantIsolationTests.cs, tests/TourneyHub.Integration.Tests/PostgresTenantIsolationTests.cs]
   - id: NFR-025
     title: Hosted email deliverability (managed provider, retry/bounce)
     priority: P1
