@@ -438,7 +438,39 @@ paths:
             application/json:
               schema:
                 type: array
-                items: { $ref: '#/components/schemas/Standing' }
+                items: { $ref: '#/components/schemas/TournamentStandingEntry' }
+
+  # --------------------------------------------------------------- Seasons
+  /seasons/{seasonId}:
+    parameters:
+      - { name: seasonId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: getSeason
+      tags: [Seasons]
+      summary: Get a season
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Season' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /seasons/{seasonId}/rankings:
+    parameters:
+      - { name: seasonId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      operationId: getSeasonRankings
+      tags: [Standings]
+      summary: Current user-scoped rankings for the season (FR-090)
+      responses:
+        '404': { $ref: '#/components/responses/Problem' }
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SeasonRankingEntry' }
 
   # --------------------------------------------------------------- Matches
   /matches/{matchId}/result:
@@ -833,7 +865,7 @@ components:
       properties:
         tournament: { $ref: '#/components/schemas/Tournament' }
         matches: { type: array, items: { $ref: '#/components/schemas/Match' } }
-        standings: { type: array, items: { $ref: '#/components/schemas/Standing' } }
+        standings: { type: array, items: { $ref: '#/components/schemas/TournamentStandingEntry' } }
 
     RegistrationCreate:
       type: object
@@ -899,12 +931,29 @@ components:
       properties:
         forfeitedParticipantId: { type: string, format: uuid }
 
-    Standing:
+    TournamentStandingEntry:
       type: object
+      description: Participant-scoped tournament standings entry (FR-058).
       properties:
-        scopeId: { type: string, format: uuid, description: tournamentId or seasonId }
-        participantId: { type: [string, 'null'], format: uuid }
+        tournamentId: { type: string, format: uuid }
+        participantId: { type: string, format: uuid }
         rank: { type: integer }
         points: { type: integer }
-        tieBreakData: { type: object, additionalProperties: true }
-      required: [scopeId, rank, points]
+        wins: { type: integer }
+        losses: { type: integer }
+        draws: { type: integer }
+        pointsScored: { type: integer }
+        pointsConceded: { type: integer }
+        pointsDifference: { type: integer }
+        byes: { type: integer }
+      required: [tournamentId, participantId, rank, points]
+    SeasonRankingEntry:
+      type: object
+      description: User-scoped season ranking entry (FR-090, FR-090a); per-player crediting.
+      properties:
+        seasonId: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        rank: { type: integer }
+        points: { type: integer }
+        matchesPlayed: { type: integer }
+      required: [seasonId, userId, rank, points]

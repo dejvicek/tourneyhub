@@ -60,6 +60,12 @@ public class TourneyHubDbContext : IdentityDbContext<User, IdentityRole<Guid>, G
 
     public DbSet<Match> Matches => Set<Match>();
 
+    public DbSet<TournamentStanding> TournamentStandings => Set<TournamentStanding>();
+
+    public DbSet<SeasonRanking> SeasonRankings => Set<SeasonRanking>();
+
+    public DbSet<RankingSnapshot> RankingSnapshots => Set<RankingSnapshot>();
+
     internal DbSet<IdempotencyEntry> IdempotencyEntries => Set<IdempotencyEntry>();
 
     /// <summary>
@@ -421,6 +427,79 @@ public class TourneyHubDbContext : IdentityDbContext<User, IdentityRole<Guid>, G
                 .WithMany()
                 .HasForeignKey(e => e.AdvanceToMatchId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        builder.Entity<TournamentStanding>(b =>
+        {
+            b.ToTable("tournament_standings");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.OrganizationId).IsRequired();
+            b.Property(e => e.TournamentId).IsRequired();
+            b.Property(e => e.ParticipantId).IsRequired();
+            b.Property(e => e.Points).IsRequired();
+            b.Property(e => e.Wins).IsRequired();
+            b.Property(e => e.Losses).IsRequired();
+            b.Property(e => e.Draws).IsRequired();
+            b.Property(e => e.PointsScored).IsRequired();
+            b.Property(e => e.PointsConceded).IsRequired();
+            b.Property(e => e.PointsDifference).IsRequired();
+            b.Property(e => e.Byes).IsRequired();
+            b.Property(e => e.Rank).IsRequired();
+            b.Property(e => e.Version).IsConcurrencyToken();
+            b.HasIndex(e => new { e.TournamentId, e.ParticipantId }).IsUnique();
+            b.HasQueryFilter(e => e.OrganizationId == _tenant.OrganizationId);
+            b.HasOne<Organization>()
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<Tournament>()
+                .WithMany()
+                .HasForeignKey(e => e.TournamentId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<SeasonRanking>(b =>
+        {
+            b.ToTable("season_rankings");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.OrganizationId).IsRequired();
+            b.Property(e => e.SeasonId).IsRequired();
+            b.Property(e => e.UserId).IsRequired();
+            b.Property(e => e.Points).IsRequired();
+            b.Property(e => e.MatchesPlayed).IsRequired();
+            b.Property(e => e.Rank).IsRequired();
+            b.Property(e => e.Version).IsConcurrencyToken();
+            b.HasIndex(e => new { e.SeasonId, e.UserId }).IsUnique();
+            b.HasQueryFilter(e => e.OrganizationId == _tenant.OrganizationId);
+            b.HasOne<Organization>()
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<Season>()
+                .WithMany()
+                .HasForeignKey(e => e.SeasonId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<RankingSnapshot>(b =>
+        {
+            b.ToTable("ranking_snapshots");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.OrganizationId).IsRequired();
+            b.Property(e => e.SeasonId).IsRequired();
+            b.Property(e => e.CreatedAt).IsRequired();
+            b.Property(e => e.Data).IsRequired().HasColumnType("jsonb");
+            b.Property(e => e.Version).IsConcurrencyToken();
+            b.HasIndex(e => new { e.SeasonId });
+            b.HasQueryFilter(e => e.OrganizationId == _tenant.OrganizationId);
+            b.HasOne<Organization>()
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<Season>()
+                .WithMany()
+                .HasForeignKey(e => e.SeasonId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         builder.Entity<TestEntity>(b =>
