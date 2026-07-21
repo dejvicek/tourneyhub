@@ -515,23 +515,23 @@ functional:
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Api/Extensions/MatchesEndpoints.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Application/Competition/ITournamentService.cs, src/TourneyHub.Application/Competition/MatchCommands.cs]
+    tests: [tests/TourneyHub.Integration.Tests/MatchResultIntegrationTests.cs]
   - id: FR-051
     title: resultEntryMode organizer (default) / playerSelfReport
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Competition/Tournament.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs]
+    tests: [tests/TourneyHub.Integration.Tests/TournamentRegistrationIntegrationTests.cs]
   - id: FR-051a
     title: Self-report submit + opposing-captain confirm; dispute/timeout->organizer
     module: Competition
     scope: MVP
     priority: P1
-    status: not_started
+    status: deferred
     files: []
     tests: []
   - id: FR-051b
@@ -539,17 +539,17 @@ functional:
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Domain/Competition/Match.cs, src/TourneyHub.Domain/Platform/AuditEvent.cs]
+    tests: [tests/TourneyHub.Integration.Tests/MatchResultIntegrationTests.cs]
   - id: FR-052
     title: Validate results vs resultModel/scoreConfig
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: [spec/test-vectors/tie-breaks.json]
-    tests: []
+    status: done
+    files: [src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Application/Competition/MatchCommands.cs]
+    tests: [tests/TourneyHub.Integration.Tests/MatchResultIntegrationTests.cs]
   - id: FR-053
     title: Auto-assign byes for non-power-of-two (byes to top seeds)
     module: Competition
@@ -563,17 +563,17 @@ functional:
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Api/Extensions/MatchesEndpoints.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Domain/Competition/Match.cs]
+    tests: [tests/TourneyHub.Integration.Tests/MatchResultIntegrationTests.cs]
   - id: FR-055
     title: Withdrawals (exit whole tournament; auto-forfeit remaining)
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Api/Extensions/MatchesEndpoints.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Domain/Competition/Participant.cs]
+    tests: [tests/TourneyHub.Integration.Tests/MatchResultIntegrationTests.cs]
   - id: FR-056
     title: Cancel a tournament (terminal, with reason)
     module: Competition
@@ -595,9 +595,9 @@ functional:
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Logic/Recompute/RecomputeService.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs]
+    tests: [tests/TourneyHub.Integration.Tests/MatchResultIntegrationTests.cs]
   - id: FR-059
     title: Re-open a completed tournament for correction (audited)
     module: Competition
@@ -629,9 +629,9 @@ functional:
     module: Platform
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Api/Extensions/MatchesEndpoints.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Domain/Competition/Match.cs]
+    tests: [tests/TourneyHub.Integration.Tests/MatchResultIntegrationTests.cs]
   - id: FR-063
     title: Graceful degrade to polling if live transport unavailable
     module: Platform
@@ -825,9 +825,9 @@ functional:
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: [spec/test-vectors/tie-breaks.json]
+    status: done
+    files: [src/TourneyHub.Domain/Logic/Recompute/RecomputeService.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs]
+    tests: [tests/TourneyHub.Integration.Tests/MatchResultIntegrationTests.cs]
   - id: FR-096
     title: Cache derived rankings/stats; invalidate on source change
     module: Competition

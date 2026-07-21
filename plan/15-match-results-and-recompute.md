@@ -1,7 +1,7 @@
 # Step 15 — Match results, validation & recompute
 
 - **Scope:** MVP
-- **Status:** ⬜ not started
+- **Status:** ✅ done
 - **Depends on:** 02, 03, 13
 - **Unblocks:** 16, 18
 - **Requirements:** FR-050, FR-051, FR-051a-b, FR-052, FR-054, FR-055, FR-058, FR-062, FR-095, BR-010, BR-103, BR-104, §10.2

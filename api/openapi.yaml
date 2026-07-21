@@ -468,6 +468,43 @@ paths:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
         '422': { $ref: '#/components/responses/Problem' }
+  /matches/{matchId}/forfeit:
+    parameters:
+      - $ref: '#/components/parameters/MatchId'
+    post:
+      operationId: forfeitMatch
+      tags: [Matches]
+      summary: Mark a participant as forfeited in a match (FR-054)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ForfeitRequest' }
+      responses:
+        '200':
+          description: Applied
+          headers: { ETag: { $ref: '#/components/headers/ETag' } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Match' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /participants/{participantId}/withdraw:
+    parameters:
+      - $ref: '#/components/parameters/ParticipantId'
+    post:
+      operationId: withdrawParticipant
+      tags: [Registrations]
+      summary: Withdraw a participant from a tournament; remaining matches auto-forfeit (FR-055)
+      responses:
+        '200':
+          description: Withdrawn
+          headers: { ETag: { $ref: '#/components/headers/ETag' } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Registration' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
 
   # -------------------------------------------------------------- Public
   /public/leagues/{slug}:
@@ -524,6 +561,7 @@ components:
     LeagueId: { name: leagueId, in: path, required: true, schema: { type: string, format: uuid } }
     TournamentId: { name: tournamentId, in: path, required: true, schema: { type: string, format: uuid } }
     MatchId: { name: matchId, in: path, required: true, schema: { type: string, format: uuid } }
+    ParticipantId: { name: participantId, in: path, required: true, schema: { type: string, format: uuid } }
     OrganizationIdHeader:
       name: X-Organization-Id
       in: header
@@ -836,8 +874,14 @@ components:
         slot: { type: integer }
         participantA: { type: [string, 'null'], format: uuid }
         participantB: { type: [string, 'null'], format: uuid }
-        state: { type: string, enum: [Pending, Ready, InProgress, AwaitingConfirmation, Walkover, Completed] }
+        state: { type: string, enum: [Pending, Ready, InProgress, AwaitingConfirmation, Walkover, Completed, Cancelled] }
         result: { $ref: '#/components/schemas/Result' }
+        winnerId: { type: [string, 'null'], format: uuid }
+        scoreA: { type: [integer, 'null'] }
+        scoreB: { type: [integer, 'null'] }
+        forfeitedParticipantId: { type: [string, 'null'], format: uuid }
+        isDraw: { type: boolean }
+        advanceToMatchId: { type: [string, 'null'], format: uuid }
         version: { type: integer }
       required: [id, tournamentId, round, slot, state]
     Result:
@@ -849,6 +893,11 @@ components:
         scoreB: { type: [integer, 'null'] }
         isDraw: { type: boolean, default: false }
         isForfeit: { type: boolean, default: false }
+    ForfeitRequest:
+      type: object
+      required: [forfeitedParticipantId]
+      properties:
+        forfeitedParticipantId: { type: string, format: uuid }
 
     Standing:
       type: object
