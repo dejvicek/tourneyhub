@@ -788,15 +788,34 @@ if (match.WinnerId is null && !match.IsDraw && match.ForfeitedParticipantId is n
                 return;
             }
 
-            var allSeasonTournaments = await _db.Tournaments
-                .Where(t => t.SeasonId == seasonId.Value
-                            && t.State == TournamentState.Completed)
-                .ToListAsync(ct);
-
             var allTournamentStandings = new List<TournamentStandingsResult>();
             var participantMembers = new Dictionary<Guid, IReadOnlyList<Guid>>();
 
-            foreach (var seasonTournament in allSeasonTournaments)
+            if (tournament.State == TournamentState.Completed)
+            {
+                allTournamentStandings.Add(standingsResult);
+            }
+
+            var persistedSeasonTournaments = await _db.Tournaments
+                .Where(t => t.SeasonId == seasonId.Value
+                            && t.State == TournamentState.Completed
+                            && t.Id != tournament.Id)
+                .ToListAsync(ct);
+
+            foreach (var p in participants)
+            {
+                if (!participantMembers.ContainsKey(p.Id))
+                {
+                    var members = await _db.ParticipantMembers
+                        .Where(m => m.ParticipantId == p.Id && m.Status == ParticipantMemberStatus.Accepted)
+                        .Select(m => m.UserId)
+                        .ToListAsync(ct);
+
+                    participantMembers[p.Id] = members;
+                }
+            }
+
+            foreach (var seasonTournament in persistedSeasonTournaments)
             {
                 var tnParticipants = await _db.Participants
                     .Where(p => p.TournamentId == seasonTournament.Id)

@@ -369,9 +369,9 @@ functional:
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Logic/Rankings/RankingCalculator.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Domain/Competition/SeasonRanking.cs]
+    tests: [tests/TourneyHub.Integration.Tests/RankingAndStandingsIntegrationTests.cs]
   - id: FR-031
     title: League-level statistics (participation, leaders)
     module: Competition
@@ -596,8 +596,8 @@ functional:
     scope: MVP
     priority: P0
     status: done
-    files: [src/TourneyHub.Domain/Logic/Recompute/RecomputeService.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs]
-    tests: [tests/TourneyHub.Integration.Tests/MatchResultIntegrationTests.cs]
+    files: [src/TourneyHub.Domain/Logic/Recompute/RecomputeService.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Domain/Competition/TournamentStanding.cs, src/TourneyHub.Domain/Logic/Rankings/RankingCalculator.cs]
+    tests: [tests/TourneyHub.Integration.Tests/MatchResultIntegrationTests.cs, tests/TourneyHub.Integration.Tests/RankingAndStandingsIntegrationTests.cs]
   - id: FR-059
     title: Re-open a completed tournament for correction (audited)
     module: Competition
@@ -777,25 +777,25 @@ functional:
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: [spec/test-vectors/tie-breaks.json]
+    status: done
+    files: [src/TourneyHub.Domain/Logic/Rankings/RankingCalculator.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Domain/Competition/SeasonRanking.cs]
+    tests: [spec/test-vectors/tie-breaks.json, tests/TourneyHub.Integration.Tests/RankingAndStandingsIntegrationTests.cs]
   - id: FR-090a
     title: Team play awards points per player; standings per-User
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Logic/Rankings/RankingCalculator.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs]
+    tests: [tests/TourneyHub.Integration.Tests/RankingAndStandingsIntegrationTests.cs]
   - id: FR-091
     title: Preserve historical rankings per finished season (snapshot)
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Competition/RankingSnapshot.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs]
+    tests: [tests/TourneyHub.Integration.Tests/RankingAndStandingsIntegrationTests.cs]
   - id: FR-092
     title: Per-player match history
     module: Competition
@@ -826,8 +826,8 @@ functional:
     scope: MVP
     priority: P0
     status: done
-    files: [src/TourneyHub.Domain/Logic/Recompute/RecomputeService.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs]
-    tests: [tests/TourneyHub.Integration.Tests/MatchResultIntegrationTests.cs]
+    files: [src/TourneyHub.Domain/Logic/Recompute/RecomputeService.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Domain/Logic/Rankings/RankingCalculator.cs, src/TourneyHub.Domain/Competition/TournamentStanding.cs, src/TourneyHub.Domain/Competition/SeasonRanking.cs]
+    tests: [tests/TourneyHub.Integration.Tests/MatchResultIntegrationTests.cs, tests/TourneyHub.Integration.Tests/RankingAndStandingsIntegrationTests.cs]
   - id: FR-096
     title: Cache derived rankings/stats; invalidate on source change
     module: Competition

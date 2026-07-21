@@ -24,7 +24,7 @@
 | 13  | Single-elimination bracket         | ✅      | MVP          | 12         | 2026-07-21 | 2026-07-21 |
 | 14  | Round-robin & tie-breaks           | ✅      | MVP*         | 11, 12     | 2026-07-21 | 2026-07-21 |
 | 15  | Match results, validation & recompute | ✅      | MVP          | 02, 03, 13 | 2026-07-21 | 2026-07-21 |
-| 16  | Rankings, standings & public reads | ⬜      | MVP          | 11, 15     | —        | —         |
+| 16  | Rankings, standings & public reads | ✅      | MVP          | 11, 15     | 2026-07-21 | 2026-07-21 |
 | 17  | Live/realtime gateway              | ⬜      | MVP*         | 04, 16     | —        | —         |
 | 18  | Fees, payments & prize pool        | ⬜      | MVP*         | 12, 16     | —        | —         |
 | 19  | Payouts & team splits              | ⬜      | MVP*         | 18         | —        | —         |
