@@ -23,3 +23,10 @@ public sealed record RegisterParticipantCommand(
     List<string>? RosterInviteEmails);
 
 public sealed record AcceptMemberCommand();
+
+public sealed record SeedTournamentCommand(
+    string Method,
+    List<Guid>? Order);
+
+public sealed record GenerateBracketCommand(
+    bool Force = false);

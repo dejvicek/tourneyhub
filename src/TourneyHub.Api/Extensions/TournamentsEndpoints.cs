@@ -26,6 +26,8 @@ internal static class TournamentsEndpoints
         tournaments.MapPost("/", CreateAsync).WithOpenApi();
         tournaments.MapGet("/{tournamentId:guid}", GetByIdAsync).WithOpenApi();
         tournaments.MapPost("/{tournamentId:guid}/registrations", RegisterParticipantAsync).WithOpenApi();
+        tournaments.MapPost("/{tournamentId:guid}/seed", SeedAsync).WithOpenApi();
+        tournaments.MapPost("/{tournamentId:guid}/generate-bracket", GenerateBracketAsync).WithOpenApi();
 
         var participants = app.MapGroup("/api/v1/participants");
         participants.MapPost("/{participantId:guid}/members/accept", AcceptMemberAsync).WithOpenApi();
@@ -175,6 +177,69 @@ internal static class TournamentsEndpoints
         }
     }
 
+    private static async Task<IResult> SeedAsync(
+        Guid tournamentId,
+        [FromBody] SeedTournamentRequest request,
+        ITournamentService tournamentService,
+        HttpContext httpContext,
+        CancellationToken ct)
+    {
+        var orgId = GetOrgId(httpContext);
+        if (orgId is null)
+            return WriteProblem(400, ErrorCodes.NoTenantResolved, "No organization context resolved.");
+
+        try
+        {
+            var command = new SeedTournamentCommand(request.Method, request.Order);
+            await tournamentService.SeedAsync(tournamentId, command, ct);
+            return Results.Ok();
+        }
+        catch (TournamentOperationException ex)
+        {
+            var (status, code) = ex.Code switch
+            {
+                ErrorCodes.InvalidTournamentState => (409, ex.Code),
+                ErrorCodes.InsufficientParticipants => (409, ex.Code),
+                "seed_count_mismatch" => (422, ex.Code),
+                "invalid_participant_id" => (422, ex.Code),
+                "seed_not_supported" => (422, ex.Code),
+                _ => (400, ex.Code),
+            };
+            return WriteProblem(status, code, ex.Message);
+        }
+    }
+
+    private static async Task<IResult> GenerateBracketAsync(
+        Guid tournamentId,
+        [FromBody] GenerateBracketRequest request,
+        ITournamentService tournamentService,
+        HttpContext httpContext,
+        CancellationToken ct)
+    {
+        var orgId = GetOrgId(httpContext);
+        if (orgId is null)
+            return WriteProblem(400, ErrorCodes.NoTenantResolved, "No organization context resolved.");
+
+        try
+        {
+            var command = new GenerateBracketCommand(request.Force);
+            var matches = await tournamentService.GenerateBracketAsync(tournamentId, command, ct);
+            return JsonOk(matches.Select(MapMatchResponse).ToList());
+        }
+        catch (TournamentOperationException ex)
+        {
+            var (status, code) = ex.Code switch
+            {
+                ErrorCodes.InvalidTournamentState => (409, ex.Code),
+                ErrorCodes.InsufficientParticipants => (409, ex.Code),
+                ErrorCodes.BracketAlreadyGenerated => (409, ex.Code),
+                "bracket_not_supported" => (422, ex.Code),
+                _ => (400, ex.Code),
+            };
+            return WriteProblem(status, code, ex.Message);
+        }
+    }
+
     private static Guid? GetUserId(HttpContext httpContext)
     {
         var subClaim = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)
@@ -227,6 +292,17 @@ internal static class TournamentsEndpoints
         m.TournamentId,
         m.UserId,
         m.Status.ToString().ToLowerInvariant(),
+        m.Version);
+
+    private static MatchResponse MapMatchResponse(Match m) => new(
+        m.Id,
+        m.TournamentId,
+        m.RoundNumber,
+        m.PositionInRound,
+        m.ParticipantAId,
+        m.ParticipantBId,
+        m.State.ToString().ToLowerInvariant(),
+        m.IsByeMatch,
         m.Version);
 
     private static IResult JsonOk(object? value) => Results.Text(
@@ -319,4 +395,22 @@ internal sealed record MemberResponse(
     Guid TournamentId,
     Guid UserId,
     string Status,
+    int Version);
+
+internal sealed record SeedTournamentRequest(
+    string Method,
+    List<Guid>? Order);
+
+internal sealed record GenerateBracketRequest(
+    bool Force);
+
+internal sealed record MatchResponse(
+    Guid Id,
+    Guid TournamentId,
+    int Round,
+    int Slot,
+    Guid? ParticipantA,
+    Guid? ParticipantB,
+    string State,
+    bool IsByeMatch,
     int Version);

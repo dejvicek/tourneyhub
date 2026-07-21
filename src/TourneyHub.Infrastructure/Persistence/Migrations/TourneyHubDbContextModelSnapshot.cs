@@ -275,6 +275,63 @@ namespace TourneyHub.Infrastructure.Persistence.Migrations
                     b.ToTable("leagues", (string)null);
                 });
 
+            modelBuilder.Entity("TourneyHub.Domain.Competition.Match", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AdvanceToMatchId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsByeMatch")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ParticipantAId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ParticipantBId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("PositionInRound")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RoundNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("TournamentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("WinnerId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdvanceToMatchId");
+
+                    b.HasIndex("ParticipantAId");
+
+                    b.HasIndex("ParticipantBId");
+
+                    b.HasIndex("OrganizationId", "Id");
+
+                    b.HasIndex("TournamentId", "RoundNumber", "PositionInRound")
+                        .IsUnique();
+
+                    b.ToTable("matches", (string)null);
+                });
+
             modelBuilder.Entity("TourneyHub.Domain.Competition.Participant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -926,6 +983,36 @@ namespace TourneyHub.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("OrganizationId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("TourneyHub.Domain.Competition.Match", b =>
+                {
+                    b.HasOne("TourneyHub.Domain.Competition.Match", null)
+                        .WithMany()
+                        .HasForeignKey("AdvanceToMatchId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("TourneyHub.Domain.Organizations.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TourneyHub.Domain.Competition.Participant", null)
+                        .WithMany()
+                        .HasForeignKey("ParticipantAId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("TourneyHub.Domain.Competition.Participant", null)
+                        .WithMany()
+                        .HasForeignKey("ParticipantBId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("TourneyHub.Domain.Competition.Tournament", null)
+                        .WithMany()
+                        .HasForeignKey("TournamentId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

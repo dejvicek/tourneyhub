@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using TourneyHub.Application.Common;
 using TourneyHub.Application.Competition;
 using TourneyHub.Domain.Competition;
+using TourneyHub.Domain.Logic.Formats;
 using TourneyHub.Infrastructure.Persistence;
 
 namespace TourneyHub.Infrastructure.Competition;
@@ -191,6 +192,143 @@ internal sealed partial class TournamentService : ITournamentService
         return member;
     }
 
+    public async Task SeedAsync(Guid tournamentId, SeedTournamentCommand command, CancellationToken ct)
+    {
+        var tournament = await GetTournamentRequiredAsync(tournamentId, ct);
+
+        if (tournament.FormatType != FormatType.SingleElimination)
+            throw new TournamentOperationException("seed_not_supported", "Seeding is only supported for Single Elimination tournaments.");
+
+        if (tournament.State != TournamentState.RegistrationClosed)
+            throw new TournamentOperationException(ErrorCodes.InvalidTournamentState, "Can only seed from RegistrationClosed state.");
+
+        var confirmedParticipants = await _db.Participants
+            .Where(p => p.TournamentId == tournamentId && p.Status == ParticipantState.Confirmed)
+            .OrderBy(p => p.Id)
+            .ToListAsync(ct);
+
+        if (confirmedParticipants.Count < 2)
+            throw new TournamentOperationException(ErrorCodes.InsufficientParticipants, "At least 2 confirmed participants are required to seed.");
+
+        if (command.Method == "manual" && command.Order is { Count: > 0 })
+        {
+            if (command.Order.Count != confirmedParticipants.Count)
+                throw new TournamentOperationException("seed_count_mismatch", $"Expected {confirmedParticipants.Count} participant IDs in seed order, got {command.Order.Count}.");
+
+            var participantIds = confirmedParticipants.Select(p => p.Id).ToHashSet();
+            foreach (var id in command.Order)
+            {
+                if (!participantIds.Contains(id))
+                    throw new TournamentOperationException("invalid_participant_id", $"Participant {id} is not a confirmed participant in this tournament.");
+            }
+
+            var rngSeed = Guid.NewGuid().ToString("N");
+            tournament.SetRngSeed(rngSeed);
+        }
+        else
+        {
+            var rngSeed = Guid.NewGuid().ToString("N");
+            tournament.SetRngSeed(rngSeed);
+        }
+
+        tournament.Seed();
+        await _db.SaveChangesAsync(ct);
+
+        LogTournamentSeeded(tournamentId);
+    }
+
+    public async Task<IReadOnlyList<Match>> GenerateBracketAsync(Guid tournamentId, GenerateBracketCommand command, CancellationToken ct)
+    {
+        var tournament = await GetTournamentRequiredAsync(tournamentId, ct);
+
+        if (tournament.FormatType != FormatType.SingleElimination)
+            throw new TournamentOperationException("bracket_not_supported", "Bracket generation is only supported for Single Elimination tournaments.");
+
+        if (!command.Force && tournament.State != TournamentState.Seeded)
+            throw new TournamentOperationException(ErrorCodes.InvalidTournamentState, "Tournament must be in Seeded state to generate bracket.");
+
+        if (command.Force && tournament.State is not TournamentState.Seeded and not TournamentState.InProgress)
+            throw new TournamentOperationException(ErrorCodes.InvalidTournamentState, "Bracket can only be force-regenerated from Seeded or InProgress states.");
+
+        var anyCompleted = await _db.Matches
+            .AnyAsync(m => m.TournamentId == tournamentId && m.State == MatchState.Completed, ct);
+
+        if (anyCompleted && !command.Force)
+            throw new TournamentOperationException(ErrorCodes.BracketAlreadyGenerated, "Bracket cannot be regenerated after match results have been entered.");
+
+        var existingMatches = await _db.Matches
+            .Where(m => m.TournamentId == tournamentId)
+            .ToListAsync(ct);
+
+        var confirmedParticipants = await _db.Participants
+            .Where(p => p.TournamentId == tournamentId && p.Status == ParticipantState.Confirmed)
+            .OrderBy(p => p.Id)
+            .ToListAsync(ct);
+
+        if (confirmedParticipants.Count < 2)
+            throw new TournamentOperationException(ErrorCodes.InsufficientParticipants, "At least 2 confirmed participants are required to generate a bracket.");
+
+        int participantCount = confirmedParticipants.Count;
+        var rngSeed = tournament.RngSeed ?? "default";
+
+        var orderedSeeds = SingleEliminationGenerator.ShuffleSeeds(participantCount, rngSeed);
+        var bracket = SingleEliminationGenerator.Generate(participantCount, rngSeed);
+
+        var matches = new List<Match>();
+        foreach (var bm in bracket.Matches)
+        {
+            int? seedA = bm.SeedA;
+            int? seedB = bm.SeedB;
+
+            Guid? participantAId = seedA.HasValue && seedA.Value <= orderedSeeds.Count
+                ? confirmedParticipants[orderedSeeds[seedA.Value - 1] - 1].Id
+                : null;
+
+            Guid? participantBId = seedB.HasValue && seedB.Value <= orderedSeeds.Count
+                ? confirmedParticipants[orderedSeeds[seedB.Value - 1] - 1].Id
+                : null;
+
+            var match = new Match(
+                tournamentId,
+                bm.RoundNumber,
+                bm.PositionInRound,
+                participantAId,
+                participantBId,
+                bm.IsByeMatch);
+
+            matches.Add(match);
+        }
+
+        for (int i = 0; i < matches.Count; i++)
+        {
+            var bm = bracket.Matches[i];
+            if (bm.AdvanceToRound.HasValue && bm.AdvanceToPosition.HasValue)
+            {
+                var advanceToMatch = matches.First(m =>
+                    m.RoundNumber == bm.AdvanceToRound.Value &&
+                    m.PositionInRound == bm.AdvanceToPosition.Value);
+                matches[i].SetAdvanceToMatch(advanceToMatch.Id);
+            }
+        }
+
+        if (existingMatches.Count > 0)
+        {
+            _db.Matches.RemoveRange(existingMatches);
+        }
+
+        _db.Matches.AddRange(matches);
+
+        if (tournament.State == TournamentState.Seeded)
+        {
+            tournament.StartInProgress();
+        }
+
+        await _db.SaveChangesAsync(ct);
+
+        LogBracketGenerated(tournamentId, matches.Count);
+        return matches.AsReadOnly();
+    }
+
     private async Task<Tournament> GetTournamentRequiredAsync(Guid tournamentId, CancellationToken ct)
     {
         return await _db.Tournaments.FirstOrDefaultAsync(t => t.Id == tournamentId, ct)
@@ -226,4 +364,10 @@ internal sealed partial class TournamentService : ITournamentService
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Member {MemberId} accepted for participant {ParticipantId}, user {UserId}")]
     private partial void LogMemberAccepted(Guid memberId, Guid participantId, Guid userId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Tournament {TournamentId} seeded")]
+    private partial void LogTournamentSeeded(Guid tournamentId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Bracket generated for tournament {TournamentId} with {MatchCount} matches")]
+    private partial void LogBracketGenerated(Guid tournamentId, int matchCount);
 }

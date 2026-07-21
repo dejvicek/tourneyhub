@@ -435,16 +435,16 @@ functional:
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: [spec/test-vectors/single-elimination.json, spec/test-vectors/round-robin.json]
+    status: in_progress
+    files: [src/TourneyHub.Domain/Logic/Formats/SingleEliminationGenerator.cs, src/TourneyHub.Domain/Competition/Match.cs]
+    tests: [tests/TourneyHub.Domain.Tests/SingleEliminationGeneratorTests.cs, spec/test-vectors/single-elimination.json, spec/test-vectors/round-robin.json]
   - id: FR-042
     title: Pluggable formats (Strategy/registry, no core changes)
     module: Competition
     scope: MVP
     priority: P0
     status: not_started
-    files: []
+    files: [src/TourneyHub.Domain/Logic/Formats/SingleEliminationGenerator.cs]
     tests: []
   - id: FR-043
     title: Registration window (open/close, capacity, deadline)
@@ -483,25 +483,25 @@ functional:
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Logic/Formats/SingleEliminationGenerator.cs, src/TourneyHub.Application/Competition/ITournamentService.cs, src/TourneyHub.Application/Competition/TournamentCommands.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Api/Extensions/TournamentsEndpoints.cs]
+    tests: [tests/TourneyHub.Domain.Tests/SingleEliminationGeneratorTests.cs]
   - id: FR-047
     title: Deterministic bracket/schedule generation from seeds
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: [spec/test-vectors/single-elimination.json, spec/test-vectors/round-robin.json]
+    status: done
+    files: [src/TourneyHub.Domain/Logic/Formats/SingleEliminationGenerator.cs, src/TourneyHub.Application/Competition/ITournamentService.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Api/Extensions/TournamentsEndpoints.cs]
+    tests: [tests/TourneyHub.Domain.Tests/SingleEliminationGeneratorTests.cs, spec/test-vectors/single-elimination.json]
   - id: FR-048
     title: Bracket generation idempotent until start; forced regen audited
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: []
+    status: done
+    files: [src/TourneyHub.Domain/Logic/Formats/SingleEliminationGenerator.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Api/Extensions/TournamentsEndpoints.cs]
+    tests: [tests/TourneyHub.Domain.Tests/SingleEliminationGeneratorTests.cs]
   - id: FR-049
     title: Per-match scheduling metadata (round, table, planned time)
     module: Competition
@@ -555,9 +555,9 @@ functional:
     module: Competition
     scope: MVP
     priority: P0
-    status: not_started
-    files: []
-    tests: [spec/test-vectors/single-elimination.json]
+    status: done
+    files: [src/TourneyHub.Domain/Logic/Formats/SingleEliminationGenerator.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs]
+    tests: [tests/TourneyHub.Domain.Tests/SingleEliminationGeneratorTests.cs, spec/test-vectors/single-elimination.json]
   - id: FR-054
     title: Forfeits (participant loses a specific match)
     module: Competition
@@ -1111,9 +1111,9 @@ non_functional:
   - id: NFR-018
     title: Determinism (bracket/seed/ranking from inputs + stored seed)
     priority: P0
-    status: not_started
-    files: []
-    tests: [spec/test-vectors/single-elimination.json, spec/test-vectors/round-robin.json, spec/test-vectors/tie-breaks.json]
+    status: done
+    files: [src/TourneyHub.Domain/Logic/Formats/SingleEliminationGenerator.cs, src/TourneyHub.Domain/Competition/Tournament.cs]
+    tests: [tests/TourneyHub.Domain.Tests/SingleEliminationGeneratorTests.cs, spec/test-vectors/single-elimination.json, spec/test-vectors/round-robin.json, spec/test-vectors/tie-breaks.json]
   - id: NFR-019
     title: Licensing AGPL-3.0 + CLA
     priority: P0

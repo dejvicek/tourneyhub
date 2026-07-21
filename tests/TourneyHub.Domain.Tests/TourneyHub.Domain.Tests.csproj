@@ -18,5 +18,6 @@
     <!-- Golden oracle copied next to the test binary so tests read it by file name. -->
     <None Include="..\..\spec\test-vectors\payout-split.json" Link="payout-split.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\spec\test-vectors\tie-breaks.json" Link="tie-breaks.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\spec\test-vectors\single-elimination.json" Link="single-elimination.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

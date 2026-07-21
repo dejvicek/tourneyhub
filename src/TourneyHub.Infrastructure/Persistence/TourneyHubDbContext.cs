@@ -58,6 +58,8 @@ public class TourneyHubDbContext : IdentityDbContext<User, IdentityRole<Guid>, G
 
     public DbSet<ParticipantMember> ParticipantMembers => Set<ParticipantMember>();
 
+    public DbSet<Match> Matches => Set<Match>();
+
     internal DbSet<IdempotencyEntry> IdempotencyEntries => Set<IdempotencyEntry>();
 
     /// <summary>
@@ -375,6 +377,46 @@ public class TourneyHubDbContext : IdentityDbContext<User, IdentityRole<Guid>, G
                 .WithMany()
                 .HasForeignKey(e => e.TournamentId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<Match>(b =>
+        {
+            b.ToTable("matches");
+            b.HasKey(e => e.Id);
+            b.Property(e => e.OrganizationId).IsRequired();
+            b.Property(e => e.TournamentId).IsRequired();
+            b.Property(e => e.RoundNumber).IsRequired();
+            b.Property(e => e.PositionInRound).IsRequired();
+            b.Property(e => e.ParticipantAId);
+            b.Property(e => e.ParticipantBId);
+            b.Property(e => e.WinnerId);
+            b.Property(e => e.State).HasConversion<string>().IsRequired();
+            b.Property(e => e.IsByeMatch).IsRequired();
+            b.Property(e => e.AdvanceToMatchId);
+            b.Property(e => e.Version).IsConcurrencyToken();
+            b.HasIndex(e => new { e.OrganizationId, e.Id });
+            b.HasIndex(e => new { e.TournamentId, e.RoundNumber, e.PositionInRound }).IsUnique();
+            b.HasQueryFilter(e => e.OrganizationId == _tenant.OrganizationId);
+            b.HasOne<Organization>()
+                .WithMany()
+                .HasForeignKey(e => e.OrganizationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<Tournament>()
+                .WithMany()
+                .HasForeignKey(e => e.TournamentId)
+                .OnDelete(DeleteBehavior.Cascade);
+            b.HasOne<Participant>()
+                .WithMany()
+                .HasForeignKey(e => e.ParticipantAId)
+                .OnDelete(DeleteBehavior.SetNull);
+            b.HasOne<Participant>()
+                .WithMany()
+                .HasForeignKey(e => e.ParticipantBId)
+                .OnDelete(DeleteBehavior.SetNull);
+            b.HasOne<Match>()
+                .WithMany()
+                .HasForeignKey(e => e.AdvanceToMatchId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         builder.Entity<TestEntity>(b =>

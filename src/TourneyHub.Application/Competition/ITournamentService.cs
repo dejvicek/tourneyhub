@@ -17,4 +17,8 @@ public interface ITournamentService
         CancellationToken ct);
 
     Task<ParticipantMember> AcceptMemberAsync(Guid participantId, Guid userId, CancellationToken ct);
+
+    Task SeedAsync(Guid tournamentId, SeedTournamentCommand command, CancellationToken ct);
+
+    Task<IReadOnlyList<Match>> GenerateBracketAsync(Guid tournamentId, GenerateBracketCommand command, CancellationToken ct);
 }
