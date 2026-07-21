@@ -29,6 +29,14 @@ public class Participant : TenantEntity
             throw new ParticipantOperationException("participant_already_confirmed", "Participant is already confirmed.");
         Status = ParticipantState.Confirmed;
     }
+
+    public void Withdraw(Guid tournamentId)
+    {
+        if (Status != ParticipantState.Confirmed)
+            throw new ParticipantOperationException("not_confirmed", "Only confirmed participants can withdraw.");
+        Status = ParticipantState.Confirmed;
+        RaiseDomainEvent(new ParticipantWithdrawnEvent(tournamentId, Id));
+    }
 }
 
 public class ParticipantOperationException : Exception

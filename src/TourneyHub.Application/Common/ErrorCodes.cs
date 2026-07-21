@@ -43,6 +43,13 @@ public static class ErrorCodes
     public const string InvalidResult = "invalid_result";
     public const string BracketAlreadyGenerated = "bracket_already_generated";
     public const string InsufficientParticipants = "insufficient_participants";
+    public const string InvalidMatchState = "invalid_match_state";
+    public const string MatchNotFound = "match_not_found";
+    public const string ParticipantNotDetermined = "participants_not_determined";
+    public const string DrawsNotAllowed = "draws_not_allowed";
+    public const string ScoreOutOfRange = "score_out_of_range";
+    public const string WinnerMismatch = "winner_mismatch";
+    public const string InvalidForfeit = "invalid_forfeit";
     public const string SeasonAlreadyActive = "season_already_active";
     public const string LeagueArchived = "league_archived";
     public const string LeagueNotFound = "league_not_found";

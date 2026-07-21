@@ -23,4 +23,10 @@ public interface ITournamentService
     Task<IReadOnlyList<Match>> GenerateBracketAsync(Guid tournamentId, GenerateBracketCommand command, CancellationToken ct);
 
     Task<IReadOnlyList<Match>> GenerateScheduleAsync(Guid tournamentId, GenerateBracketCommand command, CancellationToken ct);
+
+    Task<Match> SubmitResultAsync(Guid matchId, SubmitResultCommand command, Guid organizationId, Guid actorUserId, int ifMatchVersion, CancellationToken ct);
+
+    Task<Match> ForfeitMatchAsync(Guid matchId, ForfeitMatchCommand command, Guid organizationId, Guid actorUserId, CancellationToken ct);
+
+    Task<Participant> WithdrawParticipantAsync(Guid participantId, Guid organizationId, Guid actorUserId, CancellationToken ct);
 }
