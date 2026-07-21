@@ -21,7 +21,7 @@
 | 10  | Leagues & seasons                  | ✅      | MVP          | 06         | 2026-07-21 | 2026-07-21 |
 | 11  | Scoring system config              | ✅      | MVP          | 10         | 2026-07-21 | 2026-07-21 |
 | 12  | Tournaments, participants & rosters | ✅      | MVP          | 10         | 2026-07-21 | 2026-07-21 |
-| 13  | Single-elimination bracket         | ⬜      | MVP          | 12         | —        | —         |
+| 13  | Single-elimination bracket         | ✅      | MVP          | 12         | 2026-07-21 | 2026-07-21 |
 | 14  | Round-robin & tie-breaks           | ⬜      | MVP*         | 11, 12     | —        | —         |
 | 15  | Match results, validation & recompute | ⬜   | MVP          | 02, 03, 13 | —        | —         |
 | 16  | Rankings, standings & public reads | ⬜      | MVP          | 11, 15     | —        | —         |
