@@ -21,4 +21,6 @@ public interface ITournamentService
     Task SeedAsync(Guid tournamentId, SeedTournamentCommand command, CancellationToken ct);
 
     Task<IReadOnlyList<Match>> GenerateBracketAsync(Guid tournamentId, GenerateBracketCommand command, CancellationToken ct);
+
+    Task<IReadOnlyList<Match>> GenerateScheduleAsync(Guid tournamentId, GenerateBracketCommand command, CancellationToken ct);
 }

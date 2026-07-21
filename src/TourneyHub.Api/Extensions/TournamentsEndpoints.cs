@@ -28,6 +28,7 @@ internal static class TournamentsEndpoints
         tournaments.MapPost("/{tournamentId:guid}/registrations", RegisterParticipantAsync).WithOpenApi();
         tournaments.MapPost("/{tournamentId:guid}/seed", SeedAsync).WithOpenApi();
         tournaments.MapPost("/{tournamentId:guid}/generate-bracket", GenerateBracketAsync).WithOpenApi();
+        tournaments.MapPost("/{tournamentId:guid}/generate-schedule", GenerateScheduleAsync).WithOpenApi();
 
         var participants = app.MapGroup("/api/v1/participants");
         participants.MapPost("/{participantId:guid}/members/accept", AcceptMemberAsync).WithOpenApi();
@@ -234,6 +235,37 @@ internal static class TournamentsEndpoints
                 ErrorCodes.InsufficientParticipants => (409, ex.Code),
                 ErrorCodes.BracketAlreadyGenerated => (409, ex.Code),
                 "bracket_not_supported" => (422, ex.Code),
+                _ => (400, ex.Code),
+            };
+            return WriteProblem(status, code, ex.Message);
+        }
+    }
+
+    private static async Task<IResult> GenerateScheduleAsync(
+        Guid tournamentId,
+        [FromBody] GenerateBracketRequest request,
+        ITournamentService tournamentService,
+        HttpContext httpContext,
+        CancellationToken ct)
+    {
+        var orgId = GetOrgId(httpContext);
+        if (orgId is null)
+            return WriteProblem(400, ErrorCodes.NoTenantResolved, "No organization context resolved.");
+
+        try
+        {
+            var command = new GenerateBracketCommand(request.Force);
+            var matches = await tournamentService.GenerateScheduleAsync(tournamentId, command, ct);
+            return JsonOk(matches.Select(MapMatchResponse).ToList());
+        }
+        catch (TournamentOperationException ex)
+        {
+            var (status, code) = ex.Code switch
+            {
+                ErrorCodes.InvalidTournamentState => (409, ex.Code),
+                ErrorCodes.InsufficientParticipants => (409, ex.Code),
+                ErrorCodes.BracketAlreadyGenerated => (409, ex.Code),
+                "schedule_not_supported" => (422, ex.Code),
                 _ => (400, ex.Code),
             };
             return WriteProblem(status, code, ex.Message);

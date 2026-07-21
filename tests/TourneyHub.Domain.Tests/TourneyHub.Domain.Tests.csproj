@@ -19,5 +19,6 @@
     <None Include="..\..\spec\test-vectors\payout-split.json" Link="payout-split.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\spec\test-vectors\tie-breaks.json" Link="tie-breaks.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\spec\test-vectors\single-elimination.json" Link="single-elimination.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\spec\test-vectors\round-robin.json" Link="round-robin.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
