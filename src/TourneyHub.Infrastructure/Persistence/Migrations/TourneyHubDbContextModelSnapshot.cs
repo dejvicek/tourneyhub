@@ -284,7 +284,13 @@ namespace TourneyHub.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("AdvanceToMatchId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ForfeitedParticipantId")
+                        .HasColumnType("uuid");
+
                     b.Property<bool>("IsByeMatch")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDraw")
                         .HasColumnType("boolean");
 
                     b.Property<Guid>("OrganizationId")
@@ -300,6 +306,12 @@ namespace TourneyHub.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer");
 
                     b.Property<int>("RoundNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ScoreA")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ScoreB")
                         .HasColumnType("integer");
 
                     b.Property<string>("State")

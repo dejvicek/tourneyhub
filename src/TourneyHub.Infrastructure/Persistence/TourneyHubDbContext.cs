@@ -393,6 +393,10 @@ public class TourneyHubDbContext : IdentityDbContext<User, IdentityRole<Guid>, G
             b.Property(e => e.State).HasConversion<string>().IsRequired();
             b.Property(e => e.IsByeMatch).IsRequired();
             b.Property(e => e.AdvanceToMatchId);
+            b.Property(e => e.ScoreA);
+            b.Property(e => e.ScoreB);
+            b.Property(e => e.ForfeitedParticipantId);
+            b.Property(e => e.IsDraw).IsRequired();
             b.Property(e => e.Version).IsConcurrencyToken();
             b.HasIndex(e => new { e.OrganizationId, e.Id });
             b.HasIndex(e => new { e.TournamentId, e.RoundNumber, e.PositionInRound }).IsUnique();

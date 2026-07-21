@@ -171,6 +171,8 @@ app.MapLeagueInvitationsEndpoints();
 app.MapLeaguesEndpoints();
 app.MapPublicEndpoints();
 app.MapTournamentsEndpoints();
+app.MapMatchesEndpoints();
+app.MapParticipantWithdrawalEndpoints();
 
 app.MapGet("/api/v1/ping", () => Results.Text("pong", statusCode: 200));
 
