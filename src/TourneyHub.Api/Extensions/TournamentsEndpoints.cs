@@ -29,6 +29,8 @@ internal static class TournamentsEndpoints
         tournaments.MapPost("/{tournamentId:guid}/seed", SeedAsync).WithOpenApi();
         tournaments.MapPost("/{tournamentId:guid}/generate-bracket", GenerateBracketAsync).WithOpenApi();
         tournaments.MapPost("/{tournamentId:guid}/generate-schedule", GenerateScheduleAsync).WithOpenApi();
+        tournaments.MapGet("/{tournamentId:guid}/standings", GetStandingsAsync).WithOpenApi();
+        tournaments.MapGet("/{tournamentId:guid}/overview", GetOverviewAsync).WithOpenApi();
 
         var participants = app.MapGroup("/api/v1/participants");
         participants.MapPost("/{participantId:guid}/members/accept", AcceptMemberAsync).WithOpenApi();
@@ -113,6 +115,32 @@ internal static class TournamentsEndpoints
 
         httpContext.Response.Headers.ETag = $"\"{tournament.Version}\"";
         return JsonOk(MapTournamentResponse(tournament));
+    }
+
+    private static async Task<IResult> GetStandingsAsync(
+        Guid tournamentId,
+        ITournamentService tournamentService,
+        HttpContext httpContext,
+        CancellationToken ct)
+    {
+        var orgId = GetOrgId(httpContext);
+        if (orgId is null)
+            return WriteProblem(400, ErrorCodes.NoTenantResolved, "No organization context resolved.");
+
+        var standings = await tournamentService.GetTournamentStandingsAsync(tournamentId, ct);
+        return JsonOk(standings.Select(MapStandingResponse).ToList());
+    }
+
+    private static async Task<IResult> GetOverviewAsync(
+        Guid tournamentId,
+        ITournamentService tournamentService,
+        CancellationToken ct)
+    {
+        var overview = await tournamentService.GetTournamentOverviewAsync(tournamentId, ct);
+        if (overview is null)
+            return WriteProblem(404, ErrorCodes.NotFound, "Tournament not found.");
+
+        return JsonOk(MapOverviewResponse(overview));
     }
 
     private static async Task<IResult> RegisterParticipantAsync(
@@ -370,6 +398,46 @@ internal static class TournamentsEndpoints
             "application/problem+json",
             statusCode: status);
     }
+
+    private static TournamentStandingResponse MapStandingResponse(TournamentStanding s) => new(
+        s.TournamentId,
+        s.ParticipantId,
+        s.Rank,
+        s.Points,
+        s.Wins,
+        s.Losses,
+        s.Draws,
+        s.PointsScored,
+        s.PointsConceded,
+        s.PointsDifference,
+        s.Byes);
+
+    private static TournamentOverviewResponse MapOverviewResponse(TourneyHub.Application.Competition.TournamentOverview overview)
+    {
+        var matchDetailResponses = overview.Matches.Select(m => new MatchDetailResponse(
+            m.Id,
+            m.TournamentId,
+            m.RoundNumber,
+            m.PositionInRound,
+            m.ParticipantAId,
+            m.ParticipantBId,
+            m.State.ToString(),
+            m.IsByeMatch,
+            m.WinnerId,
+            m.ScoreA,
+            m.ScoreB,
+            m.ForfeitedParticipantId,
+            m.IsDraw,
+            m.AdvanceToMatchId,
+            m.Version)).ToList();
+
+        var standingResponses = overview.Standings.Select(MapStandingResponse).ToList();
+
+        return new TournamentOverviewResponse(
+            MapTournamentResponse(overview.Tournament),
+            matchDetailResponses,
+            standingResponses);
+    }
 }
 
 internal sealed record CreateTournamentRequest(
@@ -446,3 +514,21 @@ internal sealed record MatchResponse(
     string State,
     bool IsByeMatch,
     int Version);
+
+internal sealed record TournamentStandingResponse(
+    Guid TournamentId,
+    Guid ParticipantId,
+    int Rank,
+    int Points,
+    int Wins,
+    int Losses,
+    int Draws,
+    int PointsScored,
+    int PointsConceded,
+    int PointsDifference,
+    int Byes);
+
+internal sealed record TournamentOverviewResponse(
+    TournamentResponse Tournament,
+    List<MatchDetailResponse> Matches,
+    List<TournamentStandingResponse> Standings);

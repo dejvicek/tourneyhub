@@ -36,6 +36,7 @@ internal static class LeaguesEndpoints
         leagues.MapPost("/seasons/{seasonId:guid}/activate", ActivateSeasonAsync).WithOpenApi();
         leagues.MapPost("/seasons/{seasonId:guid}/close", CloseSeasonAsync).WithOpenApi();
         leagues.MapPost("/seasons/{seasonId:guid}/cancel", CancelSeasonAsync).WithOpenApi();
+        leagues.MapGet("/seasons/{seasonId:guid}/rankings", GetSeasonRankingsAsync).WithOpenApi();
 
         return leagues;
     }
@@ -351,6 +352,27 @@ internal static class LeaguesEndpoints
         }
     }
 
+    private static async Task<IResult> GetSeasonRankingsAsync(
+        Guid seasonId,
+        ITournamentService tournamentService,
+        HttpContext httpContext,
+        CancellationToken ct)
+    {
+        var orgId = GetOrgId(httpContext);
+        if (orgId is null)
+            return WriteProblem(400, ErrorCodes.NoTenantResolved, "No organization context resolved.");
+
+        var rankings = await tournamentService.GetSeasonRankingsAsync(seasonId, ct);
+        return JsonOk(rankings.Select(MapSeasonRankingResponse).ToList());
+    }
+
+    private static SeasonRankingResponse MapSeasonRankingResponse(SeasonRanking r) => new(
+        r.SeasonId,
+        r.UserId,
+        r.Rank,
+        r.Points,
+        r.MatchesPlayed);
+
     private static async Task<IResult> GetPublicBySlugAsync(
         string slug,
         ILeagueService leagueService,
@@ -469,3 +491,6 @@ internal sealed record LeagueResponse(
 internal sealed record SeasonResponse(
     Guid Id, Guid LeagueId, Guid OrganizationId, string Name, string State,
     DateTime? StartedAt, DateTime? CompletedAt, string? RngSeed, int Version);
+
+internal sealed record SeasonRankingResponse(
+    Guid SeasonId, Guid UserId, int Rank, int Points, int MatchesPlayed);

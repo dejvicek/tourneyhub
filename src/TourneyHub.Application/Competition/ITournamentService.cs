@@ -29,4 +29,10 @@ public interface ITournamentService
     Task<Match> ForfeitMatchAsync(Guid matchId, ForfeitMatchCommand command, Guid organizationId, Guid actorUserId, CancellationToken ct);
 
     Task<Participant> WithdrawParticipantAsync(Guid participantId, Guid organizationId, Guid actorUserId, CancellationToken ct);
+
+    Task<IReadOnlyList<TournamentStanding>> GetTournamentStandingsAsync(Guid tournamentId, CancellationToken ct);
+
+    Task<TournamentOverview?> GetTournamentOverviewAsync(Guid tournamentId, CancellationToken ct);
+
+    Task<IReadOnlyList<SeasonRanking>> GetSeasonRankingsAsync(Guid seasonId, CancellationToken ct);
 }

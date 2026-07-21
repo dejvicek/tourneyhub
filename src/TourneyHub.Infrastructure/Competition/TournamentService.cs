@@ -4,7 +4,9 @@ using TourneyHub.Application.Common;
 using TourneyHub.Application.Competition;
 using TourneyHub.Domain.Competition;
 using TourneyHub.Domain.Logic.Formats;
+using TourneyHub.Domain.Logic.Rankings;
 using TourneyHub.Domain.Logic.Recompute;
+using TourneyHub.Domain.Logic.Scoring;
 using TourneyHub.Domain.Platform;
 using TourneyHub.Infrastructure.Persistence;
 
@@ -538,6 +540,8 @@ if (match.WinnerId is null && !match.IsDraw && match.ForfeitedParticipantId is n
             tournament.Complete();
         }
 
+        await RecomputeStandingsAndRankingsAsync(tournament, ct);
+
         _db.AuditEvents.Add(new AuditEvent(
                 actorUserId.ToString(),
                 isEdit ? "result_edit" : "result_submit",
@@ -609,6 +613,8 @@ if (match.WinnerId is null && !match.IsDraw && match.ForfeitedParticipantId is n
             tournament.Complete();
         }
 
+        await RecomputeStandingsAndRankingsAsync(tournament, ct);
+
         _db.AuditEvents.Add(new AuditEvent(
                 actorUserId.ToString(),
                 "forfeit",
@@ -667,10 +673,193 @@ if (match.WinnerId is null && !match.IsDraw && match.ForfeitedParticipantId is n
 
         participant.Withdraw(tournament.Id);
 
+        await RecomputeStandingsAndRankingsAsync(tournament, ct);
+
         await _db.SaveChangesAsync(ct);
 
         LogWithdrawal(participantId, tournament.Id);
         return participant;
+    }
+
+    public async Task<IReadOnlyList<TournamentStanding>> GetTournamentStandingsAsync(
+        Guid tournamentId,
+        CancellationToken ct)
+    {
+        return await _db.TournamentStandings
+            .Where(s => s.TournamentId == tournamentId)
+            .OrderBy(s => s.Rank)
+            .ToListAsync(ct);
+    }
+
+    public async Task<TournamentOverview?> GetTournamentOverviewAsync(
+        Guid tournamentId,
+        CancellationToken ct)
+    {
+        var tournament = await _db.Tournaments
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(t => t.Id == tournamentId, ct);
+
+        if (tournament is null)
+            return null;
+
+        var matches = await _db.Matches
+            .IgnoreQueryFilters()
+            .Where(m => m.TournamentId == tournamentId)
+            .OrderBy(m => m.RoundNumber).ThenBy(m => m.PositionInRound)
+            .ToListAsync(ct);
+
+        var standings = await _db.TournamentStandings
+            .IgnoreQueryFilters()
+            .Where(s => s.TournamentId == tournamentId)
+            .OrderBy(s => s.Rank)
+            .ToListAsync(ct);
+
+        return new TournamentOverview(tournament, matches.AsReadOnly(), standings.AsReadOnly());
+    }
+
+    public async Task<IReadOnlyList<SeasonRanking>> GetSeasonRankingsAsync(
+        Guid seasonId,
+        CancellationToken ct)
+    {
+        return await _db.SeasonRankings
+            .Where(r => r.SeasonId == seasonId)
+            .OrderBy(r => r.Rank)
+            .ToListAsync(ct);
+    }
+
+    private async Task RecomputeStandingsAndRankingsAsync(
+        Tournament tournament,
+        CancellationToken ct)
+    {
+        var scoringConfig = RankingCalculator.GetDefaultScoringConfig();
+
+        var participants = await _db.Participants
+            .Where(p => p.TournamentId == tournament.Id)
+            .ToListAsync(ct);
+
+        var matches = await _db.Matches
+            .Where(m => m.TournamentId == tournament.Id)
+            .ToListAsync(ct);
+
+        var seasonId = tournament.SeasonId;
+
+        var standingsResult = RankingCalculator.ComputeTournamentStandings(
+            tournament.Id,
+            seasonId,
+            participants.Select(p => p.Id).ToList(),
+            matches,
+            scoringConfig,
+            tournament.RngSeed ?? "default-seed");
+
+        var existingStandings = await _db.TournamentStandings
+            .Where(s => s.TournamentId == tournament.Id)
+            .ToListAsync(ct);
+
+        foreach (var input in standingsResult.Standings)
+        {
+            var existing = existingStandings.FirstOrDefault(s => s.ParticipantId == input.ParticipantId);
+            if (existing is not null)
+            {
+                existing.UpdateFromEntry(input.Points, input.Wins, input.Losses, input.Draws,
+                    input.PointsScored, input.PointsConceded, input.PointsDifference, input.Byes, input.Rank);
+            }
+            else
+            {
+                _db.TournamentStandings.Add(new TournamentStanding(
+                    input.TournamentId,
+                    input.ParticipantId,
+                    input.Points,
+                    input.Wins,
+                    input.Losses,
+                    input.Draws,
+                    input.PointsScored,
+                    input.PointsConceded,
+                    input.PointsDifference,
+                    input.Byes,
+                    input.Rank));
+            }
+        }
+
+        if (seasonId.HasValue)
+        {
+            var season = await _db.Seasons.FirstOrDefaultAsync(s => s.Id == seasonId.Value, ct);
+            if (season is not null && season.State == SeasonState.Closed)
+            {
+                return;
+            }
+
+            var allSeasonTournaments = await _db.Tournaments
+                .Where(t => t.SeasonId == seasonId.Value
+                            && t.State == TournamentState.Completed)
+                .ToListAsync(ct);
+
+            var allTournamentStandings = new List<TournamentStandingsResult>();
+            var participantMembers = new Dictionary<Guid, IReadOnlyList<Guid>>();
+
+            foreach (var seasonTournament in allSeasonTournaments)
+            {
+                var tnParticipants = await _db.Participants
+                    .Where(p => p.TournamentId == seasonTournament.Id)
+                    .ToListAsync(ct);
+
+                foreach (var p in tnParticipants)
+                {
+                    if (!participantMembers.ContainsKey(p.Id))
+                    {
+                        var members = await _db.ParticipantMembers
+                            .Where(m => m.ParticipantId == p.Id && m.Status == ParticipantMemberStatus.Accepted)
+                            .Select(m => m.UserId)
+                            .ToListAsync(ct);
+
+                        participantMembers[p.Id] = members;
+                    }
+                }
+
+                var tnMatches = await _db.Matches
+                    .Where(m => m.TournamentId == seasonTournament.Id)
+                    .ToListAsync(ct);
+
+                var tnStandings = RankingCalculator.ComputeTournamentStandings(
+                    seasonTournament.Id,
+                    seasonId,
+                    tnParticipants.Select(p => p.Id).ToList(),
+                    tnMatches,
+                    scoringConfig,
+                    seasonTournament.RngSeed ?? "default-seed");
+
+                allTournamentStandings.Add(tnStandings);
+            }
+
+            if (allTournamentStandings.Count > 0)
+            {
+                var seasonRankingsResult = RankingCalculator.ComputeSeasonRankings(
+                    seasonId.Value,
+                    allTournamentStandings,
+                    participantMembers);
+
+                var existingRankings = await _db.SeasonRankings
+                    .Where(r => r.SeasonId == seasonId.Value)
+                    .ToListAsync(ct);
+
+                foreach (var input in seasonRankingsResult.Rankings)
+                {
+                    var existing = existingRankings.FirstOrDefault(r => r.UserId == input.UserId);
+                    if (existing is not null)
+                    {
+                        existing.UpdateFromEntry(input.Points, input.MatchesPlayed, input.Rank);
+                    }
+                    else
+                    {
+                        _db.SeasonRankings.Add(new SeasonRanking(
+                            input.SeasonId,
+                            input.UserId,
+                            input.Points,
+                            input.MatchesPlayed,
+                            input.Rank));
+                    }
+                }
+            }
+        }
     }
 
     private async Task<Tournament> GetTournamentRequiredAsync(Guid tournamentId, CancellationToken ct)
