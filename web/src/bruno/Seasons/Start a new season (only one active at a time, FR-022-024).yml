@@ -1,0 +1,101 @@
+info:
+  name: Start a new season (only one active at a time, FR-022/024)
+  type: http
+  seq: 1
+  tags:
+    - Seasons
+
+http:
+  method: POST
+  url: "{{baseUrl}}/leagues/:leagueId/seasons"
+  params:
+    - name: leagueId
+      value: ""
+      type: path
+  body:
+    type: json
+    data: |-
+      {
+        "name": "",
+        "startsAt": "",
+        "endsAt": ""
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 201 Response
+    description: Created
+    request:
+      url: "{{baseUrl}}/leagues/:leagueId/seasons"
+      method: POST
+      params:
+        - name: leagueId
+          value: ""
+          type: path
+      body:
+        type: json
+        data: |-
+          {
+            "name": "",
+            "startsAt": "",
+            "endsAt": ""
+          }
+    response:
+      status: 201
+      statusText: Created
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "id": "",
+            "leagueId": "",
+            "name": "",
+            "state": "upcoming",
+            "startsAt": "",
+            "endsAt": ""
+          }
+  - name: 409 Response
+    description: RFC 7807 Problem Details
+    request:
+      url: "{{baseUrl}}/leagues/:leagueId/seasons"
+      method: POST
+      params:
+        - name: leagueId
+          value: ""
+          type: path
+      body:
+        type: json
+        data: |-
+          {
+            "name": "",
+            "startsAt": "",
+            "endsAt": ""
+          }
+    response:
+      status: 409
+      statusText: Conflict
+      headers:
+        - name: Content-Type
+          value: application/problem+json
+      body:
+        type: json
+        data: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "detail": "",
+            "instance": "",
+            "traceId": "",
+            "code": "unknown_error",
+            "errors": {}
+          }

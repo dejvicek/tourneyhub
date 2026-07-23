@@ -1,0 +1,98 @@
+info:
+  name: Invite a user to a league by email or link (FR-014)
+  type: http
+  seq: 1
+  tags:
+    - Invitations
+
+http:
+  method: POST
+  url: "{{baseUrl}}/leagues/:leagueId/invitations"
+  params:
+    - name: leagueId
+      value: ""
+      type: path
+  body:
+    type: json
+    data: |-
+      {
+        "email": "",
+        "role": ""
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 201 Response
+    description: Created
+    request:
+      url: "{{baseUrl}}/leagues/:leagueId/invitations"
+      method: POST
+      params:
+        - name: leagueId
+          value: ""
+          type: path
+      body:
+        type: json
+        data: |-
+          {
+            "email": "",
+            "role": ""
+          }
+    response:
+      status: 201
+      statusText: Created
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "id": "",
+            "email": "",
+            "scope": "organization",
+            "role": "",
+            "state": "pending",
+            "expiresAt": ""
+          }
+  - name: 404 Response
+    description: RFC 7807 Problem Details
+    request:
+      url: "{{baseUrl}}/leagues/:leagueId/invitations"
+      method: POST
+      params:
+        - name: leagueId
+          value: ""
+          type: path
+      body:
+        type: json
+        data: |-
+          {
+            "email": "",
+            "role": ""
+          }
+    response:
+      status: 404
+      statusText: Not Found
+      headers:
+        - name: Content-Type
+          value: application/problem+json
+      body:
+        type: json
+        data: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "detail": "",
+            "instance": "",
+            "traceId": "",
+            "code": "unknown_error",
+            "errors": {}
+          }

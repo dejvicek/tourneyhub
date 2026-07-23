@@ -1,0 +1,7 @@
+info:
+  name: Users_GDPR
+  type: folder
+  seq: 1
+
+request:
+  auth: inherit

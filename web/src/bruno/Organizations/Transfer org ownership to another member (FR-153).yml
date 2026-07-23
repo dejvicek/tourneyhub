@@ -1,0 +1,84 @@
+info:
+  name: Transfer org ownership to another member (FR-153)
+  type: http
+  seq: 4
+  tags:
+    - Organizations
+
+http:
+  method: POST
+  url: "{{baseUrl}}/organizations/:orgId/transfer-ownership"
+  params:
+    - name: orgId
+      value: ""
+      type: path
+  body:
+    type: json
+    data: |-
+      {
+        "newOwnerUserId": ""
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 204 Response
+    description: Ownership transferred
+    request:
+      url: "{{baseUrl}}/organizations/:orgId/transfer-ownership"
+      method: POST
+      params:
+        - name: orgId
+          value: ""
+          type: path
+      body:
+        type: json
+        data: |-
+          {
+            "newOwnerUserId": ""
+          }
+    response:
+      status: 204
+      statusText: No Content
+      body:
+        type: text
+        data: ""
+  - name: 403 Response
+    description: RFC 7807 Problem Details
+    request:
+      url: "{{baseUrl}}/organizations/:orgId/transfer-ownership"
+      method: POST
+      params:
+        - name: orgId
+          value: ""
+          type: path
+      body:
+        type: json
+        data: |-
+          {
+            "newOwnerUserId": ""
+          }
+    response:
+      status: 403
+      statusText: Forbidden
+      headers:
+        - name: Content-Type
+          value: application/problem+json
+      body:
+        type: json
+        data: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "detail": "",
+            "instance": "",
+            "traceId": "",
+            "code": "unknown_error",
+            "errors": {}
+          }

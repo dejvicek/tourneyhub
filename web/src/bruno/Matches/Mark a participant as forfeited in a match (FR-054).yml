@@ -1,0 +1,144 @@
+info:
+  name: Mark a participant as forfeited in a match (FR-054)
+  type: http
+  seq: 2
+  tags:
+    - Matches
+
+http:
+  method: POST
+  url: "{{baseUrl}}/matches/:matchId/forfeit"
+  params:
+    - name: matchId
+      value: ""
+      type: path
+  body:
+    type: json
+    data: |-
+      {
+        "forfeitedParticipantId": ""
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Applied
+    request:
+      url: "{{baseUrl}}/matches/:matchId/forfeit"
+      method: POST
+      params:
+        - name: matchId
+          value: ""
+          type: path
+      body:
+        type: json
+        data: |-
+          {
+            "forfeitedParticipantId": ""
+          }
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "id": "",
+            "tournamentId": "",
+            "round": 0,
+            "slot": 0,
+            "participantA": "",
+            "participantB": "",
+            "state": "Pending",
+            "result": {
+              "winnerId": "",
+              "scoreA": "",
+              "scoreB": "",
+              "isDraw": false,
+              "isForfeit": false
+            },
+            "winnerId": "",
+            "scoreA": "",
+            "scoreB": "",
+            "forfeitedParticipantId": "",
+            "isDraw": false,
+            "advanceToMatchId": "",
+            "version": 0
+          }
+  - name: 409 Response
+    description: RFC 7807 Problem Details
+    request:
+      url: "{{baseUrl}}/matches/:matchId/forfeit"
+      method: POST
+      params:
+        - name: matchId
+          value: ""
+          type: path
+      body:
+        type: json
+        data: |-
+          {
+            "forfeitedParticipantId": ""
+          }
+    response:
+      status: 409
+      statusText: Conflict
+      headers:
+        - name: Content-Type
+          value: application/problem+json
+      body:
+        type: json
+        data: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "detail": "",
+            "instance": "",
+            "traceId": "",
+            "code": "unknown_error",
+            "errors": {}
+          }
+  - name: 422 Response
+    description: RFC 7807 Problem Details
+    request:
+      url: "{{baseUrl}}/matches/:matchId/forfeit"
+      method: POST
+      params:
+        - name: matchId
+          value: ""
+          type: path
+      body:
+        type: json
+        data: |-
+          {
+            "forfeitedParticipantId": ""
+          }
+    response:
+      status: 422
+      statusText: Unprocessable Entity
+      headers:
+        - name: Content-Type
+          value: application/problem+json
+      body:
+        type: json
+        data: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "detail": "",
+            "instance": "",
+            "traceId": "",
+            "code": "unknown_error",
+            "errors": {}
+          }

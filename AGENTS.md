@@ -71,6 +71,8 @@ Module boundaries are enforced (NFR-001): **no circular deps**; domain code has 
 | Frontend build / typecheck / lint | `npm run build` / `npm run typecheck` / `npm run lint` |
 | Frontend e2e | `npx playwright test` |
 | Regenerate TS API client | `npm run gen:api` (from `api/openapi.yaml`) |
+| Regenerate Bruno collection | `npm run gen:bruno` (in `/web`) |
+| Check Bruno collection is in sync | `npm run gen:bruno:check` (in `/web`) |
 | Validate OpenAPI | `npx @redocly/cli lint api/openapi.yaml` |
 
 ---
@@ -112,6 +114,7 @@ Keep slices atomic (1 concern, ideally 1 module). If it needs more than a few fi
 - Backend DTOs and the frontend TS client are **generated** from it — do not hand-write mismatched types.
 - Every UI capability is backed by a documented endpoint (NFR-002). The web app consumes the same API as third parties.
 - Versioning: `/api/v1/...`; never break v1 without bumping.
+- A Bruno collection is generated from the spec at `web/src/bruno/` (`npm run gen:bruno`). It is committed to git and shared with the frontend team. The CI guard (`gen:bruno:check`) ensures it never drifts from the spec.
 
 ---
 

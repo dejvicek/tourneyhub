@@ -1,0 +1,54 @@
+info:
+  name: Delete account — anonymize, retain competition facts (FR-130)
+  type: http
+  seq: 2
+  tags:
+    - Users_GDPR
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/users/me"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 204 Response
+    description: Deletion accepted; identity tombstoned
+    request:
+      url: "{{baseUrl}}/users/me"
+      method: DELETE
+    response:
+      status: 204
+      statusText: No Content
+      body:
+        type: text
+        data: ""
+  - name: 409 Response
+    description: Sole OrgOwner/League Owner must transfer first (BR-106)
+    request:
+      url: "{{baseUrl}}/users/me"
+      method: DELETE
+    response:
+      status: 409
+      statusText: Conflict
+      headers:
+        - name: Content-Type
+          value: application/problem+json
+      body:
+        type: json
+        data: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "detail": "",
+            "instance": "",
+            "traceId": "",
+            "code": "unknown_error",
+            "errors": {}
+          }
