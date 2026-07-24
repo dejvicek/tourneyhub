@@ -14,9 +14,7 @@ function useOrganizations() {
 function useOrganization(orgId: string) {
   return useQuery<Organization>({
     queryKey: ['organizations', orgId],
-    queryFn: () => apiClient('/organizations/{orgId}', 'get', {
-      // Path params injected via URL
-    }) as Promise<Organization>,
+    queryFn: () => apiClient(`/organizations/${orgId}`, 'get') as Promise<Organization>,
     enabled: !!orgId,
   })
 }
@@ -36,7 +34,7 @@ function useTransferOwnership(orgId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (newOwnerUserId: string) =>
-      apiClient('/organizations/{orgId}/transfer-ownership', 'post', {
+      apiClient(`/organizations/${orgId}/transfer-ownership`, 'post', {
         body: JSON.stringify({ newOwnerUserId }),
       }),
     onSuccess: () => {

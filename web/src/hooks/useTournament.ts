@@ -18,7 +18,7 @@ function useTournaments(orgId: string | null) {
 function useTournament(id: string) {
   return useQuery<Tournament>({
     queryKey: ['tournaments', id],
-    queryFn: () => apiClient('/tournaments/{tournamentId}', 'get') as Promise<Tournament>,
+    queryFn: () => apiClient(`/tournaments/${id}`, 'get') as Promise<Tournament>,
     enabled: !!id,
   })
 }
@@ -26,7 +26,7 @@ function useTournament(id: string) {
 function useTournamentOverview(id: string) {
   return useQuery<TournamentOverview>({
     queryKey: ['tournament-overview', id],
-    queryFn: () => apiClient('/tournaments/{tournamentId}/overview', 'get') as Promise<TournamentOverview>,
+    queryFn: () => apiClient(`/tournaments/${id}/overview`, 'get') as Promise<TournamentOverview>,
     enabled: !!id,
     refetchInterval: 5000,
   })
@@ -47,7 +47,7 @@ function useSeedTournament(id: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (args: { method: 'random' | 'manual'; order?: string[] }) =>
-      apiClient('/tournaments/{tournamentId}/seed', 'post', {
+      apiClient(`/tournaments/${id}/seed`, 'post', {
         body: JSON.stringify({ method: args.method, order: args.order }),
       }),
     onSuccess: () => {
@@ -61,7 +61,7 @@ function useGenerateBracket(id: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: () =>
-      apiClient('/tournaments/{tournamentId}/generate-bracket', 'post'),
+      apiClient(`/tournaments/${id}/generate-bracket`, 'post'),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tournaments', id] })
       qc.invalidateQueries({ queryKey: ['tournament-overview', id] })

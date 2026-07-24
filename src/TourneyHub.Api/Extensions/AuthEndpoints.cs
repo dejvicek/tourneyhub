@@ -14,7 +14,7 @@ internal static class AuthEndpoints
 {
     public static RouteGroupBuilder MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
-        var auth = app.MapGroup("/auth");
+        var auth = app.MapGroup("/api/v1/auth");
 
         auth.MapPost("/register", RegisterAsync)
             .RequireRateLimiting("auth")

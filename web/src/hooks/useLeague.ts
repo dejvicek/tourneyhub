@@ -16,7 +16,7 @@ function useLeagues() {
 function useLeague(id: string) {
   return useQuery<League>({
     queryKey: ['leagues', id],
-    queryFn: () => apiClient('/leagues/{leagueId}', 'get') as Promise<League>,
+    queryFn: () => apiClient(`/leagues/${id}`, 'get') as Promise<League>,
     enabled: !!id,
   })
 }
