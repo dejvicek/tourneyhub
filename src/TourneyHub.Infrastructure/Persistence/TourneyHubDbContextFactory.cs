@@ -14,7 +14,7 @@ public sealed class TourneyHubDbContextFactory : IDesignTimeDbContextFactory<Tou
     public TourneyHubDbContext CreateDbContext(string[] args)
     {
         var options = new DbContextOptionsBuilder<TourneyHubDbContext>()
-            .UseNpgsql("Host=localhost;Port=5432;Database=tourneyhub_design;Username=postgres;Password=postgres")
+            .UseNpgsql("Host=localhost;Port=5432;Database=tourneyhub;Username=tourneyhub;Password=tourneyhub")
             .Options;
 
         return new TourneyHubDbContext(options, new DesignTimeTenantContext());
