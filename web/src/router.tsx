@@ -22,6 +22,7 @@ import PublicTournamentOverview from './pages/PublicTournamentOverview'
 import SeasonViewPage from './pages/SeasonViewPage'
 import RankingsPage from './pages/RankingsPage'
 import StandingsPage from './pages/StandingsPage'
+import ComponentShowcase from './pages/dev/ComponentShowcase'
 
 export const router = createBrowserRouter([
   {
@@ -54,6 +55,7 @@ export const router = createBrowserRouter([
       { path: '/s/:seasonId', element: <SeasonViewPage /> },
       { path: '/s/:seasonId/rankings', element: <RankingsPage /> },
       { path: '/s/:seasonId/standings', element: <StandingsPage /> },
+      { path: '/dev/components', element: <ComponentShowcase /> },
     ],
   },
   {

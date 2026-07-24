@@ -4,6 +4,7 @@
 @theme {
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
+  --color-primary-fg: var(--primary-fg);
   --color-accent: var(--accent);
   --color-bg: var(--bg);
   --color-bg-surface: var(--bg-surface);
@@ -23,6 +24,28 @@
   --radius-full: var(--radius-full);
 
   --shadow-glow: var(--shadow-glow);
+
+  --animate-fade-in: fade-in 200ms ease-out;
+  --animate-scale-in: scale-in 200ms ease-out;
+  --animate-slide-up: slide-up 200ms ease-out;
+  --animate-pulse-gold: pulse-gold 600ms ease-in-out;
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes scale-in {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes slide-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes pulse-gold {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+  }
 }
 
 @layer base {
@@ -37,6 +60,7 @@
 
     --primary: #b8941e;
     --primary-hover: #a07d15;
+    --primary-fg: #0a0e17;
 
     --accent: #d64a28;
 
@@ -69,6 +93,7 @@
 
       --primary: #c6a227;
       --primary-hover: #d4b44a;
+      --primary-fg: #0a0e17;
 
       --accent: #e85d3a;
 
