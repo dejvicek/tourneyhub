@@ -15,8 +15,8 @@ export default function RegisterPage() {
   const [success, setSuccess] = useState(false)
 
   const passwordStrength = () => {
-    if (password.length < 8) return { level: 0, label: t('auth.passwordTooShort') }
-    if (password.length < 10) return { level: 1, label: t('auth.passwordWeak') }
+    if (password.length < 12) return { level: 0, label: t('auth.passwordTooShort') }
+    if (password.length < 14) return { level: 1, label: t('auth.passwordWeak') }
     if (password.length < 12 || !/[A-Z]/.test(password) || !/[0-9]/.test(password))
       return { level: 2, label: t('auth.passwordGood') }
     return { level: 3, label: t('auth.passwordStrong') }
