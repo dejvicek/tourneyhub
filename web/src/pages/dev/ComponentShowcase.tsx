@@ -1,8 +1,12 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, Input, Card, Badge, Select, Table, Modal, Bracket } from '../../components/ui'
+import { useToast } from '../../hooks/useToast'
 
 export default function ComponentShowcase() {
+  const { t } = useTranslation()
   const [modalOpen, setModalOpen] = useState(false)
+  const { toast } = useToast()
 
   return (
     <div className="max-w-4xl mx-auto space-y-12 py-8">
@@ -27,10 +31,25 @@ export default function ComponentShowcase() {
       </section>
 
       <section className="space-y-4">
+        <h2 className="font-heading text-xl text-fg">Toast</h2>
+        <div className="flex flex-wrap gap-3">
+          <Button variant="primary" size="sm" onClick={() => toast('Tournament created!', 'success')}>
+            Success
+          </Button>
+          <Button variant="danger" size="sm" onClick={() => toast('Something went wrong', 'error')}>
+            Error
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => toast('New update available', 'info')}>
+            Info
+          </Button>
+        </div>
+      </section>
+
+      <section className="space-y-4">
         <h2 className="font-heading text-xl text-fg">Input</h2>
         <div className="max-w-sm space-y-4">
-          <Input label="Email" type="email" placeholder="you@example.com" hint="We'll never share your email." />
-          <Input label="Password" type="password" error="Must be at least 8 characters" />
+          <Input label="Email" type="email" placeholder="you@example.com" hint={t('auth.checkEmail')} />
+          <Input label="Password" type="password" error={t('auth.passwordTooShort')} />
         </div>
       </section>
 
@@ -38,11 +57,11 @@ export default function ComponentShowcase() {
         <h2 className="font-heading text-xl text-fg">Select</h2>
         <div className="max-w-sm">
           <Select
-            label="Format"
+            label={t('tournament.format')}
             options={[
-              { value: 'single', label: 'Single Elimination' },
-              { value: 'roundrobin', label: 'Round Robin' },
-              { value: 'swiss', label: 'Swiss' },
+              { value: 'single', label: t('tournament.singleElimination') },
+              { value: 'roundrobin', label: t('tournament.roundRobin') },
+              { value: 'swiss', label: t('tournament.swiss') },
             ]}
           />
         </div>
@@ -99,14 +118,14 @@ export default function ComponentShowcase() {
         <Modal
           open={modalOpen}
           onClose={() => setModalOpen(false)}
-          title="Confirm Action"
+          title={t('common.confirm')}
           actions={
             <>
               <Button variant="ghost" size="sm" onClick={() => setModalOpen(false)}>
-                Cancel
+                {t('common.cancel')}
               </Button>
-              <Button variant="primary" size="sm" onClick={() => setModalOpen(false)}>
-                Confirm
+              <Button variant="primary" size="sm" onClick={() => { toast('Confirmed!', 'success'); setModalOpen(false) }}>
+                {t('common.confirm')}
               </Button>
             </>
           }
@@ -119,9 +138,9 @@ export default function ComponentShowcase() {
         <h2 className="font-heading text-xl text-fg">Bracket</h2>
         <Bracket
           rounds={[
-            { round: 1, label: 'Round 1' },
-            { round: 2, label: 'Semi-finals' },
-            { round: 3, label: 'Final' },
+            { round: 1, label: `${t('tournament.round')} 1` },
+            { round: 2, label: `${t('tournament.round')} 2` },
+            { round: 3, label: `${t('tournament.round')} 3` },
           ]}
           matches={[
             { id: 'm1', round: 1, slot: 0, participantA: { id: 'a', name: 'Alice' }, participantB: { id: 'b', name: 'Bob' }, state: 'Completed', winnerId: 'a' },
@@ -129,7 +148,7 @@ export default function ComponentShowcase() {
             { id: 'm3', round: 2, slot: 0, participantA: { id: 'a', name: 'Alice' }, participantB: { id: 'd', name: 'Diana' }, state: 'Pending', winnerId: null },
             { id: 'm4', round: 3, slot: 0, participantA: null, participantB: null, state: 'Pending', winnerId: null },
           ]}
-          onMatchClick={(id) => console.log('Match clicked:', id)}
+          onMatchClick={(id) => toast(`Match ${id} clicked`, 'info')}
         />
       </section>
     </div>

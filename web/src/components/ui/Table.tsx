@@ -1,4 +1,5 @@
 import { type ReactNode, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 type Column<T> = {
   key: string
@@ -17,9 +18,11 @@ type TableProps<T> = {
 export default function Table<T extends Record<string, unknown>>({
   columns,
   data,
-  emptyMessage = 'No data',
+  emptyMessage,
 }: TableProps<T>) {
+  const { t } = useTranslation()
   const [sortKey, setSortKey] = useState<string | null>(null)
+  const defaultEmpty = emptyMessage ?? t('common.noData')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
   const handleSort = (col: Column<T>) => {
@@ -46,7 +49,7 @@ export default function Table<T extends Record<string, unknown>>({
   if (data.length === 0) {
     return (
       <div className="border border-border rounded-lg overflow-hidden">
-        <div className="p-8 text-center text-fg-muted text-sm">{emptyMessage}</div>
+        <div className="p-8 text-center text-fg-muted text-sm">{defaultEmpty}</div>
       </div>
     )
   }

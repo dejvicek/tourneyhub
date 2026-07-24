@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 
 type MatchData = {
   id: string
@@ -35,12 +36,14 @@ function BracketRound({
   roundIdx,
   onMatchClick,
   highlightParticipantId,
+  t,
 }: {
   round: { round: number; label: string }
   matches: MatchData[]
   roundIdx: number
   onMatchClick?: (matchId: string) => void
   highlightParticipantId?: string
+  t: (key: string) => string
 }) {
   return (
     <div className="flex flex-col shrink-0 w-44 min-w-[180px]">
@@ -81,10 +84,10 @@ function BracketRound({
                     }`}
                   >
                     <span className="truncate">
-                      {match.participantA?.name || 'TBD'}
+                      {match.participantA?.name || t('tournament.TBD')}
                     </span>
                     {match.winnerId === match.participantA?.id && (
-                      <span className="text-primary text-[10px] ml-1 shrink-0">W</span>
+                      <span className="text-primary text-[10px] ml-1 shrink-0">{t('tournament.W')}</span>
                     )}
                   </div>
                   <div
@@ -95,15 +98,15 @@ function BracketRound({
                     }`}
                   >
                     <span className="truncate">
-                      {match.participantB?.name || 'TBD'}
+                      {match.participantB?.name || t('tournament.TBD')}
                     </span>
                     {match.winnerId === match.participantB?.id && (
-                      <span className="text-primary text-[10px] ml-1 shrink-0">W</span>
+                      <span className="text-primary text-[10px] ml-1 shrink-0">{t('tournament.W')}</span>
                     )}
                   </div>
                 </div>
                 {match.state === 'Completed' && (
-                  <div className="mt-1 text-[10px] text-fg-muted">Completed</div>
+                  <div className="mt-1 text-[10px] text-fg-muted">{t('tournament.completed')}</div>
                 )}
               </button>
             </div>
@@ -120,6 +123,7 @@ export default function Bracket({
   onMatchClick,
   highlightParticipantId,
 }: BracketProps) {
+  const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const grouped = rounds.map((r) => ({
@@ -130,7 +134,7 @@ export default function Bracket({
   if (rounds.length === 0 || matches.length === 0) {
     return (
       <div className="flex items-center justify-center p-12 border border-border rounded-lg bg-bg-surface">
-        <p className="text-fg-muted text-sm">No matches generated yet — seed participants first</p>
+        <p className="text-fg-muted text-sm">{t('tournament.noMatches')}</p>
       </div>
     )
   }
@@ -149,6 +153,7 @@ export default function Bracket({
               roundIdx={roundIdx}
               onMatchClick={onMatchClick}
               highlightParticipantId={highlightParticipantId}
+              t={t}
             />
             {roundIdx < grouped.length - 1 && (
               <div className="flex flex-col justify-center gap-4 mt-10 shrink-0">

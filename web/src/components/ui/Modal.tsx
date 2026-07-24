@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 
 type ModalProps = {
   open: boolean
@@ -9,6 +10,7 @@ type ModalProps = {
 }
 
 export default function Modal({ open, onClose, title, children, actions }: ModalProps) {
+  const { t } = useTranslation()
   const overlayRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
 
@@ -79,7 +81,7 @@ export default function Modal({ open, onClose, title, children, actions }: Modal
           <button
             onClick={onClose}
             className="text-fg-muted hover:text-fg transition-colors p-1 -mr-1"
-            aria-label="Close"
+            aria-label={t('common.close')}
           >
             <svg viewBox="0 0 24 24" className="w-5 h-5 fill-none stroke-current stroke-2" strokeLinecap="round">
               <path d="M18 6L6 18M6 6l12 12" />
