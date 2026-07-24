@@ -39,6 +39,17 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<HttpTenantContext>();
 builder.Services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<HttpTenantContext>());
 
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.WithOrigins("http://localhost:5173")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
 builder.Services.AddDbContext<TourneyHubDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Postgres")));
 
@@ -159,6 +170,7 @@ app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<ProblemDetailsMiddleware>();
 app.UseMiddleware<IdempotencyMiddleware>();
 app.UseRateLimiter();
+app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<SuspensionGuardMiddleware>();
