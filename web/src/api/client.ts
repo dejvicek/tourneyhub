@@ -8,8 +8,8 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 export async function apiClient<T extends keyof paths>(
-  path: T,
-  method: keyof paths[T],
+  path: T | string,
+  method: T extends keyof paths ? keyof paths[T] : string,
   options?: RequestInit,
 ): Promise<unknown> {
   const url = `${API_BASE_URL}${String(path)}`
