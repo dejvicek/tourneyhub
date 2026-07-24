@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useCreateTournament } from '../hooks/useTournament'
 import { useOrgContext } from '../hooks/useOrgContext'
@@ -38,7 +38,10 @@ export default function CreateTournamentWizard() {
   }
 
   const handleCreate = () => {
-    if (!activeOrgId) return
+    if (!activeOrgId) {
+      setError(t('org.noOrgsCta'))
+      return
+    }
     setError('')
     createTournament.mutate(
       {
@@ -65,6 +68,17 @@ export default function CreateTournamentWizard() {
   return (
     <div className="max-w-xl mx-auto">
       <h1 className="font-heading text-2xl text-fg mb-6">{t('tournament.create')}</h1>
+
+      {!activeOrgId && (
+        <div className="mb-6 p-4 border border-accent/30 rounded-md bg-accent/5 text-center">
+          <p className="text-sm text-fg mb-2">{t('org.noOrgs')} {t('org.noOrgsCta')}</p>
+          <Link to="/orgs/new">
+            <Button variant="primary" size="sm">
+              {t('org.create')}
+            </Button>
+          </Link>
+        </div>
+      )}
 
       {/* Step tabs */}
       <div className="flex border-b border-border mb-6">
