@@ -1,48 +1,44 @@
-# ---- OpenCode / tooling internals ----
-.omo/
-.playwright-mcp/
-
-# ---- OS files ----
+# ---- OS / editors ----
 .DS_Store
-.DS_Store?
 ._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
-
-# ---- Editors / IDEs ----
 .vscode/
 .idea/
 *.swp
-*.swo
-*~
-
-# ---- Logs & temp ----
-*.log
-*.tmp
-tmp/
 
 # ---- Secrets / environment ----
 .env
 .env.*
 !.env.example
 
-# ---- Node / frontend (React + Vite, per PRD §21) ----
-node_modules/
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.hypothesis/
+.coverage
+htmlcov/
 dist/
 build/
-.vite/
-coverage/
+*.egg-info/
+
+# ---- Node / web ----
+node_modules/
+web/dist/
+web/.vite/
+web/coverage/
 *.local
+playwright-report/
+test-results/
 
-# ---- .NET / backend (ASP.NET Core, per PRD §21) ----
-bin/
-obj/
-*.user
-appsettings.*.Local.json
+# ---- Logs & temp ----
+*.log
+*.tmp
+tmp/
 
-# ---- QA / screenshot artifacts ----
-page-*.png
-*-desktop.png
-*-mobile.png
+# ---- Tooling internals ----
+.omo/
+.playwright-mcp/

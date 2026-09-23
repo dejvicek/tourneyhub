@@ -1,5 +1,0 @@
-[*.cs]
-# Auto-generated EF Core migration files — suppress analyzer warnings that
-# don't apply to generated tooling code.
-dotnet_diagnostic.CA1062.severity = none
-dotnet_diagnostic.CA1861.severity = none

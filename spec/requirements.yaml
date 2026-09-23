@@ -1,1158 +1,1006 @@
-# TourneyHub — Requirements Traceability Index
+# TourneyHub — Requirements Traceability Index (MVP)
 # ---------------------------------------------------------------------------
-# Machine-readable coverage tracker. Source of truth for the requirement text
-# is PRD.md; this file tracks IMPLEMENTATION coverage. As you build a slice
-# (AGENTS.md §6), update each touched requirement:
+# Machine-readable coverage tracker. Requirement TEXT lives in PRD.md; this file
+# tracks IMPLEMENTATION coverage. When you work a slice (CLAUDE.md §8) update:
 #   status: not_started | in_progress | done | deferred
 #   files:  [ relative paths implementing it ]
 #   tests:  [ relative paths proving it ]
 # Keep IDs identical to PRD.md. Do not delete requirements; mark deferred.
-#
-# Legend:
-#   scope:    MVP | V1 | Future
-#   priority: P0 (must) | P1 (should) | P2 (could)
-#   module:   Identity | Platform | Competition | Finance | Reporting | GDPR
+# Non-MVP requirement IDs live in ROADMAP.md §4 and are NOT listed here.
 # ---------------------------------------------------------------------------
 meta:
   prd: PRD.md
-  decisions: DECISIONS.md
-  api_contract: api/openapi.yaml
+  roadmap: ROADMAP.md
+  data_model: DATA-MODEL.md
+  adr: ADR.md
+  api_contract: api/openapi.json
   test_vectors_dir: spec/test-vectors/
   statuses: [not_started, in_progress, done, deferred]
+  milestones: [M0, M1, M2, M3, M4]
 
 functional:
-  # ----------------------------------------------------------- User Management (§6.1)
+  # ---- 6.1 Identity & accounts
   - id: FR-001
-    title: Self-registration with email + password
-    module: Identity
-    scope: MVP
+    title: "Self-registration with email + password"
+    module: identity
+    milestone: M0
     priority: P0
-    status: done
-    files: [src/TourneyHub.Api/Extensions/AuthEndpoints.cs, src/TourneyHub.Application/Identity/IIdentityService.cs, src/TourneyHub.Infrastructure/Identity/IdentityService.cs]
-    tests: [tests/TourneyHub.Domain.Tests/AccountStateTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-002
-    title: Password policy (min 12, breached-password check R-001)
-    module: Identity
-    scope: MVP
+    title: "Password policy"
+    module: identity
+    milestone: M0
     priority: P0
-    status: done
-    files: [src/TourneyHub.Infrastructure/Identity/BreachedPasswordValidator.cs, src/TourneyHub.Api/Program.cs]
-    tests: [tests/TourneyHub.Integration.Tests/TourneyHub.Integration.Tests.csproj]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-003
-    title: Authenticate via email + password; issue session/token
-    module: Identity
-    scope: MVP
+    title: "Authenticate with email + password"
+    module: identity
+    milestone: M0
     priority: P0
-    status: done
-    files: [src/TourneyHub.Api/Extensions/AuthEndpoints.cs, src/TourneyHub.Infrastructure/Identity/JwtTokenService.cs, src/TourneyHub.Infrastructure/Identity/IdentityService.cs]
+    status: not_started
+    files: []
     tests: []
   - id: FR-004
-    title: Email verification; unverified accounts limited (BR-009)
-    module: Identity
-    scope: MVP
+    title: "Email verification required"
+    module: identity
+    milestone: M0
     priority: P0
-    status: done
-    files: [src/TourneyHub.Api/Extensions/AuthEndpoints.cs, src/TourneyHub.Infrastructure/Identity/IdentityService.cs, src/TourneyHub.Domain/Identity/AccountState.cs]
+    status: not_started
+    files: []
     tests: []
   - id: FR-005
-    title: Password reset via time-limited single-use token
-    module: Identity
-    scope: MVP
+    title: "Password reset via single-use, time-limited (1 h) hashed token"
+    module: identity
+    milestone: M0
     priority: P0
-    status: done
-    files: [src/TourneyHub.Api/Extensions/AuthEndpoints.cs, src/TourneyHub.Infrastructure/Identity/IdentityService.cs]
+    status: not_started
+    files: []
     tests: []
   - id: FR-006
-    title: View/edit profile (name, avatar, locale, timezone, visibility)
-    module: Identity
-    scope: MVP
+    title: "Profile"
+    module: identity
+    milestone: M0
     priority: P0
     status: not_started
     files: []
     tests: []
   - id: FR-007
-    title: Role assignment scoped to org and league/tournament + global admin
-    module: Identity
-    scope: MVP
+    title: "Roles scoped to an organization (owner,member) and to a league (owner,organizer,player), plus a global plat..."
+    module: platform/leagues
+    milestone: M0
     priority: P0
-    status: in_progress
-    files: [src/TourneyHub.Domain/Organizations/Membership.cs, src/TourneyHub.Api/Extensions/OrganizationsEndpoints.cs]
-    tests: [tests/TourneyHub.Integration.Tests/OrganizationMembershipIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-008
-    title: Account deletion (anonymization/retention flow §13)
-    module: GDPR
-    scope: MVP
+    title: "Users can delete their account → anonymization flow (§13)"
+    module: identity
+    milestone: M4
     priority: P0
     status: not_started
     files: []
     tests: []
   - id: FR-009
-    title: Admin ban/suspend user (revoke sessions, preserve for audit)
-    module: Platform
-    scope: MVP
+    title: "Platform admins can suspend/ban a user"
+    module: identity
+    milestone: M4
     priority: P1
-    status: done
-    files: [src/TourneyHub.Infrastructure/Identity/InstanceAdminRequirement.cs, src/TourneyHub.Infrastructure/Identity/InstanceAdminHandler.cs, src/TourneyHub.Infrastructure/Identity/BootstrapService.cs]
-    tests: [tests/TourneyHub.Integration.Tests/PlatformAdminIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-009a
-    title: Self-host env-configured bootstrap admin
-    module: Platform
-    scope: MVP
+    title: "Self-host bootstrap"
+    module: identity
+    milestone: M0
     priority: P0
-    status: done
-    files: [src/TourneyHub.Infrastructure/Identity/BootstrapService.cs, src/TourneyHub.Api/Program.cs]
-    tests: [tests/TourneyHub.Integration.Tests/PlatformAdminIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-009b
-    title: First-user-admin only behind explicit opt-in on empty instance
-    module: Platform
-    scope: MVP
+    title: "First-user-becomes-admin only when TOURNEYHUB_ALLOW_FIRST_USER_ADMIN=true and the instance has zero users"
+    module: identity
+    milestone: M0
     priority: P0
-    status: done
-    files: [src/TourneyHub.Infrastructure/Identity/BootstrapService.cs, src/TourneyHub.Infrastructure/Identity/IdentityService.cs]
+    status: not_started
+    files: []
     tests: []
   - id: FR-009c
-    title: Bootstrap one-shot, audited, always >=1 InstanceAdmin
-    module: Platform
-    scope: MVP
+    title: "Bootstrap is one-shot (disabled once an admin exists) and audited (platform_audit_events, users.bootstrap_s..."
+    module: identity
+    milestone: M0
     priority: P0
-    status: done
-    files: [src/TourneyHub.Infrastructure/Identity/BootstrapService.cs]
-    tests: [tests/TourneyHub.Integration.Tests/PlatformAdminIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-009d
-    title: Hosted platform-operator admin + per-org Owner (self-host secondary)
-    module: Platform
-    scope: MVP
+    title: "Hosted"
+    module: platform
+    milestone: M0
     priority: P0
-    status: done
-    files: [src/TourneyHub.Infrastructure/Identity/InstanceAdminRequirement.cs, src/TourneyHub.Infrastructure/Identity/InstanceAdminHandler.cs, src/TourneyHub.Infrastructure/Identity/BootstrapService.cs, src/TourneyHub.Api/Program.cs]
-    tests: [tests/TourneyHub.Integration.Tests/PlatformAdminIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-010
-    title: Account states (pending_verification..banned)
-    module: Identity
-    scope: MVP
+    title: "Account states pending_verification, active, inactive, suspended, banned, deleted (§10.8)"
+    module: identity
+    milestone: M0
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Identity/AccountState.cs, src/TourneyHub.Domain/Identity/User.cs, src/TourneyHub.Infrastructure/Identity/IdentityService.cs]
-    tests: [tests/TourneyHub.Domain.Tests/AccountStateTests.cs]
-  - id: FR-011
-    title: Social/OAuth login (Google, GitHub)
-    module: Identity
-    scope: V1
-    priority: P2
     status: not_started
     files: []
     tests: []
-  - id: FR-012
-    title: Optional TOTP 2FA
-    module: Identity
-    scope: V1
-    priority: P1
-    status: not_started
-    files: []
-    tests: []
-  - id: FR-013
-    title: Inactivity flag (default 540 days, flag only)
-    module: Identity
-    scope: V1
-    priority: P2
-    status: not_started
-    files: []
-    tests: []
-
-  # ------------------------------------------------- Organizations & Tenancy (§6.1a)
+  # ---- 6.1a Organizations & tenancy
   - id: FR-150
-    title: Self-serve org creation at onboarding; creator becomes OrgOwner
-    module: Platform
-    scope: MVP
+    title: "Authenticated verified user creates an Organization (name, slug)"
+    module: platform
+    milestone: M0
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Organizations/Organization.cs, src/TourneyHub.Domain/Organizations/Membership.cs, src/TourneyHub.Application/Organizations/IOrganizationService.cs, src/TourneyHub.Application/Organizations/OrganizationCommands.cs, src/TourneyHub.Infrastructure/Organizations/OrganizationService.cs, src/TourneyHub.Api/Extensions/OrganizationsEndpoints.cs, src/TourneyHub.Api/Program.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs]
-    tests: [tests/TourneyHub.Integration.Tests/OrganizationMembershipIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-151
-    title: Every tenant-scoped entity has non-null organization_id
-    module: Platform
-    scope: MVP
+    title: "Every tenant-scoped entity has a non-null, immutable organization_id (see DATA-MODEL.md)"
+    module: all
+    milestone: M0
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Common/TenantEntity.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs, src/TourneyHub.Infrastructure/Persistence/Migrations/]
-    tests: [tests/TourneyHub.Integration.Tests/TenantIsolationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-152
-    title: Tenant isolation on every access path (cross-org = P0 defect)
-    module: Platform
-    scope: MVP
+    title: "Tenant isolation on every access path"
+    module: all
+    milestone: M0
     priority: P0
-    status: done
-    files: [src/TourneyHub.Application/Tenancy/ITenantContext.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs, src/TourneyHub.Infrastructure/Tenancy/HttpTenantContext.cs, src/TourneyHub.Api/Middleware/TenantResolutionMiddleware.cs, src/TourneyHub.Api/Program.cs]
-    tests: [tests/TourneyHub.Integration.Tests/TenantIsolationTests.cs, tests/TourneyHub.Integration.Tests/PostgresTenantIsolationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-153
-    title: OrgOwner edits settings + transfers ownership; always >=1 OrgOwner
-    module: Platform
-    scope: MVP
+    title: "OrgOwner edits name/slug/settings and transfers ownership"
+    module: platform
+    milestone: M0
     priority: P0
-    status: done
-    files: [src/TourneyHub.Infrastructure/Organizations/OrganizationService.cs, src/TourneyHub.Api/Extensions/OrganizationsEndpoints.cs]
-    tests: [tests/TourneyHub.Integration.Tests/OrganizationMembershipIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-154
-    title: User may belong to multiple orgs; one active org resolved server-side
-    module: Platform
-    scope: MVP
+    title: "A user may belong to many orgs"
+    module: platform
+    milestone: M0
     priority: P0
-    status: done
-    files: [src/TourneyHub.Infrastructure/Tenancy/HttpTenantContext.cs, src/TourneyHub.Api/Middleware/TenantResolutionMiddleware.cs, src/TourneyHub.Api/Program.cs, api/openapi.yaml]
-    tests: [tests/TourneyHub.Integration.Tests/TenantIsolationTests.cs, tests/TourneyHub.Integration.Tests/PostgresTenantIsolationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-155
-    title: Platform operator suspends/reactivates org (suspended = read-only)
-    module: Platform
-    scope: MVP
+    title: "Platform admins list, suspend and reactivate organizations"
+    module: platform
+    milestone: M4
     priority: P1
-    status: done
-    files: [src/TourneyHub.Infrastructure/Organizations/OrganizationService.cs, src/TourneyHub.Api/Extensions/OrganizationsEndpoints.cs, src/TourneyHub.Api/Middleware/SuspensionGuardMiddleware.cs, src/TourneyHub.Api/Program.cs]
-    tests: [tests/TourneyHub.Integration.Tests/PlatformAdminIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-156
-    title: Organization.plan + entitlement seam (no billing UX at MVP)
-    module: Platform
-    scope: MVP
+    title: "organizations.plan column and an EntitlementService port with a permissive default implementation exist"
+    module: platform
+    milestone: M0
     priority: P1
     status: not_started
     files: []
     tests: []
-
-  # ------------------------------------------------------------- Invitations (§6.2)
+  # ---- 6.2 Invitations & following
   - id: FR-014
-    title: Invite users to a league by email or shareable link
-    module: Identity
-    scope: MVP
+    title: "Organizers invite users to a league by email or shareable link with a role (organizer/player)"
+    module: invitations
+    milestone: M0
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Identity/Invitation.cs, src/TourneyHub.Application/Identity/IInvitationService.cs, src/TourneyHub.Application/Identity/Commands/CreateInvitationCommand.cs, src/TourneyHub.Infrastructure/Identity/InvitationService.cs, src/TourneyHub.Api/Extensions/InvitationsEndpoints.cs]
-    tests: [tests/TourneyHub.Domain.Tests/InvitationStateMachineTests.cs, tests/TourneyHub.Integration.Tests/InvitationIntegrationTests.cs]
-  - id: FR-015
-    title: Invitation states (pending..expired, TTL 14d)
-    module: Identity
-    scope: MVP
-    priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Identity/Invitation.cs]
-    tests: [tests/TourneyHub.Domain.Tests/InvitationStateMachineTests.cs, tests/TourneyHub.Integration.Tests/InvitationIntegrationTests.cs]
-  - id: FR-016
-    title: Accepting invite grants invited role; decline/expiry does not
-    module: Identity
-    scope: MVP
-    priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Identity/Invitation.cs, src/TourneyHub.Infrastructure/Identity/InvitationService.cs, src/TourneyHub.Api/Extensions/InvitationsEndpoints.cs]
-    tests: [tests/TourneyHub.Integration.Tests/InvitationIntegrationTests.cs]
-  - id: FR-017
-    title: Invite non-registered email resolvable on signup
-    module: Identity
-    scope: MVP
-    priority: P1
-    status: done
-    files: [src/TourneyHub.Infrastructure/Identity/InvitationService.cs, src/TourneyHub.Application/Identity/IInvitationService.cs]
-    tests: [tests/TourneyHub.Integration.Tests/InvitationIntegrationTests.cs]
-  - id: FR-018
-    title: Single/multi-use invite links with optional max-acceptances
-    module: Identity
-    scope: V1
-    priority: P2
     status: not_started
     files: []
     tests: []
-
-  # ------------------------------------------------------- League Management (§6.3)
-  - id: FR-020
-    title: Create/edit/delete leagues within an Organization
-    module: Competition
-    scope: MVP
+  - id: FR-015
+    title: "Invitation states pending, accepted, declined, revoked, expired"
+    module: invitations
+    milestone: M0
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Competition/League.cs, src/TourneyHub.Application/Competition/ILeagueService.cs, src/TourneyHub.Application/Competition/LeagueCommands.cs, src/TourneyHub.Infrastructure/Competition/LeagueService.cs, src/TourneyHub.Api/Extensions/LeaguesEndpoints.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs, src/TourneyHub.Infrastructure/Persistence/Migrations/20260720230726_AddLeaguesAndSeasons.cs]
-    tests: [tests/TourneyHub.Domain.Tests/LeagueStateMachineTests.cs, tests/TourneyHub.Integration.Tests/LeagueSeasonIntegrationTests.cs]
-  - id: FR-021
-    title: Transfer league ownership to another member
-    module: Competition
-    scope: MVP
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-016
+    title: "Accepting grants exactly the invited role (immutable)"
+    module: invitations
+    milestone: M0
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-017
+    title: "Inviting a non-registered email creates a pending invite resolved automatically on signup with that email"
+    module: invitations
+    milestone: M0
     priority: P1
-    status: done
-    files: [src/TourneyHub.Domain/Competition/League.cs, src/TourneyHub.Infrastructure/Competition/LeagueService.cs, src/TourneyHub.Api/Extensions/LeaguesEndpoints.cs]
-    tests: [tests/TourneyHub.Domain.Tests/LeagueStateMachineTests.cs]
-  - id: FR-022
-    title: Multiple seasons; exactly one active at a time (BR-002)
-    module: Competition
-    scope: MVP
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-028b
+    title: "Logged-in users follow/unfollow leagues and tournaments"
+    module: invitations
+    milestone: M2
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  # ---- 6.3 Leagues, seasons, scoring
+  - id: FR-020
+    title: "League create/edit/soft-delete within an organization by org owners (create) and league owners (edit/delete)"
+    module: leagues
+    milestone: M1
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Competition/Season.cs, src/TourneyHub.Infrastructure/Competition/LeagueService.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs, src/TourneyHub.Infrastructure/Persistence/Migrations/20260720230726_AddLeaguesAndSeasons.cs]
-    tests: [tests/TourneyHub.Domain.Tests/SeasonStateMachineTests.cs, tests/TourneyHub.Integration.Tests/LeagueSeasonIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-021
+    title: "League owner transfers league ownership to another member"
+    module: leagues
+    milestone: M1
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-022
+    title: "Multiple seasons per league"
+    module: leagues
+    milestone: M1
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
   - id: FR-023
-    title: Players join/leave a league/season
-    module: Competition
-    scope: MVP
+    title: "Players join (per join_policy"
+    module: leagues
+    milestone: M1
     priority: P0
     status: not_started
     files: []
     tests: []
   - id: FR-024
-    title: New season resets standings; historical seasons immutable
-    module: Competition
-    scope: MVP
+    title: "Closing a season writes an immutable season_snapshot (standings + frozen scoring config)"
+    module: leagues
+    milestone: M1
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Competition/Season.cs]
-    tests: [tests/TourneyHub.Domain.Tests/SeasonStateMachineTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-025
-    title: Configurable scoring system per league (§12)
-    module: Competition
-    scope: MVP
+    title: "Each league references a scoring system created from a preset (chess, football, winner_takes_rank)"
+    module: leagues
+    milestone: M1
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Competition/ScoringConfig.cs, src/TourneyHub.Domain/Competition/ScoringSystem.cs, src/TourneyHub.Domain/Logic/Scoring/ScoringCalculator.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs, src/TourneyHub.Infrastructure/Persistence/Migrations/20260720232205_AddScoringSystem.cs]
-    tests: [tests/TourneyHub.Domain.Tests/ScoringCalculatorTests.cs, tests/TourneyHub.Domain.Tests/ScoringSystemEntityTests.cs, tests/TourneyHub.Domain.Tests/ScoringCalculatorPropertyTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-026
-    title: League visibility (public/unlisted/private)
-    module: Competition
-    scope: MVP
+    title: "Visibility public (listed, viewable by anyone), unlisted (viewable by URL), private (members only)"
+    module: leagues
+    milestone: M1
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Competition/League.cs, src/TourneyHub.Application/Competition/ILeagueService.cs, src/TourneyHub.Infrastructure/Competition/LeagueService.cs, src/TourneyHub.Api/Extensions/LeaguesEndpoints.cs]
-    tests: [tests/TourneyHub.Integration.Tests/LeagueSeasonIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-026a
-    title: Public discovery/listing of public leagues (no auth)
-    module: Competition
-    scope: MVP
+    title: "Public discovery endpoint/page lists public leagues and their public tournaments of active orgs, paginated,..."
+    module: leagues
+    milestone: M2
     priority: P1
     status: not_started
     files: []
     tests: []
   - id: FR-027
-    title: League player invitations (per §6.2)
-    module: Competition
-    scope: MVP
+    title: "Leagues support invitations (§6.2)"
+    module: leagues
+    milestone: M1
     priority: P0
     status: not_started
     files: []
     tests: []
   - id: FR-028
-    title: Public league page (info, standings, schedule) no auth
-    module: Competition
-    scope: MVP
-    priority: P0
-    status: done
-    files: [src/TourneyHub.Api/Extensions/LeaguesEndpoints.cs, src/TourneyHub.Application/Competition/ILeagueService.cs, src/TourneyHub.Infrastructure/Competition/LeagueService.cs]
-    tests: [tests/TourneyHub.Integration.Tests/LeagueSeasonIntegrationTests.cs]
-  - id: FR-028a
-    title: Spectator is a capability level, not an assignable role
-    module: Competition
-    scope: MVP
+    title: "Public league page (info, current standings, upcoming/past tournaments) for public/unlisted, no auth"
+    module: leagues
+    milestone: M1
     priority: P0
     status: not_started
     files: []
     tests: []
-  - id: FR-028b
-    title: Logged-in users follow/favourite a league or tournament
-    module: Competition
-    scope: MVP
-    priority: P1
+  - id: FR-028a
+    title: "Spectator is a capability level, not a role"
+    module: leagues
+    milestone: M1
+    priority: P0
     status: not_started
     files: []
     tests: []
   - id: FR-029
-    title: Archive/unarchive a league (read-only history)
-    module: Competition
-    scope: MVP
+    title: "League owner archives (read-only) and unarchives a league (E-13)"
+    module: leagues
+    milestone: M2
     priority: P1
-    status: done
-    files: [src/TourneyHub.Domain/Competition/League.cs, src/TourneyHub.Infrastructure/Competition/LeagueService.cs, src/TourneyHub.Api/Extensions/LeaguesEndpoints.cs]
-    tests: [tests/TourneyHub.Domain.Tests/LeagueStateMachineTests.cs, tests/TourneyHub.Integration.Tests/LeagueSeasonIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-030
-    title: Automatic league/season rankings from results
-    module: Competition
-    scope: MVP
+    title: "Season standings computed automatically from completed tournament matches per the scoring system (§12.1)"
+    module: leagues
+    milestone: M1
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Logic/Rankings/RankingCalculator.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Domain/Competition/SeasonRanking.cs]
-    tests: [tests/TourneyHub.Integration.Tests/RankingAndStandingsIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-031
-    title: League-level statistics (participation, leaders)
-    module: Competition
-    scope: MVP
+    title: "League statistics"
+    module: leagues
+    milestone: M2
     priority: P1
     status: not_started
     files: []
     tests: []
   - id: FR-032
-    title: Leaving mid-season retains earned results (A-007)
-    module: Competition
-    scope: MVP
+    title: "A player leaving mid-season keeps earned points"
+    module: leagues
+    milestone: M2
     priority: P1
     status: not_started
     files: []
     tests: []
-
-  # --------------------------------------------------- Tournament Management (§6.4)
+  # ---- 6.4 Tournaments, participants, formats, results
   - id: FR-040
-    title: Create tournaments standalone or under a league season
-    module: Competition
-    scope: MVP
-    priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Competition/Tournament.cs, src/TourneyHub.Application/Competition/ITournamentService.cs, src/TourneyHub.Application/Competition/TournamentCommands.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Api/Extensions/TournamentsEndpoints.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs, src/TourneyHub.Infrastructure/Persistence/Migrations/20260720234653_AddTournamentsAndParticipants.cs]
-    tests: [tests/TourneyHub.Integration.Tests/TournamentRegistrationIntegrationTests.cs]
-  - id: FR-040a
-    title: Configurable teamSize 1-10; participant has exactly teamSize members
-    module: Competition
-    scope: MVP
-    priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Competition/Tournament.cs, src/TourneyHub.Domain/Competition/Participant.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs]
-    tests: [tests/TourneyHub.Integration.Tests/TournamentRegistrationIntegrationTests.cs]
-  - id: FR-040b
-    title: Discipline (free-text) + resultModel winner/score with scoreConfig
-    module: Competition
-    scope: MVP
-    priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Competition/Tournament.cs, src/TourneyHub.Application/Competition/TournamentCommands.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs]
-    tests: [tests/TourneyHub.Integration.Tests/TournamentRegistrationIntegrationTests.cs]
-  - id: FR-040c
-    title: bestOf N flag; MVP records aggregate result only
-    module: Competition
-    scope: MVP
-    priority: P1
-    status: done
-    files: [src/TourneyHub.Domain/Competition/Tournament.cs, src/TourneyHub.Application/Competition/TournamentCommands.cs]
-    tests: [tests/TourneyHub.Integration.Tests/TournamentRegistrationIntegrationTests.cs]
-  - id: FR-040d
-    title: Head-to-head via ordered participant slots (N-slot additive)
-    module: Competition
-    scope: MVP
-    priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Competition/Tournament.cs]
-    tests: []
-  - id: FR-041
-    title: Support Single Elimination and Round Robin
-    module: Competition
-    scope: MVP
-    priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Logic/Formats/SingleEliminationGenerator.cs, src/TourneyHub.Domain/Logic/Formats/RoundRobinGenerator.cs, src/TourneyHub.Domain/Competition/Match.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Api/Extensions/TournamentsEndpoints.cs]
-    tests: [tests/TourneyHub.Domain.Tests/SingleEliminationGeneratorTests.cs, tests/TourneyHub.Domain.Tests/RoundRobinGeneratorTests.cs, spec/test-vectors/single-elimination.json, spec/test-vectors/round-robin.json]
-  - id: FR-042
-    title: Pluggable formats (Strategy/registry, no core changes)
-    module: Competition
-    scope: MVP
+    title: "Tournaments are created standalone or attached to a league season (org-scoped either way)"
+    module: tournaments
+    milestone: M1
     priority: P0
     status: not_started
-    files: [src/TourneyHub.Domain/Logic/Formats/SingleEliminationGenerator.cs]
+    files: []
+    tests: []
+  - id: FR-040a
+    title: "team_size 1–10"
+    module: tournaments
+    milestone: M2
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-040b
+    title: "discipline_name free text"
+    module: tournaments
+    milestone: M1
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-040c
+    title: "Optional best_of N flag"
+    module: tournaments
+    milestone: M1
+    priority: P1
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-040d
+    title: "Matches are head-to-head"
+    module: tournaments
+    milestone: M1
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-041
+    title: "Formats at MVP"
+    module: tournaments
+    milestone: M1/M2
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-042
+    title: "Formats implement the TournamentFormat protocol (§12.2) and register via the module manifest"
+    module: tournaments
+    milestone: M1
+    priority: P0
+    status: not_started
+    files: []
     tests: []
   - id: FR-043
-    title: Registration window (open/close, capacity, deadline)
-    module: Competition
-    scope: MVP
+    title: "Registration window"
+    module: tournaments
+    milestone: M1
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Competition/Tournament.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs]
-    tests: [tests/TourneyHub.Integration.Tests/TournamentRegistrationIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-044
-    title: Register participant; captain assembles roster if teamSize>1
-    module: Competition
-    scope: MVP
+    title: "A player registers a Participant (self, or organizer adds)"
+    module: tournaments
+    milestone: M1 (individual) / M2 (teams)
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Competition/Participant.cs, src/TourneyHub.Domain/Competition/ParticipantMember.cs, src/TourneyHub.Application/Competition/ITournamentService.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Api/Extensions/TournamentsEndpoints.cs]
-    tests: [tests/TourneyHub.Integration.Tests/TournamentRegistrationIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-044a
-    title: Participant incomplete until exactly teamSize accepted members
-    module: Competition
-    scope: MVP
+    title: "A Participant is incomplete until exactly team_size members accepted"
+    module: tournaments
+    milestone: M2
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Competition/Participant.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs]
-    tests: [tests/TourneyHub.Integration.Tests/TournamentRegistrationIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-045
-    title: A player appears in at most one Participant per tournament
-    module: Competition
-    scope: MVP
+    title: "A user appears in at most one Participant per tournament (unique index, E-30)"
+    module: tournaments
+    milestone: M1
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Competition/ParticipantMember.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs, src/TourneyHub.Infrastructure/Persistence/Migrations/20260720234653_AddTournamentsAndParticipants.cs]
-    tests: [tests/TourneyHub.Integration.Tests/TournamentRegistrationIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-046
-    title: Seeding random (stored rng_seed) / manual / ranking-based (V1)
-    module: Competition
-    scope: MVP
+    title: "Seeding random (from rng_seed) or manual (organizer order)"
+    module: tournaments
+    milestone: M1
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Logic/Formats/SingleEliminationGenerator.cs, src/TourneyHub.Application/Competition/ITournamentService.cs, src/TourneyHub.Application/Competition/TournamentCommands.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Api/Extensions/TournamentsEndpoints.cs]
-    tests: [tests/TourneyHub.Domain.Tests/SingleEliminationGeneratorTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-047
-    title: Deterministic bracket/schedule generation from seeds
-    module: Competition
-    scope: MVP
+    title: "Bracket/schedule generation is deterministic from (confirmed participants, seeds, format_config, rng_seed)..."
+    module: tournaments
+    milestone: M1/M2
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Logic/Formats/SingleEliminationGenerator.cs, src/TourneyHub.Domain/Logic/Formats/RoundRobinGenerator.cs, src/TourneyHub.Application/Competition/ITournamentService.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Api/Extensions/TournamentsEndpoints.cs]
-    tests: [tests/TourneyHub.Domain.Tests/SingleEliminationGeneratorTests.cs, tests/TourneyHub.Domain.Tests/RoundRobinGeneratorTests.cs, spec/test-vectors/single-elimination.json, spec/test-vectors/round-robin.json]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-048
-    title: Bracket generation idempotent until start; forced regen audited
-    module: Competition
-    scope: MVP
+    title: "Generation is idempotent before start"
+    module: tournaments
+    milestone: M1
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Logic/Formats/SingleEliminationGenerator.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Api/Extensions/TournamentsEndpoints.cs]
-    tests: [tests/TourneyHub.Domain.Tests/SingleEliminationGeneratorTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-049
-    title: Per-match scheduling metadata (round, table, planned time)
-    module: Competition
-    scope: MVP
+    title: "Per-match scheduling metadata"
+    module: tournaments
+    milestone: M2
     priority: P1
     status: not_started
     files: []
     tests: []
   - id: FR-050
-    title: Enter match results per resultModel
-    module: Competition
-    scope: MVP
+    title: "Authorised users enter results per result_model"
+    module: tournaments
+    milestone: M1
     priority: P0
-    status: done
-    files: [src/TourneyHub.Api/Extensions/MatchesEndpoints.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Application/Competition/ITournamentService.cs, src/TourneyHub.Application/Competition/MatchCommands.cs]
-    tests: [tests/TourneyHub.Integration.Tests/MatchResultIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-051
-    title: resultEntryMode organizer (default) / playerSelfReport
-    module: Competition
-    scope: MVP
+    title: "result_entry_mode ∈ {organizer (default), player_self_report}"
+    module: tournaments
+    milestone: M1
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Competition/Tournament.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs]
-    tests: [tests/TourneyHub.Integration.Tests/TournamentRegistrationIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-051a
-    title: Self-report submit + opposing-captain confirm; dispute/timeout->organizer
-    module: Competition
-    scope: MVP
+    title: "In player_self_report, a captain submits (ready → awaiting_confirmation)"
+    module: tournaments
+    milestone: M2
     priority: P1
-    status: deferred
+    status: not_started
     files: []
     tests: []
   - id: FR-051b
-    title: Organizers can always override results (audited)
-    module: Competition
-    scope: MVP
+    title: "Organizers/owners can override any result in any mode"
+    module: tournaments
+    milestone: M1
     priority: P0
-    status: done
-    files: [src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Domain/Competition/Match.cs, src/TourneyHub.Domain/Platform/AuditEvent.cs]
-    tests: [tests/TourneyHub.Integration.Tests/MatchResultIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-052
-    title: Validate results vs resultModel/scoreConfig
-    module: Competition
-    scope: MVP
+    title: "Result validation"
+    module: tournaments
+    milestone: M1
     priority: P0
-    status: done
-    files: [src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Application/Competition/MatchCommands.cs]
-    tests: [tests/TourneyHub.Integration.Tests/MatchResultIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-053
-    title: Auto-assign byes for non-power-of-two (byes to top seeds)
-    module: Competition
-    scope: MVP
+    title: "Single elimination pads to the next power of two"
+    module: tournaments
+    milestone: M1
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Logic/Formats/SingleEliminationGenerator.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs]
-    tests: [tests/TourneyHub.Domain.Tests/SingleEliminationGeneratorTests.cs, spec/test-vectors/single-elimination.json]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-054
-    title: Forfeits (participant loses a specific match)
-    module: Competition
-    scope: MVP
+    title: "Forfeit"
+    module: tournaments
+    milestone: M1
     priority: P0
-    status: done
-    files: [src/TourneyHub.Api/Extensions/MatchesEndpoints.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Domain/Competition/Match.cs]
-    tests: [tests/TourneyHub.Integration.Tests/MatchResultIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-055
-    title: Withdrawals (exit whole tournament; auto-forfeit remaining)
-    module: Competition
-    scope: MVP
+    title: "Withdrawal"
+    module: tournaments
+    milestone: M1
     priority: P0
-    status: done
-    files: [src/TourneyHub.Api/Extensions/MatchesEndpoints.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Domain/Competition/Participant.cs]
-    tests: [tests/TourneyHub.Integration.Tests/MatchResultIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-056
-    title: Cancel a tournament (terminal, with reason)
-    module: Competition
-    scope: MVP
+    title: "Cancel a tournament (terminal, reason required, audited)"
+    module: tournaments
+    milestone: M1
     priority: P1
     status: not_started
     files: []
     tests: []
   - id: FR-057
-    title: Configurable tie-break rules (defaults MVP / configurable V1)
-    module: Competition
-    scope: MVP
+    title: "Tie-breakers"
+    module: tournaments
+    milestone: M2
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Competition/ScoringConfig.cs, src/TourneyHub.Domain/Logic/Scoring/ScoringCalculator.cs, src/TourneyHub.Domain/Logic/Scoring/TieBreakerResolver.cs]
-    tests: [tests/TourneyHub.Domain.Tests/ScoringCalculatorTests.cs, tests/TourneyHub.Domain.Tests/TieBreakerResolverTests.cs, spec/test-vectors/tie-breaks.json]
-  - id: FR-058
-    title: Detect completion; compute final standings + payouts
-    module: Competition
-    scope: MVP
-    priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Logic/Recompute/RecomputeService.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Domain/Competition/TournamentStanding.cs, src/TourneyHub.Domain/Logic/Rankings/RankingCalculator.cs]
-    tests: [tests/TourneyHub.Integration.Tests/MatchResultIntegrationTests.cs, tests/TourneyHub.Integration.Tests/RankingAndStandingsIntegrationTests.cs]
-  - id: FR-059
-    title: Re-open a completed tournament for correction (audited)
-    module: Competition
-    scope: V1
-    priority: P2
     status: not_started
     files: []
     tests: []
-
-  # ------------------------------------------------------- Live Tournament (§6.5)
+  - id: FR-058
+    title: "Completion detection"
+    module: tournaments
+    milestone: M1
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  # ---- 6.5 Live updates
   - id: FR-060
-    title: Push live updates (bracket, standings, match states)
-    module: Platform
-    scope: MVP
+    title: "Bracket, standings and match state changes are pushed to connected clients (ADR-007) within 2 s of commit (..."
+    module: realtime
+    milestone: M3
     priority: P0
     status: not_started
     files: []
     tests: []
   - id: FR-061
-    title: Public spectators receive live updates without auth
-    module: Platform
-    scope: MVP
+    title: "Public spectators receive updates on public/unlisted tournaments without auth on the public channel"
+    module: realtime
+    milestone: M3
     priority: P0
     status: not_started
     files: []
     tests: []
   - id: FR-062
-    title: Server authoritative for results; optimistic UI reconciles
-    module: Platform
-    scope: MVP
+    title: "Server is authoritative"
+    module: web
+    milestone: M3
     priority: P0
-    status: done
-    files: [src/TourneyHub.Api/Extensions/MatchesEndpoints.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Domain/Competition/Match.cs]
-    tests: [tests/TourneyHub.Integration.Tests/MatchResultIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-063
-    title: Graceful degrade to polling if live transport unavailable
-    module: Platform
-    scope: MVP
+    title: "Degrade to ETag polling of the overview endpoint when the stream is unavailable"
+    module: web
+    milestone: M3
     priority: P1
     status: not_started
     files: []
     tests: []
   - id: FR-064
-    title: Live updates scoped/authorised (no private leak on public channels)
-    module: Platform
-    scope: MVP
+    title: "Channels are org- and visibility-scoped"
+    module: realtime
+    milestone: M3
     priority: P0
     status: not_started
     files: []
     tests: []
-
-  # -------------------------------------------------- Registration & Finance (§6.6)
+  # ---- 6.6 Finance (manual ledger)
   - id: FR-070
-    title: Optional entry fee (currency + integer minor units)
-    module: Finance
-    scope: MVP
+    title: "Optional entry fee per tournament"
+    module: finance
+    milestone: M3
     priority: P0
     status: not_started
     files: []
     tests: []
   - id: FR-071
-    title: Record payment status per registration
-    module: Finance
-    scope: MVP
+    title: "Organizers record payment status per registration"
+    module: finance
+    milestone: M3
     priority: P0
     status: not_started
     files: []
     tests: []
   - id: FR-072
-    title: Compute prize pool = sum(paid fees) - organizer fee
-    module: Finance
-    scope: MVP
+    title: "Prize pool = Σ(paid entry fees) − organizer fee, integer minor units (BR-005)"
+    module: finance
+    milestone: M3
     priority: P0
     status: not_started
     files: []
-    tests: [spec/test-vectors/payout-split.json]
+    tests: []
   - id: FR-073
-    title: Configurable prize distribution (presets MVP / custom V1)
-    module: Finance
-    scope: V1
+    title: "Prize distribution presets at MVP"
+    module: finance
+    milestone: M3
     priority: P0
     status: not_started
     files: []
-    tests: [spec/test-vectors/payout-split.json]
+    tests: []
   - id: FR-074
-    title: Organizer fee percentage OR fixed (mutually exclusive)
-    module: Finance
-    scope: MVP
+    title: "Organizer fee = percentage (basis points) or fixed minor amount, never both (BR-006)"
+    module: finance
+    milestone: M3
     priority: P0
     status: not_started
     files: []
-    tests: [spec/test-vectors/payout-split.json]
+    tests: []
   - id: FR-075
-    title: Generate payout records per final standing; track status
-    module: Finance
-    scope: MVP
+    title: "On completion, payout rows are calculated per final rank"
+    module: finance
+    milestone: M3
     priority: P1
     status: not_started
     files: []
     tests: []
   - id: FR-075a
-    title: Team payout split equally; remainder to captain (PayoutShare)
-    module: Finance
-    scope: MVP
-    priority: P1
-    status: not_started
-    files: []
-    tests: [spec/test-vectors/payout-split.json]
-  - id: FR-076
-    title: Refunds (full/partial) with audit and reason
-    module: Finance
-    scope: V1
-    priority: P1
-    status: not_started
-    files: []
-    tests: []
-  - id: FR-077
-    title: Unpaid-registration policy (forfeit/auto-remove)
-    module: Finance
-    scope: V1
-    priority: P1
-    status: not_started
-    files: []
-    tests: []
-  - id: FR-078
-    title: Financial report per tournament/season
-    module: Finance
-    scope: V1
+    title: "For team_size > 1, each payout is split into payout_shares per member"
+    module: finance
+    milestone: M3
     priority: P1
     status: not_started
     files: []
     tests: []
   - id: FR-079
-    title: Manual money handling at MVP; no gateway
-    module: Finance
-    scope: MVP
+    title: "Money handling is manual at MVP (organizer records reality) for hosted and self-host"
+    module: finance
+    milestone: M3
     priority: P0
     status: not_started
     files: []
     tests: []
   - id: FR-080
-    title: One currency per financial scope (BR-007)
-    module: Finance
-    scope: MVP
+    title: "One currency per tournament"
+    module: finance
+    milestone: M3
     priority: P0
     status: not_started
     files: []
     tests: []
   - id: FR-081
-    title: Integer minor units + defined rounding policy
-    module: Finance
-    scope: MVP
+    title: "All money math on integer minor units"
+    module: finance
+    milestone: M3
     priority: P0
     status: not_started
     files: []
-    tests: [spec/test-vectors/payout-split.json]
+    tests: []
   - id: FR-082
-    title: IPaymentProvider seam with ManualProvider at MVP
-    module: Finance
-    scope: MVP
+    title: "PaymentProvider port with a single ManualProvider"
+    module: finance
+    milestone: M3
     priority: P0
     status: not_started
     files: []
     tests: []
-  - id: FR-083
-    title: Hosted inbound entry-fee gateway (V1); outbound payouts (Future+)
-    module: Finance
-    scope: V1
-    priority: P1
-    status: not_started
-    files: []
-    tests: []
-
-  # ------------------------------------------------- Rankings & Statistics (§6.7)
+  # ---- 6.7 Rankings & statistics
   - id: FR-090
-    title: Compute league/season rankings automatically
-    module: Competition
-    scope: MVP
+    title: "Season standings recomputed automatically from completed matches of completed tournaments in that season"
+    module: leagues
+    milestone: M1
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Logic/Rankings/RankingCalculator.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Domain/Competition/SeasonRanking.cs]
-    tests: [spec/test-vectors/tie-breaks.json, tests/TourneyHub.Integration.Tests/RankingAndStandingsIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-090a
-    title: Team play awards points per player; standings per-User
-    module: Competition
-    scope: MVP
+    title: "Team play credits each member with the Participant's points"
+    module: leagues
+    milestone: M2
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Logic/Rankings/RankingCalculator.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs]
-    tests: [tests/TourneyHub.Integration.Tests/RankingAndStandingsIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-091
-    title: Preserve historical rankings per finished season (snapshot)
-    module: Competition
-    scope: MVP
+    title: "Closed seasons are immutable snapshots (FR-024)"
+    module: leagues
+    milestone: M1
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Competition/RankingSnapshot.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs]
-    tests: [tests/TourneyHub.Integration.Tests/RankingAndStandingsIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-092
-    title: Per-player match history
-    module: Competition
-    scope: MVP
+    title: "Per-player match history (all matches via roster membership) with pagination"
+    module: tournaments
+    milestone: M1
     priority: P0
     status: not_started
     files: []
     tests: []
   - id: FR-093
-    title: Win/loss/draw statistics per player (overall/league/discipline)
-    module: Competition
-    scope: MVP
+    title: "Win/loss/draw statistics per player"
+    module: leagues
+    milestone: M2
     priority: P1
     status: not_started
     files: []
     tests: []
   - id: FR-094
-    title: Tournament history per player
-    module: Competition
-    scope: MVP
+    title: "Tournament history per player"
+    module: tournaments
+    milestone: M2
     priority: P1
     status: not_started
     files: []
     tests: []
   - id: FR-095
-    title: Recompute rankings deterministically on relevant events
-    module: Competition
-    scope: MVP
+    title: "Recompute on result entry/edit/override, forfeit, withdrawal, cancellation, deterministically and inside th..."
+    module: tournaments/leagues
+    milestone: M1
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Logic/Recompute/RecomputeService.cs, src/TourneyHub.Infrastructure/Competition/TournamentService.cs, src/TourneyHub.Domain/Logic/Rankings/RankingCalculator.cs, src/TourneyHub.Domain/Competition/TournamentStanding.cs, src/TourneyHub.Domain/Competition/SeasonRanking.cs]
-    tests: [tests/TourneyHub.Integration.Tests/MatchResultIntegrationTests.cs, tests/TourneyHub.Integration.Tests/RankingAndStandingsIntegrationTests.cs]
-  - id: FR-096
-    title: Cache derived rankings/stats; invalidate on source change
-    module: Competition
-    scope: V1
-    priority: P1
     status: not_started
     files: []
     tests: []
-  - id: FR-097
-    title: Head-to-head records
-    module: Competition
-    scope: Future
-    priority: P2
-    status: deferred
-    files: []
-    tests: []
-  - id: FR-098
-    title: Elo/rating computation
-    module: Competition
-    scope: Future
-    priority: P2
-    status: deferred
-    files: []
-    tests: []
-
-  # ---------------------------------------------------------------- Reporting (§6.8)
+  # ---- 6.8 Reporting, audit, GDPR, notifications
   - id: FR-100
-    title: Tournament, league, and player report views
-    module: Reporting
-    scope: MVP
+    title: "Report views (JSON + UI) for a tournament (participants, results, standings, finance summary), a league sea..."
+    module: tournaments/leagues
+    milestone: M4
     priority: P1
     status: not_started
     files: []
     tests: []
-  - id: FR-101
-    title: CSV export of standings, schedules, financial reports
-    module: Reporting
-    scope: V1
-    priority: P1
-    status: not_started
-    files: []
-    tests: []
-  - id: FR-102
-    title: PDF export of reports
-    module: Reporting
-    scope: Future
-    priority: P2
-    status: deferred
-    files: []
-    tests: []
-  - id: FR-103
-    title: Async report generation for large datasets
-    module: Reporting
-    scope: V1
-    priority: P2
-    status: not_started
-    files: []
-    tests: []
-
-  # ----------------------------------------------------------- Security & Audit (§6.9)
   - id: FR-120
-    title: Audit log for security/finance/admin events
-    module: Platform
-    scope: MVP
+    title: "Audit rows for security, finance, admin and result-override events"
+    module: platform
+    milestone: M0
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Platform/AuditEvent.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs, src/TourneyHub.Infrastructure/Persistence/Migrations/]
-    tests: [tests/TourneyHub.Integration.Tests/OutboxIntegrationTests.cs, tests/TourneyHub.Architecture.Tests/AuditAppendOnlyTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-121
-    title: Audit logs append-only and tamper-evident
-    module: Platform
-    scope: MVP
+    title: "Audit tables are append-only (no UPDATE/DELETE grants for the app role)"
+    module: platform
+    milestone: M0
     priority: P1
-    status: done
-    files: [src/TourneyHub.Domain/Platform/AuditEvent.cs]
-    tests: [tests/TourneyHub.Architecture.Tests/AuditAppendOnlyTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: FR-122
-    title: Record consent events (privacy policy version)
-    module: GDPR
-    scope: MVP
+    title: "Consent events recorded with policy kind + version (consent_records)"
+    module: identity
+    milestone: M0
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Identity/ConsentRecord.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs, src/TourneyHub.Infrastructure/Persistence/Migrations/]
-    tests: [tests/TourneyHub.Integration.Tests/OutboxIntegrationTests.cs]
-
-  # ------------------------------------------------------------- GDPR / Privacy (§6.10)
+    status: not_started
+    files: []
+    tests: []
   - id: FR-130
-    title: Account deletion with anonymization; retain competition facts
-    module: GDPR
-    scope: MVP
+    title: "Account deletion anonymizes"
+    module: identity
+    milestone: M4
     priority: P0
     status: not_started
     files: []
     tests: []
   - id: FR-131
-    title: Export personal data (machine-readable JSON)
-    module: GDPR
-    scope: MVP
+    title: "GET /me/export returns machine-readable JSON of all personal data and participation"
+    module: identity
+    milestone: M4
     priority: P0
     status: not_started
     files: []
     tests: []
   - id: FR-132
-    title: Present privacy policy; capture consent at registration
-    module: GDPR
-    scope: MVP
+    title: "Privacy policy shown and consent captured at registration"
+    module: identity
+    milestone: M0
     priority: P0
     status: not_started
     files: []
     tests: []
-  - id: FR-133
-    title: Configurable data-retention policy
-    module: GDPR
-    scope: V1
-    priority: P1
-    status: not_started
-    files: []
-    tests: []
   - id: FR-134
-    title: Minimise personal data collected
-    module: GDPR
-    scope: MVP
+    title: "Data minimisation"
+    module: identity
+    milestone: M0
     priority: P0
     status: not_started
     files: []
     tests: []
   - id: FR-135
-    title: Profile visibility control (public/members-only/private)
-    module: GDPR
-    scope: MVP
+    title: "Profile visibility public/members_only/private respected on all profile reads"
+    module: identity
+    milestone: M2
     priority: P1
     status: not_started
     files: []
     tests: []
-
-  # -------------------------------------------------------------- Notifications (§6.11)
   - id: FR-140
-    title: Transactional notifications for core flows
-    module: Platform
-    scope: MVP
+    title: "Transactional emails"
+    module: platform
+    milestone: M0–M2
     priority: P0
-    status: done
-    files: [src/TourneyHub.Application/Abstractions/INotificationChannel.cs, src/TourneyHub.Infrastructure/Notifications/EmailChannel.cs, src/TourneyHub.Infrastructure/Messaging/NotificationOutboxConsumer.cs, src/TourneyHub.Infrastructure/Notifications/LiquidTemplateRenderer.cs, src/TourneyHub.Infrastructure/Notifications/EmailTemplates/UserRegistered.liquid, src/TourneyHub.Infrastructure/Notifications/EmailTemplates/PasswordReset.liquid, src/TourneyHub.Infrastructure/Notifications/EmailTemplates/InvitationCreated.liquid, src/TourneyHub.Domain/Identity/Events/UserRegisteredEvent.cs, src/TourneyHub.Domain/Identity/Events/PasswordResetRequestedEvent.cs, src/TourneyHub.Domain/Identity/Events/InvitationCreatedEvent.cs, src/TourneyHub.Infrastructure/Identity/IdentityService.cs, src/TourneyHub.Domain/Platform/SentNotification.cs]
-    tests: [tests/TourneyHub.Integration.Tests/NotificationIntegrationTests.cs, tests/TourneyHub.Architecture.Tests/NotificationDomainEventMappingTests.cs]
-  - id: FR-141
-    title: INotificationChannel abstraction + EmailChannel; event-triggered (outbox)
-    module: Platform
-    scope: MVP
-    priority: P0
-    status: done
-    files: [src/TourneyHub.Application/Abstractions/INotificationChannel.cs, src/TourneyHub.Application/Abstractions/IOutbox.cs, src/TourneyHub.Infrastructure/Notifications/EmailChannel.cs, src/TourneyHub.Infrastructure/Messaging/NotificationOutboxConsumer.cs, src/TourneyHub.Domain/Common/OutboxMessage.cs, src/TourneyHub.Application/Notifications/Notification.cs, src/TourneyHub.Application/Notifications/NotificationCategory.cs]
-    tests: [tests/TourneyHub.Integration.Tests/NotificationIntegrationTests.cs, tests/TourneyHub.Architecture.Tests/NotificationDomainEventMappingTests.cs]
-  - id: FR-142
-    title: Hosted managed email primary; self-host SMTP secondary; validated at startup
-    module: Platform
-    scope: MVP
-    priority: P0
-    status: done
-    files: [src/TourneyHub.Api/Health/SmtpHealthCheck.cs, src/TourneyHub.Infrastructure/Notifications/EmailChannel.cs, src/TourneyHub.Infrastructure/Notifications/EmailOptions.cs, src/TourneyHub.Api/Program.cs, .env.example]
-    tests: [tests/TourneyHub.Integration.Tests/NotificationIntegrationTests.cs]
-  - id: FR-143
-    title: Transactional vs engagement distinction (opt-out only for engagement)
-    module: Platform
-    scope: MVP
-    priority: P1
-    status: done
-    files: [src/TourneyHub.Application/Notifications/NotificationCategory.cs, src/TourneyHub.Application/Notifications/Notification.cs]
+    status: not_started
+    files: []
     tests: []
-  - id: FR-144
-    title: Engagement notifications, extra channels, preferences
-    module: Platform
-    scope: Future
-    priority: P2
-    status: deferred
+  - id: FR-141
+    title: "All notifications flow domain event → outbox → NotificationChannel (EmailChannel only at MVP)"
+    module: platform
+    milestone: M0
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-142
+    title: "Hosted uses a managed provider adapter"
+    module: platform
+    milestone: M0
+    priority: P0
+    status: not_started
+    files: []
+    tests: []
+  - id: FR-143
+    title: "Transactional emails are not subject to marketing opt-out"
+    module: platform
+    milestone: M0
+    priority: P1
+    status: not_started
     files: []
     tests: []
 
 non_functional:
   - id: NFR-001
-    title: Modularity by domain module; no circular deps
+    title: "Modularity"
     priority: P0
     status: not_started
     files: []
     tests: []
   - id: NFR-002
-    title: API-first; UI consumes same API as third parties
+    title: "API-first"
     priority: P0
-    status: in_progress
-    files: [api/openapi.yaml, src/TourneyHub.Api/Middleware/CorrelationIdMiddleware.cs, src/TourneyHub.Api/Middleware/ProblemDetailsMiddleware.cs, src/TourneyHub.Api/Middleware/IdempotencyMiddleware.cs, spec/error-catalog.md]
-    tests: [tests/TourneyHub.Integration.Tests/ApiConventionsTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: NFR-003
-    title: Extensibility (formats/scoring pluggable via interfaces)
+    title: "Extensibility"
     priority: P0
     status: not_started
     files: []
     tests: []
   - id: NFR-004
-    title: Multi-tenancy core; non-null organization_id, server-side scoping
+    title: "Multi-tenancy"
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Common/TenantEntity.cs, src/TourneyHub.Application/Tenancy/ITenantContext.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs, src/TourneyHub.Infrastructure/Tenancy/HttpTenantContext.cs, src/TourneyHub.Api/Middleware/TenantResolutionMiddleware.cs, src/TourneyHub.Api/Program.cs]
-    tests: [tests/TourneyHub.Integration.Tests/TenantIsolationTests.cs, tests/TourneyHub.Integration.Tests/PostgresTenantIsolationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: NFR-005
-    title: Performance (P95 read <300ms, write <600ms at MVP scale)
+    title: "Performance"
     priority: P1
     status: not_started
     files: []
     tests: []
   - id: NFR-006
-    title: Live latency < 2s of server commit
+    title: "Live latency"
     priority: P1
     status: not_started
     files: []
     tests: []
   - id: NFR-007
-    title: Scalability (stateless app; shared pub/sub backplane)
+    title: "Scalability"
     priority: P1
     status: not_started
     files: []
     tests: []
   - id: NFR-008
-    title: Availability target 99.5%; no restart-blocking in-memory state
+    title: "Availability"
     priority: P1
     status: not_started
     files: []
     tests: []
   - id: NFR-009
-    title: Security (Argon2id/PBKDF2, OWASP, CSRF, rate limiting)
+    title: "Security"
     priority: P0
     status: not_started
     files: []
     tests: []
   - id: NFR-010
-    title: Accessibility (WCAG 2.1 AA V1; keyboard/SR core MVP)
+    title: "Accessibility"
     priority: P1
     status: not_started
     files: []
     tests: []
   - id: NFR-011
-    title: Responsive/mobile-first (usable at 360px)
+    title: "Mobile-first"
     priority: P0
     status: not_started
     files: []
     tests: []
   - id: NFR-012
-    title: i18n-ready (no hardcoded strings; localisable formatting)
+    title: "i18n-ready"
     priority: P1
     status: not_started
     files: []
     tests: []
   - id: NFR-013
-    title: Testability (unit/integration/e2e; CI gate)
+    title: "Testability"
     priority: P0
-    status: done
-    files: [.github/workflows/ci.yml, .editorconfig, Directory.Build.props, Directory.Packages.props]
-    tests: [tests/TourneyHub.Integration.Tests/TenantIsolationTests.cs, tests/TourneyHub.Domain.Tests/PayoutSplitterTests.cs, tests/TourneyHub.Architecture.Tests/]
+    status: not_started
+    files: []
+    tests: []
   - id: NFR-014
-    title: Observability (structured logging, health, metrics)
+    title: "Observability"
     priority: P1
-    status: in_progress
-    files: [src/TourneyHub.Api/Program.cs, src/TourneyHub.Api/Middleware/CorrelationIdMiddleware.cs, src/TourneyHub.Api/Middleware/ProblemDetailsMiddleware.cs]
-    tests: [tests/TourneyHub.Integration.Tests/ApiConventionsTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: NFR-015
-    title: Documentation (OpenAPI, self-host install, config ref)
+    title: "Documentation"
     priority: P0
-    status: done
-    files: [api/openapi.yaml, CONTRIBUTING.md, .editorconfig, .env.example]
-    tests: [.github/workflows/ci.yml (openapi lint)]
+    status: not_started
+    files: []
+    tests: []
   - id: NFR-016
-    title: Data portability (backup/restore; no lock-in)
+    title: "Portability"
     priority: P0
-    status: done
-    files: [Directory.Packages.props, docker-compose.yml, .env.example]
-    tests: [.github/workflows/ci.yml (migration-apply)]
+    status: not_started
+    files: []
+    tests: []
   - id: NFR-017
-    title: Auditability (state-changing events reconstructable)
+    title: "Auditability"
     priority: P1
-    status: done
-    files: [src/TourneyHub.Domain/Common/DomainEvent.cs, src/TourneyHub.Domain/Common/OutboxMessage.cs, src/TourneyHub.Domain/Platform/AuditEvent.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs, src/TourneyHub.Infrastructure/Messaging/OutboxDispatcher.cs, src/TourneyHub.Infrastructure/Persistence/Migrations/]
-    tests: [tests/TourneyHub.Integration.Tests/OutboxIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: NFR-018
-    title: Determinism (bracket/seed/ranking from inputs + stored seed)
+    title: "Determinism"
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Logic/Formats/SingleEliminationGenerator.cs, src/TourneyHub.Domain/Logic/Formats/RoundRobinGenerator.cs, src/TourneyHub.Domain/Logic/Scoring/TieBreakerResolver.cs, src/TourneyHub.Domain/Competition/Tournament.cs]
-    tests: [tests/TourneyHub.Domain.Tests/SingleEliminationGeneratorTests.cs, tests/TourneyHub.Domain.Tests/RoundRobinGeneratorTests.cs, tests/TourneyHub.Domain.Tests/TieBreakerResolverTests.cs, spec/test-vectors/single-elimination.json, spec/test-vectors/round-robin.json, spec/test-vectors/tie-breaks.json]
+    status: not_started
+    files: []
+    tests: []
   - id: NFR-019
-    title: Licensing AGPL-3.0 + CLA
+    title: "License"
     priority: P0
-    status: done
-    files: [LICENSE, CONTRIBUTING.md]
+    status: not_started
+    files: []
     tests: []
   - id: NFR-020
-    title: Configuration over code (scoring/formats/fees data-driven)
+    title: "Configuration over code"
     priority: P0
-    status: done
-    files: [src/TourneyHub.Domain/Competition/ScoringConfig.cs, src/TourneyHub.Domain/Competition/ScoringSystem.cs, src/TourneyHub.Domain/Logic/Scoring/ScoringCalculator.cs, src/TourneyHub.Infrastructure/Persistence/Migrations/20260720232205_AddScoringSystem.cs]
-    tests: [tests/TourneyHub.Domain.Tests/ScoringCalculatorTests.cs, tests/TourneyHub.Domain.Tests/ScoringCalculatorPropertyTests.cs, spec/test-vectors/tie-breaks.json]
+    status: not_started
+    files: []
+    tests: []
   - id: NFR-021
-    title: Privacy by design (minimise PII, TLS, no secret logging)
+    title: "Privacy by design"
     priority: P0
     status: not_started
     files: []
     tests: []
   - id: NFR-022
-    title: Time correctness (store UTC; localize at presentation)
+    title: "Time"
     priority: P0
     status: not_started
     files: []
     tests: []
   - id: NFR-023
-    title: Concurrency safety (optimistic locking via version/ETag)
+    title: "Concurrency"
     priority: P0
-    status: in_progress
-    files: [api/openapi.yaml, src/TourneyHub.Domain/Common/Entity.cs, src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs, src/TourneyHub.Api/Middleware/ProblemDetailsMiddleware.cs, src/TourneyHub.Api/Extensions/PaginationExtensions.cs]
-    tests: [tests/TourneyHub.Integration.Tests/ApiConventionsTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: NFR-024
-    title: Tenant isolation across all surfaces; automated isolation tests
+    title: "Tenant isolation tests"
     priority: P0
-    status: done
-    files: [src/TourneyHub.Infrastructure/Persistence/TourneyHubDbContext.cs, src/TourneyHub.Infrastructure/Tenancy/HttpTenantContext.cs, src/TourneyHub.Api/Middleware/TenantResolutionMiddleware.cs, src/TourneyHub.Api/Program.cs]
-    tests: [tests/TourneyHub.Integration.Tests/TenantIsolationTests.cs, tests/TourneyHub.Integration.Tests/PostgresTenantIsolationTests.cs]
+    status: not_started
+    files: []
+    tests: []
   - id: NFR-025
-    title: Hosted email deliverability (managed provider, retry/bounce)
+    title: "Email deliverability"
     priority: P1
-    status: done
-    files: [src/TourneyHub.Infrastructure/Notifications/EmailChannel.cs, src/TourneyHub.Infrastructure/Messaging/NotificationOutboxConsumer.cs, src/TourneyHub.Domain/Platform/SentNotification.cs, src/TourneyHub.Api/Health/SmtpHealthCheck.cs, src/TourneyHub.Api/Program.cs]
-    tests: [tests/TourneyHub.Integration.Tests/NotificationIntegrationTests.cs]
+    status: not_started
+    files: []
+    tests: []

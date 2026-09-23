@@ -1,4 +1,0 @@
-name: Version 1
-variables:
-  - name: baseUrl
-    value: /api/v1

@@ -1,7 +1,6 @@
 # TourneyHub local infrastructure — Postgres + Redis + Mailpit.
-# Usage: `docker compose up -d`  (AGENTS.md §4). The API and web app run on the
-# host (dotnet / npm), not in compose, during development.
-# Values default to the same credentials as .env.example; override via a .env file.
+# Usage: `docker compose up -d` (CLAUDE.md §4). The API, worker and web app run on the
+# host (uv / npm) during development. Values default to .env.example credentials.
 
 name: tourneyhub
 
@@ -41,7 +40,7 @@ services:
     image: axllent/mailpit:latest
     container_name: tourneyhub-mailpit
     ports:
-      - "1025:1025"   # SMTP (Smtp__Port)
+      - "1025:1025"   # SMTP (TOURNEYHUB_EMAIL_SMTP_PORT)
       - "8025:8025"   # Web UI — http://localhost:8025
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8025/readyz"]

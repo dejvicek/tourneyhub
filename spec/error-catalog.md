@@ -40,3 +40,12 @@ All API errors use RFC 7807 `application/problem+json` with a stable `code` fiel
 | `sole_owner_cannot_leave` | 409 | The sole OrgOwner must transfer ownership before leaving (BR-106). |
 | `invitation_expired` | 410 | The invitation has expired. |
 | `invitation_already_accepted` | 409 | The invitation has already been accepted. |
+| `idempotency_key_reused` | 422 | The `Idempotency-Key` was already used with a different request payload. |
+| `precondition_failed` | 412 | `If-None-Match` / conditional request not satisfiable. |
+| `org_owner_required` | 422 | The operation would leave the organization without an owner (BR-013). |
+| `league_owner_required` | 422 | The operation would leave the league without an owner (BR-001). |
+| `bracket_generation_blocked` | 409 | Tournament already started; regeneration needs `force=true` by an owner (BR-011). |
+| `roster_incomplete` | 422 | Participant does not have exactly `team_size` accepted members (FR-044a). |
+| `result_confirmation_pending` | 409 | Match awaits opponent confirmation; only confirm/dispute/override are allowed. |
+| `invalid_transition` | 409 | Requested state transition is not allowed by the aggregate's state machine. |
+| `plan_limit_reached` | 402 | Organization plan limit reached (reserved for ROADMAP M-ENT). |

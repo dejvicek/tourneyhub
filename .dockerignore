@@ -1,9 +1,0 @@
-**/bin
-**/obj
-**/.vs
-web
-node_modules
-.git
-.github
-tests
-*.md
