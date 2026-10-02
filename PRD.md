@@ -270,15 +270,15 @@ Format: *As a role, I want capability, so that benefit.* → requirements.
 | ID | Requirement | Mod | M | Pri |
 |---|---|---|---|---|
 | FR-070 | Optional entry fee per tournament: `currency` + `entry_fee_minor`. | finance | M3 | P0 |
-| FR-071 | Organizers record payment status per registration: `pending`, `paid`, `waived`, `failed`, `refunded` (`none` when no fee). Each change is audited. | finance | M3 | P0 |
+| FR-071 | Organizers record payment status per registration: `pending`, `paid`, `waived`, `failed`, `refunded`. Each change is audited. **"No fee" is the absence of a `Payment` row**, not a sixth status — the API reports it as `none`, the database does not store it. A registration's payment state is served by `finance` (the owning module), never denormalised onto the registration. | finance | M3 | P0 |
 | FR-072 | Prize pool = Σ(paid entry fees) − organizer fee, integer minor units (BR-005). | finance | M3 | P0 |
 | FR-073 | Prize distribution presets at MVP: `winner_takes_all`, `70_20_10`, `60_30_10`, `50_30_20`; custom per-rank basis points is V1. | finance | M3 | P0 |
 | FR-074 | Organizer fee = percentage (basis points) **or** fixed minor amount, never both (BR-006). | finance | M3 | P0 |
-| FR-075 | On completion, payout rows are calculated per final rank; organizer approves and marks paid; states per §10.5; approved/paid rows immutable (ADR-002 §2.1). | finance | M3 | P1 |
+| FR-075 | On completion, one payout row is calculated **per participant** (ranks can be shared, so they are not a key); organizer approves and marks paid; states per §10.5; approved/paid rows immutable (ADR-002 §2.1). | finance | M3 | P1 |
 | FR-075a | For `team_size > 1`, each payout is split into `payout_shares` per member: equal integer split, remainder to captain, Σ shares = payout. | finance | M3 | P1 |
 | FR-079 | Money handling is manual at MVP (organizer records reality) for hosted and self-host; a disclaimer is shown on finance screens. | finance | M3 | P0 |
-| FR-080 | One currency per tournament; payments must match it (BR-007) → 422 `invalid_currency`. | finance | M3 | P0 |
-| FR-081 | All money math on integer minor units; percentage splits use banker's rounding and assign residual to the top rank; verified against `spec/test-vectors/payout-split.json`. | finance | M3 | P0 |
+| FR-080 | One currency per tournament, held on `TournamentFinanceSettings`; every `Payment`, `Payout` and `PayoutShare` must match it (BR-007) → 422 `invalid_currency`. The check lives in the `finance` application service, which owns all four tables; it cannot be a composite FK because the currency is not part of any key. | finance | M3 | P0 |
+| FR-081 | All money math on integer minor units; percentage splits use banker's rounding, then reconcile the residual per BR-008; shared ranks per BR-008a. Verified against `spec/test-vectors/payout-split.json`. | finance | M3 | P0 |
 | FR-082 | `PaymentProvider` port with a single `ManualProvider`; provider key stored on `payments.provider` so a gateway is a drop-in module (ROADMAP M-PAY). | finance | M3 | P0 |
 
 ### 6.7 Rankings & statistics
@@ -348,7 +348,7 @@ Format: *As a role, I want capability, so that benefit.* → requirements.
 ## 8. Business Rules
 
 **Explicit**
-- BR-001 A league has exactly one owner. · BR-002 One `active` season per league. · BR-003 Closed seasons are immutable. · BR-004 A user is in at most one Participant per tournament. · BR-004a A Participant needs exactly `team_size` accepted members to be confirmed/seeded; points credit every member. · BR-004b Team payouts split equally, remainder to captain, Σ shares = payout. · BR-005 Prize pool = Σ paid fees − organizer fee. · BR-006 Organizer fee is percentage **or** fixed. · BR-007 One currency per tournament. · BR-008 Integer minor units; banker's rounding; residual to top rank. · BR-009 Verified email before organizing or money. · BR-010 Server authoritative for results. · BR-011 No regeneration after start without audited force. · BR-012 Every tenant-scoped row belongs to exactly one org. · BR-013 ≥ 1 OrgOwner always. · BR-014 Suspended org is read-only and hidden. · BR-015 Tenant scope is server-resolved.
+- BR-001 A league has exactly one owner. · BR-002 One `active` season per league. · BR-003 Closed seasons are immutable. · BR-004 A user is in at most one Participant per tournament. · BR-004a A Participant needs exactly `team_size` accepted members to be confirmed/seeded; points credit every member. · BR-004b Team payouts split equally, remainder to captain, Σ shares = payout. · BR-005 Prize pool = Σ paid fees − organizer fee. · BR-006 Organizer fee is percentage **or** fixed. · BR-007 One currency per tournament (on `TournamentFinanceSettings`; enforced by the `finance` service for payments, payouts and shares). · BR-008 Integer minor units; banker's rounding; residual reconciled one minor unit at a time — **downwards from rank 1 when the rounded sum is short, upwards from the last rank when it exceeds the pool** (banker's rounding is unbiased, so it overshoots as often as it undershoots). · BR-008a A shared rank is paid as one group: N participants sharing rank P occupy places P…P+N−1, the `share_bp` of those places are summed **before** rounding, and the group's share is then split `floor(share / N)` with the remainder to the lowest `order_index`. The merge must precede the rounding, or minor units drain out of tie groups to first place. · BR-009 Verified email before organizing or money. · BR-010 Server authoritative for results. · BR-011 No regeneration after start without audited force. · BR-012 Every tenant-scoped row belongs to exactly one org. · BR-013 ≥ 1 OrgOwner always. · BR-014 Suspended org is read-only and hidden. · BR-015 Tenant scope is server-resolved.
 
 **Implicit (enforced)**
 - BR-100 A tournament needs ≥ 2 confirmed participants to start. · BR-101 Single elimination pads to a power of two; byes to top seeds. · BR-102 Round robin has N(N−1)/2 matches (×2 for double). · BR-103 No result before both slots are resolved. · BR-104 Editing a finalized result triggers recompute + audit. · BR-105 Withdrawal forfeits remaining matches; played results stand. · BR-106 Sole owner cannot delete their account until ownership is transferred. · BR-108 Cancelled tournaments do not count for seasons. · BR-109 Draws only where allowed. · BR-110 Banned users' content hidden publicly, kept for audit. · BR-111 Every confirmed participant must be seeded before generation. · BR-112 Payouts cannot be paid before `completed`. *(BR-107 refunds → ROADMAP.)*
@@ -362,11 +362,13 @@ The authoritative schema is **`DATA-MODEL.md`**. Summary of aggregates per modul
 | Module | Aggregates | Notes |
 |---|---|---|
 | `platform` | Organization, OrganizationMembership, AuditEvent, OutboxEvent, NotificationDelivery, IdempotencyKey | Tenant root; cross-cutting services. |
-| `identity` | User, AuthToken, RefreshToken, ConsentRecord | Global (not tenant-scoped). |
+| `identity` | User, UserCredential, AuthToken, RefreshToken, ConsentRecord | Global (not tenant-scoped). |
 | `invitations` | Invitation (league / roster), Follow | |
-| `leagues` | League, LeagueMembership, Season, ScoringSystem, SeasonStanding (per user), SeasonSnapshot | |
-| `tournaments` | Tournament, Participant, ParticipantMember, Registration, Match, MatchSlot, TournamentStanding | Formats plug in here. |
-| `finance` | Payment, Payout, PayoutShare | `PaymentProvider` port. |
+| `leagues` | League, LeagueMembership, Season, ScoringSystem, SeasonSnapshot | `SeasonStanding` is owned by `tournaments` (see note). |
+| `tournaments` | Tournament, Participant, ParticipantMember, Registration, Match, MatchSlot, TournamentStanding, **SeasonStanding (per user)** | Formats plug in here. |
+| `finance` | TournamentFinanceSettings, TournamentPrizeTier, Payment, Payout, PayoutShare | `PaymentProvider` port. |
+
+`SeasonStanding` sits with `tournaments`, not `leagues`, because ADR-002 §2.1 requires it to be recomputed inside the match-result write transaction. Closing a season therefore spans two modules and is orchestrated by the route handler, not by either module (ADR-004, "Composite operations at the composition root").
 | `realtime` | — | SSE gateway over outbox events. |
 
 ```mermaid
@@ -418,10 +420,14 @@ stateDiagram-v2
 `pending → confirmed | rejected`; `confirmed → waitlisted` (capacity) `→ confirmed` (spot opens); `confirmed → withdrawn | forfeited`.
 
 ### 10.4 Payment
-`pending → paid | waived | failed`; `failed → pending`; `paid → refunded`. (`none` when no fee.)
+`pending → paid | waived | failed`; `failed → pending`; `paid → refunded`. No fee = no `Payment` row at all; the API surfaces that as `none`.
 
 ### 10.5 Payout
 `calculated → approved → paid`; `calculated | approved → voided` (recompute/correction, `replaced_by_payout_id`).
+
+### 10.3a Participant roster
+`ParticipantMember`: `pending → accepted | declined`; `accepted → released` (the whole entry withdraws, E-31 — `released` frees the user to join another entry in the same tournament, which `declined` and `accepted` do not).
+`Participant.roster_state`: `incomplete → complete` when `count(accepted) = team_size`, and back to `incomplete` if a member is removed before registration closes. Rosters lock at registration close. The entry's own lifecycle is the Registration automaton (§10.3), not this one.
 
 ### 10.6 League · 10.7 Season · 10.8 User · 10.9 Organization
 - League: `active ⇄ archived`; either `→ deleted` (soft).
@@ -499,8 +505,8 @@ class TournamentFormat(Protocol):
 | Minimisation (FR-134) | Email, password hash, display name; avatar/bio optional; no real name. |
 | Consent (FR-122/132) | `consent_records` with policy kind + version at signup; re-prompt on version change. |
 | Export (FR-131) | JSON of profile, memberships, registrations, match history, payments/shares, consents, follows. |
-| Erasure (FR-130) | Anonymize in place: null email/password/avatar/bio/ip, `display_name = "Deleted player #<id-suffix>"`, `anonymized_at`, revoke sessions, nullify `payout_shares.user_id` & `participants.captain_user_id` (auto-transfer captaincy first), keep `participant_members` rows so brackets render the tombstone. Irreversible. Blocked by BR-106 until ownership transferred. |
-| Retention (A-014) | Worker: purge audit `ip`/`user_agent` after 365 d; hard-anonymize soft-deleted accounts after 30 d; delete published outbox rows after 7 d. Pausable per org during disputes (`organizations.settings.retention_hold_until`). |
+| Erasure (FR-130) | Anonymize in place: null email, delete the `user_credentials` row, null avatar/bio/ip, `display_name = "Deleted player #<id-suffix>"`, `anonymized_at`, revoke sessions, nullify `payout_shares.user_id` & `participants.captain_user_id` (auto-transfer captaincy first), keep `participant_members` rows so brackets render the tombstone. Also rewrite `participants.display_name` to the tombstone where `team_size = 1` (a solo entry's name is personal data; a team name is not). `season_snapshots` need no redaction — they store ids and numbers only, and names are rendered from `users` at read time. Irreversible. Blocked by BR-106 until ownership transferred. |
+| Retention (A-014) | Worker: purge audit `ip`/`user_agent` after 365 d (audit rows themselves are kept to the audit horizon, then whole monthly partitions are dropped); hard-anonymize soft-deleted accounts after 30 d; delete published outbox rows after 7 d, and strip a raw verification/reset token from an outbox payload the moment its send succeeds. Pausable per org during disputes (`organizations.settings.retention_hold_until`). |
 | Roles | Hosted: operator is processor, each org is controller (DPA before hosted launch, Q-002a). Self-host: operator is controller and processor. |
 
 ---
@@ -555,6 +561,7 @@ GET|POST /api/v1/orgs/{org}/tournaments                GET|PATCH /api/v1/orgs/{o
 POST   .../tournaments/{t}/registration/open | close   POST .../tournaments/{t}/registrations   (Idempotency-Key)
 POST   .../tournaments/{t}/participants/{p}/members    POST .../tournaments/{t}/seed   POST .../tournaments/{t}/generate
 POST   .../tournaments/{t}/start | cancel              GET  .../tournaments/{t}/overview   (composite, ETag)
+GET    .../tournaments/{t}/registrations?include=payment                        (finance-served composite)
 GET    .../tournaments/{t}/matches                     PUT  .../matches/{m}/result   (If-Match)   POST .../matches/{m}/confirm | dispute
 POST   .../tournaments/{t}/participants/{p}/withdraw   GET  .../tournaments/{t}/standings
 GET|POST .../tournaments/{t}/payments                  PATCH .../payments/{id}   (If-Match)

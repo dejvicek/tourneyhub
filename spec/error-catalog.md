@@ -18,6 +18,9 @@ All API errors use RFC 7807 `application/problem+json` with a stable `code` fiel
 | `not_found` | 404 | Requested resource does not exist or is not visible. |
 | `already_exists` | 409 | Resource with the same identity already exists. |
 | `slug_already_taken` | 409 | The requested slug is in use. |
+| `prize_distribution_invalid` | 422 | Prize tiers for the tournament do not sum to 10000 basis points (`DATA-MODEL.md` §9.2 trigger). |
+| `immutable_field` | 422 | Attempted to change a column guarded by `forbid_column_update()` — `organization_id`, `rng_seed`, `created_at`, or any field of an `approved`/`paid` payout (`DATA-MODEL.md` §1). |
+| `audit_append_only` | 403 | Attempted to update or delete an audit row (FR-121). Raised by the `audit_append_only` trigger with SQLSTATE `42501`. |
 | `concurrency_conflict` | 409 | The entity was modified by another request. Retry with the updated ETag. |
 | `precondition_required` | 428 | A mutating request on a versioned resource must include `If-Match`. |
 | `idempotency_replay` | — | Internal flag; responses are replayed as the original status. |

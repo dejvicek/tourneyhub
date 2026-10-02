@@ -693,7 +693,9 @@ functional:
   # ---- 6.7 Rankings & statistics
   - id: FR-090
     title: "Season standings recomputed automatically from completed matches of completed tournaments in that season"
-    module: leagues
+    # Owned by `tournaments`: ADR-002 requires the recompute inside the match-result
+    # transaction, so the table ships with that module (DATA-MODEL.md §2).
+    module: tournaments
     milestone: M1
     priority: P0
     status: not_started
@@ -701,7 +703,7 @@ functional:
     tests: []
   - id: FR-090a
     title: "Team play credits each member with the Participant's points"
-    module: leagues
+    module: tournaments
     milestone: M2
     priority: P0
     status: not_started

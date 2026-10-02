@@ -12,10 +12,16 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-tourneyhub}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tourneyhub}
       POSTGRES_DB: ${POSTGRES_DB:-tourneyhub}
+      # Consumed by db/init/01-roles.sql on first start.
+      TOURNEYHUB_APP_DB_PASSWORD: ${TOURNEYHUB_APP_DB_PASSWORD:-tourneyhub_app}
+      TOURNEYHUB_ADMIN_DB_PASSWORD: ${TOURNEYHUB_ADMIN_DB_PASSWORD:-tourneyhub_admin}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # Creates tourneyhub_app / tourneyhub_admin (DATA-MODEL.md §11.1). Runs once,
+      # only when the data volume is empty — `docker compose down -v` to re-run.
+      - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tourneyhub} -d ${POSTGRES_DB:-tourneyhub}"]
       interval: 5s

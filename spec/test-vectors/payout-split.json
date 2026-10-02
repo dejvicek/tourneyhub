@@ -2,14 +2,16 @@
   "$comment": "Golden oracle for money math (BR-005, BR-008, FR-072, FR-074, FR-075a, FR-081). ALL amounts are integer MINOR units (e.g. cents). Never use double/float. Two distinct mechanisms: (1) prize distribution across ranks, (2) team payout split among members.",
   "rules": {
     "prizePool": "prizePool = sum(paid entry fees) - organizerFee (BR-005, FR-072). Organizer fee is EITHER a percentage OR a fixed amount, never both (BR-006, FR-074).",
-    "rankDistribution": "share_i = round(prizePool * pct_i) using banker's rounding (round-half-to-even) to integer minor units; then reconcile any residual so that sum(shares) == prizePool by assigning the leftover minor unit(s) to the TOP rank(s) first (BR-008).",
+    "rankDistribution": "share_i = round(prizePool * share_bp_i / 10000) using banker's rounding (round-half-to-even) to integer minor units. Then reconcile so sum(shares) == prizePool EXACTLY, one minor unit at a time: if the rounded sum is SHORT, add +1 walking from rank 1 downwards; if it EXCEEDS the pool, subtract 1 walking from the last rank upwards. Both directions are reachable — banker's rounding is unbiased, so it overshoots as often as it undershoots (tiers 5000/5000 with pool 3 round to 2+2=4). Walking one unit at a time rather than dumping the whole residual on one rank is a deliberate difference from teamSplit (BR-008).",
     "teamSplit": "For teamSize > 1, split a Payout equally among members: base = floor(amount / teamSize) to every member; the remainder (amount - base*teamSize) goes ENTIRELY to the captain (FR-075a). For teamSize == 1, a single PayoutShare equals the whole amount.",
     "invariants": [
-      "sum(rank shares) == prizePool exactly",
+      "sum(rank shares) == prizePool exactly, for a positive OR negative rounding residual",
       "sum(PayoutShares) == payout amount exactly",
       "no share is negative",
-      "single currency per financial scope (BR-007, FR-080)"
-    ]
+      "single currency per financial scope (BR-007, FR-080)",
+      "collapsing tied tiers happens before rounding (BR-008a)"
+    ],
+    "sharedRankDistribution": "Competition ranks MAY be shared (single elimination: everyone knocked out in the same round shares a place). The pipeline is ORDERED and the steps do NOT commute (BR-008a): (1) COLLAPSE — for each group of participants sharing rank P, sum the share_bp of the places P..P+N-1 the group occupies (a place with no tier contributes 0 bp) into one synthetic tier; (2) ROUND the collapsed tier set per rankDistribution; (3) RECONCILE the residual over the collapsed set; (4) SPLIT within each group: floor(share / N) to every member, remainder to the LOWEST orderIndex. Rounding per tier BEFORE collapsing is wrong: it loses a minor unit on every tie with fractional raw shares and step 3 then hands that unit to rank 1, draining money out of tie groups to the winner. The tie-break PRNG therefore never decides money (DATA-MODEL.md §8.7, §9.4)."
   },
   "prizePoolComputation": [
     {
@@ -18,7 +20,10 @@
       "paidEntries": 10,
       "entryFeeMinor": 500,
       "grossMinor": 5000,
-      "organizerFee": { "type": "percentage", "value": 10 },
+      "organizerFee": {
+        "type": "percentage",
+        "value": 10
+      },
       "organizerFeeMinor": 500,
       "prizePoolMinor": 4500
     },
@@ -28,7 +33,10 @@
       "paidEntries": 20,
       "entryFeeMinor": 1000,
       "grossMinor": 20000,
-      "organizerFee": { "type": "fixed", "value": 2500 },
+      "organizerFee": {
+        "type": "fixed",
+        "value": 2500
+      },
       "organizerFeeMinor": 2500,
       "prizePoolMinor": 17500
     }
@@ -37,48 +45,471 @@
     {
       "name": "Clean 70/20/10 of 4500 (no rounding)",
       "prizePoolMinor": 4500,
-      "distributionPct": [70, 20, 10],
-      "expectedSharesMinor": [3150, 900, 450],
-      "sumMinor": 4500,
-      "remainderToTopRank": 0
+      "distributionBp": [
+        7000,
+        2000,
+        1000
+      ],
+      "rawSharesMinor": [
+        3150,
+        900,
+        450
+      ],
+      "roundedMinor": [
+        3150,
+        900,
+        450
+      ],
+      "residualMinor": 0,
+      "residualRule": "none",
+      "expectedSharesMinor": [
+        3150,
+        900,
+        450
+      ],
+      "sumMinor": 4500
     },
     {
-      "name": "Thirds of 100 -> remainder to top rank",
+      "name": "Thirds of 100 -> residual to top rank",
+      "$comment": "Integer basis points cannot express 33.333333%; 3334/3333/3333 sums to exactly 10000 bp and yields the same shares.",
       "prizePoolMinor": 100,
-      "distributionPct": [33.333333, 33.333333, 33.333333],
-      "rawSharesMinor": [33.33, 33.33, 33.33],
-      "roundedMinor": [33, 33, 33],
+      "distributionBp": [
+        3334,
+        3333,
+        3333
+      ],
+      "rawSharesMinor": [
+        33.34,
+        33.33,
+        33.33
+      ],
+      "roundedMinor": [
+        33,
+        33,
+        33
+      ],
       "residualMinor": 1,
-      "expectedSharesMinor": [34, 33, 33],
-      "sumMinor": 100,
-      "remainderToTopRank": 1
+      "residualRule": "+1 at a time from rank 1 downwards",
+      "expectedSharesMinor": [
+        34,
+        33,
+        33
+      ],
+      "sumMinor": 100
     },
     {
-      "name": "Banker's rounding half-to-even: 37.5/37.5/12.5/12.5 of 100",
+      "name": "Banker's rounding half-to-even: 3750/3750/1250/1250 of 100",
       "prizePoolMinor": 100,
-      "distributionPct": [37.5, 37.5, 12.5, 12.5],
-      "rawSharesMinor": [37.5, 37.5, 12.5, 12.5],
-      "$comment": "Half-to-even: 37.5 -> 38 (even), 12.5 -> 12 (even). Sum already equals pool; no residual.",
-      "expectedSharesMinor": [38, 38, 12, 12],
-      "sumMinor": 100,
-      "remainderToTopRank": 0
+      "distributionBp": [
+        3750,
+        3750,
+        1250,
+        1250
+      ],
+      "rawSharesMinor": [
+        37.5,
+        37.5,
+        12.5,
+        12.5
+      ],
+      "roundedMinor": [
+        38,
+        38,
+        12,
+        12
+      ],
+      "residualMinor": 0,
+      "residualRule": "none",
+      "expectedSharesMinor": [
+        38,
+        38,
+        12,
+        12
+      ],
+      "sumMinor": 100
     },
     {
       "name": "70/20/10 of 1001 (nearest rounding, sum exact)",
       "prizePoolMinor": 1001,
-      "distributionPct": [70, 20, 10],
-      "rawSharesMinor": [700.7, 200.2, 100.1],
-      "expectedSharesMinor": [701, 200, 100],
-      "sumMinor": 1001,
-      "remainderToTopRank": 0
+      "distributionBp": [
+        7000,
+        2000,
+        1000
+      ],
+      "rawSharesMinor": [
+        700.7,
+        200.2,
+        100.1
+      ],
+      "roundedMinor": [
+        701,
+        200,
+        100
+      ],
+      "residualMinor": 0,
+      "residualRule": "none",
+      "expectedSharesMinor": [
+        701,
+        200,
+        100
+      ],
+      "sumMinor": 1001
     },
     {
       "name": "Winner-takes-all",
       "prizePoolMinor": 12345,
-      "distributionPct": [100],
-      "expectedSharesMinor": [12345],
-      "sumMinor": 12345,
-      "remainderToTopRank": 0
+      "distributionBp": [
+        10000
+      ],
+      "rawSharesMinor": [
+        12345
+      ],
+      "roundedMinor": [
+        12345
+      ],
+      "residualMinor": 0,
+      "residualRule": "none",
+      "expectedSharesMinor": [
+        12345
+      ],
+      "sumMinor": 12345
+    },
+    {
+      "name": "NEGATIVE residual -1: even split of an odd pool overshoots",
+      "$comment": "Both raw shares are 1.5 and half-to-even sends both to 2, totalling 4 > 3. One unit is removed from the LAST rank. Holds for every odd pool: 3, 7, 11, 15...",
+      "prizePoolMinor": 3,
+      "distributionBp": [
+        5000,
+        5000
+      ],
+      "rawSharesMinor": [
+        1.5,
+        1.5
+      ],
+      "roundedMinor": [
+        2,
+        2
+      ],
+      "residualMinor": -1,
+      "residualRule": "-1 at a time from the last rank upwards",
+      "expectedSharesMinor": [
+        2,
+        1
+      ],
+      "sumMinor": 3
+    },
+    {
+      "name": "NEGATIVE residual -2: six-way even split of 100",
+      "$comment": "All six raw shares round up, totalling 102. Units are removed one at a time from the last rank upwards: ranks 6 and 5.",
+      "prizePoolMinor": 100,
+      "distributionBp": [
+        1667,
+        1667,
+        1667,
+        1667,
+        1666,
+        1666
+      ],
+      "rawSharesMinor": [
+        16.67,
+        16.67,
+        16.67,
+        16.67,
+        16.66,
+        16.66
+      ],
+      "roundedMinor": [
+        17,
+        17,
+        17,
+        17,
+        17,
+        17
+      ],
+      "residualMinor": -2,
+      "residualRule": "-1 at a time from the last rank upwards",
+      "expectedSharesMinor": [
+        17,
+        17,
+        17,
+        17,
+        16,
+        16
+      ],
+      "sumMinor": 100
+    },
+    {
+      "name": "POSITIVE residual +2: four-way even split of 10",
+      "$comment": "All four raw shares are 2.5 and round down to 2, totalling 8. Units are added one at a time from rank 1 downwards: ranks 1 and 2 — NOT both to rank 1.",
+      "prizePoolMinor": 10,
+      "distributionBp": [
+        2500,
+        2500,
+        2500,
+        2500
+      ],
+      "rawSharesMinor": [
+        2.5,
+        2.5,
+        2.5,
+        2.5
+      ],
+      "roundedMinor": [
+        2,
+        2,
+        2,
+        2
+      ],
+      "residualMinor": 2,
+      "residualRule": "+1 at a time from rank 1 downwards",
+      "expectedSharesMinor": [
+        3,
+        3,
+        2,
+        2
+      ],
+      "sumMinor": 10
+    }
+  ],
+  "sharedRankDistribution": [
+    {
+      "name": "8-player single elim, no third-place match: two share rank 3",
+      "$comment": "Tiers exist for ranks 1-3 only; the tie group occupies places 3 and 4, and place 4 has no tier (0 bp).",
+      "prizePoolMinor": 4510,
+      "tiersBp": {
+        "1": 7000,
+        "2": 2000,
+        "3": 1000
+      },
+      "standings": [
+        {
+          "participant": "P1",
+          "rank": 1,
+          "orderIndex": 1
+        },
+        {
+          "participant": "P2",
+          "rank": 2,
+          "orderIndex": 2
+        },
+        {
+          "participant": "P3",
+          "rank": 3,
+          "orderIndex": 3
+        },
+        {
+          "participant": "P4",
+          "rank": 3,
+          "orderIndex": 4
+        }
+      ],
+      "step1_collapsedTiersBp": {
+        "1": 7000,
+        "2": 2000,
+        "3": 1000
+      },
+      "step2_rawCollapsedSharesMinor": {
+        "1": 3157,
+        "2": 902,
+        "3": 451
+      },
+      "step3_residualMinor": 0,
+      "step3_reconciledSharesMinor": {
+        "1": 3157,
+        "2": 902,
+        "3": 451
+      },
+      "step4_tieGroups": [
+        {
+          "rank": 3,
+          "members": [
+            "P3",
+            "P4"
+          ],
+          "occupiesPlaces": [
+            3,
+            4
+          ],
+          "combinedBp": 1000,
+          "combinedShareMinor": 451,
+          "baseMinor": 225,
+          "remainderMinor": 1,
+          "remainderTo": "P3 (lowest orderIndex)"
+        }
+      ],
+      "expectedPayoutsMinor": {
+        "P1": 3157,
+        "P2": 902,
+        "P3": 226,
+        "P4": 225
+      },
+      "sumMinor": 4510
+    },
+    {
+      "name": "Tie group spanning two paid tiers merges both shares",
+      "$comment": "Tier 3 (1500 bp) and tier 4 (500 bp) are summed in step 1, BEFORE rounding. Residual 1 from banker's rounding then goes to rank 1.",
+      "prizePoolMinor": 1001,
+      "tiersBp": {
+        "1": 5000,
+        "2": 3000,
+        "3": 1500,
+        "4": 500
+      },
+      "standings": [
+        {
+          "participant": "P1",
+          "rank": 1,
+          "orderIndex": 1
+        },
+        {
+          "participant": "P2",
+          "rank": 2,
+          "orderIndex": 2
+        },
+        {
+          "participant": "P3",
+          "rank": 3,
+          "orderIndex": 3
+        },
+        {
+          "participant": "P4",
+          "rank": 3,
+          "orderIndex": 4
+        }
+      ],
+      "step1_collapsedTiersBp": {
+        "1": 5000,
+        "2": 3000,
+        "3": 2000
+      },
+      "step2_rawCollapsedSharesMinor": {
+        "1": 500.5,
+        "2": 300.3,
+        "3": 200.2
+      },
+      "step3_residualMinor": 1,
+      "step3_reconciledSharesMinor": {
+        "1": 501,
+        "2": 300,
+        "3": 200
+      },
+      "step4_tieGroups": [
+        {
+          "rank": 3,
+          "members": [
+            "P3",
+            "P4"
+          ],
+          "occupiesPlaces": [
+            3,
+            4
+          ],
+          "combinedBp": 2000,
+          "combinedShareMinor": 200,
+          "baseMinor": 100,
+          "remainderMinor": 0,
+          "remainderTo": null
+        }
+      ],
+      "expectedPayoutsMinor": {
+        "P1": 501,
+        "P2": 300,
+        "P3": 100,
+        "P4": 100
+      },
+      "sumMinor": 1001
+    },
+    {
+      "name": "Merge order is decisive: collapsing after rounding pays different people",
+      "$comment": "THE discriminating case. Correct (collapse first): tier 3+4 = 2500 bp -> 25 exactly, residual 0, split 13/12.",
+      "prizePoolMinor": 100,
+      "tiersBp": {
+        "1": 5000,
+        "2": 2500,
+        "3": 1250,
+        "4": 1250
+      },
+      "standings": [
+        {
+          "participant": "P1",
+          "rank": 1,
+          "orderIndex": 1
+        },
+        {
+          "participant": "P2",
+          "rank": 2,
+          "orderIndex": 2
+        },
+        {
+          "participant": "P3",
+          "rank": 3,
+          "orderIndex": 3
+        },
+        {
+          "participant": "P4",
+          "rank": 3,
+          "orderIndex": 4
+        }
+      ],
+      "step1_collapsedTiersBp": {
+        "1": 5000,
+        "2": 2500,
+        "3": 2500
+      },
+      "step2_rawCollapsedSharesMinor": {
+        "1": 50,
+        "2": 25,
+        "3": 25
+      },
+      "step3_residualMinor": 0,
+      "step3_reconciledSharesMinor": {
+        "1": 50,
+        "2": 25,
+        "3": 25
+      },
+      "step4_tieGroups": [
+        {
+          "rank": 3,
+          "members": [
+            "P3",
+            "P4"
+          ],
+          "occupiesPlaces": [
+            3,
+            4
+          ],
+          "combinedBp": 2500,
+          "combinedShareMinor": 25,
+          "baseMinor": 12,
+          "remainderMinor": 1,
+          "remainderTo": "P3 (lowest orderIndex)"
+        }
+      ],
+      "expectedPayoutsMinor": {
+        "P1": 50,
+        "P2": 25,
+        "P3": 13,
+        "P4": 12
+      },
+      "sumMinor": 100,
+      "$wrongOrderWouldGive": {
+        "$comment": "What rounding per tier FIRST would produce — this is WRONG and the oracle rejects it.",
+        "roundedPerTierMinor": [
+          50,
+          25,
+          12,
+          12
+        ],
+        "sumBeforeResidual": 99,
+        "residualMinor": 1,
+        "residualTo": "rank 1",
+        "payoutsMinor": {
+          "P1": 51,
+          "P2": 25,
+          "P3": 12,
+          "P4": 12
+        }
+      }
     }
   ],
   "teamSplit": [
@@ -89,7 +520,11 @@
       "captainIndex": 0,
       "baseShareMinor": 3333,
       "remainderMinor": 1,
-      "expectedSharesMinor": [3334, 3333, 3333],
+      "expectedSharesMinor": [
+        3334,
+        3333,
+        3333
+      ],
       "sumMinor": 10000
     },
     {
@@ -99,7 +534,11 @@
       "captainIndex": 0,
       "baseShareMinor": 33,
       "remainderMinor": 1,
-      "expectedSharesMinor": [34, 33, 33],
+      "expectedSharesMinor": [
+        34,
+        33,
+        33
+      ],
       "sumMinor": 100
     },
     {
@@ -109,7 +548,12 @@
       "captainIndex": 0,
       "baseShareMinor": 2,
       "remainderMinor": 2,
-      "expectedSharesMinor": [4, 2, 2, 2],
+      "expectedSharesMinor": [
+        4,
+        2,
+        2,
+        2
+      ],
       "sumMinor": 10
     },
     {
@@ -119,7 +563,10 @@
       "captainIndex": 0,
       "baseShareMinor": 3,
       "remainderMinor": 1,
-      "expectedSharesMinor": [4, 3],
+      "expectedSharesMinor": [
+        4,
+        3
+      ],
       "sumMinor": 7
     },
     {
@@ -129,7 +576,9 @@
       "captainIndex": 0,
       "baseShareMinor": 5000,
       "remainderMinor": 0,
-      "expectedSharesMinor": [5000],
+      "expectedSharesMinor": [
+        5000
+      ],
       "sumMinor": 5000
     }
   ]

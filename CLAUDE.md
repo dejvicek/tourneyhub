@@ -14,7 +14,7 @@ TourneyHub is an open-source, **hosted-first, multi-tenant** platform for runnin
 | Layer | Choice |
 |---|---|
 | Backend | **Python 3.13**, **FastAPI** (ASGI, uvicorn), **Pydantic v2** (`extra="forbid"`), **SQLAlchemy 2.0 async** + asyncpg, **Alembic**, pydantic-settings (`TOURNEYHUB_*` env) |
-| Data | **PostgreSQL 16** (citext, RLS), **Redis 7** (SSE fan-out, rate limits, cache) |
+| Data | **PostgreSQL 16** (citext, RLS, three roles — see `DATA-MODEL.md` §11.1), **Redis 7** (SSE fan-out, rate limits, login lockout, cache) |
 | Realtime | **Server-Sent Events** (`sse-starlette`) + Redis pub/sub + stream replay (ADR-007) |
 | Background | `tourneyhub worker` asyncio process: outbox relay, email sender, timeouts, retention (ADR-010) |
 | Auth | Argon2id (argon2-cffi), JWT access (PyJWT) + rotating refresh (ADR-008) |
@@ -23,7 +23,7 @@ TourneyHub is an open-source, **hosted-first, multi-tenant** platform for runnin
 | Tests | pytest, pytest-asyncio, hypothesis, testcontainers (Postgres+Redis), Playwright |
 | Quality | ruff, mypy `--strict`, import-linter, bandit, pip-audit; ESLint/oxlint, tsc |
 | Package mgmt | **uv** (`uv.lock` committed); npm in `/web` |
-| Money | Python `int` minor units + `currency`; `Decimal` only for bp→minor with `ROUND_HALF_EVEN`; **never `float`** |
+| Money | Python `int` minor units + `currency` (`text`, `^[A-Z]{3}$`); `Decimal` only for bp→minor with `ROUND_HALF_EVEN`; **never `float`**, never in `jsonb` |
 
 ## 3. Repo layout (target)
 
@@ -42,6 +42,7 @@ TourneyHub is an open-source, **hosted-first, multi-tenant** platform for runnin
 /migrations/                      # alembic (single history)
 /tests/{unit,integration,contract,e2e}/
 /web/                             # React app (see /web/README.md once scaffolded)
+/db/init/01-roles.sql            # DB roles (DATA-MODEL.md §11.1) — compose init
 /docker-compose.yml /.env.example /Dockerfile
 ```
 
@@ -57,7 +58,7 @@ Module DAG (ADR-004): `platform` ← `identity` ← `invitations`; `platform, id
 | Infra | `docker compose up -d` (Postgres, Redis, Mailpit) |
 | API dev | `uv run tourneyhub api --reload` (→ http://localhost:8000, docs at `/docs`) |
 | Worker | `uv run tourneyhub worker` |
-| Migrations | `uv run alembic revision -m "<slice>"` (hand-review) · `uv run alembic upgrade head` · `uv run alembic check` |
+| Migrations | `uv run alembic revision -m "<slice>"` (hand-review) · `uv run alembic upgrade head` · `uv run alembic check` — Alembic uses `TOURNEYHUB_DATABASE_MIGRATOR_URL` (schema owner); the API uses `TOURNEYHUB_DATABASE_URL` (`tourneyhub_app`, no `BYPASSRLS`). Never swap them. |
 | Tests | `uv run pytest` · `uv run pytest tests/integration` (needs Docker) · `uv run pytest -m property` |
 | Lint / types / boundaries | `uv run ruff check . && uv run ruff format --check .` · `uv run mypy` · `uv run lint-imports` |
 | Security | `uv run bandit -r src` · `uv run pip-audit` |
@@ -69,12 +70,12 @@ Module DAG (ADR-004): `platform` ← `identity` ← `invitations`; `platform, id
 
 - **G1 — Data model approved.** While `DATA-MODEL.md` says `DRAFT`, you may build: scaffold, tooling, CI, `core/` kernel without DB, pure domain code (formats, scoring, money, splitmix64) against `spec/test-vectors/`, and the web shell. You may **not** write SQLAlchemy models, Alembic migrations, repositories, or persisting endpoints (ADR-012). Any later schema change must edit `DATA-MODEL.md` in the same PR.
 - **G2 — Contract.** Any API change ships with the regenerated `api/openapi.json` and regenerated web types/Bruno collection.
-- **G3 — Isolation.** Any new tenant-scoped table/endpoint/channel/job ships with a two-org isolation test and an RLS policy in its migration.
+- **G3 — Isolation.** Any new tenant-scoped table/endpoint/channel/job ships with a two-org isolation test, an RLS policy **and** a composite tenant FK (`DATA-MODEL.md` §1.1) in its migration. A guarantee on a partitioned table must be a trigger or a policy, never a `REVOKE` (§4.3).
 
 ## 6. HARD GUARDRAILS (violating these fails review)
 
-1. **Tenancy.** Non-null immutable `organization_id` on every tenant-scoped table; org resolved **server-side** (URL + membership), never from body/query; every query through the `TenantSession`; RLS `SET LOCAL app.current_org_id`; SSE channels and Redis keys prefixed `org:{id}`. Cross-org access is a P0 defect. (NFR-004/024, FR-151/152/154, ADR-006)
-2. **Money.** `bigint` minor units + `char(3)` currency; `int` math; banker's rounding for bp splits with residual to top rank; team split floor + remainder to captain. Verify against `spec/test-vectors/payout-split.json`. `float` is banned in `finance` and competition math (BR-008, FR-081).
+1. **Tenancy.** Non-null immutable `organization_id` on every tenant-scoped table; tenant FKs are **composite** (they carry `organization_id`); org resolved **server-side** (URL + membership), never from body/query; every query through the `TenantSession`; RLS `SET LOCAL app.current_org_id` under a role that is neither superuser nor `BYPASSRLS`; SSE channels and Redis keys prefixed `org:{id}`. Cross-org access is a P0 defect. (NFR-004/024, FR-151/152/154, ADR-006)
+2. **Money.** `bigint` minor units + `text` currency (`CHECK ~ '^[A-Z]{3}$'`), never inside `jsonb`; `int` math; banker's rounding for bp splits with residual to top rank; team split floor + remainder to captain. Verify against `spec/test-vectors/payout-split.json`. `float` is banned in `finance` and competition math (BR-008, FR-081).
 3. **Determinism.** Bracket generation, seeding, ranking and tie-breaks are pure functions of inputs + stored `rng_seed` (splitmix64, ADR-002 §2.4). No `random`, `time`, `datetime.now`, `uuid4` in those packages. Verify against `spec/test-vectors/`. (NFR-018)
 4. **Server authoritative.** Results, standings, payouts computed server-side inside the write transaction (ADR-002); clients only render optimistic state for their own action.
 5. **Concurrency.** `version` column on mutable aggregates; `If-Match` required on mutations (428 if missing) → 409 `concurrency_conflict`; domain guards return 422 with a catalog code. (NFR-023)
@@ -110,7 +111,8 @@ Module DAG (ADR-004): `platform` ← `identity` ← `invitations`; `platform, id
 
 - [ ] ruff + mypy strict + import-linter + bandit clean
 - [ ] `pytest` green incl. integration on real Postgres/Redis
-- [ ] Migration applies from empty DB; `alembic check` clean; RLS policy present for new tenant tables
+- [ ] Migration applies from empty DB; `alembic check` clean; RLS policy and composite tenant FK present for new tenant tables
+- [ ] The schema-objects, tenant-policy, enum-parity, privilege and append-only tests pass (`DATA-MODEL.md` §12) — `alembic check` alone sees no policies, triggers or grants
 - [ ] `api/openapi.json` regenerated and committed; web types/Bruno regenerated if API changed
 - [ ] Two-org isolation test for any new tenant-scoped surface
 - [ ] Relevant `spec/test-vectors/` cases covered

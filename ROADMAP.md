@@ -11,7 +11,7 @@
 | M-PAY | V1 | Hosted inbound payments (one gateway) + refunds + unpaid policy | finance | `PaymentProvider` port, `payments.provider/provider_ref`, payment FSM `failed` |
 | M-REPORT | V1 | Reporting & CSV export (async artifacts) | leagues, tournaments, finance | `reporting` module slot, report views (FR-100) |
 | M-SCORE+ | V1 | Custom scoring systems + configurable tie-breakers + ranking-based seeding | leagues, tournaments | `scoring_systems.config` jsonb, `preset_key NULL = custom`, `seeding_method` CHECK |
-| M-PRIZE+ | V1 | Custom prize distribution (per-rank basis points) | finance | `prize_config` jsonb shape `{distribution_bp: []}` |
+| M-PRIZE+ | V1 | Custom prize distribution (per-rank basis points) | finance | `tournament_prize_tiers` table (`rank`, `share_bp`) with its sum-to-10000 trigger |
 | M-AUTH+ | V1 | OAuth (Google, GitHub), TOTP 2FA, inactivity flagging | identity | `users.last_login_at`, `refresh_tokens.family_id`, auth router |
 | M-ENT | V1 | Plan entitlements & per-tenant quotas / rate limits | platform | `organizations.plan`, `EntitlementService` port |
 | M-STATS+ | V1 | Player statistics depth, cached rankings, materialized stats | leagues, tournaments | `v_player_statistics` view → materialized; `source_version` |
@@ -30,7 +30,7 @@
 | M-BRAND | Future | Custom branding / white-label / custom domains | platform, web | `organizations.branding` jsonb, CSS tokens |
 | M-RESIDENCY | Future | Per-region data residency, enterprise SSO/SCIM | platform, identity | central tenant session (schema/db-per-tenant migration path) |
 | M-PLUGINS | Future | Third-party plugin system (formats, scoring) | core registry | `ModuleManifest`, entry-point discovery |
-| M-NOTIF | Future | Engagement notifications, web push, in-app center, Discord/Slack/webhooks, preferences | platform | `NotificationChannel` registry, `notification_deliveries.channel` CHECK, `transactional` flag |
+| M-NOTIF | Future | Engagement notifications, web push, in-app center, Discord/Slack/webhooks, preferences | platform | `NotificationChannel` registry, `notification_deliveries.channel` CHECK, `transactional` flag. Note: `tourneyhub_app` has no `SELECT` on `notification_deliveries` (it holds recipient addresses), so an in-app centre needs its own user-scoped projection rather than reading that table. |
 | M-I18N | Future | UI translations | web | react-i18next already wired, no hard-coded strings |
 | M-MOBILE | Future | PWA / offline result entry | web, realtime | ETag reconciliation, idempotency keys |
 | M-WEBHOOKS | Future | Outbound webhooks + API keys/PATs for integrations | platform, identity | outbox events, auth router |
@@ -58,11 +58,11 @@ Each brief: purpose, requirements carried, data-model delta, API delta, notes fo
 
 ### M-PRIZE+ — Custom prize distribution (V1)
 - **Requirements:** FR-073 custom per-rank basis points (must sum to 10 000), organizer fee already covered.
-- **Data:** `prize_config` `{v:1, distribution_bp:[...]}` already accepted by the schema; UI + validation only.
+- **Data:** `tournament_prize_tiers` already stores per-rank `share_bp` and enforces `sum = 10000` (`DATA-MODEL.md` §9.2); presets expand into rows on create. UI + validation only. (Replaces the `prize_config` jsonb seam, dropped in the 2026-10-02 data-model review: money and basis points are never stored in `jsonb`.)
 
 ### M-AUTH+ — OAuth, TOTP, inactivity (V1)
 - **Requirements:** FR-011 (Google, GitHub OAuth), FR-012 (TOTP 2FA), FR-013 (inactivity flag after 540 d, A-004).
-- **Data:** `external_identities` (user_id, provider, subject UNIQUE, email, linked_at); `users.totp_secret_enc`, `users.totp_enabled_at`; `recovery_codes` (hashed).
+- **Data:** `external_identities` (user_id, provider, subject UNIQUE, email, linked_at); TOTP secret and `totp_enabled_at` belong on **`user_credentials`**, not `users` — the 2026-10-02 review moved secrets off `users` precisely so no `SELECT *` there can carry one (`DATA-MODEL.md` §5.1a); `recovery_codes` (hashed).
 - **Notes:** OAuth via `authlib`; account linking requires verified email match or explicit link flow; inactivity job in the worker.
 
 ### M-ENT — Entitlements & quotas (V1)
@@ -71,11 +71,11 @@ Each brief: purpose, requirements carried, data-model delta, API delta, notes fo
 - **Notes:** `EntitlementService.check(org, capability, quantity)` already called at MVP with a permissive default; this module supplies the real implementation and 402/429 responses (`plan_limit_reached`). Only build if monetization or abuse control is needed.
 
 ### M-STATS+ — Statistics depth & caching (V1)
-- **Requirements:** FR-093 depth, FR-096 (cache derived rankings, invalidate on source change, R-004), FR-094 richer histories.
+- **Requirements:** FR-093 depth, FR-096 (cache derived rankings, invalidate on source change, RK-04), FR-094 richer histories.
 - **Data:** materialize `v_player_statistics` → `player_statistics` table refreshed by outbox handlers; Redis cache for public overview.
 
 ### M-UX-V1 — Dark mode, accessibility, prerender (V1)
-- **Requirements:** NFR-010 WCAG 2.1 AA audit, dark mode via tokens (R-017 prerender/SSG of public routes for SEO).
+- **Requirements:** NFR-010 WCAG 2.1 AA audit, dark mode via tokens (RK-07 prerender/SSG of public routes for SEO).
 - **Notes:** dark theme = second token set in `design/tokens.css`; prerender via Vite SSG plugin or a build-time crawler hitting `/public/*`.
 
 ### M-FORMATS — More formats (Future)
@@ -142,7 +142,7 @@ These exist at MVP **only** so the modules above can be added additively. Do not
 | `tournaments.discipline_id` nullable, `discipline_name` kept | §8.1 | M-DISC |
 | `participants` decoupled from users; `display_name` snapshot | §8.2 | M-TEAMS, GDPR |
 | `PaymentProvider` port, `ManualProvider`, `payments.provider/provider_ref`, `failed` state | finance module | M-PAY, M-PAYOUT |
-| `prize_config` accepts `distribution_bp` | finance schema | M-PRIZE+ |
+| `tournament_prize_tiers` stores per-rank `share_bp` | finance schema | M-PRIZE+ |
 | `scoring_systems.config` jsonb, `preset_key` nullable, `TieBreakerRegistry` | leagues module | M-SCORE+ |
 | `seeding_method` as text CHECK | §8.1 | M-SCORE+ (ranking) |
 | `organizations.plan`, `EntitlementService` port (permissive default) | platform module | M-ENT, M-SAAS |
