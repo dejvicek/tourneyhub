@@ -29,7 +29,6 @@ The bigger version is a hosted platform where any club can run leagues and tourn
 | RM-04 | Best N results | A season counts only each player's best N tournaments, so missed nights hurt less. |
 | RM-05 | Double elimination (DKO) | A second kind of knockout, where an entry is out after its second loss — on its own or after any group phase. |
 | RM-06 | Several groups | A group phase split into parallel groups that feed one knockout. |
-| RM-07 | Sets | Matches played as best of 3 or 5. |
 | RM-08 | More tie-breakers | Further tie-breakers, and configurable ones in round robins. |
 | RM-09 | Player pages | Each player's history, win rate and head-to-head records. |
 | RM-10 | CSV export | A league's players, results and standings as a spreadsheet file. |
@@ -48,7 +47,7 @@ The bigger version is a hosted platform where any club can run leagues and tourn
 | RM-15 | Ratings | An Elo-style rating for each player across tournaments and leagues. |
 | RM-16 | Persistent teams | Named teams that last across tournaments, teams of more than two, and substitutions. |
 | RM-17 | Divisions | Parallel ladders in one league, with promotion and relegation. |
-| RM-18 | Scheduling | Match times, venues and table assignment. |
+| RM-18 | Scheduling | Match times and venues, and names for fields (in the MVP a field is only a number). |
 | RM-19 | Phone app | Installable on a phone, with result entry that works offline. |
 | RM-20 | Easier, safer sign-in | Sign-in with Google, and two-factor authentication. |
 

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Status | Draft |
-| Date | 2026-10-14 |
+| Date | 2026-10-21 |
 | Scope | MVP only. Business requirements only: technical decisions are recorded in `ADR.md` when they are made. |
 
 ## 1. Purpose
@@ -43,11 +43,16 @@ The MVP lets an organizer run a league in seasons, play tournaments inside each 
 | Bye | An empty spot in a first-round bracket match. The entry drawn against it gets a free win and goes through without playing. |
 | Sit-out | A group-phase round an entry does not play because the numbers do not work out. |
 | Walkover | A match won without being played, e.g. because the opponent left. |
+| Match format | How many games a match has. **BO1**: one game. **BO2**: exactly two games, so 1:1 is a draw. **BO3** and **BO5**: best of three or five, so the first side to win 2 or 3 games wins the match. |
+| Game | One game of a match, played to a number of goals, e.g. first to 10. A BO1 match is a single game. |
+| Field | A place where one match is played at a time: a foosball table, a court, a board. A tournament's fields are numbered 1, 2, 3 … |
+| On a field | A match that has a field and is being played there. |
+| Waiting | A match whose two sides are known but that has no field yet. |
 | Late player | A player — in Doubles, a pair — added after the tournament has started (BR-067). |
 | Disabled | A player or pair the organizer has taken out of new rounds for now. |
 | Top players | In Monster DYP, the players kept apart in rounds 1 and 2. |
 | BH1, BH2 | Buchholz tie-breakers. BH1 sums the points of an entry's opponents; BH2 sums those opponents' BH1. |
-| Score difference | Scores for minus scores against. |
+| Score difference | Goals for minus goals against, over every game with an entered score. |
 | Place | An entry's finishing position in a tournament. Several entries can share a place. |
 | Placement points | Season points a player earns for their place in a finished tournament. |
 | Tournament win | Finishing 1st in a tournament — including a shared 1st, and as either player of the winning pair. |
@@ -65,10 +70,12 @@ The MVP lets an organizer run a league in seasons, play tournaments inside each 
 7. Group-phase points (2 / 1 / 0, optional points for sitting out), tie-breakers (head-to-head and score difference in a round robin; score difference, BH1 and BH2 in Swiss and Monster DYP), and season standings from placement points.
 8. A read-only share link per league.
 9. English and Czech UI, usable on a phone.
+10. Match formats BO1, BO2, BO3 and BO5, chosen per phase, with an optional different format for the final.
+11. Fields: the organizer sets how many fields a tournament has. Matches go to free fields in schedule order and the rest wait. During the tournament the organizer adds and removes fields and puts matches on the field they want.
 
 ### 4.2 Not in the MVP
 
-Player accounts and players reporting their own results · co-organizers and transferring a league · organizations and multi-tenancy · teams of more than two, and named teams that last across tournaments · entry fees, prizes and payments · live updates (viewers refresh the page) · email of any kind (verification, password reset, invitations) · public listing, search and following · statistics beyond standings · data export and account deletion · double elimination (DKO) knockouts · group phases split into several groups · matches played in sets (e.g. best of three) · other tie-breakers, and configurable ones in a round robin · match times, venues and table assignment.
+Player accounts and players reporting their own results · co-organizers and transferring a league · organizations and multi-tenancy · teams of more than two, and named teams that last across tournaments · entry fees, prizes and payments · live updates (viewers refresh the page) · email of any kind (verification, password reset, invitations) · public listing, search and following · statistics beyond standings · data export and account deletion · double elimination (DKO) knockouts · group phases split into several groups · other tie-breakers, and configurable ones in a round robin · match times and venues · names for fields (a field is only a number).
 
 Each of these is on the roadmap (`ROADMAP.md`).
 
@@ -80,8 +87,8 @@ Each of these is on the roadmap (`ROADMAP.md`).
 2. They create the league "Thursday Foosball". Season 1 starts automatically.
 3. They add the regulars to the player list.
 4. On Thursday, 12 players come. The organizer creates a DYP tournament with a round robin. The 6 best-ranked players form the top half, the other 6 the bottom half, and each top-half player is drawn a bottom-half partner.
-5. Generating creates the round-robin schedule: 6 pairs, 5 rounds, 15 matches.
-6. The organizer enters each result on their phone as matches finish. When the round robin is complete, they start a knockout for the top 4 pairs, without a third-place match: 1st v 4th and 2nd v 3rd. The bracket advances by itself.
+5. Generating creates the round-robin schedule: 6 pairs, 5 rounds, 15 matches, all BO1. The bar has two foosball tables, set up as Field 1 and Field 2, so two matches of round 1 start and the third waits.
+6. The organizer enters each result on their phone as matches finish, and each freed field takes the next waiting match. Halfway through, a third table frees up and the organizer adds it as Field 3. When the round robin is complete, they start a knockout for the top 4 pairs, without a third-place match: 1st v 4th and 2nd v 3rd, with a BO3 final. The bracket advances by itself.
 7. When the final is entered, the tournament finishes. Both players of the winning pair get 10 points and the runners-up 8 each. The two pairs that lost the semifinals share 3rd, so their four players split the points for 3rd and 4th: (6 + 4) / 2 = 5 each. The two pairs that did not qualify are 5th (2 points each) and 6th (0). The season standings update.
 8. Players open the league's share link to see the round robin, the bracket and the season standings.
 
@@ -116,7 +123,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | ID | Requirement |
 |---|---|
 | FR-010 | An organizer creates a league with a name. Creating it also starts Season 1. |
-| FR-011 | League settings: name; whether draws are allowed in group phases; and the placement points table. The default is 10, 8, 6, 4, 2 for 1st–5th, kept small so that a player who misses a few tournaments can still catch up. Points are whole numbers, and no place is worth more than the place above it. |
+| FR-011 | League settings: name; whether draws are allowed in group phases; the defaults for new tournaments — number of fields (1), match format (BO1) and goals per game (10); and the placement points table. The default is 10, 8, 6, 4, 2 for 1st–5th, kept small so that a player who misses a few tournaments can still catch up. Points are whole numbers, and no place is worth more than the place above it. |
 | FR-012 | The organizer adds players to the league's player list by name, renames them and removes them (BR-001, BR-002). A rename shows everywhere, including past results. |
 | FR-013 | The organizer can delete a league after confirming. Everything in it is deleted. |
 
@@ -132,7 +139,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 
 | ID | Requirement |
 |---|---|
-| FR-030 | The organizer creates a tournament in the league's active season with a name, a date (default: today) and a type: Singles, Doubles, DYP or Monster DYP. |
+| FR-030 | The organizer creates a tournament in the league's active season with a name, a date (default: today) and a type: Singles, Doubles, DYP or Monster DYP. Setup also sets the number of fields, the match format of each phase and the goals per game, starting from the league's defaults (FR-011). |
 | FR-031 | A tournament usually has a group phase followed by a knockout, but either can be left out. Singles, Doubles and DYP choose a group phase — round robin (once or twice), Swiss or none; Monster DYP always plays its own rounds (§7.8). Without a group phase, the tournament is a knockout from the start, with or without a third-place match. After a group phase, the organizer decides whether a knockout follows (FR-040). |
 | FR-032 | The organizer picks the players from the league's player list. There must be at least 2 entries, or 4 with a third-place match; Monster DYP needs at least 4 players. There is no maximum. If a technical limit is ever needed, it must still allow 256 entries in a tournament and 20 rounds in a group phase. |
 | FR-033 | Doubles: the organizer puts the players into pairs. DYP: the players are split into a top and a bottom half — by the league ranking or by hand — and the pairs are drawn (BR-031–BR-033). |
@@ -161,10 +168,11 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 
 | ID | Requirement |
 |---|---|
-| FR-050 | The organizer enters a result for each match: a winner, or a draw where allowed (BR-090). |
-| FR-051 | A result can include a score for each side, in whole numbers. Swiss and Monster DYP rounds require scores (BR-092). |
+| FR-050 | The organizer enters a result for each match: a winner, or a draw where allowed (BR-090). In BO2, BO3 and BO5 the result is the number of games each side won, e.g. 2:1, entered game by game. |
+| FR-051 | A result can include the score of each game — goals for each side, in whole numbers. Swiss and Monster DYP rounds require them (BR-092). Without game scores, the organizer picks the winner of each game. |
 | FR-052 | A match can be recorded as a walkover: a winner, with no score. |
 | FR-053 | The organizer can change or clear a result, subject to BR-011, BR-053, BR-065 and BR-094. |
+| FR-054 | The organizer can change a phase's match format until the phase's first result is entered, and the final's format until the final has a result. |
 
 ### 6.7 Standings
 
@@ -177,7 +185,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 
 | ID | Requirement |
 |---|---|
-| FR-070 | Every league has a share link. Without an account, anyone with it can see the league, its seasons and season standings, and each tournament's bracket, schedule or rounds, results and standings. Tournaments still in setup are visible only to the organizer. |
+| FR-070 | Every league has a share link. Without an account, anyone with it can see the league, its seasons and season standings, and each tournament's bracket, schedule or rounds, results and standings, including which match is on which field and which matches are waiting. Tournaments still in setup are visible only to the organizer. |
 | FR-071 | The link cannot be guessed, and leagues are not listed or searchable anywhere. |
 | FR-072 | Viewers cannot change anything. |
 
@@ -187,7 +195,17 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 |---|---|
 | FR-080 | The whole UI is available in English and Czech. Names entered by organizers are shown as entered, and the knockout options (§7.11) keep their English names in both languages. |
 | FR-081 | Organizers choose their language and it is remembered. Viewers get their browser's language if it is English or Czech, otherwise English, and can switch. Dates follow the chosen language's format. |
-| FR-082 | Every screen works on a phone. Entering a result takes at most three taps from the bracket, schedule or round — open the match, choose the result, save — plus typing scores. |
+| FR-082 | Every screen works on a phone. Entering a result takes at most three taps from the bracket, schedule, round or field — open the match, choose the result, save — plus entering scores. In BO2, BO3 and BO5, choosing the result takes one tap per game played. |
+
+### 6.10 Fields
+
+| ID | Requirement |
+|---|---|
+| FR-090 | Every tournament has at least one field. The organizer sets how many in setup and can add or remove fields at any time while the tournament runs (BR-132). |
+| FR-091 | A field is shown as "Field" and its number. Names for fields are not in the MVP. |
+| FR-092 | Matches go onto free fields by themselves (BR-130). Matches that could be played but have no field are shown as waiting, in the order in which they will get one. |
+| FR-093 | The organizer can put a waiting match on a free field, move a match to another free field, swap the matches on two fields, or take a match off its field and back to waiting. |
+| FR-094 | Entering a match's result frees its field, which takes the next waiting match. The organizer can also enter a result for a waiting match, for example one played somewhere else; that match then never takes a field. |
 
 ## 7. Business rules
 
@@ -280,7 +298,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | BR-070 | In round robin, Swiss and Monster DYP rounds, a win is worth 2 points, a draw 1 and a loss 0. In Monster DYP, both players of a team get the points. |
 | BR-071 | A sit-out is worth 0 points, or 1 point when the tournament's "points for sitting out" setting is on. |
 | BR-072 | Swiss and Monster DYP: entries level on points are ordered by the enabled tie-breakers, in the organizer's order (FR-043). |
-| BR-073 | BH1 is the sum of the current points of every opponent faced, counted once per match. BH2 is the sum of those opponents' BH1. Score difference is scores for minus scores against over all matches. Sit-outs add nothing to BH1 or BH2, and score difference counts only entered scores. |
+| BR-073 | BH1 is the sum of the current points of every opponent faced, counted once per match. BH2 is the sum of those opponents' BH1. Score difference is goals for minus goals against over all games. Sit-outs add nothing to BH1 or BH2, and score difference counts only entered game scores. |
 | BR-074 | Entries still level share the place. Where a strict order is needed — pairing the next round, or the knockout's cut and seeding — the lot decides. |
 
 ### 7.11 From group phase to knockout
@@ -300,9 +318,9 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 
 | ID | Rule |
 |---|---|
-| BR-090 | Draws are possible only in group phases, and only if the league allows draws. Knockouts have no draws. |
+| BR-090 | Draws are possible only in group phases, and only if the league allows draws: a BO1 game with equal scores, or a BO2 match won 1:1. Knockouts have no draws. |
 | BR-091 | A match gets a result only once both of its sides are known. |
-| BR-092 | Scores, if entered, must agree with the result: the winner has the higher score, and a draw has equal scores. Swiss and Monster DYP round matches need scores, except walkovers. |
+| BR-092 | Scores, if entered, must agree with the result: the winner of a game has the higher score, a drawn BO1 game has equal scores, and the games won must match the game scores. Swiss and Monster DYP round matches need a score for every game played, except walkovers. |
 | BR-093 | A walkover counts as a normal win and loss everywhere. |
 | BR-094 | In a knockout, a result is locked once any later match it feeds has a result: the next match for its winner and, for a semifinal with a third-place match, that match for its loser. That later result must be cleared first. Changing a winner updates the sides of the later matches. |
 | BR-095 | Clearing a result in a finished tournament puts it back in progress. |
@@ -325,6 +343,27 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | BR-111 | Entries sharing a place split the points of the places they cover: each gets the average, rounded down. With the default table, two pairs sharing 3rd cover 3rd and 4th, so each of their four players gets (6 + 4) / 2 = 5; four entries sharing 5th get (2 + 0 + 0 + 0) / 4 = 0.5, rounded down to 0. |
 | BR-112 | Only finished tournaments count. Correcting a result in a finished tournament, or deleting a tournament, recalculates the season standings. |
 | BR-113 | Season standings rank players by total placement points, then tournament wins. Players still level share the place. |
+
+### 7.15 Match formats
+
+| ID | Rule |
+|---|---|
+| BR-120 | Each phase has one match format: BO1, BO2, BO3 or BO5, BO1 by default. The final can have a format of its own, for example BO5; the third-place match plays the knockout's format. |
+| BR-121 | BO1 is one game. BO2 is always two games: 2:0 is a win and 1:1 a draw, so BO2 is offered only in group phases of leagues that allow draws. In BO3 and BO5 the first side to win 2 or 3 games wins the match, and the remaining games are not played. |
+| BR-122 | Group-phase points come from the match result, not from games: a win is 2, a draw 1, a loss 0 (BR-070), whatever the format. |
+| BR-123 | Goals per game (default 10) sets how many goals the score counter shows. It is a guide, not a rule: other whole-number scores can still be entered. |
+| BR-124 | A walkover in BO2, BO3 or BO5 gives the winner the match with no game scores. |
+
+### 7.16 Fields
+
+| ID | Rule |
+|---|---|
+| BR-130 | A match can take a field once both its sides are known and none of its players is on another field. A free field takes the first such match in schedule order: in a round robin by round and then by match, so a later round's match can start while the current round finishes; in Swiss and Monster DYP within the current round; in a knockout by round, top of the bracket first. |
+| BR-131 | Nobody plays on two fields at once. A match whose players are still on another field waits, even when a field is free, and the next match that can be played takes the field. |
+| BR-132 | A new field takes the lowest free number and straight away takes the next waiting match. Removing a field keeps the other numbers; a match on the removed field goes back to the front of the waiting list. The last field cannot be removed. |
+| BR-133 | A field the organizer gives a match by hand overrides the automatic order until that match has a result. |
+| BR-134 | Clearing a result does not put the match back on a field; it waits like any other match. |
+| BR-135 | Fields do not change standings, places, points or sit-outs: waiting for a field is not sitting out. |
 
 ## 8. Open questions
 
