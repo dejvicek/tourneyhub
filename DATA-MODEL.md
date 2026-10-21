@@ -19,7 +19,7 @@ The schema follows the proposed ADRs in `ADR.md`, in particular ADR-002 (Postgre
 | D5 | **Per-round participation is stored** for group phases: played, sat out, disabled, not yet joined. | Sit-out counts and points (BR-058, BR-063, BR-071) and missed rounds of disabled and late players (BR-064, BR-067) depend on why an entry did not play in each past round. |
 | D6 | **Hard delete, except players.** Deleting a league or a tournament removes everything under it (FR-013, FR-038). A removed player is only marked removed and keeps their history (BR-002). | Matches the PRD; no `deleted_at` filters everywhere. |
 | D7 | **History only for admin actions.** `admin_actions` records who did what to whom and when (ADR-007). Matches keep only the time of the last result entry. | The organizer is the only person changing a league in the MVP. |
-| D8 | **Draws are stored, lots are seeded.** Tournaments carry an immutable random seed and a draw counter; seasons carry a seed for the league ranking's lot (ADR-010). | Reproducible draws; lots inside computed standings give the same answer on every read. |
+| D8 | **Draws are stored, lots are seeded.** Tournaments carry an immutable random seed and a draw counter; every lot, including the league ranking's (BR-020), uses the tournament's seed (ADR-010). | Reproducible draws; lots inside computed standings give the same answer on every read. |
 
 ## 2. Conventions
 
@@ -44,6 +44,8 @@ The schema follows the proposed ADRs in `ADR.md`, in particular ADR-002 (Postgre
   - starting a season carries the current season's `number` (FR-021);
   - "shuffle again" and "new DYP draw" carry the expected `draw_counter`;
   - creating a league or a tournament uses a client-supplied id (see Primary keys).
+
+  Changing the entries in setup carries no expected state: a retried add is caught by the unique `(tournament_id, stage, player_id)`, and a retried remove gets 404.
 
   Every other operation is safe to repeat: it sets a target state (`disabled: true`, never a toggle; the full seed order, never "move up"), deletes by id, or is caught by a unique constraint or by the tournament state. A full seed order that does not list exactly the current entries of the stage gets 409. A repeated delete by id gets 404, which the frontend treats like a 409: it reloads the state instead of showing an error.
 - **Case-insensitive text:** email addresses and player names are compared with `lower()`. The database is created with PostgreSQL 17's built-in locale provider: `initdb --locale-provider=builtin --builtin-locale=C.UTF-8`, passed as `POSTGRES_INITDB_ARGS` to the image. `lower()` then uses Unicode case mapping, so `Č` folds to `č`, and the `lower()` unique indexes do not depend on the image's glibc version. The behaviour is stable within a PostgreSQL major version, so the release notes are checked before a major upgrade. Text sorts by code point; a query that must list names in Czech order uses `COLLATE "cs-x-icu"`. A test checks the folding: a database created with the plain `C` locale does not fold `Č` at all.
@@ -85,7 +87,8 @@ Standalone tables: `instance_settings` (one row) and `auth_attempts` (rate limit
 | `email` | Unique on `lower(email)` (FR-002). |
 | `display_name` | |
 | `password_hash` | Argon2id (ADR-006). |
-| `is_admin` | `bool`, default `false`. Set only by the CLI (ADR-007). |
+| `is_admin` | `bool`, default `false`. Set only by the CLI (ADR-007). Read from this row on every admin request, never from the access token (ADR-006). |
+| `must_change_password` | `bool`, default `false`. Set by an admin password reset (FR-006), cleared by a password change. While set, the API allows only `/api/v1/auth/*` and `GET /api/v1/me` and answers everything else with 403 `password_change_required`; it is read from this row on every request (ADR-006). |
 | `language` | `en` or `cs`; the remembered UI language (FR-081). |
 | `created_at`, `updated_at` | |
 
@@ -95,11 +98,12 @@ Standalone tables: `instance_settings` (one row) and `auth_attempts` (rate limit
 |---|---|
 | `id` | |
 | `user_id` | FK `users`, `ON DELETE CASCADE`. |
-| `family_id` | `uuid`; all tokens of one login share it. Indexed. |
+| `family_id` | `uuid`; all tokens of one login share it. Indexed. The refresh endpoint locks the family's rows (`SELECT … FOR UPDATE`) before reading them, so presentations within one family are handled one at a time. |
+| `parent_id` | FK `refresh_tokens`, nullable, `ON DELETE SET NULL`: the token this one was rotated from. Indexed. Siblings are tokens with the same `family_id` and the same non-null `parent_id`; a normal rotation revokes the presented token's unrotated siblings. A parent expires before its children, hence `SET NULL`. |
 | `token_hash` | `bytea`, SHA-256 of the token. Unique. |
-| `expires_at` | 90 days after issue; each rotation issues a new token with a new expiry, so a device in use stays logged in (ADR-006). |
-| `rotated_at` | Set when this token was exchanged for a new one. Presenting it again within 60 seconds of `rotated_at` issues another new token in the same family; this covers two tabs refreshing at once and a retried refresh whose response was lost. Only hashes are stored, so the earlier replacement cannot be sent again. Presenting it later revokes the family. |
-| `revoked_at` | Set on logout, password change, admin reset or detected reuse. |
+| `expires_at` | 90 days after issue; each rotation issues a new token with a new expiry, so a device in use stays logged in (ADR-006). Rows past `expires_at` are deleted regularly; rotated rows stay until then, because reuse detection needs them. |
+| `rotated_at` | Set when this token was exchanged for a new one. Presenting it again within 60 seconds of `rotated_at` issues another new token in the same family and leaves `rotated_at` unchanged; this covers two tabs refreshing at once and an immediate retry after a lost response. Only hashes are stored, so the earlier replacement cannot be sent again. Presenting it later revokes the family. |
+| `revoked_at` | Set on logout, password change, admin reset, detected reuse or a sibling's normal rotation. A revoked or expired token gets 401 and changes nothing, even within the 60-second window. |
 | `created_at` | |
 
 **`auth_attempts`** — counters for login and sign-up limits (ADR-006).
@@ -108,7 +112,7 @@ Standalone tables: `instance_settings` (one row) and `auth_attempts` (rate limit
 |---|---|
 | `id` | |
 | `kind` | `login_email`, `login_ip`, `signup_ip`. |
-| `key` | The email (lower-cased) or IP address. |
+| `key` | The email (lower-cased) or the client IP from `X-Forwarded-For`, trusted only from Caddy (ADR-006); an IPv6 address is stored as its /64 prefix. |
 | `succeeded` | `bool`. |
 | `created_at` | Index on `(kind, key, created_at)`. Rows older than the longest window are deleted by the application. |
 
@@ -167,7 +171,6 @@ The sign-up code itself is never written to `admin_actions`.
 | `name` | Nullable. `NULL` means the default name, rendered in the UI language from `number` ("Season 2" / "Sezóna 2"); set when the organizer renames it (FR-020). |
 | `state` | `active` or `closed`. At most one active season per league: partial unique index on `(league_id) WHERE state = 'active'`. |
 | `placement_points` | `int[]`, the season's placement points table, e.g. `{10,8,6,4,2}` (FR-011). CHECK via an immutable SQL helper function: one-dimensional, not empty, no `NULL` elements, no negative values, non-increasing. |
-| `rng_seed` | `bytea`, 16 bytes, immutable (ADR-010). |
 | `started_at`, `closed_at` | |
 
 The placement points table lives only on seasons. The league settings screen edits the active season's table, a new season starts with a copy of the previous season's table, and a closed season's table no longer changes (BR-012). This is the "season keeps its own copy" of ADR-009 without a second copy on `leagues`.
@@ -180,12 +183,12 @@ The placement points table lives only on seasons. The league settings screen edi
 |---|---|
 | `id` | |
 | `season_id` | FK `seasons`, `ON DELETE CASCADE`. |
-| `name`, `date` | `date` defaults to today in the application (FR-030). |
+| `name`, `date` | `date` is the calendar date on the organizer's device, sent by the client, which defaults it to today (FR-030); it is never derived from a UTC timestamp, so a tournament at 23:30 in Prague stays on its day. |
 | `type` | `singles`, `doubles`, `dyp`, `monster_dyp`. |
 | `state` | `setup`, `in_progress`, `finished`. |
 | `seeding_method` | `ranking` or `random` (FR-034); not used by Monster DYP. |
 | `rng_seed` | `bytea`, 16 bytes, immutable (ADR-010). |
-| `draw_counter` | `int`, incremented on each "shuffle again" or "new DYP draw" (ADR-010). |
+| `draw_counter` | `int`, incremented on each new draw: "shuffle again", "new DYP draw", or a draw forced by a change to the entries in setup (ADR-010). |
 | `created_at`, `updated_at` | |
 
 **`tournament_phases`** — at most one group phase and one knockout per tournament (FR-031).
@@ -220,10 +223,10 @@ The helper functions used by CHECK constraints are created in the first migratio
 | `tournament_id` | FK `tournaments`, `ON DELETE CASCADE`. |
 | `stage` | `main` or `knockout`. `main` entries play the tournament's first phase. `knockout` entries are created only when a knockout follows a group phase. |
 | `kind` | `player` or `pair`. |
-| `seed` | `int`, nullable until seeded. Unique on `(tournament_id, stage, seed)`, `DEFERRABLE INITIALLY DEFERRED` so that seeds can be swapped in one transaction (FR-034). |
+| `seed` | `int`, nullable until seeded. Unique on `(tournament_id, stage, seed)`, `DEFERRABLE INITIALLY DEFERRED` so that seeds can be swapped in one transaction (FR-034). Cleared and set again whenever the entries change in setup, which also discards a hand reordering (ADR-010). |
 | `source_entry_id` | FK `entries`, nullable, `ON DELETE CASCADE`. For a knockout entry that continues one group-phase entry — after a round robin or Swiss (BR-085), and in the Monster DYP *Singles* mode (BR-082) — that entry. `NULL` for pairs formed after Monster DYP, whose players are found through `entry_members`. Used to place non-qualifiers after the knockout (BR-103). |
 | `is_top_player` | `bool`; marked as a top player by the organizer (FR-041). See "Top players" below. |
-| `is_disabled` | `bool`; the current state (FR-044, BR-064). The history is in `round_participation`. Deleting a round does not change it. |
+| `is_disabled` | `bool`; the current state (FR-044, BR-064). The history is in `round_participation`. Deleting a round does not change it; going back to setup clears it, since disabling exists only while rounds are played (FR-044). |
 | `created_at` | |
 
 Additional constraint: **`UNIQUE (id, tournament_id, stage)`**, not deferrable, so that `entry_members` can reference it with a composite foreign key. `stage` never changes after an entry is created.
@@ -254,7 +257,7 @@ Primary key `(entry_id, player_id)`. **Unique on `(tournament_id, stage, player_
 | `player_id` | FK `players`, deferred (§2). Primary key `(tournament_id, player_id)`. |
 | `half` | `top`, `bottom` or `left_out`. |
 
-The drawn pairs are stored as `pair` entries. The left-out player has no entry and does not play (BR-031).
+The drawn pairs are stored as `pair` entries. The left-out player has no entry and does not play (BR-031). When the entries change in setup (ADR-010), halves computed from the league ranking are rewritten and drawn again; hand-set rows are kept, a removed player's row is deleted, and the organizer completes the halves before the pairs can be drawn.
 
 ### 4.5 Rounds, matches and results
 
@@ -277,7 +280,7 @@ The drawn pairs are stored as `pair` entries. The left-out player has no entry a
 
 - Every round of a group phase has exactly one row for every `main` entry that exists. Generating a round writes a row per entry. In a Swiss or Monster DYP, adding a late entry writes `not_joined` rows for every round that already exists, so the rows alone tell which rounds it missed.
 - A round robin has its whole schedule from the start, so a late entry (BR-054) is added together with the reschedule, in one transaction. The reschedule moves only matches without a result, keeps every match that has a result in its round, and can add rounds. Rows of entries whose match in a round already has a result stay. All other rows of the rewritten rounds, the late entry's rows (`not_joined` where it cannot play any more) and every row of a new round are written to match the new schedule.
-- Deleting the newest round (FR-046, BR-066) deletes its rows with it. A late entry added before that round keeps its entry and plays from the next round generated. Deleting round 1 takes the tournament back to setup (FR-046): all rounds and their rows are gone, and entries added late become ordinary entries of the setup.
+- Deleting the newest round (FR-046, BR-066) deletes its rows with it. A late entry added before that round keeps its entry and plays from the next round generated. Deleting round 1 takes the tournament back to setup (FR-046): all rounds and their rows are gone, entries added late become ordinary entries of the setup, so the seeding and draws are made again (ADR-010), and every entry's disabled flag is cleared.
 
 **`matches`**
 
