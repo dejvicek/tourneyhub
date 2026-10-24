@@ -1,0 +1,129 @@
+// Deployment: development on a laptop (compose.yaml + compose.override.yaml)
+// and production on the VPS (compose.yaml + compose.prod.yaml), ADR-004, ADR-005 and ADR-014.
+// The SPA runs in a browser in both; the frontend and web containers only serve it and proxy /api.
+deployment {
+
+  dev = environment "Development: docker compose" {
+    technology "compose.yaml + compose.override.yaml"
+    description "Plain HTTP on localhost and on the LAN address. TOURNEYHUB_ENV=development, TOURNEYHUB_COOKIE_SECURE=false; with any other combination the API refuses to start."
+    link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-004--repository-layout-and-local-development-in-docker "ADR-004"
+
+    laptop = machine "Developer's machine" {
+      technology "macOS, Docker"
+      icon tech:apple
+      browser = instanceOf tourneyhub.spa {
+        title "SPA in the browser"
+      }
+      frontend = dockerContainer "frontend: Vite dev server" {
+        technology "Vite, hot reload, /api proxy"
+        icon tech:vite
+        description "Hot reload; proxies /api to api, so the browser sees one origin as in production. node_modules in a named volume because macOS and Linux need different native binaries."
+      }
+      api = dockerContainer "api: uvicorn --reload" {
+        technology "uvicorn --reload, Alembic on start"
+        icon tech:python
+        description "Source mounted, Alembic migrations on start. The same container hosts the tourneyhub CLI."
+        instanceOf tourneyhub.api
+        instanceOf tourneyhub.cli
+      }
+      db = dockerContainer "db: postgres:17" {
+        technology "PostgreSQL 17"
+        icon tech:postgresql
+        description "The db service in compose.yaml is shared by development and production."
+        link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-002--database-postgresql "ADR-002"
+        instanceOf tourneyhub.db
+      }
+    }
+
+    phone = device "Phone on the same Wi-Fi" {
+      description "Trying the app on a real phone through the machine's LAN address (FR-082). Hence the cookie without Secure: browsers do not keep it over HTTP, Safari not even on localhost."
+      link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#69-language-and-devices "PRD §6.9 (FR-082)"
+      browser = instanceOf tourneyhub.spa {
+        title "SPA in the browser"
+      }
+    }
+
+    laptop.browser -> laptop.frontend "http://localhost"
+    phone.browser -> laptop.frontend "http://192.168.x.x"
+    laptop.frontend -> laptop.api "/api proxy (HTTP)"
+    laptop.api -> laptop.db "SQL over psycopg 3"
+  }
+
+  prod = environment "Production: VPS" {
+    technology "compose.yaml + compose.prod.yaml"
+    description "COMPOSE_FILE in .env, no source code on the VPS. Updating: docker compose pull && docker compose up -d. Hosting in the EU is decided before the pilot."
+    link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-014--deployment-images-in-ghcr-manual-pull-on-the-vps "ADR-014"
+
+    client = device "User's phone or computer" {
+      description "Organizer, admin and viewer alike. The SPA runs in the browser."
+      browser = instanceOf tourneyhub.spa {
+        title "SPA in the browser"
+      }
+    }
+
+    vps = machine "VPS" {
+      technology "Docker Compose"
+      icon tech:docker
+      web = dockerContainer "web: Caddy with the SPA build" {
+        technology "Caddy, HTTPS from Let's Encrypt"
+        description "The only public entry point, on ports 80 and 443, HTTPS from Let's Encrypt. Serves the SPA build (falling back to index.html) and proxies /api/* to api. No CORS; the refresh cookie is first-party."
+        link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-005--one-origin-behind-caddy "ADR-005"
+      }
+      api = dockerContainer "api" {
+        technology "api image from GHCR, Alembic on start"
+        icon tech:python
+        description "Image from GHCR that passed Playwright. Migrations on start. Internal Docker network only."
+        link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-014--deployment-images-in-ghcr-manual-pull-on-the-vps "ADR-014"
+        instanceOf tourneyhub.api
+        instanceOf tourneyhub.cli
+      }
+      db = dockerContainer "db: PostgreSQL 17" {
+        technology "PostgreSQL 17"
+        icon tech:postgresql
+        description "Internal Docker network only."
+        link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-002--database-postgresql "ADR-002"
+        instanceOf tourneyhub.db
+      }
+    }
+
+    backup = machine "Backups off the VPS" {
+      description "Scheduled pg_dump and a tested restore. A precondition for the pilot; the details are designed before deployment."
+      link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-014--deployment-images-in-ghcr-manual-pull-on-the-vps "ADR-014"
+    }
+
+    client.browser -> vps.web "HTTPS 443: / and /api/*"
+    vps.web -> vps.api "/api/* (reverse proxy)"
+    vps.api -> vps.db "SQL over psycopg 3"
+    vps.db -> backup "pg_dump"
+  }
+}
+
+// The string after `views` is the folder (II. Deployment) shown before the title; `order` fixes the position in lists.
+views "II. Deployment" {
+  deployment view devDeployment {
+    title "7. Development: Docker Compose on a laptop"
+    order 7
+    description "Docker Compose on the developer's machine. The browser on the machine and the phone both go through Vite, which proxies /api to api."
+    include dev, dev.**
+    include dev with { navigateTo prodDeployment }
+    include dev.laptop.frontend with { navigateTo spa }
+    // The SPA's calls to the API go through Vite; hide the edges inferred from the logical model
+    exclude dev.laptop.browser -> dev.laptop.api.api
+    exclude dev.phone.browser -> dev.laptop.api.api
+    // Replaced by one labelled edge between the api and db containers
+    exclude dev.laptop.api.api -> dev.laptop.db.db
+  }
+
+  deployment view prodDeployment {
+    title "8. Production: VPS behind Caddy"
+    order 8
+    description "Caddy on 80 and 443 is the only public entry point; api and db live only on the internal Docker network."
+    include prod, prod.**
+    include prod with { navigateTo devDeployment }
+    include prod.vps.web with { navigateTo containers }
+    // The SPA's calls to the API go through Caddy; hide the edge inferred from the logical model
+    exclude prod.client.browser -> prod.vps.api.api
+    // Replaced by one labelled edge between the api and db containers
+    exclude prod.vps.api.api -> prod.vps.db.db
+  }
+}

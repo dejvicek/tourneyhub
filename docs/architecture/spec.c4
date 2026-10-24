@@ -1,0 +1,84 @@
+// Element kinds, deployment node kinds and tags for the TourneyHub model.
+specification {
+  element actor {
+    notation "Person"
+    style {
+      shape person
+      color secondary
+    }
+  }
+  element system {
+    notation "System"
+  }
+  element externalSystem {
+    notation "External system"
+    style {
+      color muted
+    }
+  }
+  element webapp {
+    notation "Web application"
+    style {
+      shape browser
+    }
+  }
+  element container {
+    notation "Container"
+  }
+  element tool {
+    notation "Tool"
+  }
+  element component {
+    notation "Component"
+  }
+  element externalComponent {
+    notation "External service"
+    style {
+      color muted
+    }
+  }
+  element database {
+    notation "Database"
+    style {
+      shape storage
+    }
+  }
+  element tableGroup {
+    notation "Table group"
+    style {
+      shape storage
+      color indigo
+    }
+  }
+
+  deploymentNode environment {
+    notation "Environment"
+    style {
+      color muted
+    }
+  }
+  deploymentNode machine {
+    notation "Machine"
+  }
+  deploymentNode dockerContainer {
+    notation "Docker container"
+  }
+  deploymentNode device {
+    notation "Device"
+    style {
+      shape mobile
+    }
+  }
+
+  // Foreign keys between table groups, drawn unlike calls: solid, crow's foot at the referencing side
+  relationship fk {
+    line solid
+    head none
+    tail crow
+    color slate
+  }
+
+  tag proposed {
+    color #f59e0b
+  }
+}

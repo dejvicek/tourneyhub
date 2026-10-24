@@ -1,0 +1,109 @@
+// Structural views: from context down to components and table groups.
+// The string after `views` is the folder (I. Structure) shown before the title; `order` fixes the position in lists.
+// `include X with { navigateTo … }` sets, per view, which flow the element opens:
+// an actor opens the flow in which it does what its edge in this view says.
+views "I. Structure" {
+
+  view index {
+    title "1. Context: who uses TourneyHub"
+    order 1
+    description "Actors (organizer, player or viewer, instance admin, developer), TourneyHub and GitHub."
+    include *
+    include organizer with { navigateTo dypEvening }
+    include viewer with { navigateTo shareLink }
+    include admin with { navigateTo adminReset }
+    include developer with { navigateTo release }
+    include admin -> tourneyhub with {
+      title "sets the sign-up code, resets a password; creates the admin via the CLI"
+    }
+  }
+
+  view containers of tourneyhub {
+    title "2. TourneyHub containers"
+    order 2
+    description "SPA, API with the engine, CLI and PostgreSQL. In production both the SPA and /api go through Caddy (view 8)."
+    include *
+    include organizer with { navigateTo dypEvening }
+    include viewer with { navigateTo shareLink }
+    include admin with { navigateTo adminReset }
+    include tourneyhub.spa -> tourneyhub.api with {
+      title "REST /api/v1: Bearer JWT, anonymous for viewers, refresh cookie only on /auth"
+    }
+    include tourneyhub.api -> tourneyhub.db with {
+      title "SQLAlchemy 2, psycopg 3; FOR UPDATE locks"
+    }
+    autoLayout LeftRight
+  }
+
+  view spa of tourneyhub.spa {
+    title "3. Web application (SPA)"
+    order 3
+    description "Parts of the frontend and which API they call. All of them use the types generated from openapi.json."
+    include *
+    include tourneyhub.spa.authClient with { navigateTo loginRefresh }
+    include tourneyhub.spa.organizerUi with { navigateTo dypEvening }
+    include tourneyhub.spa.adminUi with { navigateTo adminReset }
+    include tourneyhub.spa.publicUi with { navigateTo shareLink }
+  }
+
+  // Drawn without the API container frame: with the frame Graphviz pushes PostgreSQL below it and the
+  // five database edges snake around the engine. Everything except the SPA and PostgreSQL is inside the API (view 2).
+  view api of tourneyhub.api {
+    title "4. API and engine"
+    order 4
+    description "API components, the engine as pure functions and the database. The API container frame is left out so that the lines to the database stay short: everything except the SPA and PostgreSQL is inside the API (view 2)."
+    include tourneyhub.api.*, tourneyhub.spa, tourneyhub.db
+    include tourneyhub.api.authApi with { navigateTo loginRefresh }
+    include tourneyhub.api.tournamentsApi with { navigateTo resultEntry }
+    include tourneyhub.api.engine with { navigateTo addRound }
+    include tourneyhub.api.publicApi with { navigateTo shareLink }
+    include tourneyhub.api.adminApi with { navigateTo adminReset }
+    include tourneyhub.api.leaguesApi with { navigateTo dypEvening }
+    include tourneyhub.spa -> tourneyhub.api.authApi with {
+      title "login, refresh (cookie)"
+    }
+    include tourneyhub.api.tournamentsApi -> tourneyhub.db with {
+      title "locks the league, then the tournament; rounds, matches, results"
+    }
+    include tourneyhub.api.leaguesApi -> tourneyhub.db with {
+      title "leagues, players, seasons; reads tournaments and results"
+    }
+    include tourneyhub.api.publicApi -> tourneyhub.db with {
+      title "reads by share token"
+    }
+    autoLayout LeftRight 180
+  }
+
+  view data of tourneyhub.db {
+    title "5. Data: table groups"
+    order 5
+    description "Coarse structure of DATA-MODEL.md. Solid lines are foreign keys, dashed lines access from the API and the CLI. Columns and constraints are in the document."
+    include *
+    include tourneyhub.db.accounts with { navigateTo loginRefresh }
+    include tourneyhub.db.play with { navigateTo resultEntry }
+    include tourneyhub.api -> tourneyhub.db.accounts with {
+      title "auth and instance admin"
+    }
+    include tourneyhub.api -> tourneyhub.db.leagues with {
+      title "leagues and players; league lock"
+    }
+    include tourneyhub.api -> tourneyhub.db.tournaments with {
+      title "tournaments, setup and draws; tournament lock"
+    }
+    include tourneyhub.api -> tourneyhub.db.play with {
+      title "rounds, matches, results"
+    }
+  }
+
+  view devops of github {
+    title "6. Development, CI and images"
+    order 6
+    description "The path of the code from a PR through GitHub Actions to GHCR. The GitHub parts are grey because they are external."
+    include *
+    include developer, admin
+    include github.actions with { navigateTo release }
+    include github.ghcr with { navigateTo prodDeployment }
+    include developer with { navigateTo release }
+    include admin with { navigateTo release }
+  }
+}
