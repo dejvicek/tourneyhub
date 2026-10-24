@@ -1,0 +1,173 @@
+// Dynamic views: the flows the reviews spent most time on, and the PRD §5.1 evening.
+// All flows except release open as a sequence diagram; the Diagram/Sequence switch stays in the toolbar.
+// Long flows are split in two (13a/13b, 15a/15b) and the halves are linked with navigateTo.
+// The string after `views` is the folder (III. Flows) shown before the title; `order` fixes the position in lists.
+views "III. Flows" {
+
+  dynamic view loginRefresh {
+    variant sequence
+    title "9. Login and token refresh"
+    order 9
+    description "ADR-006: access JWT valid 15 minutes, kept in memory; refresh token in an HttpOnly cookie with rotation and a 60-second window."
+    organizer -> tourneyhub.spa.organizerUi "logs in with email and password"
+    tourneyhub.spa.organizerUi -> tourneyhub.spa.authClient "login"
+    tourneyhub.spa.authClient -> tourneyhub.api.authApi "POST /api/v1/auth/login"
+    tourneyhub.api.authApi -> tourneyhub.db.accounts "verifies Argon2id, stores the hash of the new refresh token"
+    tourneyhub.spa.authClient <- tourneyhub.api.authApi "access JWT + HttpOnly cookie"
+    tourneyhub.spa.authClient -> tourneyhub.api.authApi "on page load or after 401: POST /api/v1/auth/refresh with the CSRF header"
+    tourneyhub.api.authApi -> tourneyhub.db.accounts "locks the token family (FOR UPDATE)"
+    alt {
+      when "token valid, or rotated less than 60 s ago" {
+        tourneyhub.spa.authClient <- tourneyhub.api.authApi "new access JWT and cookie"
+      }
+      when "token revoked, expired, or reused" {
+        tourneyhub.api.authApi -> tourneyhub.db.accounts "reused token: revokes the whole family"
+        tourneyhub.spa.authClient <- tourneyhub.api.authApi "401: log in again"
+      }
+    }
+  }
+
+  dynamic view resultEntry {
+    variant sequence
+    title "10. Result entry"
+    order 10
+    description "FR-050 to FR-053, FR-082: at most three taps plus the score. The write locks the league, then the tournament. Standings are not computed on write; they are computed on every read (ADR-009)."
+    organizer -> tourneyhub.spa.organizerUi "opens the match, chooses the result, saves"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "saves the result (Bearer JWT)"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.leagues "SELECT … FOR UPDATE on the league"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "SELECT … FOR UPDATE on the tournament"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.play "loads the phase's matches and results"
+    tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "derives the sides in the bracket and checks the result lock (BR-091, BR-094)"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.play "stores the result (CHECK in matches)"
+    tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "saved match"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "loads the standings and the bracket"
+    tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "computes the standings and the bracket progression"
+    tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "standings and bracket"
+  }
+
+  dynamic view addRound {
+    variant sequence
+    title "11. Next round in a Swiss"
+    order 11
+    description "ADR-011: BR-056 top-down; when it gets stuck, blossom matching on pairs that have not met. A round can be added once every match in the round has a result (FR-040)."
+    organizer -> tourneyhub.spa.organizerUi "add a round"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "POST round with the expected round_no"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.leagues "locks the league"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the tournament"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.play "checks round_no (otherwise 409) and the round's results, loads matches and participation"
+    tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "standings, sit-out (BR-058), BR-056 pairing, fallback matching if needed"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.play "stores the round, matches and round_participation"
+    tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "new round"
+  }
+
+  dynamic view shareLink {
+    variant sequence
+    title "12. Viewer through the share link"
+    order 12
+    description "FR-070 to FR-072: no account, read-only. Standings are computed on every read (ADR-009)."
+    viewer -> tourneyhub.spa.publicUi "opens the link from the organizer"
+    tourneyhub.spa.publicUi -> tourneyhub.api.publicApi "GET /api/v1/public/{share_token}/…"
+    tourneyhub.api.publicApi -> tourneyhub.db.leagues "finds the league by share token"
+    tourneyhub.api.publicApi -> tourneyhub.db.tournaments "tournaments past setup"
+    tourneyhub.api.publicApi -> tourneyhub.db.play "rounds and results"
+    tourneyhub.api.publicApi -> tourneyhub.api.engine "computes standings, places and season points"
+    tourneyhub.spa.publicUi <- tourneyhub.api.publicApi "schedule, bracket, standings"
+  }
+
+  dynamic view adminReset {
+    variant sequence
+    title "13a. Forgotten password: admin reset"
+    order 13
+    description "FR-006, ADR-006 and ADR-007: the admin sets a new password for the organizer. The reset sets must_change_password and revokes all of the organizer's logins, so old refresh tokens get 401. Continues in view 13b."
+    admin -> tourneyhub.spa.adminUi "sets a new password for the organizer"
+    tourneyhub.spa.adminUi -> tourneyhub.api.adminApi "POST reset (Bearer JWT, is_admin from the database)"
+    tourneyhub.api.adminApi -> tourneyhub.db.accounts "new password, must_change_password, revokes all refresh token families, records reset_password in admin_actions"
+    tourneyhub.spa.adminUi <- tourneyhub.api.adminApi "done; the admin hands the password to the organizer"
+    opt "the organizer still has the app open" {
+      tourneyhub.spa.authClient -> tourneyhub.api.authApi "on page load or after 401: POST /api/v1/auth/refresh with the old token"
+      tourneyhub.api.authApi -> tourneyhub.db.accounts "token is revoked, nothing changes"
+      tourneyhub.spa.authClient <- tourneyhub.api.authApi "401: log in again" {
+        navigateTo adminResetLogin
+      }
+    }
+  }
+
+  dynamic view adminResetLogin {
+    variant sequence
+    title "13b. Forgotten password: first login"
+    order 14
+    description "ADR-006: login with the password from the admin succeeds, but everything except /api/v1/auth/* and GET /api/v1/me returns 403 password_change_required until the organizer changes the password. The admin therefore knows the password only until then. Follows view 13a."
+    organizer -> tourneyhub.spa.organizerUi "logs in with the password from the admin"
+    tourneyhub.spa.organizerUi -> tourneyhub.spa.authClient "login"
+    tourneyhub.spa.authClient -> tourneyhub.api.authApi "POST /api/v1/auth/login" {
+      navigateTo loginRefresh
+    }
+    tourneyhub.api.authApi -> tourneyhub.db.accounts "verifies Argon2id, stores the hash of the new refresh token"
+    tourneyhub.spa.authClient <- tourneyhub.api.authApi "200: access JWT and cookie, login succeeds"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "GET leagues (Bearer JWT)"
+    tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "403 password_change_required" {
+      notes "must_change_password is read from the users row on every request (ADR-006)."
+    }
+    tourneyhub.spa.organizerUi -> tourneyhub.spa.authClient "opens the new-password screen"
+    organizer -> tourneyhub.spa.organizerUi "enters a new password"
+    tourneyhub.spa.authClient -> tourneyhub.api.authApi "password change (under /api/v1/auth, FR-004)"
+    tourneyhub.api.authApi -> tourneyhub.db.accounts "new hash, clears must_change_password, revokes the other families"
+    tourneyhub.spa.authClient <- tourneyhub.api.authApi "done; other devices are logged out"
+  }
+
+  dynamic view release {
+    title "14. From PR to VPS"
+    order 15
+    description "ADR-012 and ADR-014: the VPS runs exactly the images that passed the tests. CI holds no SSH key to the VPS; the admin triggers the update."
+    developer -> github.repo "merges the PR after review with passing checks"
+    github.repo -> github.actions "push to main"
+    github.actions -> github.ghcr "api and web images, only if Playwright passes"
+    admin -> github.ghcr "on the VPS: docker compose pull"
+    admin -> tourneyhub.api "on the VPS: docker compose up -d"
+    tourneyhub.api -> tourneyhub.db "Alembic migrations on start"
+  }
+
+  dynamic view dypEvening {
+    variant sequence
+    title "15a. DYP evening: setup (PRD §5.1)"
+    order 16
+    description "PRD §5.1, steps 1 to 5: sign-up with the code from the admin, the league Thursday Foosball and its players, a DYP tournament for 12 players with a round robin, and the generated schedule. Continues in view 15b."
+    organizer -> tourneyhub.spa.organizerUi "signs up with the code from the admin"
+    tourneyhub.spa.organizerUi -> tourneyhub.spa.authClient "sign-up"
+    tourneyhub.spa.authClient -> tourneyhub.api.authApi "POST sign-up with the sign-up code (FR-001)"
+    organizer -> tourneyhub.spa.organizerUi "creates the league Thursday Foosball and adds players"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "league (Season 1 starts automatically), players"
+    organizer -> tourneyhub.spa.organizerUi "on Thursday: DYP tournament with a round robin, 12 players"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "setup: halves by league ranking, partner draw"
+    tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "league ranking and partner draw from the tournament's seed"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "generate the schedule"
+    tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "round robin: 6 pairs, 5 rounds, 15 matches"
+    tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "schedule stored, tournament in progress" {
+      navigateTo dypEveningPlay
+    }
+  }
+
+  dynamic view dypEveningPlay {
+    variant sequence
+    title "15b. DYP evening: play and viewers (PRD §5.1)"
+    order 17
+    description "PRD §5.1, steps 6 to 8: results during the evening, a knockout for the top 4 pairs without a third-place match, the final and season points, a viewer through the share link. Follows view 15a."
+    loop "15 round-robin matches, as they finish" {
+      organizer -> tourneyhub.spa.organizerUi "enters the result on the phone"
+      tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "saves the result" {
+        navigateTo resultEntry
+      }
+    }
+    organizer -> tourneyhub.spa.organizerUi "after the round robin: knockout for the top 4 pairs, no third-place match"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "start the knockout"
+    tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "bracket 1st v 4th and 2nd v 3rd, progression derived by itself"
+    organizer -> tourneyhub.spa.organizerUi "enters the semifinals and the final"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "final's result, tournament finishes"
+    tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "places and season points per player: 10, 8, 5, 2, 0"
+    viewer -> tourneyhub.spa.publicUi "opens the league's share link"
+    tourneyhub.spa.publicUi -> tourneyhub.api.publicApi "GET by share token" {
+      navigateTo shareLink
+    }
+    tourneyhub.api.publicApi -> tourneyhub.api.engine "round robin, bracket and season standings"
+  }
+}
