@@ -10,7 +10,7 @@ The ADRs decide what the backend is built from; this guide decides how its code 
 
 ## 1. Principles
 
-- **The tools are the rulebook.** What ruff, mypy, import-linter and pytest check is configured in §2 and not repeated in prose. A rule written here exists because no tool checks it.
+- **The tools are the rulebook.** What ruff, mypy, import-linter and pytest check is configured in §2. Prose mentions a tool-checked rule only to name its code; every other rule written here exists because no tool checks it.
 - **Python 3.15 only.** No compatibility code for older versions, no `typing_extensions` for what the standard library has, no `from __future__ import annotations`.
 - **Typed throughout.** `mypy --strict` passes on `src` and `tests`. No `Any` of our own; where a library's signature forces it (`type_annotation_map`, a decoded JWT payload), a comment says so. A `cast` or `# type: ignore[code]` carries a comment saying why it is safe.
 - **One way per task.** Use the patterns this guide shows. A second way to do the same thing (another session helper, another base model) needs a reason in the pull request.
@@ -39,7 +39,9 @@ uv run coverage report --include="*/tourneyhub/engine/*" --fail-under=100
 uv run python -W error -m tourneyhub.openapi > openapi.json && git diff --exit-code openapi.json
 ```
 
-`uv.lock` and `.python-version` (containing `3.15`) are committed. `[project]` gives lower bounds only; the exact versions live in `uv.lock`. Dependabot (`package-ecosystem: "uv"`) and `uv audit --preview-features audit-command` (still a preview command) watch them. The engine's coverage gate starts with the first engine code; before that, coverage has nothing to report.
+CI runs the same commands, with `uv run ruff format --check && uv run ruff check` in place of the two that change files.
+
+`uv.lock` and `.python-version` (containing `3.15`) are committed. `[project]` gives lower bounds only; the exact versions live in `uv.lock`. Dependabot (`package-ecosystem: "uv"`) and `uv audit --preview-features audit-command` (still a preview command) watch them. CI turns on the coverage gates with the first feature, and the engine gate with the first engine code; the empty skeleton of §3 has nothing to cover.
 
 ```toml
 [project]
@@ -118,6 +120,9 @@ ban-lazy = "all"                    # no PEP 810 lazy imports (§4.2)
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "random".msg = "Use secrets, or the seeded SHA-256 lot (ADR-010)."
 "sqlalchemy.orm.declarative_base".msg = "Subclass DeclarativeBase (§7)."
+"typing.TYPE_CHECKING".msg = "Import for real (§4.2)."
+"typing_extensions".msg = "Use the standard library (§1)."
+"__future__.annotations".msg = "Not needed on Python 3.15 (§1)."
 
 [tool.mypy]
 python_version = "3.15"
@@ -130,6 +135,8 @@ enable_error_code = [
 ]
 plugins = ["pydantic.mypy"]         # SQLAlchemy 2.1 needs no plugin
 files = ["src", "tests"]
+mypy_path = "src"
+explicit_package_bases = true       # tests/api/test_leagues.py and tests/services/test_leagues.py may coexist
 
 [tool.pydantic-mypy]
 init_forbid_extra = true
@@ -153,7 +160,7 @@ source_modules = ["tourneyhub.engine"]
 forbidden_modules = [
   "tourneyhub.*",                   # anything outside the engine; the engine itself is exempt
   "fastapi", "starlette", "sqlalchemy", "alembic", "psycopg", "pydantic",
-  "pydantic_settings", "jwt", "argon2", "random", "secrets", "time",
+  "pydantic_settings", "jwt", "argon2", "random", "secrets", "time", "os",
 ]
 
 [[tool.importlinter.contracts]]
@@ -181,7 +188,7 @@ skip_covered = true
 exclude_also = ["raise NotImplementedError", "assert_never\\(", "@overload"]
 
 [tool.alembic]                      # no alembic.ini; env.py reads the database URL from Settings
-script_location = "%(here)s/src/tourneyhub/migrations"
+script_location = "tourneyhub:migrations"   # found inside the installed package, also in the image
 file_template = "%%(year)d_%%(month).2d_%%(day).2d_%%(hour).2d%%(minute).2d-%%(rev)s_%%(slug)s"
 
 [[tool.alembic.post_write_hooks]]
@@ -214,8 +221,12 @@ backend/
 │   ├── openapi.py        # prints the OpenAPI schema (§5)
 │   ├── settings.py       # Settings
 │   ├── errors.py         # ErrorCode and the AppError hierarchy
+│   ├── logging_config.py # the dictConfig dictionary (§4.6)
 │   ├── cli.py            # the `tourneyhub` command (ADR-007)
-│   ├── api/              # routers, request and response models, dependencies, error handlers
+│   ├── api/              # one router module per area, plus:
+│   │   ├── deps.py       #   the dependency aliases (§5)
+│   │   ├── errors.py     #   the exception handlers (§5)
+│   │   └── schemas.py    #   RequestModel, ResponseModel, ErrorResponse, shared type aliases (§6)
 │   ├── services/         # use cases: locks, checks, engine calls
 │   ├── db/               # Base, engine and session factory, models/ by DATA-MODEL §4 area
 │   ├── engine/           # pure tournament rules (ADR-009)
@@ -260,7 +271,7 @@ Layers, enforced by import-linter: `api` and `cli` → `services` → `db` → `
 - Closed sets of values are `StrEnum`s; the database stores their values (§7).
 - `match` over enums and unions is exhaustive, through mypy's `exhaustive-match` or a final `case _: assert_never(value)`. Plain conditions use `if`.
 - Instants are aware UTC datetimes: `datetime.now(UTC)`, never `utcnow()` (ruff `DTZ`).
-- "Now" is read once per request and passed down. The API gets it from `NowDep` (§5), the CLI calls `datetime.now(UTC)` once per command, and services and the engine take `now: datetime` as an argument. Everything a rule compares against (the refresh token's 60-second window and 90-day expiry, ADR-006) and `updated_at` (DATA-MODEL §2) use that value; only `created_at` comes from SQL `now()`.
+- "Now" is read once per request and passed down. The API gets it from `NowDep` (§5), the CLI calls `datetime.now(UTC)` once per command, and services and the engine take `now: datetime` as an argument. Everything a rule compares against uses that value: the refresh token's 60-second window and 90-day expiry (ADR-006), and `auth_attempts.created_at`, which the abuse limits count in a time window (DATA-MODEL §4.1). So does `updated_at` (DATA-MODEL §2). Every other `created_at` comes from SQL `now()`.
 - Server-generated ids come from `uuid.uuid7()`.
 - Where `None` is a valid value and "not given" must be told apart, use a `sentinel()`; in Pydantic models, `model_fields_set`.
 - Flags and options are keyword-only parameters (`*, include_removed: bool = False`), checked by ruff `FBT`.
@@ -306,7 +317,7 @@ The subclass decides the HTTP status, and the code tells the frontend what happe
 
 ### 4.6 Logging
 
-- Each module has `logger = logging.getLogger(__name__)`. Logging is configured once with `logging.config.dictConfig`: JSON lines to stdout (python-json-logger). uvicorn gets the same configuration through `--log-config`.
+- Each module has `logger = logging.getLogger(__name__)`. `tourneyhub/logging_config.py` holds one `dictConfig` dictionary: JSON lines on stdout through python-json-logger's `JsonFormatter`, for the root logger and for the `uvicorn`, `uvicorn.error` and `uvicorn.access` loggers. `create_app()` applies it first, which replaces uvicorn's own configuration, so uvicorn needs no `--log-config` file.
 - Pass values as arguments, not f-strings: `logger.info("round generated", extra={"tournament_id": str(tournament_id)})` (ruff `G`, `LOG`).
 - Never log passwords, tokens, cookies, the `Authorization` header, request bodies, the sign-up code or email addresses. Log user ids instead.
 - A middleware puts a request id in a `contextvar`, and a logging filter adds it to every record.
@@ -342,7 +353,7 @@ SessionDep = Annotated[Session, Depends(get_session, scope="function")]
 - The return annotation is the response model. Routers return Pydantic models built from service results (`LeagueRead.model_validate(league)`), never dicts or ORM objects.
 - Status codes go on the decorator, as `http.HTTPStatus` members: `@router.post("", status_code=HTTPStatus.CREATED)`.
 - Operation ids are the endpoint function names: `FastAPI(generate_unique_id_function=lambda route: route.name)`. Endpoint names are therefore unique across the app.
-- Each `APIRouter(...)` passes `responses=` with `ErrorResponse` for the error statuses all its routes share; a route adds only its own. The app declares 422 with `ErrorResponse`, which keeps FastAPI's `HTTPValidationError` out of the schema (ADR-008). `ErrorResponse` lives in `api/errors.py`.
+- Each `APIRouter(...)` passes `responses=` with `ErrorResponse` for the error statuses all its routes share; a route adds only its own. The app declares 422 with `ErrorResponse`, which keeps FastAPI's `HTTPValidationError` out of the schema (ADR-008). `ErrorResponse` lives in `api/schemas.py`.
 - `api/errors.py` has handlers for `AppError`, `RequestValidationError`, `starlette.exceptions.HTTPException` (which covers the router's 404 and 405), `IntegrityError` and `Exception` (ADR-008). The validation handler builds `detail` from each error's `loc`, `type` and the numeric `ctx` keys (`min_length`, `max_length`, `ge`, …). It drops `msg`, `url` and `input`, since `input` can contain a password.
 - `python -m tourneyhub.openapi` prints the schema: it builds the app with placeholder settings (the schema does not depend on them, and creating the database engine does not connect) and prints `json.dumps(app.openapi(), indent=2, sort_keys=True)`. CI runs it with `-W error`, which turns a duplicate operation id into a failure, and compares the result with the committed `openapi.json` (§2).
 - `cli.py` uses `argparse` and reads passwords with `getpass`, never from an argument or an environment variable. It builds its session factory with the same `db` helpers as `create_app()`. Admin services take `source` (`web` or `cli`) and `admin_user_id: UUID | None` and write `admin_actions` themselves, so actions from the web and the CLI are recorded in one place (ADR-007).
@@ -388,11 +399,12 @@ class Settings(BaseSettings):
 
     env: Literal["development", "production"]
     database_url: SecretStr
-    jwt_secret: SecretStr
+    jwt_secret: Annotated[SecretStr, Field(min_length=32)]  # HS256 needs 32 bytes
     cookie_secure: bool = True
 ```
 
-- A setting without a safe default has no default. pydantic-settings does not report a misspelled variable, so a default would hide the mistake.
+- `RequestModel`, `ResponseModel`, `ErrorResponse` and the shared `type` aliases live in `api/schemas.py`; the models of one area live in its router module.
+- A setting without a safe default has no default. Constraints that would otherwise fail later fail at startup instead, like the length of `jwt_secret`. pydantic-settings does not report a misspelled variable, so a default would hide the mistake.
 - Rules between settings are `model_validator`s on `Settings`: `cookie_secure=False` is refused unless `env == "development"` (ADR-004).
 - Secrets are `SecretStr`, read with `.get_secret_value()` only where they are used.
 - No `env_file` in code; Compose and `.env` supply the environment (ADR-004). Tests pass their own `Settings(...)` to `create_app()`.
@@ -410,8 +422,10 @@ class Base(DeclarativeBase):
             "pk": "pk_%(table_name)s",
         }
     )
-    # Any: SQLAlchemy declares type_annotation_map as dict[Any, Any].
-    type_annotation_map: ClassVar[dict[Any, Any]] = {datetime: DateTime(timezone=True)}
+    # Any: the keys are Python types of every kind, the values any SQL type.
+    type_annotation_map: ClassVar[dict[Any, TypeEngine[Any]]] = {
+        datetime: DateTime(timezone=True)
+    }
 
 
 def str_enum[E: StrEnum](enum: type[E], *, name: str) -> Enum:
@@ -460,16 +474,40 @@ league = session.scalars(
 - Use `with` blocks for every session and connection. SQLAlchemy 2.1.6 on Python 3.15 leaks a pool slot for a session dropped without `close()` inside a transaction. The fix is in 2.1.7, not yet released; raise the lower bound in §2 when it ships.
 
 **Migrations**
-- Alembic lives in `src/tourneyhub/migrations/`, configured in `[tool.alembic]` (§2); its post-write hooks run ruff on new files. There is no `alembic.ini`. `env.py` builds its engine from `Settings`, or uses the connection a test passes in `config.attributes["connection"]`. It sets `target_metadata` to `Base.metadata` after importing `tourneyhub.db.models`, passes `compare_server_default=True`, and leaves logging to the app.
+- Alembic lives in `src/tourneyhub/migrations/`, configured in `[tool.alembic]` (§2); its post-write hooks run ruff on new files. There is no `alembic.ini`, and `env.py` leaves logging to the app:
+
+```python
+def _run_migrations(engine: Engine) -> None:
+    with engine.connect() as connection:
+        context.configure(
+            connection=connection,
+            target_metadata=Base.metadata,  # imported from tourneyhub.db.models
+            compare_server_default=True,
+        )
+        with context.begin_transaction():
+            context.run_migrations()
+
+
+# Tests and pytest-alembic pass an Engine under "connection"; otherwise Settings decide.
+_given: Engine | None = context.config.attributes.get("connection")
+if _given is not None:
+    _run_migrations(_given)
+else:
+    _engine = create_db_engine(Settings())
+    try:
+        _run_migrations(_engine)
+    finally:
+        _engine.dispose()
+```
 - One linear history.
 - Autogenerate is a draft. Read every generated migration. It misses changes to a partial index's `WHERE`, to a CHECK expression and to enum values, and it turns a rename into a drop and an add.
 - Data migrations use `op.execute()` or `sa.table()` stubs, never the app's models. The models will change, but the migration must not.
-- Every migration has a working `downgrade()`. A migration that cannot be undone raises `NotImplementedError` in `downgrade()` and says why.
-- CI runs `alembic upgrade head` and `alembic check`, plus pytest-alembic's tests (`test_single_head_revision`, `test_upgrade`, `test_up_down_consistency`, `test_model_definitions_match_ddl`) with an `alembic_engine` fixture that disposes of its engine.
+- Every migration has a working `downgrade()`. A migration that cannot be undone raises `NotImplementedError` in `downgrade()`, says why, and becomes the `minimum_downgrade_revision` in the `alembic_config` fixture of `tests/migrations/`; otherwise pytest-alembic's up-and-down test fails on it.
+- CI runs `alembic upgrade head` and `alembic check`, plus pytest-alembic's tests (`test_single_head_revision`, `test_upgrade`, `test_up_down_consistency`, `test_model_definitions_match_ddl`). Their `alembic_engine` fixture uses the test database of §9 and disposes of its engine.
 
 ## 8. Engine
 
-- The engine is pure functions over values: no I/O, no clock, no randomness except the seed (ADR-009, ADR-010). import-linter checks its imports.
+- The engine is pure functions over values: no I/O, no clock, no randomness except the seed (ADR-009, ADR-010). import-linter keeps out the frameworks and `random`, `secrets`, `time` and `os`. No tool sees a call to `datetime.now()` or `uuid.uuid7()` inside the engine; reviews catch those.
 - Services build its inputs from ORM rows; its outputs are engine dataclasses. ORM and Pydantic objects never reach the engine.
 - One function in `engine/lots.py` implements ADR-010: `sha256(seed + purpose.encode() + candidate.bytes)` with a 16-byte seed. A test pins one digest, because changing the encoding would reorder the lots of every stored tournament.
 - Results never depend on the iteration order of a set or dict of strings (Python randomizes string hashing per process). Sort explicitly.
@@ -488,7 +526,7 @@ league = session.scalars(
   - A failure Hypothesis finds becomes an `@example(...)`; `@reproduce_failure` is never committed.
   - CI uses Hypothesis's built-in `ci` profile (derandomized, no deadline), selected by the `CI` variable; don't redefine it.
   - Pairing tests cap the field at about 32 entries and set `@settings(deadline=None)` (ADR-011).
-- Integration tests use PostgreSQL 17 created with the builtin locale (DATA-MODEL §2). A session-scoped fixture runs `command.upgrade(Config(toml_file=...), "head")` once, handing its connection to `env.py` through `config.attributes`. Each test then runs in a transaction that is rolled back:
+- Integration tests use PostgreSQL 17 created with the builtin locale (DATA-MODEL §2). A session-scoped `settings` fixture reads its URL from `TOURNEYHUB_TEST_DATABASE_URL`. A session-scoped `engine` fixture creates the engine, puts it in `config.attributes["connection"]` of `Config(toml_file=...)` and runs `command.upgrade(config, "head")` once. Each test then runs in a transaction that is rolled back:
 
 ```python
 @pytest.fixture
@@ -499,6 +537,7 @@ def session(engine: Engine) -> Iterator[Session]:
         event.listen(session, "before_commit", _check_deferred_constraints)
         try:
             yield session
+            session.rollback()  # drop what the test left uncommitted, e.g. after an error
             assert_invariants(session)  # the queries of DATA-MODEL §5
         finally:
             session.close()
@@ -527,6 +566,7 @@ def client(settings: Settings, session: Session) -> Iterator[TestClient]:
 ```
 
   - Without `begin_nested()`, a request that ends in 409 would also roll back the data the test set up, which in production would already be committed.
+  - `session.rollback()` before the invariant queries returns to the last commit, so they check committed data and still run after a test that provoked a database error.
   - `assert_invariants` grows with the tables that DATA-MODEL §5's queries need.
   - A test of a 500 response creates its client with `raise_server_exceptions=False`; otherwise the test client raises the error instead of returning the response.
   - `httpx2` is installed; Starlette's test client warns about plain `httpx`, and the warning fails the run.
@@ -582,7 +622,8 @@ def decode_access_token(token: str, key: SecretStr) -> dict[str, Any]:
 - Python: https://docs.python.org/3.15/whatsnew/3.15.html, https://docs.python.org/3/whatsnew/3.14.html, PEPs 649 and 749 (annotations), 661 (`sentinel`), 758 (`except`), 790 (3.15 schedule), 810 (lazy imports), 814 (`frozendict`)
 - Typing: https://typing.python.org/en/latest/reference/best_practices.html
 - Tools: https://docs.astral.sh/uv/, https://docs.astral.sh/ruff/, https://mypy.readthedocs.io/, https://import-linter.readthedocs.io/
-- FastAPI dependencies with `yield` and their scope: https://fastapi.tiangolo.com/tutorial/dependencies/dependencies-with-yield/
-- SQLAlchemy 2.1: https://docs.sqlalchemy.org/en/21/changelog/migration_21.html, https://docs.sqlalchemy.org/en/21/orm/queryguide/api.html#populate-existing, https://docs.sqlalchemy.org/en/21/orm/session_transaction.html
-- Alembic: https://alembic.sqlalchemy.org/en/latest/naming.html, https://alembic.sqlalchemy.org/en/latest/autogenerate.html
-- Security: RFC 9106, RFC 8725, OWASP Password Storage, Authentication and Logging Cheat Sheets, OWASP API Security Top 10 (2023), NIST SP 800-63B-4
+- uv releases with CPython 3.15 (0.13.0, 0.13.6): https://github.com/astral-sh/uv/blob/main/CHANGELOG.md
+- FastAPI dependencies with `yield` and their scope (0.118.0, 0.121.0): https://fastapi.tiangolo.com/tutorial/dependencies/dependencies-with-yield/, https://fastapi.tiangolo.com/release-notes/
+- SQLAlchemy 2.1: https://docs.sqlalchemy.org/en/21/changelog/migration_21.html, the 2.1.7 pool fix for Python 3.15 (#13738) in https://docs.sqlalchemy.org/en/21/changelog/changelog_21.html, https://docs.sqlalchemy.org/en/21/orm/queryguide/api.html#populate-existing, https://docs.sqlalchemy.org/en/21/orm/session_transaction.html
+- Alembic: https://alembic.sqlalchemy.org/en/latest/naming.html, https://alembic.sqlalchemy.org/en/latest/autogenerate.html, the 1.20.1 CHECK fix (#1884) in https://alembic.sqlalchemy.org/en/latest/changelog.html
+- Security: RFC 9106, RFC 8725, OWASP Password Storage, Authentication and Logging Cheat Sheets, OWASP API Security Top 10 (2023), NIST SP 800-63B-4 §3.1.1.2: https://pages.nist.gov/800-63-4/sp800-63b.html
