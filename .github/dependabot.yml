@@ -1,0 +1,12 @@
+version: 2
+updates:
+  # backend/pyproject.toml and backend/uv.lock (docs/python-style.md §2)
+  - package-ecosystem: "uv"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+  # Keeps the actions in .github/workflows, pinned to commit SHAs, current
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
