@@ -352,10 +352,7 @@ class Base(DeclarativeBase):
 
 
 def str_enum[E: StrEnum](enum: type[E], *, name: str) -> Enum:
-    """A varchar column without a length and a named CHECK of the enum's values.
-
-    DATA-MODEL §2 asks for text with a CHECK; see §11.
-    """
+    """A varchar column without a length and a named CHECK of the enum's values."""
     return Enum(
         enum,
         name=name,
@@ -576,10 +573,7 @@ The Status column records the decisions of the review of 2026-11-04. Accepted ro
 
 | Document | Today | Proposal | Why | Status |
 |---|---|---|---|---|
-| DATA-MODEL §2, §5 | Integration tests run in one rolled-back transaction, with invariant queries after each | Lock tests commit on two connections (§9) | Locks cannot be tested inside one transaction | Accepted |
 | ADR-014 | — | Decide `psycopg[binary]` or `psycopg[c]` for production | psycopg's documentation recommends `[c]` for production | Deferred to the deployment phase |
-| DATA-MODEL §2 | UUIDv7 from `uuid-utils` | `uuid.uuid7()` from the standard library | In the standard library since 3.14 | Accepted |
-| DATA-MODEL §2 | Enumerations are `text` with a CHECK | Accept `varchar` without a length, which `str_enum()` creates | Identical to `text` in PostgreSQL; `text` itself needs a custom type | Accepted |
 | PRD FR-002 (owner: PRD team) | Passwords of at least 12 characters | At least 15 | NIST SP 800-63B-4 (2025) requires 15 for a password used alone | Accepted: ADR-006 done, FR-002 waits for the PRD team. The reviewer decides the NIST blocklist and the 64-character maximum with it |
 
 ## 12. Sources
