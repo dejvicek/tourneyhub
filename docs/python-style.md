@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Status | Proposed — awaiting review by another developer |
-| Date | 2026-11-03 |
+| Date | 2026-11-03, revised 2026-11-05 after review |
 | Scope | All Python in `backend/`: the `tourneyhub` package, its tests and its migrations. It applies to people and to AI agents; the Claude Code skill `.claude/skills/python-style` points here. |
 
 The ADRs decide what the backend is built from; this guide decides how its code is written. Where the two disagree, the ADR wins until it is changed; §11 lists the changes this guide proposes. Requirement IDs (FR-, BR-) refer to `PRD.md`.
@@ -221,7 +221,7 @@ backend/
 │   ├── openapi.py        # prints the OpenAPI schema (§5)
 │   ├── settings.py       # Settings
 │   ├── errors.py         # ErrorCode and the AppError hierarchy
-│   ├── logging_config.py # the dictConfig dictionary (§4.6)
+│   ├── logging_config.py # the dictConfig dictionary and the request-id filter (§4.6)
 │   ├── cli.py            # the `tourneyhub` command (ADR-007)
 │   ├── api/              # one router module per area, plus:
 │   │   ├── deps.py       #   the dependency aliases (§5)
@@ -317,7 +317,45 @@ The subclass decides the HTTP status, and the code tells the frontend what happe
 
 ### 4.6 Logging
 
-- Each module has `logger = logging.getLogger(__name__)`. `tourneyhub/logging_config.py` holds one `dictConfig` dictionary: JSON lines on stdout through python-json-logger's `JsonFormatter`, for the root logger and for the `uvicorn`, `uvicorn.error` and `uvicorn.access` loggers. `create_app()` applies it first, which replaces uvicorn's own configuration, so uvicorn needs no `--log-config` file.
+- Each module has `logger = logging.getLogger(__name__)`. `tourneyhub/logging_config.py` holds one `dictConfig` dictionary: JSON lines on stderr through python-json-logger's `JsonFormatter`, for the root logger and for the `uvicorn`, `uvicorn.error` and `uvicorn.access` loggers. `create_app()` applies it first, which replaces uvicorn's own configuration, so uvicorn needs no `--log-config` file.
+
+```python
+request_id: ContextVar[str | None] = ContextVar("request_id", default=None)
+
+
+class RequestIdFilter(logging.Filter):
+    """Add the current request id to every record; `None` outside a request."""
+
+    @override
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.request_id = request_id.get()
+        return True
+
+
+LOGGING_CONFIG: dict[str, object] = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {"request_id": {"()": RequestIdFilter}},
+    "formatters": {"json": {"()": "pythonjsonlogger.json.JsonFormatter"}},
+    "handlers": {
+        "stderr": {
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+            "filters": ["request_id"],
+            "stream": "ext://sys.stderr",
+        },
+    },
+    "root": {"level": "INFO", "handlers": ["stderr"]},
+    "loggers": {
+        name: {"level": "INFO", "handlers": ["stderr"], "propagate": False}
+        for name in ("uvicorn", "uvicorn.error", "uvicorn.access")
+    },
+}
+```
+
+  - Without `"disable_existing_loggers": False`, `dictConfig` disables every logger that already exists. Modules create their loggers at import, before `create_app()` runs, so no `tourneyhub.*` logger would emit anything. A test pins this (§9).
+  - Logs go to stderr because stdout carries the schema that `python -m tourneyhub.openapi` prints (§5).
+  - The filter sits on the handler. A filter on a logger sees only the records logged on that logger, not those of the `tourneyhub.*` modules or of uvicorn.
 - Pass values as arguments, not f-strings: `logger.info("round generated", extra={"tournament_id": str(tournament_id)})` (ruff `G`, `LOG`).
 - Never log passwords, tokens, cookies, the `Authorization` header, request bodies, the sign-up code or email addresses. Log user ids instead.
 - A middleware puts a request id in a `contextvar`, and a logging filter adds it to every record.
@@ -537,7 +575,10 @@ def session(engine: Engine) -> Iterator[Session]:
         event.listen(session, "before_commit", _check_deferred_constraints)
         try:
             yield session
-            session.rollback()  # drop what the test left uncommitted, e.g. after an error
+            if session.is_active:
+                session.commit()  # runs the deferred checks on what the test left
+            else:
+                session.rollback()  # a flush failed; back to the last commit
             assert_invariants(session)  # the queries of DATA-MODEL §5
         finally:
             session.close()
@@ -566,13 +607,27 @@ def client(settings: Settings, session: Session) -> Iterator[TestClient]:
 ```
 
   - Without `begin_nested()`, a request that ends in 409 would also roll back the data the test set up, which in production would already be committed.
-  - `session.rollback()` before the invariant queries returns to the last commit, so they check committed data and still run after a test that provoked a database error.
+  - The teardown commits what the test left, as the end of a request would: the deferred foreign keys are checked, and the invariant queries see the test's rows. A rollback would discard every row a service test flushed. Only a session whose flush failed (`is_active` is false) is rolled back, to its last commit.
+  - A test that provokes a database error does so inside `with session.begin_nested():`, like the `client` override. Outside a savepoint the failed statement aborts the transaction, and the commit in teardown fails.
   - `assert_invariants` grows with the tables that DATA-MODEL §5's queries need.
   - A test of a 500 response creates its client with `raise_server_exceptions=False`; otherwise the test client raises the error instead of returning the response.
   - `httpx2` is installed; Starlette's test client warns about plain `httpx`, and the warning fails the run.
 - Lock tests (ADR-006, ADR-008) cannot run inside one rolled-back transaction. They commit on two connections, end with `TRUNCATE … CASCADE` and carry the `concurrency` marker.
 - Every route that takes an id is tested with another organizer's id (expect 404), and every admin route as a non-admin (expect 403) (OWASP API1, API5).
 - Tests override `get_now`, the function behind `NowDep`, with a fixed time instead of patching the clock.
+- `create_app()` binds the log handler to the `sys.stderr` of that moment. Under `capsys` or `capfd`, that is a stream pytest closes after the test, and later records end in `--- Logging error ---`. A test that uses them, or reads the log, calls `create_app()` inside `redirect_stderr(io.StringIO())`. `tests/test_logging_config.py` pins §4.6:
+
+```python
+def test_a_module_logger_emits_a_json_line(settings: Settings) -> None:
+    with redirect_stderr(io.StringIO()) as stderr:
+        create_app(settings)  # binds the log handler to this stream
+
+    logger.error("probe", extra={"league_id": "L1"})  # tourneyhub.api.errors.logger
+
+    line = json.loads(stderr.getvalue().splitlines()[-1])
+    assert line["message"] == "probe"
+    assert line["league_id"] == "L1"
+```
 - pytest-randomly shuffles the test order. A test that fails only in some orders has a shared-state bug.
 
 ## 10. Security

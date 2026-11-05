@@ -19,7 +19,7 @@ The rules live in `docs/python-style.md`. Before writing code, read the sections
 | App | `create_app(settings)` reads settings eagerly and keeps them and the session factory on `app.state`, read only by `api/deps.py`; nothing is created at import time; `uvicorn --factory`. |
 | Models | `RequestModel` / `ResponseModel` bases in `api/schemas.py`; `LeagueCreate`, `LeagueRead` in the area's router module; snake_case JSON; validators raise `PydanticCustomError`. |
 | Python 3.15 | No `from __future__ import annotations`, no `if TYPE_CHECKING:` imports, no `lazy import`. `uuid.uuid7()`, `datetime.now(UTC)`; "now" comes from `NowDep` and is passed down; `random` is banned. Line length stays 88. |
-| Tests | Names cite rule IDs (`test_br056_…`). The schema comes from `alembic upgrade head`; the test session joins an outer transaction; the app override wraps each request in `begin_nested()`. `httpx2`, not `httpx`. Hypothesis only on the engine. |
+| Tests | Names cite rule IDs (`test_br056_…`). The schema comes from `alembic upgrade head`; the test session joins an outer transaction and commits in teardown before the invariant queries; the app override wraps each request in `begin_nested()`, and so does a test that expects a database error. `httpx2`, not `httpx`. Hypothesis only on the engine. |
 
 ## Before you report the work as done
 
