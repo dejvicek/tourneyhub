@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Status | Proposed — awaiting review by another developer |
-| Date | 2026-10-16, revised 2026-10-21 after review; ADR-015 to ADR-021 added 2026-11-05 for the training track |
+| Date | 2026-10-16, revised 2026-10-21 after review; ADR-015 to ADR-020 added 2026-11-05 for the training track |
 | Scope | Technical decisions for the MVP in `PRD.md`, and from ADR-015 on for the training track (`ROADMAP.md` §5) as far as it shapes the MVP. Once accepted, a changed decision gets a new ADR that supersedes the old one; accepted ADRs are not rewritten. |
 
 Each ADR states its status, the context, the decision, its consequences and the alternatives considered. Requirement IDs (FR-, BR-, RM-) refer to `PRD.md` and `ROADMAP.md`.
@@ -30,7 +30,6 @@ Each ADR states its status, the context, the decision, its consequences and the 
 | ADR-018 | Statistics as stat lines computed on read | Proposed |
 | ADR-019 | Live updates for running tournaments: Server-Sent Events | Proposed |
 | ADR-020 | Drills as a kind of match | Proposed |
-| ADR-021 | External clients and phases generated outside TourneyHub | Proposed |
 
 ---
 
@@ -362,11 +361,11 @@ Each ADR states its status, the context, the decision, its consequences and the 
 
 **Status.** Proposed.
 
-**Context.** An MVP tournament has at most a group phase and a knockout (FR-031). A training session (RM-33) is a program: blocks of rounds with one discipline each (three drills, then legs with different rules, then a match between two teams), with breaks between rounds. In Foos lab, a 3-hour session for 8 players on 4 tables has 11 such blocks, 15 rounds and 2 breaks. Its partners and roles are balanced across the whole session, not block by block. Its team match takes its teams from the standings of the blocks before it, as a knockout after a group phase is seeded from the group phase (BR-085).
+**Context.** An MVP tournament has at most a group phase and a knockout (FR-031). A training session (RM-33) is a program: blocks of rounds with one discipline each (three drills, then legs with different rules, then a match between two teams), with breaks between rounds. For example, a 3-hour session for 8 players on 4 tables has 11 such blocks, 15 rounds and 2 breaks. Its partners and roles are balanced across the whole session, not block by block. Its team match takes its teams from the standings of the blocks before it, as a knockout after a group phase is seeded from the group phase (BR-085).
 
 **Decision.**
 - A tournament holds an ordered list of phases, numbered by `position` 1, 2, … (DATA-MODEL D9). In the MVP, a tournament still has at most one group phase and one knockout, in that order. A partial unique index on `kind` enforces this, so the rule holds unchanged when the training kind arrives.
-- A phase has two settings: its **format**, which says how the sides of each round are formed, and its **rules**, which say how a match is played and scored (ADR-016). The MVP formats are `round_robin`, `swiss`, `monster_dyp` and `single_elimination`. The training track adds `balanced_rotation` (pairs first, then singles, and the rest referee, with counters for partners, opponents, sit-outs and roles), `drill_rotation`, `team_match` and `external` (ADR-021).
+- A phase has two settings: its **format**, which says how the sides of each round are formed, and its **rules**, which say how a match is played and scored (ADR-016). The MVP formats are `round_robin`, `swiss`, `monster_dyp` and `single_elimination`. The training track adds `balanced_rotation` (pairs first, then singles, and the rest referee, with counters for partners, opponents, sit-outs and roles), `drill_rotation` and `team_match`.
 - Breaks belong to the program, not to a phase. A break comes after a given round, with rounds numbered across the whole program, and has a length. The organizer starts it. The next round becomes playable when the length is over, or earlier if the organizer starts it.
 - A phase can take its seeding from the standings of earlier phases. The MVP knockout already does this.
 - The engine generates rounds over the whole program, not one phase at a time, because the balancing counters carry across phases. Stored rounds are its input, as stored rounds already are for Swiss and Monster DYP (ADR-009). A training session generates its whole program when it starts. A change of attendees reschedules only the rounds that have not started, as BR-054 does for a late entry in a round robin.
@@ -381,7 +380,7 @@ Each ADR states its status, the context, the decision, its consequences and the 
 
 **Status.** Proposed.
 
-**Context.** A discipline says how one match is played and scored. A leg can go to 6, or to a 2-goal lead with a cap of 10. It can start from a scenario score such as 0:3, where the table shows the score with the start included and only the goals played count. A turnover can count as a goal for the opponent. One side can hold a "wall" while the other breaks it, and paired disciplines play two rounds with the sides swapped. A discipline can be singles only. It sets the stats it tracks, such as turnovers, and its time: preparation and play. A drill has a metric, a number of attempts, a maximum and a direction (fewer turnovers is better). Foos lab has 21 disciplines and changed some of their lengths after its first sessions. The MVP already has two such rules on a phase: the match format and the goals per game (BR-120, BR-123).
+**Context.** A discipline says how one match is played and scored. A leg can go to 6, or to a 2-goal lead with a cap of 10. It can start from a scenario score such as 0:3, where the table shows the score with the start included and only the goals played count. A turnover can count as a goal for the opponent. One side can hold a "wall" while the other breaks it, and paired disciplines play two rounds with the sides swapped. A discipline can be singles only. It sets the stats it tracks, such as turnovers, and its time: preparation and play. A drill has a metric, a number of attempts, a maximum and a direction (fewer turnovers is better). A club's catalog has about 20 disciplines, and their lengths change as the club learns how long they take. The MVP already has two such rules on a phase: the match format and the goals per game (BR-120, BR-123).
 
 **Decision.**
 - Disciplines are presets in the engine (`tourneyhub.engine.presets`, one module per sport: foosball first, others with RM-27), versioned and tested with it.
@@ -400,13 +399,13 @@ Each ADR states its status, the context, the decision, its consequences and the 
 
 **Status.** Proposed.
 
-**Context.** RM-34: in a training session every match and drill has a limit, preparation plus the discipline's time (e.g. 1 + 8 minutes). When it runs out, the match ends with the score as it stands and the session goes on, so the session keeps its planned length. Foos lab's PRD already says so ("the round's time is a safeguard … when it runs out, the current score is recorded"), but nothing enforces it there. The owner decided: time limits apply only in training sessions and not to the team match. Time limits in other tournaments stay open. The engine reads no clock (ADR-009).
+**Context.** RM-34: in a training session every match and drill has a limit, preparation plus the discipline's time (e.g. 1 + 8 minutes). When it runs out, the match ends with the score as it stands and the session goes on, so the session keeps its planned length. The owner decided: time limits apply only in training sessions and not to the team match. Time limits in other tournaments stay open. The engine reads no clock (ADR-009).
 
 **Decision.**
 - **Stored:** for each match, `called_at` (it got a field and its players were free, BR-130), `started_at`, `ended_at` and `end_reason` (`completed`, `time_up`, `walkover`, `organizer`). The program's breaks and the tournament store when they started and ended.
 - **Derived:** `play_from = min(started_at, called_at + prep)` and `deadline = play_from + play`, with `prep` and `play` from the phase (ADR-016). A side that starts late loses playing time, and the session does not wait for it. The engine gets `now` as a parameter. A match past its deadline counts as ended at the deadline in the field queue even before anything is written, so the next match gets its field on time.
 - **Ending:** the first device that sees the deadline pass, or the organizer, sends an end with `time_up` and the state it expects. The server checks `now ≥ deadline` with its own clock and stores `ended_at = deadline` with the score as it stands. A repeat gets 409 (ADR-008). No scheduler and no cron job are needed.
-- **Result:** the score as it stands, a draw included. A drill counts the attempts played. A result ended by time can be corrected like any other (FR-053). A match that ends normally still waits for a person to confirm its end, as in Foos lab today.
+- **Result:** the score as it stands, a draw included. A drill counts the attempts played. A result ended by time can be corrected like any other (FR-053). A match that ends normally still waits for a person to confirm its end.
 - **Clock:** clients take the offset to the server's clock from the `Date` response header and count down with it, so a phone with a wrong clock cannot end a match early.
 - **Forecast:** the engine runs the field queue forward from `now`, with each match not yet played taking its full limit. It returns the latest expected end of the session and the delay against the plan. Nothing is stored.
 
@@ -420,14 +419,14 @@ Each ADR states its status, the context, the decision, its consequences and the 
 
 **Status.** Proposed.
 
-**Context.** RM-35 to RM-37. Foos lab ranks players across sessions by score difference, wins and goals for, as totals or per game, over the last 28 days, all time or a date range. It does not rank players with fewer than 2 sessions in the per-game view, keeps a ladder per drill and shows waiting times. The owner decided that a club keeps one league for training. Its seasons are the club's league years, and every tournament of that league counts, training sessions and ordinary tournaments alike. The MVP has season standings from placement points (BR-110–BR-113).
+**Context.** RM-35 to RM-37. A training league ranks players across sessions by score difference, wins and goals for, as totals or per game, over the last 28 days, all time or a date range. It does not rank players with fewer than 2 sessions in the per-game view, keeps a ladder per drill and shows waiting times. The owner decided that a club keeps one league for training. Its seasons are the club's league years, and every tournament of that league counts, training sessions and ordinary tournaments alike. The MVP has season standings from placement points (BR-110–BR-113).
 
 **Decision.**
 - The engine computes a **stat line** per player and tournament from the stored matches, games, side stats, drill results and times: games, wins, goals for and against, turnovers and the games in which they were recorded, team matches and their wins, drill results with their attempts, waiting and playing time.
 - League statistics add the stat lines up over a **scope**: a season, a window of N days ending on `today`, all time or a date range. `today` is a parameter, not the clock. A **ranking** orders the totals: `placement_points` (the MVP's season standings) or `performance` (score difference, then wins, then goals for, then team-match wins). Rankings show **totals** or an **average** per game and in percentages. The window length (default 28 days) and the minimum number of tournaments for the average (default 2) are league settings.
 - Nothing is stored (D1). Corrections and imports need no recalculation.
 
-**Consequences.** In a league that plays legs to 6 in training and games to 10 in tournaments, the per-game average mixes both. A filter by discipline can be added later without changing the model. Foos lab computes a year of sessions in under 50 ms. The guidelines of ADR-009 apply.
+**Consequences.** In a league that plays legs to 6 in training and games to 10 in tournaments, the per-game average mixes both. A filter by discipline can be added later without changing the model. A year of sessions of one club is a few thousand matches. The guidelines of ADR-009 apply.
 
 **Alternatives considered.** Stat lines stored and updated on every write (drift, recalculation on corrections). A rating such as Elo (a different item, RM-15).
 
@@ -437,7 +436,7 @@ Each ADR states its status, the context, the decision, its consequences and the 
 
 **Status.** Proposed. Decided for good when RM-03 or RM-34 is picked up.
 
-**Context.** A countdown, the field queue and results entered at several tables need to reach every screen within seconds (RM-34, RM-38). The MVP has no live updates (PRD §4.2, RM-03). Foos lab uses its database vendor's realtime feature. ADR-001 keeps endpoints synchronous and allows async ones where live updates need them.
+**Context.** A countdown, the field queue and results entered at several tables need to reach every screen within seconds (RM-34). The MVP has no live updates (PRD §4.2, RM-03). ADR-001 keeps endpoints synchronous and allows async ones where live updates need them.
 
 **Decision.**
 - One Server-Sent Events stream per tournament, for the organizer and on the share link. It sends only "the tournament changed" with a version number, and the client reloads the affected queries (TanStack Query, ADR-003).
@@ -454,30 +453,10 @@ Each ADR states its status, the context, the decision, its consequences and the 
 
 **Status.** Proposed.
 
-**Context.** In a training session a field holds either a match (two sides, a score, a winner) or a drill (two or three players, each with their own result, no winner). Both take a field, go through the field queue, have a time limit and waiting times, and record events and who may enter results. Foos lab joins them by a text id. With foreign keys, they need one row to point at.
+**Context.** In a training session a field holds either a match (two sides, a score, a winner) or a drill (two or three players, each with their own result, no winner). Both take a field, go through the field queue, have a time limit and waiting times, and record events and who may enter results. With foreign keys, they need one row to point at.
 
 **Decision.** A drill is a match with `kind = 'drill'`. It has one side with the drill's players and one `drill_results` row per player and metric. The field queue, timing, events and permissions work on `matches` alone. The result rules get an exception for drills: no outcome, no game scores, no walkover. Rules such as "every match has a result" (FR-037) count only matches of other kinds.
 
 **Consequences.** One table for everything that takes a field. The exceptions are in one place and apply only in training sessions, the only place drills exist. The MVP schema does not change.
 
 **Alternatives considered.** A separate `drills` table (clean result rules, but the queue, timing and events must handle two tables). A common parent table for everything on a field, with matches and drills as one-to-one children (the cleanest model, but fields and timing would have to move to the parent in the MVP already).
-
----
-
-## ADR-021 — External clients and phases generated outside TourneyHub
-
-**Status.** Proposed.
-
-**Context.** The owner decided that Foos lab stays a separate application with its own frontend and becomes the first application built on TourneyHub's API (RM-38), before its scheduling is part of TourneyHub. The API is meant for other software later (RM-29). Foos lab keeps all data access behind one storage interface, so a TourneyHub implementation replaces its database without touching its screens. It depends on three things today. It generates schedules itself, deterministically. Players add goals and drill attempts from several phones at once, as atomic increments. Players enter results at their own table.
-
-**Decision.**
-- **Format `external`.** The client sends the rounds and matches it generated: sides with players, fields, and the rules copy (ADR-016). The API checks only their structure: players of the league who attend the tournament, nobody twice in a round, existing fields, valid rules. It stores them like generated rounds. Standings, statistics, the field queue and time limits work on them as on any phase.
-- **One API.** External clients use the same `/api/v1` and the same committed OpenAPI schema as the SPA (ADR-008). There is no second API. Keys for third-party software come with RM-29.
-- **Origin.** Caddy serves Foos lab's built frontend on its own host name and proxies its `/api` to the same `api` container. Each app is then one origin, as ADR-005 requires: no CORS, and the refresh cookie stays first-party (ADR-006). Foos lab's frontend generates its types from the same OpenAPI schema.
-- **Repeatable writes.** Taps are append-only events with client-generated ids (`match_events`), so a repeated write has no effect. A score is derived from the events or sent as a target state, never as a bare increment. This replaces Foos lab's increment functions.
-- **Players entering results.** Foos lab players enter results at their own table, as participants or referees of a match. RM-38 therefore needs player logins and these write permissions for a training league (parts of RM-12 and RM-13).
-- **Data.** Foos lab's past sessions are imported once from its JSON backup. Its player and session ids are UUIDs and are kept. Its text match ids get new UUIDv7 values through a mapping table in the import (`docs/foos-lab.md`).
-
-**Consequences.** TourneyHub cannot check the balance rules of an external phase or regenerate it. Only its client can. Once `balanced_rotation`, `drill_rotation` and `team_match` are in the engine, Foos lab asks the API for new sessions' schedules instead of making them, keeps its frontend, and `external` stays for integrations (RM-29).
-
-**Alternatives considered.** Only a one-off import after the scheduling is ported (Foos lab keeps its own database until then, and players see two places). A shared TypeScript engine used by both (a second language in the backend, against ADR-001 and ADR-009).
