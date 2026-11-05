@@ -10,9 +10,9 @@
 
 The MVP serves groups the instance owner knows, on a single instance: organizers run game nights inside leagues and seasons, and everyone else follows a share link.
 
-The bigger version is a hosted platform where any club can run leagues and tournaments for any sport or game. It gets there in three stages.
+The bigger version is a hosted platform where any club can run leagues and tournaments for any sport or game. It gets there in three stages. Alongside them, a training track (§5) brings a club's training sessions onto TourneyHub.
 
-- The stages are ordered; the items inside a stage are not.
+- The stages are ordered; the items inside a stage are not. The training track has its own trigger and order (§5).
 - A stage starts when its trigger happens, not on a date.
 - When an item is picked up, it is written into `PRD.md` as requirements and removed from here.
 
@@ -70,3 +70,21 @@ The bigger version is a hosted platform where any club can run leagues and tourn
 | RM-30 | More languages | Languages beyond English and Czech. |
 | RM-31 | Privacy self-service | Organizers delete their own account and download their data. Until then, the instance admin handles such requests by hand. |
 | RM-32 | Large organizations | Data residency and single sign-on. |
+
+## 5. Training track — Foos lab
+
+**Starts when** the MVP runs on the VPS. It runs alongside the stages and pulls forward the parts of their items it needs.
+**Goal:** a club runs its training sessions on TourneyHub. Training sessions are a kind of tournament inside a league kept for training, and the league ranks its players across them.
+
+Foos lab is the training app of a table football club. It runs on its own database and is temporary. Its PRD holds the training rules these items take over. `docs/foos-lab.md` maps its terms to TourneyHub's and records the decisions made so far.
+
+| ID | Item | What it means |
+|---|---|---|
+| RM-33 | Training sessions | A session is a program of disciplines played round by round: drills, legs with special rules (a scenario start such as 0:3, a turnover counting as a goal for the opponent, one side holding a "wall"), singles, and a league-format match between two teams at the end. Everyone plays the same discipline in a round. Partners, opponents and who sits out to referee are balanced across the whole session. The organizer sets the length, picks the disciplines and their number of rounds, moves breaks between rounds and starts the session. |
+| RM-34 | Time limits | In a training session, every match and drill has a limit: preparation plus the discipline's time, e.g. 1 + 8 minutes. When it runs out, the match ends with the score as it stands and the session goes on. The organizer sees the expected end of the session. Only in training sessions, and not for the team match. Time limits in other tournaments stay open. |
+| RM-35 | Performance ladder | A league ranking from how players play instead of placement points: score difference, wins, goals for. Shown as totals or per game, over the season, the last 28 days, all time or a date range. Players with fewer than 2 tournaments in the range are listed but not ranked per game. Every tournament of the league counts, training sessions and ordinary tournaments alike. A season is one year of the club's league. Extends RM-09. |
+| RM-36 | Drills and measurements | Drills at a field, two or three players at a time: each player records a result out of a number of attempts (e.g. goals from 10 shots). A ladder per drill, on the same ranges as RM-35. |
+| RM-37 | Match course and waiting times | Every goal, turnover and drill attempt is recorded with its time. Each match shows how it went, and the league shows who keeps others waiting between a match becoming playable and its start. |
+| RM-38 | Foos lab on TourneyHub | Foos lab moves its data to TourneyHub and works through TourneyHub's API, while it still makes its own schedules. Its past sessions are imported once. After that, Foos lab's features move into TourneyHub one by one and Foos lab is retired. Needs what RM-33 to RM-37 store, not yet their scheduling. Players entering results at their own table needs parts of RM-12 and RM-13, live updates need RM-03, and other applications on the API need part of RM-29. |
+
+RM-38 can come before the scheduling parts of RM-33 to RM-37. Foos lab is retired once those are in TourneyHub.
