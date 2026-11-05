@@ -258,7 +258,7 @@ Layers, enforced by import-linter: `api` and `cli` → `services` → `db` → `
 - Write `X | None` and builtin generics, and import ABCs from `collections.abc`. Parameters take the widest type that works (`Iterable`, `Sequence`, `Mapping`); return values are concrete (`tuple`, `list`, `dict`).
 - Use PEP 695 generics and `type` aliases: `def first[T](items: Sequence[T]) -> T`, `type Standing = tuple[RankedEntry, ...]`. Exception: FastAPI dependency aliases are plain assignments (`SessionDep = Annotated[...]`), so that all of them have one form.
 - `Self`, `@override`, `Never`, `assert_never`, `TypeIs`, `ReadOnly` and `warnings.deprecated` come from the standard library.
-- Use `NewType` for ids where two kinds of id meet in one signature, such as `EntryId` and `PlayerId` in the engine. A `NewType` used in a mapped column is registered in `type_annotation_map`; SQLAlchemy 2.1 raises `MappedAnnotationError` for one that is not.
+- Use `NewType` for ids where two kinds of id meet in one signature, such as `EntryId` and `PlayerId` in the engine. A `NewType` used in a mapped column is registered in `type_annotation_map`. For one that is not, SQLAlchemy 2.1 raises `sqlalchemy.orm.exc.MappedAnnotationError` ("Could not locate SQLAlchemy Core type") when the model class is defined.
 - Use `Protocol` for an interface with several implementations, and an ABC only to share implementation. `isinstance` on a protocol needs `@runtime_checkable`.
 - Import for real every name used in an annotation that a library reads at runtime: Pydantic models, FastAPI signatures, SQLAlchemy models, dataclasses, Hypothesis strategies. `if TYPE_CHECKING:` is not used; an import cycle is fixed by moving code.
 - No `lazy import` (PEP 810). A missing module should stop the app at startup, not fail the first request that needs it.
@@ -270,7 +270,7 @@ Layers, enforced by import-linter: `api` and `cli` → `services` → `db` → `
 - Closed sets of values are `StrEnum`s; the database stores their values (§7).
 - `match` over enums and unions is exhaustive, through mypy's `exhaustive-match` or a final `case _: assert_never(value)`. Plain conditions use `if`.
 - Instants are aware UTC datetimes: `datetime.now(UTC)`, never `utcnow()` (ruff `DTZ`).
-- "Now" is read once per request and passed down. The API gets it from `NowDep` (§5), the CLI calls `datetime.now(UTC)` once per command, and services and the engine take `now: datetime` as an argument. Everything a rule compares against uses that value: the refresh token's 60-second window and 90-day expiry (ADR-006), and `auth_attempts.created_at`, which the abuse limits count in a time window (DATA-MODEL §4.1). So does `updated_at` (DATA-MODEL §2). Every other `created_at` comes from SQL `now()`.
+- "Now" is read once per request and passed down. The API gets it from `NowDep` (§5), the CLI calls `datetime.now(UTC)` once per command, and services and the engine take `now: datetime` as an argument. Everything a rule compares against uses that value: the refresh token's 60-second window and 90-day expiry (ADR-006), and `auth_attempts.created_at`, which the abuse limits count in a time window (DATA-MODEL §4.1). So do every `created_at` and `updated_at` (DATA-MODEL §2): one clock keeps `updated_at` from falling before `created_at`, and a test that overrides `get_now` (§9) fixes both.
 - Server-generated ids come from `uuid.uuid7()`.
 - Where `None` is a valid value and "not given" must be told apart, use a `sentinel()`; in Pydantic models, `model_fields_set`.
 - Flags and options are keyword-only parameters (`*, include_removed: bool = False`), checked by ruff `FBT`.
@@ -411,7 +411,22 @@ LoginThrottleDep = Annotated[None, Depends(throttle_login)]
 - Status codes go on the decorator, as `http.HTTPStatus` members: `@router.post("", status_code=HTTPStatus.CREATED)`.
 - Operation ids are the endpoint function names: `FastAPI(generate_unique_id_function=lambda route: route.name)`. Endpoint names are therefore unique across the app.
 - Each `APIRouter(...)` passes `responses=` with `ErrorResponse` for the error statuses all its routes share; a route adds only its own. The app declares 422 with `ErrorResponse`, which keeps FastAPI's `HTTPValidationError` out of the schema (ADR-008). `ErrorResponse` lives in `api/schemas.py`.
-- `api/errors.py` has handlers for `AppError`, `RequestValidationError`, `starlette.exceptions.HTTPException` (which covers the router's 404 and 405), `IntegrityError` and `Exception` (ADR-008). The validation handler builds `detail` from each error's `loc`, `type` and the numeric `ctx` keys (`min_length`, `max_length`, `ge`, …). It drops `msg`, `url` and `input`, since `input` can contain a password.
+- `api/errors.py` has handlers for `AppError`, `RequestValidationError`, `starlette.exceptions.HTTPException` (which covers the router's 404 and 405), `IntegrityError` and `Exception` (ADR-008). The validation handler puts one entry per error in `detail.errors`: its `loc`, its `type` and the numeric `ctx` keys (`min_length`, `max_length`, `ge`, `expected_version`, …). It drops `msg`, `url`, `input` and the other `ctx` keys, since `input` can contain a password and the rest is English text, which can quote the input. A league with a 101-character name and an `is_admin` field gets:
+
+```json
+{
+  "code": "validation_failed",
+  "detail": {
+    "errors": [
+      {"loc": ["body", "name"], "type": "string_too_long", "max_length": 100},
+      {"loc": ["body", "is_admin"], "type": "extra_forbidden"}
+    ]
+  }
+}
+```
+
+  - `loc` starts with where the value was: `body`, `path`, `query`, `header` or `cookie`. Malformed JSON gives `{"loc": ["body", 7], "type": "json_invalid"}`, where 7 is the character position.
+  - `type` is a Pydantic error type or a `PydanticCustomError` type (§6); the frontend translates it.
 - `python -m tourneyhub.openapi` prints the schema: it builds the app with placeholder settings (the schema does not depend on them, and creating the database engine does not connect) and prints `json.dumps(app.openapi(), indent=2, sort_keys=True)`. CI runs it with `-W error`, which turns a duplicate operation id into a failure, and compares the result with the committed `openapi.json` (§2). Only the schema goes to stdout; a record logged while the app is built goes to stderr (§4.6).
 - `cli.py` uses `argparse` and reads passwords with `getpass`, never from an argument or an environment variable. It builds its session factory with the same `db` helpers as `create_app()`. Admin services take `source` (`web` or `cli`) and `admin_user_id: UUID | None` and write `admin_actions` themselves, so actions from the web and the CLI are recorded in one place (ADR-007).
 
@@ -495,16 +510,16 @@ def str_enum[E: StrEnum](enum: type[E], *, name: str) -> Enum:
         name=name,
         native_enum=False,
         create_constraint=True,
-        length=None,
+        length=None,  # undocumented; a test pins the varchar without a length
         values_callable=lambda members: [member.value for member in members],
     )
 ```
 
 - Models are typed declarative: `Mapped[...]` and `mapped_column()` on a plain `DeclarativeBase`, not `MappedAsDataclass`.
 - The naming convention is required: Alembic can compare and drop only named constraints. CHECK constraints get an explicit `name=`.
-- Enumerations use `str_enum()`. Without `native_enum=False` SQLAlchemy creates a PostgreSQL enum, without `values_callable` it stores member names, and each column needs its own `name`. Alembic does not notice a value added to an enum, so a test compares every CHECK with its `StrEnum` (DATA-MODEL §2).
+- Enumerations use `str_enum()`. Without `native_enum=False` SQLAlchemy creates a PostgreSQL enum, without `values_callable` it stores member names, and each column needs its own `name`. Alembic does not notice a value added to an enum, so a test compares every CHECK with its `StrEnum` (DATA-MODEL §2). SQLAlchemy does not document `length=None`, and Alembic does not compare a length with no length, so a second test expects every enum column to be `character varying` without a maximum length in `information_schema.columns`.
 - Server-generated primary keys are `mapped_column(primary_key=True, default=uuid7)`. Ids the client supplies (leagues, tournaments, ADR-008) have no default.
-- `created_at` is `server_default=func.now()`. `updated_at` has no default; the service sets it to the `now` it was given (§4.3).
+- `created_at` and `updated_at` have no default; the service sets both to the `now` it was given (§4.3), and a row without `created_at` fails at the flush. With `server_default=func.now()`, `created_at` would come from the database's clock at the start of the transaction, after `NowDep` has read the time.
 - Relationships are `Mapped[list[X]]` or `Mapped[X]` with `back_populates` and `lazy="raise"`. Each query names what it loads: `selectinload` for collections, `joinedload` for many-to-one.
 - A relationship along an `ON DELETE CASCADE` foreign key sets `passive_deletes=True`, so deleting a league or a tournament leaves the cascade to PostgreSQL. Without it, the ORM loads the children and sets their foreign keys to `NULL`, which fails.
 - A relationship from `players` or `entries` to the rows that reference them through a deferred foreign key (DATA-MODEL §2) sets `passive_deletes="all"` or does not exist, so the ORM never sets those references to `NULL`. Removing a player sets `removed_at`; the application deletes `players` rows only with their league.
@@ -528,7 +543,7 @@ league = session.scalars(
   - Creating a league has no league row to lock, and no ADR names another lock, so its checks run unlocked. Two requests that race with one id meet at the primary key, and the later one gets 409 (§4.4).
 - SQLAlchemy 2.1 flushes before every statement, `text()` included. Use `with session.no_autoflush:` while an intermediate state must not reach the database.
 - The engine is `create_engine("postgresql+psycopg://…", pool_pre_ping=True)`. Keep the pool defaults (5 + 10 connections) until a measurement shows FastAPI's 40 worker threads waiting for them. Nothing waits inside a transaction; the login throttle sleeps after its own has ended (§5).
-- ORM objects stay in the session that loaded them: never hand them to another session, another thread or a cache.
+- ORM objects stay in the session that loaded them: never hand them to another session or a cache, and never use a session or its objects from two threads concurrently. One after the other is fine: FastAPI runs a request's dependencies, endpoint and commit on whichever threads of its pool are free, and the test client of §9 hands the test's session to them. A lock test (§9) that uses threads gives each its own session.
 - Use `with` blocks for every session and connection.
 
 **Migrations**
@@ -571,7 +586,7 @@ def migrate() -> None:
   - `main()` applies the logging configuration of §4.6 first, as `create_app()` does; otherwise the container log shows no `Running upgrade` line.
 - One linear history.
 - Autogenerate is a draft. Read every generated migration. It misses changes to a partial index's `WHERE`, to a CHECK expression and to enum values, and it turns a rename into a drop and an add.
-- Data migrations use `op.execute()` or `sa.table()` stubs, never the app's models. The models will change, but the migration must not.
+- Data migrations use `op.execute()` or `sa.table()` stubs, never the app's models. The models will change, but the migration must not. A row a data migration inserts supplies its own `created_at`, which has no default.
 - Every migration has a working `downgrade()`. A migration that cannot be undone raises `NotImplementedError` in `downgrade()`, says why, and becomes the `minimum_downgrade_revision` in the `alembic_config` fixture of `tests/migrations/`; otherwise pytest-alembic's up-and-down test fails on it.
 - CI runs `alembic upgrade head` and `alembic check`, plus pytest-alembic's tests (`test_single_head_revision`, `test_upgrade`, `test_up_down_consistency`, `test_model_definitions_match_ddl`). Their `alembic_engine` fixture uses a database of their own (§9) and disposes of its engine.
 
@@ -590,7 +605,7 @@ def migrate() -> None:
 - One behaviour per test, with arrange, act and assert separated by blank lines. Parametrize with ids: `pytest.param(..., id="BR-104-shared-places")`.
 - Check domain errors by code: `with pytest.raises(ConflictError) as raised:` and then `assert raised.value.code is ErrorCode.LEAGUE_NAME_CHANGED`. Never match English messages.
 - Fixtures that need teardown use `yield`; the others `return` (ruff `PT022`). Broad scopes only for expensive, immutable things such as the migrated database.
-- Test data comes from factory fixtures named `make_<noun>`. Each returns a function with keyword-only arguments and unique defaults that adds the row, flushes and returns it: `make_league(name="Thursday DYP")`.
+- Test data comes from factory fixtures named `make_<noun>`. Each returns a function with keyword-only arguments and unique defaults that adds the row, flushes and returns it: `make_league(name="Thursday DYP")`. The row's `created_at`, and `updated_at` where a service would set it, come from the `now` fixture (§4.3).
 - Property tests use Hypothesis on the pure engine only, never together with function-scoped database fixtures.
   - Build inputs with `st.builds` or `@composite`.
   - A failure Hypothesis finds becomes an `@example(...)`; `@reproduce_failure` is never committed.
