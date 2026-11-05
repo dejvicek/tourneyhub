@@ -1,0 +1,166 @@
+[project]
+name = "tourneyhub"
+version = "0.1.0"
+requires-python = ">=3.15"
+classifiers = ["Private :: Do Not Upload"]
+dependencies = [
+  "alembic>=1.20.1",          # 1.20.1 fixes duplicate CHECKs with SQLAlchemy 2.1
+  "argon2-cffi>=25.1",
+  "fastapi>=0.162",           # Depends(scope="function") needs 0.121 or later (§5)
+  "httptools>=0.9",
+  "networkx>=3.7",
+  "psycopg[binary]>=3.3.7",
+  "pydantic>=2.14.2",
+  "pydantic-settings>=2.16",
+  "pyjwt>=2.15.1",
+  "python-json-logger>=4.2",
+  "sqlalchemy>=2.1.7",        # 2.1.7 fixes a leaked pool slot on Python 3.15 (#13738)
+  "uvicorn>=0.54",
+  "uvloop>=0.23",             # listed directly: uvicorn[standard] pulls PyYAML, which has no 3.15 wheel
+]
+
+[project.scripts]
+tourneyhub = "tourneyhub.cli:main"   # ADR-007; entry points need the build system below
+
+[build-system]
+requires = ["uv_build>=0.13.6,<0.14"]
+build-backend = "uv_build"
+
+[dependency-groups]
+test = [
+  "coverage>=7.17", "httpx2>=2.16", "hypothesis>=6.170",
+  "pytest>=9.2", "pytest-alembic>=0.13.2", "pytest-randomly>=5.0",
+]
+lint = ["import-linter>=2.15", "mypy>=2.4.1", "ruff>=0.17.3", "types-networkx"]
+dev = [{ include-group = "test" }, { include-group = "lint" }, "watchfiles>=1.3"]  # watchfiles: --reload
+
+[tool.uv]
+required-version = ">=0.13.6"
+
+[tool.ruff]
+line-length = 88                    # the default, stated so that nobody changes it
+
+[tool.ruff.lint]
+select = [
+  "F", "E", "W", "I", "UP", "B", "SIM", "C4", "RUF", "PIE", "RET", "PERF", "FURB",
+  "N", "A", "ANN", "ARG", "FBT", "D", "S", "BLE", "TRY", "LOG", "G", "T20", "ERA",
+  "DTZ", "PTH", "TID", "INP", "PGH", "ISC", "PL", "PT", "FAST", "ASYNC",
+]
+ignore = [
+  "W191", "E501", "D206", "D300",   # the formatter owns these
+  "D100", "D104", "D105", "D107",   # module, package, magic-method and __init__ docstrings
+  "TRY003",                         # errors carry codes, not messages (ADR-008)
+  "PLR0913", "PLR0917",             # endpoints take many dependencies
+]
+
+[tool.ruff.lint.per-file-ignores]
+"!src/tourneyhub/engine/**" = ["D1"]        # docstrings are required only in the engine (§4.5)
+"src/tourneyhub/errors.py" = ["S105"]       # TOKEN_EXPIRED is an error code, not a password
+"src/tourneyhub/cli.py" = ["T201"]
+"src/tourneyhub/openapi.py" = ["T201"]
+"src/tourneyhub/migrations/**" = ["D", "ERA001", "INP001"]
+"tests/**" = ["S101", "S105", "S106", "PLR2004", "D", "INP001", "FBT001"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["tourneyhub"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+ban-lazy = "all"                    # no PEP 810 lazy imports (§4.2)
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"random".msg = "Use secrets, or the seeded SHA-256 lot (ADR-010)."
+"sqlalchemy.orm.declarative_base".msg = "Subclass DeclarativeBase (§7)."
+"typing.TYPE_CHECKING".msg = "Import for real (§4.2)."
+"typing_extensions".msg = "Use the standard library (§1)."
+"__future__.annotations".msg = "Not needed on Python 3.15 (§1)."
+
+[tool.mypy]
+python_version = "3.15"
+strict = true
+warn_unreachable = true
+enable_error_code = [
+  "ignore-without-code", "redundant-expr", "truthy-bool", "truthy-iterable",
+  "possibly-undefined", "explicit-override", "mutable-override",
+  "deprecated", "exhaustive-match", "redundant-self", "unimported-reveal",
+]
+plugins = ["pydantic.mypy"]         # SQLAlchemy 2.1 needs no plugin
+files = ["src", "tests"]
+mypy_path = "src"
+explicit_package_bases = true       # tests/api/test_leagues.py and tests/services/test_leagues.py may coexist
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+
+[tool.importlinter]
+root_package = "tourneyhub"
+include_external_packages = true    # needed to forbid third-party and standard-library modules
+
+[[tool.importlinter.contracts]]
+name = "Layers (§3)"
+type = "layers"
+containers = ["tourneyhub"]
+layers = ["api | cli", "services", "db", "engine"]
+
+[[tool.importlinter.contracts]]
+name = "Routers and dependencies run no queries (§3)"
+type = "forbidden"
+source_modules = ["tourneyhub.api"]
+forbidden_modules = ["tourneyhub.db"]
+allow_indirect_imports = true       # api -> services -> db is the normal path
+# CurrentUserDep and AdminDep are typed with the users row (§5)
+ignore_imports = ["tourneyhub.api.deps -> tourneyhub.db.models.accounts"]
+
+[[tool.importlinter.contracts]]
+name = "The engine is pure (ADR-009, ADR-010)"
+type = "forbidden"
+source_modules = ["tourneyhub.engine"]
+forbidden_modules = [
+  "tourneyhub.*",                   # anything outside the engine; the engine itself is exempt
+  "fastapi", "starlette", "sqlalchemy", "alembic", "psycopg", "pydantic",
+  "pydantic_settings", "jwt", "argon2", "random", "secrets", "time", "os",
+]
+
+[[tool.importlinter.contracts]]
+name = "errors and settings stand alone (§3)"
+type = "forbidden"
+source_modules = ["tourneyhub.errors", "tourneyhub.settings"]
+forbidden_modules = ["tourneyhub.*"]
+
+[tool.pytest]
+minversion = "9.2"
+testpaths = ["tests"]
+addopts = ["--import-mode=importlib", "-ra"]
+strict = true                       # strict config, markers, xfail and parametrize ids
+filterwarnings = ["error"]
+markers = ["concurrency: commits real transactions (§9)"]
+
+[tool.coverage.run]
+branch = true
+source_pkgs = ["tourneyhub"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_also = ["raise NotImplementedError", "assert_never\\(", "@overload"]
+
+[tool.alembic]                      # no alembic.ini; env.py reads the database URL from Settings
+script_location = "tourneyhub:migrations"   # a package path; the image runs `tourneyhub migrate` (§7)
+file_template = "%%(year)d_%%(month).2d_%%(day).2d_%%(hour).2d%%(minute).2d-%%(rev)s_%%(slug)s"
+
+[[tool.alembic.post_write_hooks]]
+name = "ruff_check"
+type = "module"
+module = "ruff"
+options = "check --fix REVISION_SCRIPT_FILENAME"
+
+[[tool.alembic.post_write_hooks]]
+name = "ruff_format"
+type = "module"
+module = "ruff"
+options = "format REVISION_SCRIPT_FILENAME"
