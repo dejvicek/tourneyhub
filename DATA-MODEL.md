@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Status | Proposed — awaiting review by another developer |
-| Date | 2026-10-17, revised 2026-10-20 after the first review, 2026-11-05 ordered phases (D9) and the training track (§8) |
+| Date | 2026-10-17, revised 2026-10-20 after the first review, 2026-11-05 ordered phases (D9) and a sketch of later columns (§8) |
 | Scope | PostgreSQL schema for the MVP in `PRD.md`: the tables, their relationships and the key decisions behind them. Column lists show what matters for review; exact types, names and the first Alembic migration are settled during implementation within these rules. |
 
 The schema follows the proposed ADRs in `ADR.md`, in particular ADR-002 (PostgreSQL), ADR-006 (authentication), ADR-007 (instance admin), ADR-008 (API conventions and locking), ADR-009 (pure engine, derived data computed on read), ADR-010 (lots) and ADR-011 (pairing). Requirement IDs (FR-, BR-) refer to `PRD.md`.
@@ -20,7 +20,7 @@ The schema follows the proposed ADRs in `ADR.md`, in particular ADR-002 (Postgre
 | D6 | **Hard delete, except players.** Deleting a league or a tournament removes everything under it (FR-013, FR-038). A removed player is only marked removed and keeps their history (BR-002). | Matches the PRD; no `deleted_at` filters everywhere. |
 | D7 | **History only for admin actions.** `admin_actions` records who did what to whom and when (ADR-007). Matches keep only the time of the last result entry. | The organizer is the only person changing a league in the MVP. |
 | D8 | **Draws are stored, lots are seeded.** Tournaments carry an immutable random seed and a draw counter; every lot, including the league ranking's (BR-020), uses the tournament's seed (ADR-010). | Reproducible draws; lots inside computed standings give the same answer on every read. |
-| D9 | **Phases are ordered.** A tournament's phases carry a `position`; the MVP's rule of at most one group phase and one knockout is a partial unique index on `kind`, not a unique key on the tournament. | ADR-015. Training sessions (RM-33) have a dozen phases; with the order in place from the start, no MVP tournament needs migrating when they arrive. |
+| D9 | **Phases are ordered.** A tournament's phases carry a `position`; the MVP's rule of at most one group phase and one knockout is a partial unique index on `kind`, not a unique key on the tournament. | ADR-015. Later formats add phases (RM-05, RM-06); with the order in place from the start, no MVP tournament needs migrating when they arrive. |
 
 ## 2. Conventions
 
@@ -199,7 +199,7 @@ The placement points table lives only on seasons. The league settings screen edi
 | `id` | |
 | `tournament_id` | FK `tournaments`, `ON DELETE CASCADE`. |
 | `position` | `1, 2, …`, the order of the phases. Unique on `(tournament_id, position)`. In the MVP the group phase is 1 and the knockout 2, or 1 when there is no group phase. |
-| `kind` | `group` or `knockout`. A partial unique index on `(tournament_id, kind) WHERE kind IN ('group', 'knockout')` keeps at most one of each, so the rule still holds when training sessions add a kind of their own (§8). |
+| `kind` | `group` or `knockout`. A partial unique index on `(tournament_id, kind) WHERE kind IN ('group', 'knockout')` keeps at most one of each, so the rule still holds when later formats add kinds of their own. |
 | `format` | `round_robin`, `swiss`, `monster_dyp` (group) or `single_elimination` (knockout). |
 | `round_robin_legs` | `1` or `2`; round robin only. |
 | `sit_out_points` | `0` or `1`; group phases only (FR-039, BR-071). |
@@ -367,7 +367,7 @@ The deferred foreign keys (§2) are checked at each simulated commit, so the inv
 - A general audit log and a history of result changes (D7).
 - Soft delete beyond players (D6).
 - Version columns for optimistic locking: the league and tournament locks cover the MVP's single organizer per league (ADR-008).
-- Training sessions, time limits, drills, match events and the performance ladder (RM-33–RM-37): only `tournament_phases.position` (D9) is in the MVP schema. The rest is sketched in §8. Each part is a new table or a nullable column, so adding it later moves no existing data.
+- Rules beyond the MVP's, time limits, breaks, side stats and league statistics (ADR-015 to ADR-019): only `tournament_phases.position` (D9) is in the MVP schema. The rest is sketched in §8. Each part is a new table or a nullable column, so adding it later moves no existing data.
 
 ## 7. Left to the implementation
 
@@ -375,20 +375,15 @@ The deferred foreign keys (§2) are checked at each simulated commit, so the inv
 - Further indexes for the read paths, chosen from query plans once the screens exist.
 - The rate-limit windows and thresholds behind `auth_attempts`.
 
-## 8. Prepared for the training track (RM-33–RM-37)
+## 8. Prepared for later items
 
-A sketch, not part of the MVP schema. It shows that the training track fits the tables above and what it adds. The decisions behind it are ADR-015 to ADR-020. The columns are settled when the items are picked up.
+A sketch, not part of the MVP schema. It shows that the decisions of ADR-015 to ADR-019 fit the tables above and what they add. The columns are settled when the items are picked up.
 
 | Table | Change | Item |
 |---|---|---|
-| `tournaments` | `type` gains `training`. `started_at` and `ended_at`: the organizer starts a training session, and nothing is playable before that. | RM-33 |
-| `tournament_phases` | `kind` gains `training`. `format` gains `balanced_rotation`, `drill_rotation`, and `team_match`. New columns: `discipline` (preset code), `rules` (`jsonb`, the copy of the preset's parameters, validated by the engine's model, ADR-016), `rounds_planned`, and for time limits `prep_sec`, `play_sec`, `on_time_up` (`none` or `keep_score`, ADR-017). | RM-33, RM-34 |
-| `program_breaks` | New. `tournament_id`, `after_round` (rounds numbered across the whole program), `minutes`, `started_at`, `ended_at`. | RM-33 |
-| `round_participation` | `status` gains `referee`: an entry that does not play the round and referees or counts at a field. | RM-33 |
-| `matches` | `kind` gains `drill` (ADR-020). Timing: `called_at` (the match got a field and its players were free), `started_at`, `ended_at`, `end_reason` (`completed`, `time_up`, `walkover`, `organizer`). The deadline is derived from these and the phase's limit, never stored (ADR-017). | RM-34, RM-36 |
-| `match_side_stats` | New. `(match_id, side, stat, value)`, e.g. `turnovers`. Which stats a match tracks comes from the phase's rules. | RM-33 |
-| `drill_results` | New. `(match_id, player_id, metric, value, attempts)`. `attempts` is `NULL` when the value was typed in as a number, which counts as the full number of attempts. | RM-36 |
-| `match_events` | New, append-only. `id` (generated by the client, so a repeated write changes nothing), `match_id`, `at`, `kind` (`goal`, `turnover`, `hit`, `miss`), `side`, `player_id`, `delta` (`+1`, or `-1` to cancel the last matching event). | RM-37 |
-| `leagues` | `ranking` (`placement_points` or `performance`), `form_window_days` (default 28), `min_tournaments_for_average` (default 2) (ADR-018). | RM-35 |
-
-Training matches use the sides of D2 as they are: partners change every round, as in Monster DYP, so the sides have players and no entry.
+| `tournament_phases` | `preset` (the rules preset's code) and `rules` (`jsonb`, the copy of the preset's parameters, validated by the engine's model, ADR-016). For time limits `prep_sec`, `play_sec` and `on_time_up` (`none` or `keep_score`, ADR-017). | RM-27, RM-18 |
+| `tournaments` | `started_at` and `ended_at` (ADR-017). | RM-18 |
+| `program_breaks` | New. `tournament_id`, `after_round` (rounds numbered across the whole program), `minutes`, `started_at`, `ended_at` (ADR-015). | RM-18 |
+| `matches` | `called_at` (the match got a field and its players were free), `started_at`, `ended_at`, `end_reason` (`completed`, `time_up`, `walkover`, `organizer`). The deadline is derived from these and the phase's limit, never stored (ADR-017). | RM-18 |
+| `match_side_stats` | New. `(match_id, side, stat, value)`. Which stats a match tracks comes from the phase's rules (ADR-016). | RM-27 |
+| `leagues` | `ranking` (`placement_points` or `performance`), `stats_window_days`, `min_tournaments_for_average` (ADR-018). | RM-09 |

@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | Status | Proposed — awaiting review by another developer |
-| Date | 2026-10-16, revised 2026-10-21 after review; ADR-015 to ADR-020 added 2026-11-05 for the training track |
-| Scope | Technical decisions for the MVP in `PRD.md`, and from ADR-015 on for the training track (`ROADMAP.md` §5) as far as it shapes the MVP. Once accepted, a changed decision gets a new ADR that supersedes the old one; accepted ADRs are not rewritten. |
+| Date | 2026-10-16, revised 2026-10-21 after review; ADR-015 to ADR-019 added 2026-11-05 |
+| Scope | Technical decisions for the MVP in `PRD.md`, and from ADR-015 on for roadmap items as far as they shape the MVP. Once accepted, a changed decision gets a new ADR that supersedes the old one; accepted ADRs are not rewritten. |
 
 Each ADR states its status, the context, the decision, its consequences and the alternatives considered. Requirement IDs (FR-, BR-, RM-) refer to `PRD.md` and `ROADMAP.md`.
 
@@ -25,11 +25,10 @@ Each ADR states its status, the context, the decision, its consequences and the 
 | ADR-013 | End-to-end tests and checks with Playwright | Proposed |
 | ADR-014 | Deployment: images in GHCR, manual pull on the VPS | Proposed |
 | ADR-015 | Tournament as an ordered program of phases | Proposed |
-| ADR-016 | Disciplines as engine presets; phases keep a copy of the rules | Proposed |
+| ADR-016 | Match rules as engine presets; phases keep a copy | Proposed |
 | ADR-017 | Time limits: deadlines derived from stored times | Proposed |
 | ADR-018 | Statistics as stat lines computed on read | Proposed |
 | ADR-019 | Live updates for running tournaments: Server-Sent Events | Proposed |
-| ADR-020 | Drills as a kind of match | Proposed |
 
 ---
 
@@ -361,37 +360,37 @@ Each ADR states its status, the context, the decision, its consequences and the 
 
 **Status.** Proposed.
 
-**Context.** An MVP tournament has at most a group phase and a knockout (FR-031). A training session (RM-33) is a program: blocks of rounds with one discipline each (three drills, then legs with different rules, then a match between two teams), with breaks between rounds. For example, a 3-hour session for 8 players on 4 tables has 11 such blocks, 15 rounds and 2 breaks. Its partners and roles are balanced across the whole session, not block by block. Its team match takes its teams from the standings of the blocks before it, as a knockout after a group phase is seeded from the group phase (BR-085).
+**Context.** An MVP tournament has at most a group phase and a knockout (FR-031). Later formats need more. Several groups can feed one knockout (RM-06). A double-elimination knockout can follow a group phase (RM-05). An evening can be a run of short phases, each with its own rules. Scheduling (RM-18) adds breaks between rounds. If the order of the phases followed only from their `kind`, each of these would need a migration of MVP tournaments.
 
 **Decision.**
-- A tournament holds an ordered list of phases, numbered by `position` 1, 2, … (DATA-MODEL D9). In the MVP, a tournament still has at most one group phase and one knockout, in that order. A partial unique index on `kind` enforces this, so the rule holds unchanged when the training kind arrives.
-- A phase has two settings: its **format**, which says how the sides of each round are formed, and its **rules**, which say how a match is played and scored (ADR-016). The MVP formats are `round_robin`, `swiss`, `monster_dyp` and `single_elimination`. The training track adds `balanced_rotation` (pairs first, then singles, and the rest referee, with counters for partners, opponents, sit-outs and roles), `drill_rotation` and `team_match`.
-- Breaks belong to the program, not to a phase. A break comes after a given round, with rounds numbered across the whole program, and has a length. The organizer starts it. The next round becomes playable when the length is over, or earlier if the organizer starts it.
-- A phase can take its seeding from the standings of earlier phases. The MVP knockout already does this.
-- The engine generates rounds over the whole program, not one phase at a time, because the balancing counters carry across phases. Stored rounds are its input, as stored rounds already are for Swiss and Monster DYP (ADR-009). A training session generates its whole program when it starts. A change of attendees reschedules only the rounds that have not started, as BR-054 does for a late entry in a round robin.
+- A tournament holds an ordered list of phases, numbered by `position` 1, 2, … (DATA-MODEL D9). In the MVP, a tournament still has at most one group phase and one knockout, in that order. A partial unique index on `kind` enforces this, so the rule holds unchanged when later kinds arrive.
+- A phase has two settings: its **format**, which says how the sides of each round are formed, and its **rules**, which say how a match is played and scored (ADR-016). The MVP formats are `round_robin`, `swiss`, `monster_dyp` and `single_elimination`. A new format is a new engine module and does not change the tournament model.
+- A phase can take its seeding from the standings of earlier phases. The MVP knockout already does this (BR-085).
+- A format can read the rounds of earlier phases, for example to balance partners and opponents across the whole tournament instead of within one phase. Stored rounds are its input, as they already are for Swiss and Monster DYP (ADR-009).
+- Breaks belong to the program, not to a phase. A break comes after a given round, with rounds numbered across the whole program, and has a length. The next round becomes playable when the length is over, or earlier if the organizer starts it. Breaks come with RM-18.
 
 **Consequences.** The MVP behaves exactly as specified. Its schema only gains `position`, so later phases need no migration of MVP tournaments. Rounds stay numbered within their phase. The program-wide round number used by breaks follows from the order of the phases.
 
-**Alternatives considered.** A separate training model beside tournaments (two implementations of fields, standings and the share link). A training session as one phase with a discipline per round (the rules of one round could no longer differ in format, time limit or seeding, and the organizer edits blocks, not rounds).
+**Alternatives considered.** A group and a knockout reference on the tournament (every new kind of phase needs a column). One phase with rules per round (rounds of one phase could no longer differ in format or seeding).
 
 ---
 
-## ADR-016 — Disciplines as engine presets; phases keep a copy of the rules
+## ADR-016 — Match rules as engine presets; phases keep a copy
 
 **Status.** Proposed.
 
-**Context.** A discipline says how one match is played and scored. A leg can go to 6, or to a 2-goal lead with a cap of 10. It can start from a scenario score such as 0:3, where the table shows the score with the start included and only the goals played count. A turnover can count as a goal for the opponent. One side can hold a "wall" while the other breaks it, and paired disciplines play two rounds with the sides swapped. A discipline can be singles only. It sets the stats it tracks, such as turnovers, and its time: preparation and play. A drill has a metric, a number of attempts, a maximum and a direction (fewer turnovers is better). A club's catalog has about 20 disciplines, and their lengths change as the club learns how long they take. The MVP already has two such rules on a phase: the match format and the goals per game (BR-120, BR-123).
+**Context.** The MVP has two rules on a phase: the match format and the goals per game (BR-120, BR-123). Variants of a sport and other sports (RM-27) need more. A game can be won by a 2-goal lead with a cap. It can start from a given score, which is shown but does not count. It can be singles only, track stats besides the score, or have a time limit (ADR-017). Rules change over time, and a played tournament must not change with them.
 
 **Decision.**
-- Disciplines are presets in the engine (`tourneyhub.engine.presets`, one module per sport: foosball first, others with RM-27), versioned and tested with it.
-- Creating a phase copies the preset's parameters into the phase: `discipline` (the preset's code), `rules` (`jsonb`, validated by the engine's model) and typed columns for the time limit (ADR-017). The engine reads only the phase's copy. It never reads the current preset for a phase that exists.
+- Rules are presets in the engine (`tourneyhub.engine.presets`, one module per sport: foosball first, others with RM-27), versioned and tested with it.
+- Creating a phase copies the preset's parameters into the phase: `preset` (the preset's code), `rules` (`jsonb`, validated by the engine's model) and typed columns for the time limit (ADR-017). The engine reads only the phase's copy. It never reads the current preset for a phase that exists.
 - A retired preset stays in the engine as read-only, so old phases still show its name.
-- The MVP's match format and goals per game stay typed columns. They are the first rules, and the training track adds the rest to `rules`.
-- The texts that explain a discipline to players are frontend translations (FR-080), not engine data.
+- The MVP's match format and goals per game stay typed columns. They are the first rules, and later rules go into `rules`.
+- The texts that explain a preset to players are frontend translations (FR-080), not engine data.
 
-**Consequences.** Changing a preset never changes a played tournament. New disciplines need a release, which is acceptable while one club uses them. Organizer-defined disciplines can come with RM-29 without changing how phases store their rules.
+**Consequences.** Changing a preset never changes a played tournament. New presets need a release, which is acceptable while one instance uses them. Organizer-defined rules can come with RM-29 without changing how phases store their rules.
 
-**Alternatives considered.** Disciplines as league data the organizer edits (every rule needs a screen and validation; premature). A reference to the preset without a copy (editing a preset would rewrite past results).
+**Alternatives considered.** Rules as league data the organizer edits (every rule needs a screen and validation; premature). A reference to the preset without a copy (editing a preset would rewrite past results).
 
 ---
 
@@ -399,19 +398,19 @@ Each ADR states its status, the context, the decision, its consequences and the 
 
 **Status.** Proposed.
 
-**Context.** RM-34: in a training session every match and drill has a limit, preparation plus the discipline's time (e.g. 1 + 8 minutes). When it runs out, the match ends with the score as it stands and the session goes on, so the session keeps its planned length. The owner decided: time limits apply only in training sessions and not to the team match. Time limits in other tournaments stay open. The engine reads no clock (ADR-009).
+**Context.** A match can have a limit: preparation plus play time, for example 1 + 8 minutes. When it runs out, the match ends with the score as it stands, so the tournament keeps its planned length. The MVP has no match times (PRD §4.2, RM-18). Where time limits apply is decided when RM-18 is picked up. A phase without a limit behaves as in the MVP. The engine reads no clock (ADR-009).
 
 **Decision.**
 - **Stored:** for each match, `called_at` (it got a field and its players were free, BR-130), `started_at`, `ended_at` and `end_reason` (`completed`, `time_up`, `walkover`, `organizer`). The program's breaks and the tournament store when they started and ended.
-- **Derived:** `play_from = min(started_at, called_at + prep)` and `deadline = play_from + play`, with `prep` and `play` from the phase (ADR-016). A side that starts late loses playing time, and the session does not wait for it. The engine gets `now` as a parameter. A match past its deadline counts as ended at the deadline in the field queue even before anything is written, so the next match gets its field on time.
+- **Derived:** `play_from = min(started_at, called_at + prep)` and `deadline = play_from + play`, with `prep` and `play` from the phase (ADR-016). A side that starts late loses playing time, and the tournament does not wait for it. The engine gets `now` as a parameter. A match past its deadline counts as ended at the deadline in the field queue even before anything is written, so the next match gets its field on time.
 - **Ending:** the first device that sees the deadline pass, or the organizer, sends an end with `time_up` and the state it expects. The server checks `now ≥ deadline` with its own clock and stores `ended_at = deadline` with the score as it stands. A repeat gets 409 (ADR-008). No scheduler and no cron job are needed.
-- **Result:** the score as it stands, a draw included. A drill counts the attempts played. A result ended by time can be corrected like any other (FR-053). A match that ends normally still waits for a person to confirm its end.
+- **Result:** the score as it stands, a draw included. A result ended by time can be corrected like any other (FR-053).
 - **Clock:** clients take the offset to the server's clock from the `Date` response header and count down with it, so a phone with a wrong clock cannot end a match early.
-- **Forecast:** the engine runs the field queue forward from `now`, with each match not yet played taking its full limit. It returns the latest expected end of the session and the delay against the plan. Nothing is stored.
+- **Forecast:** the engine runs the field queue forward from `now`, with each match not yet played taking its full limit. It returns the latest expected end of the tournament and the delay against the plan. Nothing is stored.
 
-**Consequences.** BR-092 (the winner of a game has the higher score) gets an exception for `time_up` results in training sessions. The countdown needs live updates (ADR-019). Waiting times (RM-37) follow from the same columns.
+**Consequences.** BR-092 (the winner of a game has the higher score) gets an exception for `time_up` results. The countdown needs live updates (ADR-019). Waiting times (from a match becoming playable to its start) follow from the same columns.
 
-**Alternatives considered.** The play time counted from the start only (a late start delays the whole session). A server job that ends matches (needs a scheduler and still races with result entry). The device's clock (wrong clocks end matches early or late).
+**Alternatives considered.** The play time counted from the start only (a late start delays the whole tournament). A server job that ends matches (needs a scheduler and still races with result entry). The device's clock (wrong clocks end matches early or late).
 
 ---
 
@@ -419,14 +418,14 @@ Each ADR states its status, the context, the decision, its consequences and the 
 
 **Status.** Proposed.
 
-**Context.** RM-35 to RM-37. A training league ranks players across sessions by score difference, wins and goals for, as totals or per game, over the last 28 days, all time or a date range. It does not rank players with fewer than 2 sessions in the per-game view, keeps a ladder per drill and shows waiting times. The owner decided that a club keeps one league for training. Its seasons are the club's league years, and every tournament of that league counts, training sessions and ordinary tournaments alike. The MVP has season standings from placement points (BR-110–BR-113).
+**Context.** The MVP has season standings from placement points (BR-110–BR-113). Later items need more. Player pages show win rates and head-to-head records (RM-09). A season can count only the best N tournaments (RM-04). A league can rank players by how they play instead of where they placed: score difference, wins and goals for, as totals or per game, over a season, the last N days, all time or a date range.
 
 **Decision.**
-- The engine computes a **stat line** per player and tournament from the stored matches, games, side stats, drill results and times: games, wins, goals for and against, turnovers and the games in which they were recorded, team matches and their wins, drill results with their attempts, waiting and playing time.
-- League statistics add the stat lines up over a **scope**: a season, a window of N days ending on `today`, all time or a date range. `today` is a parameter, not the clock. A **ranking** orders the totals: `placement_points` (the MVP's season standings) or `performance` (score difference, then wins, then goals for, then team-match wins). Rankings show **totals** or an **average** per game and in percentages. The window length (default 28 days) and the minimum number of tournaments for the average (default 2) are league settings.
-- Nothing is stored (D1). Corrections and imports need no recalculation.
+- The engine computes a **stat line** per player and tournament from the stored matches, games, side stats and times: games, wins, goals for and against, the tracked stats and the games in which they were recorded, waiting and playing time.
+- League statistics add the stat lines up over a **scope**: a season, a window of N days ending on `today`, all time or a date range. `today` is a parameter, not the clock. A **ranking** orders the totals: `placement_points` (the MVP's season standings) or `performance` (score difference, then wins, then goals for). Rankings show **totals** or an **average** per game and in percentages. The window length and the minimum number of tournaments for the average are league settings.
+- Nothing is stored (D1). Corrections need no recalculation.
 
-**Consequences.** In a league that plays legs to 6 in training and games to 10 in tournaments, the per-game average mixes both. A filter by discipline can be added later without changing the model. A year of sessions of one club is a few thousand matches. The guidelines of ADR-009 apply.
+**Consequences.** When a league's phases play games of different lengths, the per-game average mixes them. A filter by preset can be added later without changing the model. The guidelines of ADR-009 apply.
 
 **Alternatives considered.** Stat lines stored and updated on every write (drift, recalculation on corrections). A rating such as Elo (a different item, RM-15).
 
@@ -434,9 +433,9 @@ Each ADR states its status, the context, the decision, its consequences and the 
 
 ## ADR-019 — Live updates for running tournaments: Server-Sent Events
 
-**Status.** Proposed. Decided for good when RM-03 or RM-34 is picked up.
+**Status.** Proposed. Decided for good when RM-03 is picked up.
 
-**Context.** A countdown, the field queue and results entered at several tables need to reach every screen within seconds (RM-34). The MVP has no live updates (PRD §4.2, RM-03). ADR-001 keeps endpoints synchronous and allows async ones where live updates need them.
+**Context.** RM-03: the share link updates by itself while matches are played. A countdown (ADR-017) and the field queue need to reach every screen within seconds. The MVP has no live updates (PRD §4.2). ADR-001 keeps endpoints synchronous and allows async ones where live updates need them.
 
 **Decision.**
 - One Server-Sent Events stream per tournament, for the organizer and on the share link. It sends only "the tournament changed" with a version number, and the client reloads the affected queries (TanStack Query, ADR-003).
@@ -446,17 +445,3 @@ Each ADR states its status, the context, the decision, its consequences and the 
 **Consequences.** No new service (no Redis, no message broker). A lost event costs at most one stale screen until the next event or reload. Every client reloads on every change, which is fine at the sizes of ADR-009.
 
 **Alternatives considered.** WebSockets (two-way, which nothing needs). Polling every few seconds (simplest and acceptable at MVP load, but it makes a countdown jump; kept as the fallback when the stream fails).
-
----
-
-## ADR-020 — Drills as a kind of match
-
-**Status.** Proposed.
-
-**Context.** In a training session a field holds either a match (two sides, a score, a winner) or a drill (two or three players, each with their own result, no winner). Both take a field, go through the field queue, have a time limit and waiting times, and record events and who may enter results. With foreign keys, they need one row to point at.
-
-**Decision.** A drill is a match with `kind = 'drill'`. It has one side with the drill's players and one `drill_results` row per player and metric. The field queue, timing, events and permissions work on `matches` alone. The result rules get an exception for drills: no outcome, no game scores, no walkover. Rules such as "every match has a result" (FR-037) count only matches of other kinds.
-
-**Consequences.** One table for everything that takes a field. The exceptions are in one place and apply only in training sessions, the only place drills exist. The MVP schema does not change.
-
-**Alternatives considered.** A separate `drills` table (clean result rules, but the queue, timing and events must handle two tables). A common parent table for everything on a field, with matches and drills as one-to-one children (the cleanest model, but fields and timing would have to move to the parent in the MVP already).

@@ -75,7 +75,7 @@ The MVP lets an organizer run a league in seasons, play tournaments inside each 
 
 ### 4.2 Not in the MVP
 
-Player accounts and players reporting their own results · co-organizers and transferring a league · organizations and multi-tenancy · teams of more than two, and named teams that last across tournaments · entry fees, prizes and payments · live updates (viewers refresh the page) · email of any kind (verification, password reset, invitations) · public listing, search and following · statistics beyond standings · data export and account deletion · double elimination (DKO) knockouts · group phases split into several groups · other tie-breakers, and configurable ones in a round robin · match times and venues · names for fields (a field is only a number) · training sessions, time limits, drills and a performance ladder (the training track, RM-33–RM-37).
+Player accounts and players reporting their own results · co-organizers and transferring a league · organizations and multi-tenancy · teams of more than two, and named teams that last across tournaments · entry fees, prizes and payments · live updates (viewers refresh the page) · email of any kind (verification, password reset, invitations) · public listing, search and following · statistics beyond standings · data export and account deletion · double elimination (DKO) knockouts · group phases split into several groups · other tie-breakers, and configurable ones in a round robin · match times and venues · names for fields (a field is only a number).
 
 Each of these is on the roadmap (`ROADMAP.md`).
 
