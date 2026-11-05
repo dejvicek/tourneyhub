@@ -76,7 +76,7 @@ model {
     }
 
     api = container "API" {
-      technology "Python 3.13, FastAPI on uvicorn, Pydantic v2, SQLAlchemy 2 (synchronous), psycopg 3, Alembic migrations"
+      technology "Python 3.15, FastAPI on uvicorn, Pydantic v2, SQLAlchemy 2 (synchronous), psycopg 3, Alembic migrations"
       icon tech:python
       summary "REST under /api/v1. Errors always {code, detail}. League writes lock the league, then the tournament."
       description "

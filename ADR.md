@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Status | Proposed — awaiting review by another developer |
-| Date | 2026-10-16, revised 2026-10-21 after review |
+| Date | 2026-10-16, revised 2026-10-21 after review and 2026-11-03 (ADR-001: Python 3.15, SQLAlchemy 2.1) |
 | Scope | Technical decisions for the MVP in `PRD.md`. Once accepted, a changed decision gets a new ADR that supersedes the old one; accepted ADRs are not rewritten. |
 
 Each ADR states its status, the context, the decision, its consequences and the alternatives considered. Requirement IDs (FR-, BR-, RM-) refer to `PRD.md` and `ROADMAP.md`.
@@ -37,10 +37,10 @@ Each ADR states its status, the context, the decision, its consequences and the 
 
 | Concern | Choice |
 |---|---|
-| Runtime and tooling | Python 3.13, `uv` for environments, the lock file and scripts |
+| Runtime and tooling | Python 3.15, `uv` for environments, the lock file and scripts |
 | Web framework | FastAPI on uvicorn |
 | Schemas | Pydantic v2; request and response models form the API contract (ADR-008) |
-| Database access | SQLAlchemy 2.0 with typed `Mapped[]` models, **synchronous** sessions, psycopg 3 driver |
+| Database access | SQLAlchemy 2.1 with typed `Mapped[]` models, **synchronous** sessions, psycopg 3 driver |
 | Migrations | Alembic, one linear history; autogenerate is only a draft and every migration is reviewed |
 | Settings | pydantic-settings, environment variables with the prefix `TOURNEYHUB_`; startup fails on missing or invalid config |
 | Password hashing | argon2-cffi (Argon2id) |
