@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Proposed — awaiting review by another developer |
+| Status | Accepted |
 | Date | 2026-11-03, revised 2026-11-05 after review and after the backend skeleton |
 | Scope | All Python in `backend/`: the `tourneyhub` package, its tests and its migrations. It applies to people and to AI agents; the Claude Code skill `.claude/skills/python-style` points here. |
 
