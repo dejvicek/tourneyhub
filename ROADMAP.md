@@ -74,9 +74,9 @@ The bigger version is a hosted platform where any club can run leagues and tourn
 ## 5. Training track — Foos lab
 
 **Starts when** the MVP runs on the VPS. It runs alongside the stages and pulls forward the parts of their items it needs.
-**Goal:** a club runs its training sessions on TourneyHub. Training sessions are a kind of tournament inside a league kept for training, and the league ranks its players across them.
+**Goal:** a club runs its training sessions on TourneyHub, with Foos lab as their frontend. Training sessions are a kind of tournament inside a league kept for training, and the league ranks its players across them.
 
-Foos lab is the training app of a table football club. It runs on its own database and is temporary. Its PRD holds the training rules these items take over. `docs/foos-lab.md` maps its terms to TourneyHub's and records the decisions made so far.
+Foos lab is the training app of a table football club. It stays a separate application with its own frontend and becomes the first application built on TourneyHub's API. Until then it runs on its own database. Its PRD holds the training rules these items take over. `docs/foos-lab.md` maps its terms to TourneyHub's and records the decisions made so far.
 
 | ID | Item | What it means |
 |---|---|---|
@@ -85,6 +85,6 @@ Foos lab is the training app of a table football club. It runs on its own databa
 | RM-35 | Performance ladder | A league ranking from how players play instead of placement points: score difference, wins, goals for. Shown as totals or per game, over the season, the last 28 days, all time or a date range. Players with fewer than 2 tournaments in the range are listed but not ranked per game. Every tournament of the league counts, training sessions and ordinary tournaments alike. A season is one year of the club's league. Extends RM-09. |
 | RM-36 | Drills and measurements | Drills at a field, two or three players at a time: each player records a result out of a number of attempts (e.g. goals from 10 shots). A ladder per drill, on the same ranges as RM-35. |
 | RM-37 | Match course and waiting times | Every goal, turnover and drill attempt is recorded with its time. Each match shows how it went, and the league shows who keeps others waiting between a match becoming playable and its start. |
-| RM-38 | Foos lab on TourneyHub | Foos lab moves its data to TourneyHub and works through TourneyHub's API, while it still makes its own schedules. Its past sessions are imported once. After that, Foos lab's features move into TourneyHub one by one and Foos lab is retired. Needs what RM-33 to RM-37 store, not yet their scheduling. Players entering results at their own table needs parts of RM-12 and RM-13, live updates need RM-03, and other applications on the API need part of RM-29. |
+| RM-38 | Foos lab on TourneyHub's API | Foos lab keeps its own frontend and moves its data to TourneyHub: it reads and writes only through TourneyHub's API, the first application to do so. At first it still makes its own schedules. Its past sessions are imported once. Needs what RM-33 to RM-37 store, not yet their scheduling. Players entering results at their own table needs parts of RM-12 and RM-13, live updates need RM-03, and other applications on the API need part of RM-29. |
 
-RM-38 can come before the scheduling parts of RM-33 to RM-37. Foos lab is retired once those are in TourneyHub.
+RM-38 can come before the scheduling parts of RM-33 to RM-37. Once those are in TourneyHub, Foos lab asks TourneyHub's API for its schedules instead of making them, and keeps its own frontend.

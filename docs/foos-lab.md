@@ -8,9 +8,9 @@
 
 ## 1. What Foos lab is
 
-Foos lab ("Rozpis stolů") is the training app of a table football club with 6–13 players and up to 4 tables. It keeps the club's roster and generates each session's schedule: who plays whom, on which table and when. Players enter goals, turnovers and drill results from their phones, and the app ranks players across sessions. It is a React app on Supabase, with its own PRD and a pure domain layer (`src/domain`, about 5,300 lines without tests) that has no React and no database code, the same idea as ADR-009.
+Foos lab is the training app of a table football club with 6–13 players and up to 4 tables. It keeps the club's roster and generates each session's schedule: who plays whom, on which table and when. Players enter goals, turnovers and drill results from their phones, and the app ranks players across sessions. It is a React app on Supabase, with its own PRD and a pure domain layer (`src/domain`, about 5,300 lines without tests) that has no React and no database code, the same idea as ADR-009.
 
-Foos lab is temporary. The goal is to have everything in TourneyHub. Its PRD stays the source of the training rules until an item of the training track is picked up and written into `PRD.md`.
+Foos lab stays a separate application with its own frontend. It becomes the first application built on TourneyHub's API: TourneyHub keeps the data, the league and its statistics, and later the scheduling, and Foos lab keeps its screens. Its PRD stays the source of the training rules until an item of the training track is picked up and written into `PRD.md`.
 
 ## 2. Decisions
 
@@ -23,7 +23,7 @@ Foos lab is temporary. The goal is to have everything in TourneyHub. Its PRD sta
 | 5 | Seasons? | One season per year of the club's league. |
 | 6 | What counts in the ladder? | The club keeps one league for training. Every tournament in it counts, training sessions and ordinary tournaments alike. |
 | 7 | How are drills stored? | As a kind of match (ADR-020). |
-| 8 | How does Foos lab move? | It moves onto TourneyHub's API (ADR-021, RM-38), first with its own scheduling, which then moves into TourneyHub's engine. |
+| 8 | How does Foos lab move? | It keeps its own frontend and becomes the first application on TourneyHub's API (ADR-021, RM-38). At first it makes its own schedules, which then move into TourneyHub's engine. |
 
 ## 3. Terms
 
@@ -113,12 +113,12 @@ With a limit of 1 + 8 minutes:
 
 The rest is in ADR-017: who writes the end, the server's clock, the forecast of the session's end, and results after `time_up`. In Foos lab this changes one rule: its PRD §4.8 says nothing ends by itself. With time limits, a match ends when its time runs out, and only a match that ends normally waits for a person to confirm.
 
-## 6. Moving Foos lab
+## 6. Moving Foos lab onto the API
 
-1. **Foos lab, now.** Foos lab builds time limits with the model of ADR-017: a pure deadline function, `called_at` and `end_reason` on its play times, an end checked against the server's clock, and the deadline counted in its queue. It keeps a copy of the rules in each locked round and splits its domain into a generic core (program, queue, time limits, statistics) and the foosball content (catalog, rules, texts).
+1. **Foos lab, now.** Foos lab builds time limits with the model of ADR-017: a pure deadline function, `called_at` and `end_reason` on its play times, an end checked against the server's clock, and the deadline counted in its queue. It keeps a copy of the rules in each locked round and splits its domain into a generic core (program, queue, time limits, statistics), which TourneyHub's API later provides, and the foosball content (catalog, rules, texts), which stays in Foos lab.
 2. **TourneyHub, MVP.** Phases are ordered (D9). Nothing else of the training track is built.
-3. **RM-38.** TourneyHub stores what the training track needs (DATA-MODEL §8) and accepts `external` phases (ADR-021). Foos lab gets a storage implementation on the API, and its data is imported once.
-4. **RM-33 to RM-37.** The scheduling moves into TourneyHub's engine: `balanced_rotation`, `drill_rotation` and `team_match`, with Foos lab's acceptance criteria and test cases as test vectors (ADR-012). New sessions are scheduled by TourneyHub, and Foos lab is retired.
+3. **RM-38.** TourneyHub stores what the training track needs (DATA-MODEL §8) and accepts `external` phases (ADR-021). Foos lab gets a storage implementation on the API and keeps its screens. Its data is imported once, and its own database is switched off.
+4. **RM-33 to RM-37.** The scheduling moves into TourneyHub's engine: `balanced_rotation`, `drill_rotation` and `team_match`, with Foos lab's acceptance criteria and test cases as test vectors (ADR-012). Foos lab asks the API for new sessions' schedules instead of making them, and its own scheduling code is removed.
 
 ### Import
 
@@ -138,4 +138,5 @@ Player and session ids are UUIDs and are kept. Match ids are text (`league|round
 
 - Time limits in other tournaments than training sessions (decision 3).
 - Whether the per-game average of a league that plays legs to 6 and games to 10 needs a filter by discipline (ADR-018).
+- Whether TourneyHub's own frontend shows training sessions too, for example read-only, or only Foos lab does.
 - Live updates: Server-Sent Events are proposed (ADR-019) and decided when RM-03 or RM-34 is picked up.
