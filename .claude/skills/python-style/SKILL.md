@@ -5,7 +5,7 @@ description: Use when planning, writing, changing or reviewing Python in Tourney
 
 # TourneyHub Python style
 
-The rules live in `docs/python-style.md`. Before writing code, read the sections for what you touch (§3 layers, §4 errors, time and logging, §5 FastAPI, §6 Pydantic, §7 SQLAlchemy, §8 engine, §9 tests, §10 security). Take tool versions and configuration from its §2, not from memory. Where it disagrees with `ADR.md`, the ADR wins until it is changed; the guide's §11 lists the changes it proposes.
+The rules live in `docs/python-style.md`. Before writing code, read the sections for what you touch (§3 layers, §4 errors, time and logging, §5 FastAPI, §6 Pydantic, §7 SQLAlchemy, §8 engine, §9 tests, §10 security). Take tool versions and configuration from `backend/pyproject.toml` and `backend/uv.lock`, not from memory; the guide's §2 explains the choices in them that are not obvious. Where it disagrees with `ADR.md`, the ADR wins until it is changed; the guide's §11 lists the changes it proposes.
 
 ## Project decisions an agent will not guess
 

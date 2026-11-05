@@ -3,14 +3,14 @@
 | | |
 |---|---|
 | Status | Proposed — awaiting review by another developer |
-| Date | 2026-11-03, revised 2026-11-05 after review |
+| Date | 2026-11-03, revised 2026-11-05 after review and after the backend skeleton |
 | Scope | All Python in `backend/`: the `tourneyhub` package, its tests and its migrations. It applies to people and to AI agents; the Claude Code skill `.claude/skills/python-style` points here. |
 
 The ADRs decide what the backend is built from; this guide decides how its code is written. Where the two disagree, the ADR wins until it is changed; §11 lists the changes this guide proposes. Requirement IDs (FR-, BR-) refer to `PRD.md`.
 
 ## 1. Principles
 
-- **The tools are the rulebook.** What ruff, mypy, import-linter and pytest check is configured in §2. Prose mentions a tool-checked rule only to name its code; every other rule written here exists because no tool checks it.
+- **The tools are the rulebook.** What ruff, mypy, import-linter and pytest check is configured in `backend/pyproject.toml` (§2). Prose mentions a tool-checked rule only to name its code; every other rule written here exists because no tool checks it.
 - **Python 3.15 only.** No compatibility code for older versions, no `typing_extensions` for what the standard library has, no `from __future__ import annotations`.
 - **Typed throughout.** `mypy --strict` passes on `src` and `tests`. No `Any` of our own; where a library's signature forces it (`type_annotation_map`, a decoded JWT payload), a comment says so. A `cast` or `# type: ignore[code]` carries a comment saying why it is safe.
 - **One way per task.** Use the patterns this guide shows. A second way to do the same thing (another session helper, another base model) needs a reason in the pull request.
@@ -19,13 +19,15 @@ The ADRs decide what the backend is built from; this guide decides how its code 
 
 ## 2. Toolchain
 
-| Tool | Version | Role |
-|---|---|---|
-| uv | ≥ 0.13.6 | Python, environments, lock file; 0.13.6 is the first release that ships CPython 3.15.2 |
-| ruff | ≥ 0.17.3 | Lint and format, default line length of 88 |
-| mypy | ≥ 2.4.1 | Type check, strict, with the Pydantic plugin |
-| import-linter | ≥ 2.15 | Layer and purity contracts (§3) |
-| pytest, Hypothesis, coverage | ≥ 9.2, 6.170, 7.17 | Tests (§9) |
+The configuration CI runs is [`backend/pyproject.toml`](../backend/pyproject.toml). It gives lower bounds only; the exact versions live in `backend/uv.lock`.
+
+| Tool | Role |
+|---|---|
+| uv | Python, environments, lock file |
+| ruff | Lint and format, default line length of 88 |
+| mypy | Type check, strict, with the Pydantic plugin |
+| import-linter | Layer and purity contracts (§3) |
+| pytest, Hypothesis, coverage | Tests (§9) |
 
 Run every command from `backend/`, where the configuration lives. Since ruff 0.16, `ruff format` also formats Python blocks inside Markdown, so run from the repository root it would also reformat the samples in this guide with default settings.
 
@@ -39,183 +41,23 @@ uv run coverage report --include="*/tourneyhub/engine/*" --fail-under=100
 uv run python -W error -m tourneyhub.openapi > openapi.json && git diff --exit-code openapi.json
 ```
 
-CI runs the same commands, with `uv run ruff format --check && uv run ruff check` in place of the two that change files.
+CI (`.github/workflows/ci.yml`) runs the same commands, with `uv run ruff format --check && uv run ruff check` in place of the two that change files, then `alembic upgrade head` and `alembic check` (§7) and `uv audit`.
 
-`uv.lock` and `.python-version` (containing `3.15`) are committed. `[project]` gives lower bounds only; the exact versions live in `uv.lock`. Dependabot (`package-ecosystem: "uv"`) and `uv audit --preview-features audit-command` (still a preview command) watch them. CI turns on the coverage gates with the first feature, and the engine gate with the first engine code; the empty skeleton of §3 has nothing to cover.
-
-```toml
-[project]
-name = "tourneyhub"
-version = "0.1.0"
-requires-python = ">=3.15"
-classifiers = ["Private :: Do Not Upload"]
-dependencies = [
-  "alembic>=1.20.1",          # 1.20.1 fixes duplicate CHECKs with SQLAlchemy 2.1
-  "argon2-cffi>=25.1",
-  "fastapi>=0.162",           # Depends(scope="function") needs 0.121 or later (§5)
-  "httptools>=0.9",
-  "networkx>=3.7",
-  "psycopg[binary]>=3.3.7",
-  "pydantic>=2.14.2",
-  "pydantic-settings>=2.16",
-  "pyjwt>=2.15.1",
-  "python-json-logger>=4.2",
-  "sqlalchemy>=2.1.7",        # 2.1.7 fixes a leaked pool slot on Python 3.15 (#13738)
-  "uvicorn>=0.54",
-  "uvloop>=0.23",             # listed directly: uvicorn[standard] pulls PyYAML, which has no 3.15 wheel
-]
-
-[project.scripts]
-tourneyhub = "tourneyhub.cli:main"   # ADR-007; entry points need the build system below
-
-[build-system]
-requires = ["uv_build>=0.13.6,<0.14"]
-build-backend = "uv_build"
-
-[dependency-groups]
-test = [
-  "coverage>=7.17", "httpx2>=2.16", "hypothesis>=6.170",
-  "pytest>=9.2", "pytest-alembic>=0.13.2", "pytest-randomly>=5.0",
-]
-lint = ["import-linter>=2.15", "mypy>=2.4.1", "ruff>=0.17.3", "types-networkx"]
-dev = [{ include-group = "test" }, { include-group = "lint" }, "watchfiles>=1.3"]  # watchfiles: --reload
-
-[tool.uv]
-required-version = ">=0.13.6"
-
-[tool.ruff]
-line-length = 88                    # the default, stated so that nobody changes it
-
-[tool.ruff.lint]
-select = [
-  "F", "E", "W", "I", "UP", "B", "SIM", "C4", "RUF", "PIE", "RET", "PERF", "FURB",
-  "N", "A", "ANN", "ARG", "FBT", "D", "S", "BLE", "TRY", "LOG", "G", "T20", "ERA",
-  "DTZ", "PTH", "TID", "INP", "PGH", "ISC", "PL", "PT", "FAST", "ASYNC",
-]
-ignore = [
-  "W191", "E501", "D206", "D300",   # the formatter owns these
-  "D100", "D104", "D105", "D107",   # module, package, magic-method and __init__ docstrings
-  "TRY003",                         # errors carry codes, not messages (ADR-008)
-  "PLR0913", "PLR0917",             # endpoints take many dependencies
-]
-
-[tool.ruff.lint.per-file-ignores]
-"!src/tourneyhub/engine/**" = ["D1"]        # docstrings are required only in the engine (§4.5)
-"src/tourneyhub/errors.py" = ["S105"]       # TOKEN_EXPIRED is an error code, not a password
-"src/tourneyhub/cli.py" = ["T201"]
-"src/tourneyhub/openapi.py" = ["T201"]
-"src/tourneyhub/migrations/**" = ["D", "ERA001", "INP001"]
-"tests/**" = ["S101", "S105", "S106", "PLR2004", "D", "INP001", "FBT001"]
-
-[tool.ruff.lint.isort]
-known-first-party = ["tourneyhub"]
-
-[tool.ruff.lint.pydocstyle]
-convention = "google"
-
-[tool.ruff.lint.flake8-tidy-imports]
-ban-relative-imports = "all"
-ban-lazy = "all"                    # no PEP 810 lazy imports (§4.2)
-
-[tool.ruff.lint.flake8-tidy-imports.banned-api]
-"random".msg = "Use secrets, or the seeded SHA-256 lot (ADR-010)."
-"sqlalchemy.orm.declarative_base".msg = "Subclass DeclarativeBase (§7)."
-"typing.TYPE_CHECKING".msg = "Import for real (§4.2)."
-"typing_extensions".msg = "Use the standard library (§1)."
-"__future__.annotations".msg = "Not needed on Python 3.15 (§1)."
-
-[tool.mypy]
-python_version = "3.15"
-strict = true
-warn_unreachable = true
-enable_error_code = [
-  "ignore-without-code", "redundant-expr", "truthy-bool", "truthy-iterable",
-  "possibly-undefined", "explicit-override", "mutable-override",
-  "deprecated", "exhaustive-match", "redundant-self", "unimported-reveal",
-]
-plugins = ["pydantic.mypy"]         # SQLAlchemy 2.1 needs no plugin
-files = ["src", "tests"]
-mypy_path = "src"
-explicit_package_bases = true       # tests/api/test_leagues.py and tests/services/test_leagues.py may coexist
-
-[tool.pydantic-mypy]
-init_forbid_extra = true
-init_typed = true
-warn_required_dynamic_aliases = true
-
-[tool.importlinter]
-root_package = "tourneyhub"
-include_external_packages = true    # needed to forbid third-party and standard-library modules
-
-[[tool.importlinter.contracts]]
-name = "Layers (§3)"
-type = "layers"
-containers = ["tourneyhub"]
-layers = ["api | cli", "services", "db", "engine"]
-
-[[tool.importlinter.contracts]]
-name = "Routers and dependencies run no queries (§3)"
-type = "forbidden"
-source_modules = ["tourneyhub.api"]
-forbidden_modules = ["tourneyhub.db"]
-allow_indirect_imports = true       # api -> services -> db is the normal path
-# CurrentUserDep and AdminDep are typed with the users row (§5)
-ignore_imports = ["tourneyhub.api.deps -> tourneyhub.db.models.accounts"]
-
-[[tool.importlinter.contracts]]
-name = "The engine is pure (ADR-009, ADR-010)"
-type = "forbidden"
-source_modules = ["tourneyhub.engine"]
-forbidden_modules = [
-  "tourneyhub.*",                   # anything outside the engine; the engine itself is exempt
-  "fastapi", "starlette", "sqlalchemy", "alembic", "psycopg", "pydantic",
-  "pydantic_settings", "jwt", "argon2", "random", "secrets", "time", "os",
-]
-
-[[tool.importlinter.contracts]]
-name = "errors and settings stand alone (§3)"
-type = "forbidden"
-source_modules = ["tourneyhub.errors", "tourneyhub.settings"]
-forbidden_modules = ["tourneyhub.*"]
-
-[tool.pytest]
-minversion = "9.2"
-testpaths = ["tests"]
-addopts = ["--import-mode=importlib", "-ra"]
-strict = true                       # strict config, markers, xfail and parametrize ids
-filterwarnings = ["error"]
-markers = ["concurrency: commits real transactions (§9)"]
-
-[tool.coverage.run]
-branch = true
-source_pkgs = ["tourneyhub"]
-
-[tool.coverage.report]
-show_missing = true
-skip_covered = true
-exclude_also = ["raise NotImplementedError", "assert_never\\(", "@overload"]
-
-[tool.alembic]                      # no alembic.ini; env.py reads the database URL from Settings
-script_location = "tourneyhub:migrations"   # a package path; the image runs `tourneyhub migrate` (§7)
-file_template = "%%(year)d_%%(month).2d_%%(day).2d_%%(hour).2d%%(minute).2d-%%(rev)s_%%(slug)s"
-
-[[tool.alembic.post_write_hooks]]
-name = "ruff_check"
-type = "module"
-module = "ruff"
-options = "check --fix REVISION_SCRIPT_FILENAME"
-
-[[tool.alembic.post_write_hooks]]
-name = "ruff_format"
-type = "module"
-module = "ruff"
-options = "format REVISION_SCRIPT_FILENAME"
-```
+`uv.lock` and `.python-version` (containing `3.15`) are committed. Dependabot (`package-ecosystem: "uv"`) and `uv audit --preview-features audit-command` (still a preview command) watch them. The engine gate runs from the start, since the skeleton has engine code. The gate for the whole package (90 %, ADR-012) is switched on with the first feature; until then `[tool.coverage.report]` has no `fail_under`.
 
 Choices in the configuration that are not obvious:
+- `required-version = ">=0.13.6"`: 0.13.6 is the first uv release that ships CPython 3.15.2.
+- Three lower bounds carry a fix the guide relies on: `alembic>=1.20.1` (duplicate CHECKs with SQLAlchemy 2.1), `fastapi>=0.162` (`Depends(scope="function")` needs 0.121 or later, §5) and `sqlalchemy>=2.1.7` (a leaked pool slot on Python 3.15, #13738).
+- `uvloop` is listed directly: `uvicorn[standard]` pulls PyYAML, which has no 3.15 wheel.
+- `[build-system]` uses `uv_build`: the `tourneyhub` entry point (ADR-007) needs a build system.
 - `select` names rule families instead of `ALL`, so a ruff upgrade does not switch on new rules unannounced.
 - `TC` (imports only for type checking) stays off. Pydantic, FastAPI, SQLAlchemy and Hypothesis read annotations at runtime, and moving their imports under `if TYPE_CHECKING:` breaks them.
+- `ban-lazy = "all"`: no PEP 810 lazy imports (§4.2).
 - `random` is banned everywhere: lots use the stored seed (ADR-010), everything else uses `secrets`.
+- mypy uses only the Pydantic plugin; SQLAlchemy 2.1 needs none. `explicit_package_bases = true` lets test modules with one file name coexist, such as `tests/api/test_leagues.py` and `tests/services/test_leagues.py`.
+- import-linter's `include_external_packages = true` is needed to forbid third-party and standard-library modules in the engine contract. That contract forbids `tourneyhub.*`, which leaves out the engine itself.
+- The contract "Routers and dependencies run no queries (§3)" sets `allow_indirect_imports = true`, because `api` → `services` → `db` is the normal path, and ignores one import, `tourneyhub.api.deps -> tourneyhub.db.models.accounts`: `CurrentUserDep` and `AdminDep` are typed with the `User` row (§5). import-linter reports an ignore that matches no import as an error, so the entry goes when that import goes.
+- Alembic has no `alembic.ini`; `env.py` reads the database URL from `Settings`. `script_location = "tourneyhub:migrations"` is a package path, and the image runs `tourneyhub migrate` (§7), since the wheel ships no `pyproject.toml`.
 
 ## 3. Layout and layers
 
@@ -242,7 +84,7 @@ backend/
 └── tests/                # mirrors src/tourneyhub/
 ```
 
-The first backend pull request creates every package and module above, empty where nothing exists yet: import-linter fails on a missing layer.
+Every package and module above exists, empty where nothing lives in it yet: import-linter fails on a missing layer.
 
 Layers, enforced by import-linter: `api` and `cli` → `services` → `db` → `engine`. A module imports from layers below it, never from above. `errors.py` and `settings.py` import nothing else from `tourneyhub`.
 
@@ -730,12 +572,10 @@ def decode_access_token(token: str, key: SecretStr) -> dict[str, Any]:
 
 ## 11. Proposed changes to other documents
 
-The Status column records the decisions of the review of 2026-11-04. Accepted rows move into their documents in follow-up pull requests and then leave this table; the first two, already changed in ADR.md, leave after the backend skeleton pull request.
+The Status column records the decisions of the review of 2026-11-04. Accepted rows move into their documents in follow-up pull requests and then leave this table.
 
 | Document | Today | Proposal | Why | Status |
 |---|---|---|---|---|
-| ADR-001 | Python 3.13 | Python 3.15 (changed in this pull request) | 3.15.0 came out on 2026-10-09; every dependency installs from wheels | Accepted; already in ADR.md |
-| ADR-001 | SQLAlchemy 2.0 | SQLAlchemy 2.1 (changed in this pull request) | Current stable release since 2026-09-24, same 2.0-style API; 2.1.0b1 removed the mypy plugin. §2 requires 2.1.7 (2026-11-03), which fixes a pool leak on Python 3.15 | Accepted; already in ADR.md |
 | ADR-001 | — | Record that the request owns the transaction (`Depends(scope="function")`, §5) | With the default scope (`"request"`, FastAPI 0.118 and later), the commit runs after the response is sent; `scope="function"` exists since 0.121.0 | Accepted |
 | ADR-008 | Codes for 401, 403, 404, 409 | 422 with a stable code when the current state refuses a request and the organizer needs a message (`RuleViolationError`); 409 only for a stale expectation that a reload repairs; and the framework codes of §4.4 | ADR-008 names no status or code for these | Accepted |
 | ADR-010 | A test enforces that the engine does not use `random` | ruff `banned-api` and the import-linter contract enforce it | Checked on every lint run, no extra test | Accepted |
