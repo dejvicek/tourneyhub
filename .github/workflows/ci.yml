@@ -1,0 +1,136 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A newer push to the same pull request or to main cancels the run it supersedes:
+# GitHub Free has 2,000 Actions minutes a month (ADR-012).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The path filter lives here, not under `on:`, so that ci-ok always reports (ADR-012).
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # a push is compared with the commit before it
+          persist-credentials: false
+      - name: Find the changed areas
+        id: filter
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          # A pull request: its merge commit against the first parent, the branch it
+          # merges into. A push: against the commit before the push. When that commit
+          # is unknown (a new branch, a force push), every area counts as changed.
+          if [ "$EVENT_NAME" = pull_request ]; then
+            base=HEAD^1
+          elif git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            base=$BEFORE
+          else
+            base=
+          fi
+          if [ -z "$base" ] || [ -n "$(git diff --no-renames --name-only "$base" HEAD -- backend .github/workflows)" ]; then
+            backend=true
+          else
+            backend=false
+          fi
+          echo "backend=$backend" | tee -a "$GITHUB_OUTPUT"
+
+  backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_INITDB_ARGS: --locale-provider=builtin --builtin-locale=C.UTF-8 # DATA-MODEL §2
+        # -h localhost: the entrypoint's first, temporary server listens only on its socket
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+        ports:
+          - 5432:5432
+    env:
+      TOURNEYHUB_TEST_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/tourneyhub_test
+      # pytest-alembic's tests empty this one before each test (docs/python-style.md §9)
+      TOURNEYHUB_TEST_MIGRATIONS_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/tourneyhub_test_migrations
+      # Settings for `alembic upgrade head` and `alembic check`
+      TOURNEYHUB_ENV: development
+      TOURNEYHUB_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/tourneyhub_dev
+      # Not a real secret: a dummy of 48 characters, because Settings require one
+      TOURNEYHUB_JWT_SECRET: "0123456789abcdef0123456789abcdef0123456789abcdef"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.7"
+      - run: uv sync --locked
+      # Through psycopg, not docker exec into the service: act, which runs this workflow
+      # locally, leaves job.services empty, so the container id is unknown there.
+      - name: Create the databases
+        run: |
+          uv run python - <<'EOF'
+          import psycopg
+          from psycopg import sql
+
+          url = "postgresql://postgres:postgres@localhost:5432/postgres"
+          with psycopg.connect(url, autocommit=True) as conn:
+              for name in ("tourneyhub_test", "tourneyhub_test_migrations", "tourneyhub_dev"):
+                  conn.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
+          EOF
+      - run: uv run python -VV # from .python-version (3.15); uv 0.13.7 installs 3.15.2
+      - run: uv run ruff format --check
+      - run: uv run ruff check
+      - run: uv run mypy
+      - run: uv run lint-imports
+      - run: uv run coverage run -m pytest
+      - run: uv run coverage report
+      - name: Engine coverage 100 %
+        run: uv run coverage report --include="*/tourneyhub/engine/*" --fail-under=100
+      - name: Export openapi.json
+        run: uv run python -W error -m tourneyhub.openapi > openapi.json
+      - name: openapi.json drift
+        run: git diff --exit-code openapi.json
+      - run: uv run alembic upgrade head
+      - run: uv run alembic check
+      - run: uv audit --preview-features audit-command
+
+  # The one check to require (ADR-012): it fails when a needed job failed or was
+  # cancelled, and passes when backend was skipped because nothing in it changed.
+  ci-ok:
+    needs: [changes, backend]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check the needed jobs
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: $RESULTS"
+          case " $RESULTS " in
+            *" failure "* | *" cancelled "*) exit 1 ;;
+          esac
