@@ -60,7 +60,7 @@ dependencies = [
   "pydantic-settings>=2.16",
   "pyjwt>=2.15.1",
   "python-json-logger>=4.2",
-  "sqlalchemy>=2.1.6",
+  "sqlalchemy>=2.1.7",        # 2.1.7 fixes a leaked pool slot on Python 3.15 (#13738)
   "uvicorn>=0.54",
   "uvloop>=0.23",             # listed directly: uvicorn[standard] pulls PyYAML, which has no 3.15 wheel
 ]
@@ -182,13 +182,12 @@ branch = true
 source_pkgs = ["tourneyhub"]
 
 [tool.coverage.report]
-fail_under = 90
 show_missing = true
 skip_covered = true
 exclude_also = ["raise NotImplementedError", "assert_never\\(", "@overload"]
 
 [tool.alembic]                      # no alembic.ini; env.py reads the database URL from Settings
-script_location = "tourneyhub:migrations"   # found inside the installed package, also in the image
+script_location = "tourneyhub:migrations"   # a package path; the image runs `tourneyhub migrate` (§7)
 file_template = "%%(year)d_%%(month).2d_%%(day).2d_%%(hour).2d%%(minute).2d-%%(rev)s_%%(slug)s"
 
 [[tool.alembic.post_write_hooks]]
@@ -222,7 +221,7 @@ backend/
 │   ├── settings.py       # Settings
 │   ├── errors.py         # ErrorCode and the AppError hierarchy
 │   ├── logging_config.py # the dictConfig dictionary and the request-id filter (§4.6)
-│   ├── cli.py            # the `tourneyhub` command (ADR-007)
+│   ├── cli.py            # the `tourneyhub` command: admin (ADR-007) and `migrate` (§7)
 │   ├── api/              # one router module per area, plus:
 │   │   ├── deps.py       #   the dependency aliases (§5)
 │   │   ├── errors.py     #   the exception handlers (§5)
@@ -297,15 +296,17 @@ The subclass decides the HTTP status, and the code tells the frontend what happe
 | `NotAuthenticatedError` | 401 | No valid access token |
 | `ForbiddenError` | 403 | Not allowed, e.g. `password_change_required` (ADR-006) |
 | `NotFoundError` | 404 | Unknown id, or one from another organizer's league |
-| `ConflictError` | 409 | The expected state did not match, or a client id belongs to another row (ADR-008) |
-| `RuleViolationError` | 422 | A business rule refused the request, e.g. too few entries |
+| `ConflictError` | 409 | The request carried an expectation that is stale, and a reload repairs it: an expected value, a target state, a client id of another row (ADR-008) |
+| `RuleViolationError` | 422 | The current state refuses the action, and the organizer needs a message: a taken player name (BR-001), too few entries |
 
 - `ErrorCode` also holds the codes for framework errors: `validation_failed` (422), `not_found` and `method_not_allowed` (the router's 404 and 405), `bad_request` (any other HTTP error) and `internal_error` (500).
 - The engine raises its own exceptions, defined in `engine/errors.py` as subclasses of `EngineError` with keyword-only fields (`NotEnoughEntriesError(minimum=4, given=3)`). One function, `services/engine_errors.py:to_app_error()`, translates each into a `RuleViolationError` whose `detail` carries the same fields; services call engine functions inside `except EngineError as err: raise to_app_error(err) from err`.
-- Services never catch `IntegrityError`; where a race is expected, the query avoids it (`on_conflict_do_nothing`). A violation surfaces at the next flush, at the latest at the commit in `get_session`; either way it reaches the handler uncaught. A handler in `api/errors.py` turns one from a constraint listed in its table, recognized by `err.orig.diag.constraint_name`, into that constraint's 409 code. Any other, including a deferred foreign key, becomes 500 `internal_error` with the constraint name logged (DATA-MODEL §2).
+- 409 makes the frontend reload, and the reloaded screen shows what changed (ADR-008); a stale `expected_round_no` is 409. 422 makes it show a message built from the code and `detail`, because a reload would change nothing; a player name the league already has is 422.
+- Services check the rules an organizer can break under the lock, before a unique index would fire. Adding a player locks the league and looks the name up with `lower()` (BR-001): an active player of that name is 422 `player_name_taken`, a removed one is restored (DATA-MODEL §4.2). A create with a client id first loads the row with that id and answers as ADR-008 says; only then are its rules checked, so a retry gets its row back instead of a 422 that its own first attempt caused.
+- Services never catch `IntegrityError`; where a race is expected, the query avoids it (`on_conflict_do_nothing`). A violation surfaces at the next flush, at the latest at the commit in `get_session`; either way it reaches the handler uncaught. A handler in `api/errors.py` turns one from a constraint listed in its table, recognized by `err.orig.diag.constraint_name`, into that constraint's 409 code. The table lists only constraints that a race can reach, because no lock covers their check: creating a league has no league row to lock (§7), so `pk_leagues` is listed. Any other violation, including a deferred foreign key or a unique index that a service checks under its lock, is a bug and becomes 500 `internal_error` with the constraint name logged (DATA-MODEL §2).
 - Inside `except`, write `raise NewError(...) from err`. Use `from None` only when the cause tells a reader of the log nothing.
 - Catch the narrowest exception. The only catch-all is the API's handler for unexpected errors, which answers `internal_error`.
-- Log an unexpected exception once: `logger.exception(...)` inside `except` (ruff `TRY400`), and `logger.error(..., exc_info=exc)` in an exception handler, which receives the exception as an argument (ruff `LOG004`).
+- Log an unexpected exception once: `logger.exception(...)` inside `except` (ruff `TRY400`), and `logger.error(..., exc_info=exc)` in the `IntegrityError` handler, which receives the exception as an argument (ruff `LOG004`). The `Exception` handler logs nothing and only answers `internal_error`: Starlette re-raises the exception after that response, and uvicorn logs it with its traceback and the request id (§4.6).
 - `assert` only in tests. Use `assert_never` for exhaustiveness.
 
 ### 4.5 Docstrings and comments
@@ -317,7 +318,7 @@ The subclass decides the HTTP status, and the code tells the frontend what happe
 
 ### 4.6 Logging
 
-- Each module has `logger = logging.getLogger(__name__)`. `tourneyhub/logging_config.py` holds one `dictConfig` dictionary: JSON lines on stderr through python-json-logger's `JsonFormatter`, for the root logger and for the `uvicorn`, `uvicorn.error` and `uvicorn.access` loggers. `create_app()` applies it first, which replaces uvicorn's own configuration, so uvicorn needs no `--log-config` file.
+- Each module has `logger = logging.getLogger(__name__)`. `tourneyhub/logging_config.py` holds one `dictConfig` dictionary: JSON lines on stderr through python-json-logger's `JsonFormatter`, for the root logger and for the `uvicorn`, `uvicorn.error` and `uvicorn.access` loggers. `create_app()` applies it first, as does the CLI's `main()` (§7). In the app it replaces uvicorn's own configuration, so uvicorn needs no `--log-config` file.
 
 ```python
 request_id: ContextVar[str | None] = ContextVar("request_id", default=None)
@@ -358,7 +359,7 @@ LOGGING_CONFIG: dict[str, object] = {
   - The filter sits on the handler. A filter on a logger sees only the records logged on that logger, not those of the `tourneyhub.*` modules or of uvicorn.
 - Pass values as arguments, not f-strings: `logger.info("round generated", extra={"tournament_id": str(tournament_id)})` (ruff `G`, `LOG`).
 - Never log passwords, tokens, cookies, the `Authorization` header, request bodies, the sign-up code or email addresses. Log user ids instead.
-- A middleware puts a request id in a `contextvar`, and a logging filter adds it to every record.
+- A middleware sets a new request id in `request_id` at the start of every request, and the filter adds it to every record. The middleware does not reset it: Starlette's `ServerErrorMiddleware`, which wraps every other middleware, answers an unhandled exception, and uvicorn logs it (§4.4), both after the middleware has returned. Each request runs in its own asyncio task with its own copy of the context.
 - No `print` outside `cli.py` and `openapi.py` (ruff `T20`).
 
 ## 5. FastAPI
@@ -368,7 +369,7 @@ LOGGING_CONFIG: dict[str, object] = {
 - Use `lifespan`, never `on_event`. The lifespan disposes of the database engine.
 - One `APIRouter` per area, with a `prefix` and `tags`.
 - Every endpoint and dependency is `def`; FastAPI runs them in its thread pool. Exception handlers and middleware are `async def` and never block.
-- Dependencies are `Annotated` aliases defined once in `api/deps.py`: `SessionDep`, `SettingsDep`, `NowDep` (`get_now`, which returns `datetime.now(UTC)`), `CurrentUserDep`, `AdminDep`. Endpoints use the aliases, never an inline `Depends(...)`.
+- Dependencies are `Annotated` aliases defined once in `api/deps.py`: `SessionDep`, `SettingsDep`, `NowDep` (`get_now`, which returns `datetime.now(UTC)`), `CurrentUserDep`, `AdminDep`, `LoginThrottleDep`. Endpoints use the aliases, never an inline `Depends(...)`.
 - **The request owns the transaction:**
 
 ```python
@@ -384,16 +385,34 @@ SessionDep = Annotated[Session, Depends(get_session, scope="function")]
 
   - With the default scope, the code after `yield` runs after the response has been sent, so a commit could fail after the client received a 2xx. With `scope="function"`, a failing commit reaches the error handlers, and an `AppError` raised in the endpoint rolls back before its error response goes out.
   - Use `get_session` only through `SessionDep`. A plain `Depends(get_session)` in the same request opens a second session.
-  - The CLI opens its own transaction with `with session_factory.begin() as session:` around one service call.
+  - The CLI and the login throttle (below) open their own transaction with `with session_factory.begin() as session:` around one service call.
   - Integration tests pin this: a commit that fails returns 500 `internal_error`, and one that fails on a known unique constraint returns its 409 code.
 - `CurrentUserDep` loads the user row on every request and raises `ForbiddenError(ErrorCode.PASSWORD_CHANGE_REQUIRED)` while `must_change_password` is set. The `auth` router and `GET /api/v1/me` use a variant without that check (ADR-006). `AdminDep` reads `is_admin` from the same row (ADR-007). Missing tokens are handled with `HTTPBearer(auto_error=False)` and our own `NotAuthenticatedError`, so they get an ADR-008 code instead of FastAPI's English `detail`.
+- The login throttle (ADR-006) waits outside every transaction, so a burst of failed logins cannot take the pool's connections. `throttle_login` reads the delay through a service in a short transaction of its own and sleeps after that transaction has ended. `log_in` lists it first: `def log_in(_throttle: LoginThrottleDep, body: LoginRequest, session: SessionDep, …)`.
+
+```python
+def throttle_login(request: Request, body: LoginRequest, now: NowDep) -> None:
+    """Delay a login after repeated failures (ADR-006), holding no connection."""
+    session_factory: sessionmaker[Session] = request.app.state.session_factory
+    with session_factory.begin() as session:  # a short transaction of its own
+        delay = auth_service.login_delay(
+            session, email=body.email, ip=_client_ip(request), now=now
+        )
+    time.sleep(delay.total_seconds())  # its connection is back in the pool
+
+
+LoginThrottleDep = Annotated[None, Depends(throttle_login)]
+```
+
+  - FastAPI resolves dependencies in the order of the signature. `SessionDep`'s session takes a connection only at its first query, so the throttle comes before any dependency that queries through `SessionDep`.
+  - With the delay inside `SessionDep`'s transaction, 15 delayed logins hold all 15 connections of the pool (§7), and the 16th request fails after `pool_timeout`.
 - Every id in a path or body is loaded through the current organizer's league, under its lock when writing (ADR-008). Another organizer's id is then simply not found (OWASP API1).
 - The return annotation is the response model. Routers return Pydantic models built from service results (`LeagueRead.model_validate(league)`), never dicts or ORM objects.
 - Status codes go on the decorator, as `http.HTTPStatus` members: `@router.post("", status_code=HTTPStatus.CREATED)`.
 - Operation ids are the endpoint function names: `FastAPI(generate_unique_id_function=lambda route: route.name)`. Endpoint names are therefore unique across the app.
 - Each `APIRouter(...)` passes `responses=` with `ErrorResponse` for the error statuses all its routes share; a route adds only its own. The app declares 422 with `ErrorResponse`, which keeps FastAPI's `HTTPValidationError` out of the schema (ADR-008). `ErrorResponse` lives in `api/schemas.py`.
 - `api/errors.py` has handlers for `AppError`, `RequestValidationError`, `starlette.exceptions.HTTPException` (which covers the router's 404 and 405), `IntegrityError` and `Exception` (ADR-008). The validation handler builds `detail` from each error's `loc`, `type` and the numeric `ctx` keys (`min_length`, `max_length`, `ge`, …). It drops `msg`, `url` and `input`, since `input` can contain a password.
-- `python -m tourneyhub.openapi` prints the schema: it builds the app with placeholder settings (the schema does not depend on them, and creating the database engine does not connect) and prints `json.dumps(app.openapi(), indent=2, sort_keys=True)`. CI runs it with `-W error`, which turns a duplicate operation id into a failure, and compares the result with the committed `openapi.json` (§2).
+- `python -m tourneyhub.openapi` prints the schema: it builds the app with placeholder settings (the schema does not depend on them, and creating the database engine does not connect) and prints `json.dumps(app.openapi(), indent=2, sort_keys=True)`. CI runs it with `-W error`, which turns a duplicate operation id into a failure, and compares the result with the committed `openapi.json` (§2). Only the schema goes to stdout; a record logged while the app is built goes to stderr (§4.6).
 - `cli.py` uses `argparse` and reads passwords with `getpass`, never from an argument or an environment variable. It builds its session factory with the same `db` helpers as `create_app()`. Admin services take `source` (`web` or `cli`) and `admin_user_id: UUID | None` and write `admin_actions` themselves, so actions from the web and the CLI are recorded in one place (ADR-007).
 
 ## 6. Pydantic and settings
@@ -441,7 +460,7 @@ class Settings(BaseSettings):
     cookie_secure: bool = True
 ```
 
-- `RequestModel`, `ResponseModel`, `ErrorResponse` and the shared `type` aliases live in `api/schemas.py`; the models of one area live in its router module.
+- `RequestModel`, `ResponseModel`, `ErrorResponse` and the shared `type` aliases live in `api/schemas.py`; the models of one area live in its router module. A model that a dependency reads, such as `LoginRequest`, also lives in `api/schemas.py`: the router module imports `api/deps.py`, so `api/deps.py` cannot import from it.
 - A setting without a safe default has no default. Constraints that would otherwise fail later fail at startup instead, like the length of `jwt_secret`. pydantic-settings does not report a misspelled variable, so a default would hide the mistake.
 - Rules between settings are `model_validator`s on `Settings`: `cookie_secure=False` is refused unless `env == "development"` (ADR-004).
 - Secrets are `SecretStr`, read with `.get_secret_value()` only where they are used.
@@ -506,10 +525,11 @@ league = session.scalars(
   - Without `populate_existing`, a row already in the session gets `FOR UPDATE` but keeps its old attributes, and the expected-state check compares stale data.
   - A lock query that joins other tables uses `with_for_update(of=Model)`. Never combine `FOR UPDATE` with `joinedload`; PostgreSQL refuses it on the nullable side of an outer join.
   - The refresh endpoint locks a token family's rows the same way before reading them (ADR-006).
+  - Creating a league has no league row to lock, and no ADR names another lock, so its checks run unlocked. Two requests that race with one id meet at the primary key, and the later one gets 409 (§4.4).
 - SQLAlchemy 2.1 flushes before every statement, `text()` included. Use `with session.no_autoflush:` while an intermediate state must not reach the database.
-- The engine is `create_engine("postgresql+psycopg://…", pool_pre_ping=True)`. Keep the pool defaults (5 + 10 connections) until a measurement shows FastAPI's 40 worker threads waiting for them.
+- The engine is `create_engine("postgresql+psycopg://…", pool_pre_ping=True)`. Keep the pool defaults (5 + 10 connections) until a measurement shows FastAPI's 40 worker threads waiting for them. Nothing waits inside a transaction; the login throttle sleeps after its own has ended (§5).
 - ORM objects stay in the session that loaded them: never hand them to another session, another thread or a cache.
-- Use `with` blocks for every session and connection. SQLAlchemy 2.1.6 on Python 3.15 leaks a pool slot for a session dropped without `close()` inside a transaction. The fix is in 2.1.7, not yet released; raise the lower bound in §2 when it ships.
+- Use `with` blocks for every session and connection.
 
 **Migrations**
 - Alembic lives in `src/tourneyhub/migrations/`, configured in `[tool.alembic]` (§2); its post-write hooks run ruff on new files. There is no `alembic.ini`, and `env.py` leaves logging to the app:
@@ -537,11 +557,23 @@ else:
     finally:
         _engine.dispose()
 ```
+- The wheel ships `migrations/` but not `pyproject.toml`, so in the image `alembic upgrade head` stops with "No 'script_location' key found in configuration". The `api` container runs `tourneyhub migrate` before uvicorn instead (ADR-004, ADR-014). It builds the configuration in code, and `env.py` takes the database from `Settings`:
+
+```python
+def migrate() -> None:
+    """Run `alembic upgrade head` from the installed package (ADR-014)."""
+    config = Config()  # the image has no pyproject.toml
+    config.set_main_option("script_location", "tourneyhub:migrations")
+    command.upgrade(config, "head")
+```
+
+  - A test in `tests/migrations/` runs `main(["migrate"])` on the migration tests' empty database (§9) and compares its revision with the head that `[tool.alembic]` finds, so the two configurations cannot drift apart.
+  - `main()` applies the logging configuration of §4.6 first, as `create_app()` does; otherwise the container log shows no `Running upgrade` line.
 - One linear history.
 - Autogenerate is a draft. Read every generated migration. It misses changes to a partial index's `WHERE`, to a CHECK expression and to enum values, and it turns a rename into a drop and an add.
 - Data migrations use `op.execute()` or `sa.table()` stubs, never the app's models. The models will change, but the migration must not.
 - Every migration has a working `downgrade()`. A migration that cannot be undone raises `NotImplementedError` in `downgrade()`, says why, and becomes the `minimum_downgrade_revision` in the `alembic_config` fixture of `tests/migrations/`; otherwise pytest-alembic's up-and-down test fails on it.
-- CI runs `alembic upgrade head` and `alembic check`, plus pytest-alembic's tests (`test_single_head_revision`, `test_upgrade`, `test_up_down_consistency`, `test_model_definitions_match_ddl`). Their `alembic_engine` fixture uses the test database of §9 and disposes of its engine.
+- CI runs `alembic upgrade head` and `alembic check`, plus pytest-alembic's tests (`test_single_head_revision`, `test_upgrade`, `test_up_down_consistency`, `test_model_definitions_match_ddl`). Their `alembic_engine` fixture uses a database of their own (§9) and disposes of its engine.
 
 ## 8. Engine
 
@@ -564,7 +596,7 @@ else:
   - A failure Hypothesis finds becomes an `@example(...)`; `@reproduce_failure` is never committed.
   - CI uses Hypothesis's built-in `ci` profile (derandomized, no deadline), selected by the `CI` variable; don't redefine it.
   - Pairing tests cap the field at about 32 entries and set `@settings(deadline=None)` (ADR-011).
-- Integration tests use PostgreSQL 17 created with the builtin locale (DATA-MODEL §2). A session-scoped `settings` fixture reads its URL from `TOURNEYHUB_TEST_DATABASE_URL`. A session-scoped `engine` fixture creates the engine, puts it in `config.attributes["connection"]` of `Config(toml_file=...)` and runs `command.upgrade(config, "head")` once. Each test then runs in a transaction that is rolled back:
+- Integration tests use PostgreSQL 17 created with the builtin locale (DATA-MODEL §2). A session-scoped `settings` fixture reads its URL from `TOURNEYHUB_TEST_DATABASE_URL` and passes `env="development", cookie_secure=False`: the test client talks to `http://testserver`, and a client never sends a `Secure` cookie back over plain HTTP. A session-scoped `engine` fixture creates the engine, puts it in `config.attributes["connection"]` of `Config(toml_file=...)` and runs `command.upgrade(config, "head")` once. Each test then runs in a transaction that is rolled back:
 
 ```python
 @pytest.fixture
@@ -610,12 +642,28 @@ def client(settings: Settings, session: Session) -> Iterator[TestClient]:
   - The teardown commits what the test left, as the end of a request would: the deferred foreign keys are checked, and the invariant queries see the test's rows. A rollback would discard every row a service test flushed. Only a session whose flush failed (`is_active` is false) is rolled back, to its last commit.
   - A test that provokes a database error does so inside `with session.begin_nested():`, like the `client` override. Outside a savepoint the failed statement aborts the transaction, and the commit in teardown fails.
   - `assert_invariants` grows with the tables that DATA-MODEL §5's queries need.
-  - A test of a 500 response creates its client with `raise_server_exceptions=False`; otherwise the test client raises the error instead of returning the response.
+  - A test of a 500 response creates its client with `raise_server_exceptions=False`; otherwise the test client raises the error instead of returning the response. The test sees no log record of the error; uvicorn writes it (§4.4).
+  - The `client` override replaces only `get_session`. `throttle_login` opens its own session from `app.state` (§5) and does not see the rows a test added, so the login delay is tested at the service level, through `login_delay` with the test session.
   - `httpx2` is installed; Starlette's test client warns about plain `httpx`, and the warning fails the run.
+- pytest-alembic's tests (§7) run on a database of their own, from `TOURNEYHUB_TEST_MIGRATIONS_DATABASE_URL`, emptied before each test. On the database the `engine` fixture migrated, `test_upgrade` would start at head and run nothing, and `test_up_down_consistency` would drop and rebuild the schema the other tests share, so one broken downgrade would fail unrelated tests in some orders:
+
+```python
+@pytest.fixture
+def alembic_engine() -> Iterator[Engine]:
+    """A database of their own, emptied first, so each test starts from base."""
+    engine = create_engine(os.environ["TOURNEYHUB_TEST_MIGRATIONS_DATABASE_URL"])
+    with engine.begin() as connection:
+        connection.execute(text("DROP SCHEMA public CASCADE"))
+        connection.execute(text("CREATE SCHEMA public"))
+    yield engine
+    engine.dispose()
+```
+
+  - CI creates the second database in the same PostgreSQL service, so it gets the builtin locale as well.
 - Lock tests (ADR-006, ADR-008) cannot run inside one rolled-back transaction. They commit on two connections, end with `TRUNCATE … CASCADE` and carry the `concurrency` marker.
 - Every route that takes an id is tested with another organizer's id (expect 404), and every admin route as a non-admin (expect 403) (OWASP API1, API5).
 - Tests override `get_now`, the function behind `NowDep`, with a fixed time instead of patching the clock.
-- `create_app()` binds the log handler to the `sys.stderr` of that moment. Under `capsys` or `capfd`, that is a stream pytest closes after the test, and later records end in `--- Logging error ---`. A test that uses them, or reads the log, calls `create_app()` inside `redirect_stderr(io.StringIO())`. `tests/test_logging_config.py` pins §4.6:
+- `create_app()` and the CLI's `main()` bind the log handler to the `sys.stderr` of that moment. Under `capsys` or `capfd`, that is a stream pytest closes after the test, and later records end in `--- Logging error ---`. A test that uses those fixtures, or reads the log, calls either inside `redirect_stderr(io.StringIO())`. `tests/test_logging_config.py` pins §4.6:
 
 ```python
 def test_a_module_logger_emits_a_json_line(settings: Settings) -> None:
@@ -660,11 +708,11 @@ def decode_access_token(token: str, key: SecretStr) -> dict[str, Any]:
 | Document | Today | Proposal | Why |
 |---|---|---|---|
 | ADR-001 | Python 3.13 | Python 3.15 (changed in this pull request) | 3.15.0 came out on 2026-10-09; every dependency installs from wheels |
-| ADR-001 | SQLAlchemy 2.0 | SQLAlchemy 2.1 (changed in this pull request) | Current stable release since 2026-09-24, same 2.0-style API; 2.1 removed the mypy plugin |
+| ADR-001 | SQLAlchemy 2.0 | SQLAlchemy 2.1 (changed in this pull request) | Current stable release since 2026-09-24, same 2.0-style API; 2.1.0b1 removed the mypy plugin. §2 requires 2.1.7 (2026-11-03), which fixes a pool leak on Python 3.15 |
 | ADR-001 | — | Record that the request owns the transaction (`Depends(scope="function")`, §5) | With the default scope (`"request"`, FastAPI 0.118 and later), the commit runs after the response is sent; `scope="function"` exists since 0.121.0 |
-| ADR-008 | Codes for 401, 403, 404, 409 | 422 with a stable code when a business rule refuses a request (`RuleViolationError`), and the framework codes of §4.4 | ADR-008 names no status or code for these |
+| ADR-008 | Codes for 401, 403, 404, 409 | 422 with a stable code when the current state refuses a request and the organizer needs a message (`RuleViolationError`); 409 only for a stale expectation that a reload repairs; and the framework codes of §4.4 | ADR-008 names no status or code for these |
 | ADR-010 | A test enforces that the engine does not use `random` | ruff `banned-api` and the import-linter contract enforce it | Checked on every lint run, no extra test |
-| ADR-012 | Backend checks | Add the coverage gates (90 % overall, 100 % engine), pytest-alembic, the OpenAPI drift check through `tourneyhub.openapi`, and `uv audit` (a preview command). The CI PostgreSQL service needs `POSTGRES_INITDB_ARGS` from DATA-MODEL §2 | The locale-folding test fails without it |
+| ADR-012 | Backend checks | Add the coverage gates (90 % overall, 100 % engine), pytest-alembic, the OpenAPI drift check through `tourneyhub.openapi`, and `uv audit` (a preview command). The CI PostgreSQL service needs `POSTGRES_INITDB_ARGS` from DATA-MODEL §2 and a second database for the migration tests (§9) | The locale-folding test fails without it |
 | DATA-MODEL §2, §5 | Integration tests run in one rolled-back transaction, with invariant queries after each | Lock tests commit on two connections (§9) | Locks cannot be tested inside one transaction |
 | ADR-006, ADR-014 | — | Size the VPS for Argon2, or limit concurrent hashing: 64 MiB per hash × up to 40 threads ≈ 2.5 GiB in a burst of logins | Argon2's default uses 64 MiB per hash |
 | ADR-014 | — | Decide `psycopg[binary]` or `psycopg[c]` for production | psycopg's documentation recommends `[c]` for production |
@@ -679,6 +727,7 @@ def decode_access_token(token: str, key: SecretStr) -> dict[str, Any]:
 - Tools: https://docs.astral.sh/uv/, https://docs.astral.sh/ruff/, https://mypy.readthedocs.io/, https://import-linter.readthedocs.io/
 - uv releases with CPython 3.15 (0.13.0, 0.13.6): https://github.com/astral-sh/uv/blob/main/CHANGELOG.md
 - FastAPI dependencies with `yield` and their scope (0.118.0, 0.121.0): https://fastapi.tiangolo.com/tutorial/dependencies/dependencies-with-yield/, https://fastapi.tiangolo.com/release-notes/
-- SQLAlchemy 2.1: https://docs.sqlalchemy.org/en/21/changelog/migration_21.html, the 2.1.7 pool fix for Python 3.15 (#13738) in https://docs.sqlalchemy.org/en/21/changelog/changelog_21.html, https://docs.sqlalchemy.org/en/21/orm/queryguide/api.html#populate-existing, https://docs.sqlalchemy.org/en/21/orm/session_transaction.html
-- Alembic: https://alembic.sqlalchemy.org/en/latest/naming.html, https://alembic.sqlalchemy.org/en/latest/autogenerate.html, the 1.20.1 CHECK fix (#1884) in https://alembic.sqlalchemy.org/en/latest/changelog.html
+- SQLAlchemy 2.1: https://docs.sqlalchemy.org/en/21/changelog/migration_21.html; the mypy plugin's removal in 2.1.0b1 (#12293) and the 2.1.7 pool fix for Python 3.15 (#13738) in https://docs.sqlalchemy.org/en/21/changelog/changelog_21.html; release dates in https://pypi.org/project/SQLAlchemy/#history; `NewType` in `type_annotation_map`: https://docs.sqlalchemy.org/en/21/orm/declarative_tables.html#support-for-type-alias-types-defined-by-pep-695-and-newtype; one thread at a time: https://docs.sqlalchemy.org/en/21/orm/session_basics.html#is-the-session-thread-safe-is-asyncsession-safe-to-share-in-concurrent-tasks; https://docs.sqlalchemy.org/en/21/orm/queryguide/api.html#populate-existing, https://docs.sqlalchemy.org/en/21/orm/session_transaction.html
+- Alembic: https://alembic.sqlalchemy.org/en/latest/naming.html, https://alembic.sqlalchemy.org/en/latest/autogenerate.html, the 1.20.1 CHECK fix (#1884) in https://alembic.sqlalchemy.org/en/latest/changelog.html, a `Config` built in code: https://alembic.sqlalchemy.org/en/latest/api/config.html
+- Logging: https://docs.python.org/3.15/library/logging.config.html (`disable_existing_loggers`), https://docs.python.org/3.15/library/logging.html#filter-objects, Starlette's `ServerErrorMiddleware`, which re-raises so that the server logs: https://github.com/Kludex/starlette/blob/main/starlette/middleware/errors.py
 - Security: RFC 9106, RFC 8725, OWASP Password Storage, Authentication and Logging Cheat Sheets, OWASP API Security Top 10 (2023), NIST SP 800-63B-4 §3.1.1.2: https://pages.nist.gov/800-63-4/sp800-63b.html
