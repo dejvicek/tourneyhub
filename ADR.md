@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | Status | Proposed — awaiting review by another developer |
-| Date | 2026-10-16, revised 2026-10-21 after review |
-| Scope | Technical decisions for the MVP in `PRD.md`. Once accepted, a changed decision gets a new ADR that supersedes the old one; accepted ADRs are not rewritten. |
+| Date | 2026-10-16, revised 2026-10-21 after review; ADR-015 to ADR-019 added 2026-11-05 |
+| Scope | Technical decisions for the MVP in `PRD.md`, and from ADR-015 on for roadmap items as far as they shape the MVP. Once accepted, a changed decision gets a new ADR that supersedes the old one; accepted ADRs are not rewritten. |
 
 Each ADR states its status, the context, the decision, its consequences and the alternatives considered. Requirement IDs (FR-, BR-, RM-) refer to `PRD.md` and `ROADMAP.md`.
 
@@ -24,6 +24,11 @@ Each ADR states its status, the context, the decision, its consequences and the 
 | ADR-012 | Quality gates in GitHub Actions | Proposed |
 | ADR-013 | End-to-end tests and checks with Playwright | Proposed |
 | ADR-014 | Deployment: images in GHCR, manual pull on the VPS | Proposed |
+| ADR-015 | Tournament as an ordered program of phases | Proposed |
+| ADR-016 | Match rules as engine presets; phases keep a copy | Proposed |
+| ADR-017 | Time limits: deadlines derived from stored times | Proposed |
+| ADR-018 | Statistics as stat lines computed on read | Proposed |
+| ADR-019 | Live updates for running tournaments: Server-Sent Events | Proposed |
 
 ---
 
@@ -348,3 +353,95 @@ Each ADR states its status, the context, the decision, its consequences and the 
 **Consequences.** What runs on the VPS is what CI tested. Updating needs a person with access to the VPS, which suits a pilot with one instance.
 
 **Alternatives considered.** Automatic deploy from CI over SSH (CI holds a production key). Building on the VPS (load on production, and what runs is not exactly what CI tested).
+
+---
+
+## ADR-015 — Tournament as an ordered program of phases
+
+**Status.** Proposed.
+
+**Context.** An MVP tournament has at most a group phase and a knockout (FR-031). Later formats need more. Several groups can feed one knockout (RM-06). A double-elimination knockout can follow a group phase (RM-05). An evening can be a run of short phases, each with its own rules. Scheduling (RM-18) adds breaks between rounds. If the order of the phases followed only from their `kind`, each of these would need a migration of MVP tournaments.
+
+**Decision.**
+- A tournament holds an ordered list of phases, numbered by `position` 1, 2, … (DATA-MODEL D9). In the MVP, a tournament still has at most one group phase and one knockout, in that order. A partial unique index on `kind` enforces this, so the rule holds unchanged when later kinds arrive.
+- A phase has two settings: its **format**, which says how the sides of each round are formed, and its **rules**, which say how a match is played and scored (ADR-016). The MVP formats are `round_robin`, `swiss`, `monster_dyp` and `single_elimination`. A new format is a new engine module and does not change the tournament model.
+- A phase can take its seeding from the standings of earlier phases. The MVP knockout already does this (BR-085).
+- A format can read the rounds of earlier phases, for example to balance partners and opponents across the whole tournament instead of within one phase. Stored rounds are its input, as they already are for Swiss and Monster DYP (ADR-009).
+- Breaks belong to the program, not to a phase. A break comes after a given round, with rounds numbered across the whole program, and has a length. The next round becomes playable when the length is over, or earlier if the organizer starts it. Breaks come with RM-18.
+
+**Consequences.** The MVP behaves exactly as specified. Its schema only gains `position`, so later phases need no migration of MVP tournaments. Rounds stay numbered within their phase. The program-wide round number used by breaks follows from the order of the phases.
+
+**Alternatives considered.** A group and a knockout reference on the tournament (every new kind of phase needs a column). One phase with rules per round (rounds of one phase could no longer differ in format or seeding).
+
+---
+
+## ADR-016 — Match rules as engine presets; phases keep a copy
+
+**Status.** Proposed.
+
+**Context.** The MVP has two rules on a phase: the match format and the goals per game (BR-120, BR-123). Variants of a sport and other sports (RM-27) need more. A game can be won by a 2-goal lead with a cap. It can start from a given score, which is shown but does not count. It can be singles only, track stats besides the score, or have a time limit (ADR-017). Rules change over time, and a played tournament must not change with them.
+
+**Decision.**
+- Rules are presets in the engine (`tourneyhub.engine.presets`, one module per sport: foosball first, others with RM-27), versioned and tested with it.
+- Creating a phase copies the preset's parameters into the phase: `preset` (the preset's code), `rules` (`jsonb`, validated by the engine's model) and typed columns for the time limit (ADR-017). The engine reads only the phase's copy. It never reads the current preset for a phase that exists.
+- A retired preset stays in the engine as read-only, so old phases still show its name.
+- The MVP's match format and goals per game stay typed columns. They are the first rules, and later rules go into `rules`.
+- The texts that explain a preset to players are frontend translations (FR-080), not engine data.
+
+**Consequences.** Changing a preset never changes a played tournament. New presets need a release, which is acceptable while one instance uses them. Organizer-defined rules can come with RM-29 without changing how phases store their rules.
+
+**Alternatives considered.** Rules as league data the organizer edits (every rule needs a screen and validation; premature). A reference to the preset without a copy (editing a preset would rewrite past results).
+
+---
+
+## ADR-017 — Time limits: deadlines derived from stored times
+
+**Status.** Proposed.
+
+**Context.** A match can have a limit: preparation plus play time, for example 1 + 8 minutes. When it runs out, the match ends with the score as it stands, so the tournament keeps its planned length. The MVP has no match times (PRD §4.2, RM-18). Where time limits apply is decided when RM-18 is picked up. A phase without a limit behaves as in the MVP. The engine reads no clock (ADR-009).
+
+**Decision.**
+- **Stored:** for each match, `called_at` (it got a field and its players were free, BR-130), `started_at`, `ended_at` and `end_reason` (`completed`, `time_up`, `walkover`, `organizer`). The program's breaks and the tournament store when they started and ended.
+- **Derived:** `play_from = min(started_at, called_at + prep)` and `deadline = play_from + play`, with `prep` and `play` from the phase (ADR-016). A side that starts late loses playing time, and the tournament does not wait for it. The engine gets `now` as a parameter. A match past its deadline counts as ended at the deadline in the field queue even before anything is written, so the next match gets its field on time.
+- **Ending:** the first device that sees the deadline pass, or the organizer, sends an end with `time_up` and the state it expects. The server checks `now ≥ deadline` with its own clock and stores `ended_at = deadline` with the score as it stands. A repeat gets 409 (ADR-008). No scheduler and no cron job are needed.
+- **Result:** the score as it stands, a draw included. A result ended by time can be corrected like any other (FR-053).
+- **Clock:** clients take the offset to the server's clock from the `Date` response header and count down with it, so a phone with a wrong clock cannot end a match early.
+- **Forecast:** the engine runs the field queue forward from `now`, with each match not yet played taking its full limit. It returns the latest expected end of the tournament and the delay against the plan. Nothing is stored.
+
+**Consequences.** BR-092 (the winner of a game has the higher score) gets an exception for `time_up` results. The countdown needs live updates (ADR-019). Waiting times (from a match becoming playable to its start) follow from the same columns.
+
+**Alternatives considered.** The play time counted from the start only (a late start delays the whole tournament). A server job that ends matches (needs a scheduler and still races with result entry). The device's clock (wrong clocks end matches early or late).
+
+---
+
+## ADR-018 — Statistics as stat lines computed on read
+
+**Status.** Proposed.
+
+**Context.** The MVP has season standings from placement points (BR-110–BR-113). Later items need more. Player pages show win rates and head-to-head records (RM-09). A season can count only the best N tournaments (RM-04). A league can rank players by how they play instead of where they placed: score difference, wins and goals for, as totals or per game, over a season, the last N days, all time or a date range.
+
+**Decision.**
+- The engine computes a **stat line** per player and tournament from the stored matches, games, side stats and times: games, wins, goals for and against, the tracked stats and the games in which they were recorded, waiting and playing time.
+- League statistics add the stat lines up over a **scope**: a season, a window of N days ending on `today`, all time or a date range. `today` is a parameter, not the clock. A **ranking** orders the totals: `placement_points` (the MVP's season standings) or `performance` (score difference, then wins, then goals for). Rankings show **totals** or an **average** per game and in percentages. The window length and the minimum number of tournaments for the average are league settings.
+- Nothing is stored (D1). Corrections need no recalculation.
+
+**Consequences.** When a league's phases play games of different lengths, the per-game average mixes them. A filter by preset can be added later without changing the model. The guidelines of ADR-009 apply.
+
+**Alternatives considered.** Stat lines stored and updated on every write (drift, recalculation on corrections). A rating such as Elo (a different item, RM-15).
+
+---
+
+## ADR-019 — Live updates for running tournaments: Server-Sent Events
+
+**Status.** Proposed. Decided for good when RM-03 is picked up.
+
+**Context.** RM-03: the share link updates by itself while matches are played. A countdown (ADR-017) and the field queue need to reach every screen within seconds. The MVP has no live updates (PRD §4.2). ADR-001 keeps endpoints synchronous and allows async ones where live updates need them.
+
+**Decision.**
+- One Server-Sent Events stream per tournament, for the organizer and on the share link. It sends only "the tournament changed" with a version number, and the client reloads the affected queries (TanStack Query, ADR-003).
+- Writes notify through PostgreSQL `LISTEN`/`NOTIFY` after commit. The stream endpoint is the only async endpoint.
+- Caddy passes `text/event-stream` responses through without buffering.
+
+**Consequences.** No new service (no Redis, no message broker). A lost event costs at most one stale screen until the next event or reload. Every client reloads on every change, which is fine at the sizes of ADR-009.
+
+**Alternatives considered.** WebSockets (two-way, which nothing needs). Polling every few seconds (simplest and acceptable at MVP load, but it makes a countdown jump; kept as the fallback when the stream fails).
