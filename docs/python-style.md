@@ -547,7 +547,7 @@ def test_a_module_logger_emits_a_json_line(settings: Settings) -> None:
 ## 10. Security
 
 - Passwords: argon2-cffi `PasswordHasher()` with its defaults (RFC 9106's low-memory profile). Call `check_needs_rehash` after a successful login (ADR-006). An unknown email is verified against a dummy hash, so the response time does not reveal which accounts exist.
-- Every Argon2 hash and verification (login, password change, the `check_needs_rehash` rehash, the dummy hash for an unknown email) runs under one process-wide `threading.BoundedSemaphore(4)`, so at most 4 hashes of 64 MiB run at once, however many of FastAPI's 40 threads are logging in (ADR-006, §11). A login waits for the semaphore inside its transaction and holds its connection; the wait lasts only while the hashes ahead of it run, unlike the throttle's delay (§5).
+- Every Argon2 hash and verification (login, password change, the `check_needs_rehash` rehash, the dummy hash for an unknown email) runs under one process-wide `threading.BoundedSemaphore(4)`, so at most 4 hashes of 64 MiB run at once, however many of FastAPI's 40 threads are logging in (ADR-006). A login waits for the semaphore inside its transaction and holds its connection; the wait lasts only while the hashes ahead of it run, unlike the throttle's delay (§5).
 - Access tokens with PyJWT; the algorithm list is fixed in code, never read from the token:
 
 ```python
@@ -576,16 +576,11 @@ The Status column records the decisions of the review of 2026-11-04. Accepted ro
 
 | Document | Today | Proposal | Why | Status |
 |---|---|---|---|---|
-| ADR-001 | — | Record that the request owns the transaction (`Depends(scope="function")`, §5) | With the default scope (`"request"`, FastAPI 0.118 and later), the commit runs after the response is sent; `scope="function"` exists since 0.121.0 | Accepted |
-| ADR-008 | Codes for 401, 403, 404, 409 | 422 with a stable code when the current state refuses a request and the organizer needs a message (`RuleViolationError`); 409 only for a stale expectation that a reload repairs; and the framework codes of §4.4 | ADR-008 names no status or code for these | Accepted |
-| ADR-010 | A test enforces that the engine does not use `random` | ruff `banned-api` and the import-linter contract enforce it | Checked on every lint run, no extra test | Accepted |
-| ADR-012 | Backend checks | Add the coverage gates (90 % overall, 100 % engine), pytest-alembic, the OpenAPI drift check through `tourneyhub.openapi`, and `uv audit` (a preview command). The CI PostgreSQL service needs `POSTGRES_INITDB_ARGS` from DATA-MODEL §2 and a second database for the migration tests (§9) | The locale-folding test fails without it | Accepted |
 | DATA-MODEL §2, §5 | Integration tests run in one rolled-back transaction, with invariant queries after each | Lock tests commit on two connections (§9) | Locks cannot be tested inside one transaction | Accepted |
-| ADR-006, ADR-014 | — | Limit concurrent hashing to 4 with one bounded semaphore (§10) | Argon2's default uses 64 MiB per hash: up to 40 threads would need about 2.5 GiB in a burst of logins, 4 need at most 4 × 64 MiB = 256 MiB | Accepted with a change: the semaphore replaces sizing the VPS |
 | ADR-014 | — | Decide `psycopg[binary]` or `psycopg[c]` for production | psycopg's documentation recommends `[c]` for production | Deferred to the deployment phase |
 | DATA-MODEL §2 | UUIDv7 from `uuid-utils` | `uuid.uuid7()` from the standard library | In the standard library since 3.14 | Accepted |
 | DATA-MODEL §2 | Enumerations are `text` with a CHECK | Accept `varchar` without a length, which `str_enum()` creates | Identical to `text` in PostgreSQL; `text` itself needs a custom type | Accepted |
-| PRD FR-002 (owner: PRD team), ADR-006 | Passwords of at least 12 characters | At least 15 | NIST SP 800-63B-4 (2025) requires 15 for a password used alone | Accepted: at least 15; FR-002 and ADR-006 follow. The reviewer decides the NIST blocklist and the 64-character maximum |
+| PRD FR-002 (owner: PRD team) | Passwords of at least 12 characters | At least 15 | NIST SP 800-63B-4 (2025) requires 15 for a password used alone | Accepted: ADR-006 done, FR-002 waits for the PRD team. The reviewer decides the NIST blocklist and the 64-character maximum with it |
 
 ## 12. Sources
 
