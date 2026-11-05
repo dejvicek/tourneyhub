@@ -542,7 +542,7 @@ league = session.scalars(
   - The refresh endpoint locks a token family's rows the same way before reading them (ADR-006).
   - Creating a league has no league row to lock, and no ADR names another lock, so its checks run unlocked. Two requests that race with one id meet at the primary key, and the later one gets 409 (§4.4).
 - SQLAlchemy 2.1 flushes before every statement, `text()` included. Use `with session.no_autoflush:` while an intermediate state must not reach the database.
-- The engine is `create_engine("postgresql+psycopg://…", pool_pre_ping=True)`. Keep the pool defaults (5 + 10 connections) until a measurement shows FastAPI's 40 worker threads waiting for them. Nothing waits inside a transaction; the login throttle sleeps after its own has ended (§5).
+- The engine is `create_engine("postgresql+psycopg://…", pool_pre_ping=True)`. Keep the pool defaults (5 + 10 connections) until a measurement shows FastAPI's 40 worker threads waiting for them. Nothing sleeps inside a transaction; the login throttle sleeps after its own has ended (§5).
 - ORM objects stay in the session that loaded them: never hand them to another session or a cache, and never use a session or its objects from two threads concurrently. One after the other is fine: FastAPI runs a request's dependencies, endpoint and commit on whichever threads of its pool are free, and the test client of §9 hands the test's session to them. A lock test (§9) that uses threads gives each its own session.
 - Use `with` blocks for every session and connection.
 
@@ -696,6 +696,7 @@ def test_a_module_logger_emits_a_json_line(settings: Settings) -> None:
 ## 10. Security
 
 - Passwords: argon2-cffi `PasswordHasher()` with its defaults (RFC 9106's low-memory profile). Call `check_needs_rehash` after a successful login (ADR-006). An unknown email is verified against a dummy hash, so the response time does not reveal which accounts exist.
+- Every Argon2 hash and verification (login, password change, the `check_needs_rehash` rehash, the dummy hash for an unknown email) runs under one process-wide `threading.BoundedSemaphore(4)`, so at most 4 hashes of 64 MiB run at once, however many of FastAPI's 40 threads are logging in (ADR-006, §11). A login waits for the semaphore inside its transaction and holds its connection; the wait lasts only while the hashes ahead of it run, unlike the throttle's delay (§5).
 - Access tokens with PyJWT; the algorithm list is fixed in code, never read from the token:
 
 ```python
@@ -720,20 +721,22 @@ def decode_access_token(token: str, key: SecretStr) -> dict[str, Any]:
 
 ## 11. Proposed changes to other documents
 
-| Document | Today | Proposal | Why |
-|---|---|---|---|
-| ADR-001 | Python 3.13 | Python 3.15 (changed in this pull request) | 3.15.0 came out on 2026-10-09; every dependency installs from wheels |
-| ADR-001 | SQLAlchemy 2.0 | SQLAlchemy 2.1 (changed in this pull request) | Current stable release since 2026-09-24, same 2.0-style API; 2.1.0b1 removed the mypy plugin. §2 requires 2.1.7 (2026-11-03), which fixes a pool leak on Python 3.15 |
-| ADR-001 | — | Record that the request owns the transaction (`Depends(scope="function")`, §5) | With the default scope (`"request"`, FastAPI 0.118 and later), the commit runs after the response is sent; `scope="function"` exists since 0.121.0 |
-| ADR-008 | Codes for 401, 403, 404, 409 | 422 with a stable code when the current state refuses a request and the organizer needs a message (`RuleViolationError`); 409 only for a stale expectation that a reload repairs; and the framework codes of §4.4 | ADR-008 names no status or code for these |
-| ADR-010 | A test enforces that the engine does not use `random` | ruff `banned-api` and the import-linter contract enforce it | Checked on every lint run, no extra test |
-| ADR-012 | Backend checks | Add the coverage gates (90 % overall, 100 % engine), pytest-alembic, the OpenAPI drift check through `tourneyhub.openapi`, and `uv audit` (a preview command). The CI PostgreSQL service needs `POSTGRES_INITDB_ARGS` from DATA-MODEL §2 and a second database for the migration tests (§9) | The locale-folding test fails without it |
-| DATA-MODEL §2, §5 | Integration tests run in one rolled-back transaction, with invariant queries after each | Lock tests commit on two connections (§9) | Locks cannot be tested inside one transaction |
-| ADR-006, ADR-014 | — | Size the VPS for Argon2, or limit concurrent hashing: 64 MiB per hash × up to 40 threads ≈ 2.5 GiB in a burst of logins | Argon2's default uses 64 MiB per hash |
-| ADR-014 | — | Decide `psycopg[binary]` or `psycopg[c]` for production | psycopg's documentation recommends `[c]` for production |
-| DATA-MODEL §2 | UUIDv7 from `uuid-utils` | `uuid.uuid7()` from the standard library | In the standard library since 3.14 |
-| DATA-MODEL §2 | Enumerations are `text` with a CHECK | Accept `varchar` without a length, which `str_enum()` creates | Identical to `text` in PostgreSQL; `text` itself needs a custom type |
-| PRD FR-002 (owner: PRD team), ADR-006 | Passwords of at least 12 characters | At least 15 | NIST SP 800-63B-4 (2025) requires 15 for a password used alone |
+The Status column records the decisions of the review of 2026-11-04. Accepted rows move into their documents in follow-up pull requests and then leave this table; the first two, already changed in ADR.md, leave after the backend skeleton pull request.
+
+| Document | Today | Proposal | Why | Status |
+|---|---|---|---|---|
+| ADR-001 | Python 3.13 | Python 3.15 (changed in this pull request) | 3.15.0 came out on 2026-10-09; every dependency installs from wheels | Accepted; already in ADR.md |
+| ADR-001 | SQLAlchemy 2.0 | SQLAlchemy 2.1 (changed in this pull request) | Current stable release since 2026-09-24, same 2.0-style API; 2.1.0b1 removed the mypy plugin. §2 requires 2.1.7 (2026-11-03), which fixes a pool leak on Python 3.15 | Accepted; already in ADR.md |
+| ADR-001 | — | Record that the request owns the transaction (`Depends(scope="function")`, §5) | With the default scope (`"request"`, FastAPI 0.118 and later), the commit runs after the response is sent; `scope="function"` exists since 0.121.0 | Accepted |
+| ADR-008 | Codes for 401, 403, 404, 409 | 422 with a stable code when the current state refuses a request and the organizer needs a message (`RuleViolationError`); 409 only for a stale expectation that a reload repairs; and the framework codes of §4.4 | ADR-008 names no status or code for these | Accepted |
+| ADR-010 | A test enforces that the engine does not use `random` | ruff `banned-api` and the import-linter contract enforce it | Checked on every lint run, no extra test | Accepted |
+| ADR-012 | Backend checks | Add the coverage gates (90 % overall, 100 % engine), pytest-alembic, the OpenAPI drift check through `tourneyhub.openapi`, and `uv audit` (a preview command). The CI PostgreSQL service needs `POSTGRES_INITDB_ARGS` from DATA-MODEL §2 and a second database for the migration tests (§9) | The locale-folding test fails without it | Accepted |
+| DATA-MODEL §2, §5 | Integration tests run in one rolled-back transaction, with invariant queries after each | Lock tests commit on two connections (§9) | Locks cannot be tested inside one transaction | Accepted |
+| ADR-006, ADR-014 | — | Limit concurrent hashing to 4 with one bounded semaphore (§10) | Argon2's default uses 64 MiB per hash: up to 40 threads would need about 2.5 GiB in a burst of logins, 4 need at most 4 × 64 MiB = 256 MiB | Accepted with a change: the semaphore replaces sizing the VPS |
+| ADR-014 | — | Decide `psycopg[binary]` or `psycopg[c]` for production | psycopg's documentation recommends `[c]` for production | Deferred to the deployment phase |
+| DATA-MODEL §2 | UUIDv7 from `uuid-utils` | `uuid.uuid7()` from the standard library | In the standard library since 3.14 | Accepted |
+| DATA-MODEL §2 | Enumerations are `text` with a CHECK | Accept `varchar` without a length, which `str_enum()` creates | Identical to `text` in PostgreSQL; `text` itself needs a custom type | Accepted |
+| PRD FR-002 (owner: PRD team), ADR-006 | Passwords of at least 12 characters | At least 15 | NIST SP 800-63B-4 (2025) requires 15 for a password used alone | Accepted: at least 15; FR-002 and ADR-006 follow. The reviewer decides the NIST blocklist and the 64-character maximum |
 
 ## 12. Sources
 
