@@ -154,6 +154,15 @@ containers = ["tourneyhub"]
 layers = ["api | cli", "services", "db", "engine"]
 
 [[tool.importlinter.contracts]]
+name = "Routers and dependencies run no queries (§3)"
+type = "forbidden"
+source_modules = ["tourneyhub.api"]
+forbidden_modules = ["tourneyhub.db"]
+allow_indirect_imports = true       # api -> services -> db is the normal path
+# CurrentUserDep and AdminDep are typed with the users row (§5)
+ignore_imports = ["tourneyhub.api.deps -> tourneyhub.db.models.accounts"]
+
+[[tool.importlinter.contracts]]
 name = "The engine is pure (ADR-009, ADR-010)"
 type = "forbidden"
 source_modules = ["tourneyhub.engine"]
@@ -239,7 +248,7 @@ Layers, enforced by import-linter: `api` and `cli` → `services` → `db` → `
 
 - **`engine`** imports nothing from the rest of `tourneyhub`, no framework and no source of time or chance (§2). It also holds the domain `StrEnum`s, so that `db` and `api` can use them.
 - **`services`** are module-level functions in `services/<area>.py`, named verb first (`create_league`, `generate_round`). A service takes `session: Session` first, then keyword-only arguments: plain values, never request models, and `now: datetime` when it needs the time. It takes the locks and checks the expected state (§7), calls the engine and raises `AppError`s. It returns ORM rows or engine values with everything the response will read already loaded; a `lazy="raise"` error in a router is a bug in the service. Services never import FastAPI, never commit and never build response models.
-- **`api`** turns requests into service calls and service results into response models. Routers and dependencies run no queries of their own; `CurrentUserDep`, for example, calls a service.
+- **`api`** turns requests into service calls and service results into response models. Routers and dependencies run no queries of their own; `CurrentUserDep`, for example, calls a service. import-linter keeps `tourneyhub.db` out of `api`, except the `User` model that `api/deps.py` needs as the type of `CurrentUserDep` and `AdminDep` (§2). It cannot keep out SQLAlchemy, which `api` needs for `Session` and `IntegrityError`, so a query that does not use the models, such as one through `text()`, is left to review.
 - **`db/models/`** has one module per DATA-MODEL §4 area (`accounts`, `leagues`, `tournaments`, `entries`, `matches`); `db/models/__init__.py` imports them all, so Alembic sees the whole schema.
 - One module per area in `api/` and `services/`: `api/leagues.py` calls `services/leagues.py`.
 
@@ -387,7 +396,7 @@ SessionDep = Annotated[Session, Depends(get_session, scope="function")]
   - Use `get_session` only through `SessionDep`. A plain `Depends(get_session)` in the same request opens a second session.
   - The CLI and the login throttle (below) open their own transaction with `with session_factory.begin() as session:` around one service call.
   - Integration tests pin this: a commit that fails returns 500 `internal_error`, and one that fails on a known unique constraint returns its 409 code.
-- `CurrentUserDep` loads the user row on every request and raises `ForbiddenError(ErrorCode.PASSWORD_CHANGE_REQUIRED)` while `must_change_password` is set. The `auth` router and `GET /api/v1/me` use a variant without that check (ADR-006). `AdminDep` reads `is_admin` from the same row (ADR-007). Missing tokens are handled with `HTTPBearer(auto_error=False)` and our own `NotAuthenticatedError`, so they get an ADR-008 code instead of FastAPI's English `detail`.
+- `CurrentUserDep` loads the user row on every request, gives it to the endpoint as a `User`, and raises `ForbiddenError(ErrorCode.PASSWORD_CHANGE_REQUIRED)` while `must_change_password` is set. The `auth` router and `GET /api/v1/me` use a variant without that check (ADR-006). `AdminDep` reads `is_admin` from the same row (ADR-007). Missing tokens are handled with `HTTPBearer(auto_error=False)` and our own `NotAuthenticatedError`, so they get an ADR-008 code instead of FastAPI's English `detail`.
 - The login throttle (ADR-006) waits outside every transaction, so a burst of failed logins cannot take the pool's connections. `throttle_login` reads the delay through a service in a short transaction of its own and sleeps after that transaction has ended. `log_in` lists it first: `def log_in(_throttle: LoginThrottleDep, body: LoginRequest, session: SessionDep, …)`.
 
 ```python
