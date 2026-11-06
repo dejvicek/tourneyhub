@@ -15,7 +15,6 @@
           "forbidden",
           "league_not_found",
           "league_id_taken",
-          "league_name_taken",
           "league_name_changed",
           "league_not_active"
         ],
@@ -86,9 +85,6 @@
             "title": "Name",
             "type": "string"
           },
-          "status": {
-            "$ref": "#/components/schemas/LeagueStatus"
-          },
           "updated_at": {
             "anyOf": [
               {
@@ -105,21 +101,11 @@
         "required": [
           "id",
           "name",
-          "status",
           "created_at",
           "updated_at"
         ],
         "title": "LeagueRead",
         "type": "object"
-      },
-      "LeagueStatus": {
-        "description": "Where a league is in its life (DATA-MODEL \u00a74.2).",
-        "enum": [
-          "active",
-          "archived"
-        ],
-        "title": "LeagueStatus",
-        "type": "string"
       },
       "LoginRequest": {
         "additionalProperties": false,
@@ -222,7 +208,7 @@
     },
     "/api/v1/leagues": {
       "post": {
-        "description": "Create a league, or return it again when the request is repeated.\n\nA name the organizer already uses is 422 `league_name_taken`. An id of\nanother organizer's league, or a request racing another, is 409: reload.",
+        "description": "Create a league, or return it again when the request is repeated.\n\nAn id of another organizer's league, or a repeat racing its first attempt,\nis 409: reload.",
         "operationId": "create_league",
         "parameters": [
           {

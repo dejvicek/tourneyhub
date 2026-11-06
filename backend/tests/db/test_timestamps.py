@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 
 from tourneyhub.db.models.accounts import User
 from tourneyhub.db.models.leagues import League
-from tourneyhub.engine.leagues import LeagueStatus
 
 
 def test_a_row_without_created_at_fails_at_the_flush(
@@ -22,7 +21,6 @@ def test_a_row_without_created_at_fails_at_the_flush(
                 id=uuid7(),
                 owner_user_id=owner.id,
                 name="No clock",
-                status=LeagueStatus.ACTIVE,
             )
         )
 

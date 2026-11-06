@@ -33,7 +33,6 @@ def test_post_creates_a_league_for_the_caller(
     body = response.json()
     assert body["id"] == league_id
     assert body["name"] == "Thursday DYP"
-    assert body["status"] == "active"
 
 
 def test_get_returns_the_callers_league(
@@ -103,21 +102,6 @@ def test_post_with_another_organizers_id_is_a_conflict(
 
     assert response.status_code == 409
     assert response.json() == {"code": "league_id_taken", "detail": {}}
-
-
-def test_post_with_a_name_the_organizer_uses_is_refused(
-    client: TestClient, make_league: Callable[..., League]
-) -> None:
-    league = make_league(name="Taken")
-
-    response = client.post(
-        "/api/v1/leagues",
-        json={"id": str(uuid7()), "name": "Taken"},
-        headers={"X-User-Id": str(league.owner_user_id)},
-    )
-
-    assert response.status_code == 422
-    assert response.json() == {"code": "league_name_taken", "detail": {}}
 
 
 def test_post_with_a_too_long_name_reports_loc_type_and_limit(
@@ -213,19 +197,8 @@ def _wait_until_another_connection_waits_for_a_lock(engine: Engine) -> None:
 
 
 @pytest.mark.concurrency
-@pytest.mark.parametrize(
-    ("same_id", "code"),
-    [
-        pytest.param(True, "league_id_taken", id="ADR-008-retry-in-flight"),
-        pytest.param(False, "league_name_taken", id="two-devices-one-name"),
-    ],
-)
-def test_post_racing_an_uncommitted_create_is_a_conflict(
-    settings: Settings,
-    committing_engine: Engine,
-    now: datetime,
-    same_id: bool,
-    code: str,
+def test_adr008_a_retry_racing_its_uncommitted_first_attempt_is_a_conflict(
+    settings: Settings, committing_engine: Engine, now: datetime
 ) -> None:
     with Session(committing_engine) as setup:
         owner = User(email="racer@example.test")
@@ -250,10 +223,7 @@ def test_post_racing_an_uncommitted_create_is_a_conflict(
         def post_second() -> None:
             response = client.post(
                 "/api/v1/leagues",
-                json={
-                    "id": str(league_id if same_id else uuid7()),
-                    "name": "Thursday DYP",
-                },
+                json={"id": str(league_id), "name": "Thursday DYP"},
                 headers={"X-User-Id": str(owner_id)},
             )
             outcome.append((response.status_code, response.json()))
@@ -265,4 +235,4 @@ def test_post_racing_an_uncommitted_create_is_a_conflict(
         first.commit()
         second.join()
 
-    assert outcome == [(409, {"code": code, "detail": {}})]
+    assert outcome == [(409, {"code": "league_id_taken", "detail": {}})]

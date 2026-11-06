@@ -5,13 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from tourneyhub.db.models.leagues import League
-from tourneyhub.engine.leagues import LeagueStatus
-from tourneyhub.errors import (
-    ConflictError,
-    ErrorCode,
-    NotFoundError,
-    RuleViolationError,
-)
+from tourneyhub.errors import ConflictError, ErrorCode, NotFoundError
 
 
 def create_league(
@@ -20,29 +14,16 @@ def create_league(
     """Add a league with a client-supplied id (ADR-008).
 
     A repeated request gets its league back; an id of another organizer's league
-    is a conflict. The id is checked before the name, so a retry is not refused
-    for its own name. No league row exists yet to lock, so two requests racing on
-    the same id or name meet at a unique index, which `api/errors.py` turns into
-    a 409.
+    is a conflict. No league row exists yet to lock, so two requests racing on
+    the same id meet at the primary key, which `api/errors.py` turns into a 409.
     """
     existing = session.get(League, league_id)
     if existing is not None:
         if existing.owner_user_id != owner_user_id:
             raise ConflictError(ErrorCode.LEAGUE_ID_TAKEN)
         return existing
-    name_taken = session.scalar(
-        select(League.id).where(
-            League.owner_user_id == owner_user_id, League.name == name
-        )
-    )
-    if name_taken is not None:
-        raise RuleViolationError(ErrorCode.LEAGUE_NAME_TAKEN)
     league = League(
-        id=league_id,
-        owner_user_id=owner_user_id,
-        name=name,
-        status=LeagueStatus.ACTIVE,
-        created_at=now,
+        id=league_id, owner_user_id=owner_user_id, name=name, created_at=now
     )
     session.add(league)
     session.flush()

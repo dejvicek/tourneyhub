@@ -7,17 +7,11 @@ from sqlalchemy.orm import Session
 
 from tourneyhub.db.models.accounts import User
 from tourneyhub.db.models.leagues import League
-from tourneyhub.engine.leagues import LeagueStatus
-from tourneyhub.errors import (
-    ConflictError,
-    ErrorCode,
-    NotFoundError,
-    RuleViolationError,
-)
+from tourneyhub.errors import ConflictError, ErrorCode, NotFoundError
 from tourneyhub.services import leagues as league_service
 
 
-def test_create_league_stores_an_active_league_with_the_given_id(
+def test_create_league_stores_the_league_with_the_given_id(
     session: Session, make_user: Callable[..., User], now: datetime
 ) -> None:
     owner = make_user()
@@ -32,7 +26,6 @@ def test_create_league_stores_an_active_league_with_the_given_id(
     )
 
     assert league.id == league_id
-    assert league.status is LeagueStatus.ACTIVE
     assert league.created_at == now
 
 
@@ -71,23 +64,6 @@ def test_create_league_with_another_organizers_id_is_a_conflict(
         )
 
     assert raised.value.code is ErrorCode.LEAGUE_ID_TAKEN
-
-
-def test_create_league_refuses_a_name_the_organizer_uses(
-    session: Session, make_league: Callable[..., League], now: datetime
-) -> None:
-    league = make_league(name="Taken")
-
-    with pytest.raises(RuleViolationError) as raised:
-        league_service.create_league(
-            session,
-            league_id=uuid7(),
-            owner_user_id=league.owner_user_id,
-            name="Taken",
-            now=now,
-        )
-
-    assert raised.value.code is ErrorCode.LEAGUE_NAME_TAKEN
 
 
 def test_lock_league_hides_another_organizers_league(

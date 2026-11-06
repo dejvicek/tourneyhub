@@ -34,7 +34,6 @@ _STATUS_BY_ERROR: dict[type[AppError], HTTPStatus] = {
 # that a race can reach belong here: creating a league locks nothing (§4.4).
 _CONFLICT_BY_CONSTRAINT: dict[str, ErrorCode] = {
     "pk_leagues": ErrorCode.LEAGUE_ID_TAKEN,
-    "uq_leagues_owner_user_id_name": ErrorCode.LEAGUE_NAME_TAKEN,
 }
 
 

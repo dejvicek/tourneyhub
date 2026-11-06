@@ -12,7 +12,6 @@ from tourneyhub.api.schemas import (
     RequestModel,
     ResponseModel,
 )
-from tourneyhub.engine.leagues import LeagueStatus
 from tourneyhub.services import leagues as league_service
 
 router = APIRouter(
@@ -34,7 +33,6 @@ class LeagueRead(ResponseModel):
 
     id: UUID
     name: str
-    status: LeagueStatus
     created_at: datetime
     updated_at: datetime | None
 
@@ -49,8 +47,8 @@ def create_league(
 ) -> LeagueRead:
     """Create a league, or return it again when the request is repeated.
 
-    A name the organizer already uses is 422 `league_name_taken`. An id of
-    another organizer's league, or a request racing another, is 409: reload.
+    An id of another organizer's league, or a repeat racing its first attempt,
+    is 409: reload.
     """
     league = league_service.create_league(
         session, league_id=body.id, owner_user_id=user.id, name=body.name, now=now
