@@ -162,7 +162,7 @@ export function HalvesSection({ data }: { data: SetupData }) {
         <Button
           type="button"
           variant="ghost"
-          className="h-11 w-fit gap-2 px-3 text-primary"
+          className="w-fit text-primary"
           disabled={draw.isPending || !complete}
           onClick={() => {
             draw.mutate({

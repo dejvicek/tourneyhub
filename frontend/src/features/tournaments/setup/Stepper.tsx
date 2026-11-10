@@ -45,11 +45,10 @@ export function Stepper({
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        {/* TODO(foundation-buttons): size-11 until Button has a 44 px icon size */}
         <Button
           type="button"
           variant="outline"
-          className="size-11 rounded-full"
+          size="icon"
           aria-label={decreaseLabel}
           disabled={value <= min}
           onClick={() => {
@@ -67,7 +66,7 @@ export function Stepper({
         <Button
           type="button"
           variant="outline"
-          className="size-11 rounded-full"
+          size="icon"
           aria-label={increaseLabel}
           disabled={value >= max}
           onClick={() => {

@@ -85,8 +85,7 @@ export function TournamentsPage() {
         <h1 className="font-display text-display-title">
           {t("tournaments.list.title")}
         </h1>
-        {/* TODO(foundation-buttons): size="lg" once Button has the 56 px Primary size */}
-        <Button asChild className="h-14 px-6 text-button-lg md:min-w-60">
+        <Button asChild size="lg" className="md:min-w-60">
           <Link to={generatePath(paths.newTournament, { leagueId })}>
             {t("tournaments.list.newTournament")}
           </Link>

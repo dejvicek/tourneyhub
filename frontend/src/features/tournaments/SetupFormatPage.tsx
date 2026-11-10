@@ -426,16 +426,16 @@ function FormatForm({
       )}
 
       <div className="flex flex-col gap-3 md:flex-row-reverse md:justify-start">
-        {/* TODO(foundation-buttons): size="lg" once Button has the 56 px Primary size */}
         <Button
           type="submit"
           disabled={saving.isPending}
-          className="h-14 px-6 text-button-lg md:min-w-60"
+          size="lg"
+          className="md:min-w-60"
         >
           {t("tournaments.setup.format.next")}
         </Button>
         {layout !== "phone" && (
-          <Button asChild variant="ghost" className="h-14 px-6 text-button-sm">
+          <Button asChild variant="text" size="lg">
             <Link to={generatePath(paths.tournaments, { leagueId })}>
               {t("tournaments.setup.cancel")}
             </Link>

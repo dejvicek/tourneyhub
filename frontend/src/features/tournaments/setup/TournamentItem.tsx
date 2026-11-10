@@ -199,11 +199,11 @@ export function TournamentItem({
       </Link>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          {/* TODO(foundation-buttons): size="icon" once it is 44 px */}
           <Button
             type="button"
             variant="ghost"
-            className="m-1 size-11"
+            size="icon"
+            className="m-1"
             aria-label={t("tournaments.list.actions", { name: summary.name })}
           >
             <MoreIcon />

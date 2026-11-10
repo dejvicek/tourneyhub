@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ApiError, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
 
-import { DEMO_LEAGUE_ID, DEMO_SEASON_ID } from "./seed";
+import { DEMO_LEAGUE_ID, DEMO_SEASON_ID } from "./ids";
 import {
   createDraft,
   pickPlayers,

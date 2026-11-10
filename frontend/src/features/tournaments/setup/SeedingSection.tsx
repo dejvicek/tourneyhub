@@ -64,7 +64,7 @@ export function SeedingSection({ data }: { data: SetupData }) {
         <Button
           type="button"
           variant="ghost"
-          className="h-11 w-fit gap-2 px-3 text-primary"
+          className="w-fit text-primary"
           disabled={shuffle.isPending}
           onClick={() => {
             shuffle.mutate({
@@ -122,11 +122,10 @@ export function SeedingSection({ data }: { data: SetupData }) {
                         })}
                   </span>
                 </div>
-                {/* TODO(foundation-buttons): size="icon" once it is 44 px */}
                 <Button
                   type="button"
                   variant="outline"
-                  className="size-11"
+                  size="icon"
                   disabled={index === 0 || order.isPending}
                   aria-label={t("tournaments.setup.draw.moveUp", { name })}
                   onClick={() => {
@@ -138,7 +137,7 @@ export function SeedingSection({ data }: { data: SetupData }) {
                 <Button
                   type="button"
                   variant="outline"
-                  className="size-11"
+                  size="icon"
                   disabled={index === entries.length - 1 || order.isPending}
                   aria-label={t("tournaments.setup.draw.moveDown", { name })}
                   onClick={() => {

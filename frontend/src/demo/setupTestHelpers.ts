@@ -5,7 +5,7 @@ import { dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
 
 import type { TournamentFormatWrite } from "./contract";
-import { DEMO_LEAGUE_ID, DEMO_SEASON_ID } from "./seed";
+import { DEMO_LEAGUE_ID, DEMO_SEASON_ID } from "./ids";
 import { newId } from "./setupEngine";
 
 /** The formats of a DYP evening as screen 2 would send them. */

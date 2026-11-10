@@ -130,7 +130,7 @@ function PlayersForm({ data }: { data: SetupData }) {
             <Button
               type="button"
               variant="ghost"
-              className="h-11 px-3"
+
               onClick={() => {
                 setPicked(new Set(ranking.map((row) => row.player_id)));
               }}
@@ -140,7 +140,7 @@ function PlayersForm({ data }: { data: SetupData }) {
             <Button
               type="button"
               variant="ghost"
-              className="h-11 px-3"
+
               onClick={() => {
                 setPicked(new Set());
               }}
@@ -194,7 +194,7 @@ function PlayersForm({ data }: { data: SetupData }) {
           type="button"
           variant="ghost"
           disabled={save.isPending}
-          className="h-14 px-6 text-button-sm"
+          size="lg"
           onClick={() => {
             save.mutate(chosen(), {
               onSuccess: () => {
@@ -208,11 +208,11 @@ function PlayersForm({ data }: { data: SetupData }) {
         >
           {t("tournaments.setup.back")}
         </Button>
-        {/* TODO(foundation-buttons): size="lg" once Button has the 56 px Primary size */}
         <Button
           type="button"
           disabled={!enough || save.isPending}
-          className="h-14 px-6 text-button-lg md:min-w-60"
+          size="lg"
+          className="md:min-w-60"
           onClick={() => {
             goTo(paths.setupDraw);
           }}

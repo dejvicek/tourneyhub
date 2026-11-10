@@ -58,20 +58,19 @@ function DrawStep({ data }: { data: SetupData }) {
       )}
 
       <div className="flex flex-col gap-3 md:flex-row md:justify-between">
-        <Button asChild variant="ghost" className="h-14 px-6 text-button-sm">
+        <Button asChild variant="text" size="lg">
           <Link to={generatePath(paths.setupPlayers, params)}>
             {t("tournaments.setup.back")}
           </Link>
         </Button>
-        {/* TODO(foundation-buttons): size="lg" once Button has the 56 px Primary size */}
         {canContinue ? (
-          <Button asChild className="h-14 px-6 text-button-lg md:min-w-60">
+          <Button asChild size="lg" className="md:min-w-60">
             <Link to={generatePath(paths.setupReview, params)}>
               {t("tournaments.setup.draw.next")}
             </Link>
           </Button>
         ) : (
-          <Button disabled className="h-14 px-6 text-button-lg md:min-w-60">
+          <Button disabled size="lg" className="md:min-w-60">
             {t("tournaments.setup.draw.next")}
           </Button>
         )}

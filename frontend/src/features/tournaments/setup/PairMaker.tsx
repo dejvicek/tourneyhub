@@ -71,7 +71,7 @@ export function PairMaker({ data }: { data: SetupData }) {
       <div className="flex flex-wrap gap-2">
         <Button
           type="button"
-          className="h-11 px-4"
+
           disabled={
             first === undefined || second === undefined || save.isPending
           }
@@ -90,7 +90,7 @@ export function PairMaker({ data }: { data: SetupData }) {
         <Button
           type="button"
           variant="ghost"
-          className="h-11 gap-2 px-3 text-primary"
+          className="text-primary"
           disabled={alone.length < 2 || draw.isPending}
           onClick={() => {
             draw.mutate({
@@ -126,7 +126,7 @@ export function PairMaker({ data }: { data: SetupData }) {
                 <Button
                   type="button"
                   variant="ghost"
-                  className="h-11 px-3"
+
                   disabled={save.isPending}
                   aria-label={t("tournaments.setup.draw.breakUp", { name })}
                   onClick={() => {

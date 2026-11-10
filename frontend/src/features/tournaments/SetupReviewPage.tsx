@@ -263,16 +263,16 @@ function Review({ data }: { data: SetupData }) {
         </p>
       )}
       <div className="flex flex-col gap-3 md:flex-row md:justify-between">
-        <Button asChild variant="ghost" className="h-14 px-6 text-button-sm">
+        <Button asChild variant="text" size="lg">
           <Link to={generatePath(paths.setupDraw, params)}>
             {t("tournaments.setup.back")}
           </Link>
         </Button>
-        {/* TODO(foundation-buttons): size="lg" once Button has the 56 px Primary size */}
         <Button
           type="button"
           disabled={start.isPending || preview.data === undefined}
-          className="h-14 px-6 text-button-lg md:min-w-60"
+          size="lg"
+          className="md:min-w-60"
           onClick={() => {
             start.mutate(setup.draw_counter, {
               onSuccess: () => {

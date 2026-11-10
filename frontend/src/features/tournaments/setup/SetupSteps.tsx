@@ -61,12 +61,11 @@ export function SetupSteps({ current, type }: SetupStepsProps) {
               )}
             >
               <span
-                className={cn(
-                  "relative z-10 grid size-7 place-content-center rounded-full border-2 font-display text-score-s",
+                className={`relative z-10 grid size-7 place-content-center rounded-full border-2 font-display text-score-s ${
                   done || active
                     ? "border-primary bg-primary text-primary-foreground"
-                    : "border-input bg-background text-muted-foreground",
-                )}
+                    : "border-input bg-background text-muted-foreground"
+                }`}
               >
                 {done ? <CheckIcon className="size-4" /> : step}
                 <span className="sr-only">

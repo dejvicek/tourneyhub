@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { generatePath } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { DEMO_LEAGUE_ID } from "@/demo/seed";
+import { DEMO_LEAGUE_ID } from "@/demo/ids";
 import {
   axeViolations,
   createDraft,

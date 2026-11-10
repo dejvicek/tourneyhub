@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { generatePath } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { DEMO_LEAGUE_ID } from "@/demo/seed";
+import { DEMO_LEAGUE_ID } from "@/demo/ids";
 import {
   allowDraws,
   axeViolations,
@@ -127,7 +127,7 @@ describe("setup: format (screen 2)", () => {
     expect(name).toHaveAttribute("aria-invalid", "true");
     expect(name).toHaveFocus();
     expect(name).toHaveAccessibleDescription(/Give the tournament a name\./);
-    expect(await tournamentsOfSeason()).toHaveLength(3);
+    expect(await tournamentsOfSeason()).toHaveLength(4);
   });
 
   it("changes the tournament it was opened for instead of creating another", async () => {
@@ -147,7 +147,7 @@ describe("setup: format (screen 2)", () => {
       expect(view.state.location.pathname).toMatch(/\/setup\/players$/);
     });
     const all = await tournamentsOfSeason();
-    expect(all).toHaveLength(4);
+    expect(all).toHaveLength(5);
     expect(all.find((t) => t.id === id)?.name).toBe("Friday finals");
   });
 

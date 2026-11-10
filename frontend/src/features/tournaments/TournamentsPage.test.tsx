@@ -3,8 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { generatePath } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { DEMO_LEAGUE_ID } from "@/demo/ids";
 import { route } from "@/demo/route";
-import { DEMO_LEAGUE_ID } from "@/demo/seed";
 import {
   axeViolations,
   createDraft,
@@ -49,6 +49,7 @@ describe("the tournament list (screen 1)", () => {
         .map((link) => link.textContent),
     ).toEqual([
       expect.stringContaining("Thursday DYP"),
+      expect.stringContaining("Next Thursday DYP"),
       expect.stringContaining("Friday DYP"),
     ]);
     expect(within(finished).getAllByRole("link")).toHaveLength(2);
@@ -63,6 +64,9 @@ describe("the tournament list (screen 1)", () => {
         name: "Matches played in Thursday DYP",
       }),
     ).toHaveAttribute("aria-valuenow", "7");
+    expect(
+      await within(running).findByText(/14 players picked\. Not started yet\./),
+    ).toBeInTheDocument();
     expect(
       await within(running).findByText(/12 players picked\. Not started yet\./),
     ).toBeInTheDocument();
