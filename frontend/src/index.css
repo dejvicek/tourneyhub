@@ -127,6 +127,10 @@
   --color-nav-active-foreground: var(--nav-active-foreground);
   --color-bead-empty: var(--bead-empty);
   --color-bead-rod: var(--bead-rod);
+  --color-field: var(--field);
+  --color-field-foreground: var(--field-foreground);
+  --color-feature: var(--feature);
+  --color-feature-foreground: var(--feature-foreground);
 }
 
 /* Values from the Figma file's variables (ADR-003), light here and dark
@@ -183,6 +187,12 @@
   --nav-active-foreground: #1e784b;
   --bead-empty: #ffffff;
   --bead-rod: #85988d;
+  /* The playfield (field/bg) and the Feature button on it (feature/button,
+     components.md); the label colour is text/default. */
+  --field: #1e7a4c;
+  --field-foreground: #ffffff;
+  --feature: #ffffff;
+  --feature-foreground: #1e3327;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -235,6 +245,13 @@
     --nav-active-foreground: #edf2f6;
     --bead-empty: #1a2430;
     --bead-rod: #5b6f84;
+    /* Provisional: the Figma file has no dark field/bg or feature/button
+       (tokens.md, "Not read"). A darker field green and the dark primary
+       pair stand in until the design defines them (guide §5.2). */
+    --field: #1d5a3c;
+    --field-foreground: #edf2f6;
+    --feature: #edf2f6;
+    --feature-foreground: #1a2430;
   }
 }
 
