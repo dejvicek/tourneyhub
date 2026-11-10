@@ -8,9 +8,9 @@ import { results } from "./cs/results";
 import { shell } from "./cs/shell";
 import { standings } from "./cs/standings";
 import { tournaments } from "./cs/tournaments";
-import type { Messages } from "./en";
+import type { CsMessages } from "./en";
 
-export const cs: Messages = {
+export const cs: CsMessages = {
   ...common,
   shell,
   auth,

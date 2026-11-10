@@ -1,6 +1,7 @@
+import type { CsMessages } from "../en";
 import type { common as reference } from "../en/common";
 
-export const common: typeof reference = {
+export const common: CsMessages<typeof reference> = {
   app: {
     name: "TourneyHub",
     title: "{{screen}} · TourneyHub",

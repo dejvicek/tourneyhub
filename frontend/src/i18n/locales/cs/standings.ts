@@ -1,5 +1,5 @@
-import type { Messages } from "../en";
+import type { CsMessages, Messages } from "../en";
 
-export const standings: Messages["standings"] = {
+export const standings: CsMessages<Messages["standings"]> = {
   season: { title: "Pořadí sezóny" },
 };

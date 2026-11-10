@@ -1,5 +1,5 @@
-import type { Messages } from "../en";
+import type { CsMessages, Messages } from "../en";
 
-export const players: Messages["players"] = {
+export const players: CsMessages<Messages["players"]> = {
   list: { title: "Hráči" },
 };

@@ -1,6 +1,6 @@
-import type { Messages } from "../en";
+import type { CsMessages, Messages } from "../en";
 
-export const leagues: Messages["leagues"] = {
+export const leagues: CsMessages<Messages["leagues"]> = {
   myLeagues: {
     title: "Moje ligy",
     empty: "Zatím nemáte žádnou ligu.",

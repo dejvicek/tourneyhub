@@ -1,6 +1,6 @@
-import type { Messages } from "../en";
+import type { CsMessages, Messages } from "../en";
 
-export const tournaments: Messages["tournaments"] = {
+export const tournaments: CsMessages<Messages["tournaments"]> = {
   list: {
     title: "Turnaje sezóny",
     newTournament: "Nový turnaj",

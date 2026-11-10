@@ -176,13 +176,13 @@ Checked by tools: ESLint jsx-a11y-x `strict` and `jsx-a11y-x/control-has-associa
 
 ## 7. Translations
 
-Checked by tools: `tsc` (keys of `t()` through `CustomTypeOptions` in `src/i18n/i18next.d.ts`; `cs` has every key of `en` through its `Messages` type); ESLint `no-restricted-properties` (`toLocaleString`, `toLocaleDateString`, `toLocaleTimeString`); `i18next-cli lint`, part of `pnpm lint`, for user-facing text in JSX elements and attributes outside `t()` and `<Trans>` [I1].
+Checked by tools: `tsc` (keys of `t()` through `CustomTypeOptions` in `src/i18n/i18next.d.ts`; `cs` has every key of `en`, and no other, through its `CsMessages` type); ESLint `no-restricted-properties` (`toLocaleString`, `toLocaleDateString`, `toLocaleTimeString`); `i18next-cli lint`, part of `pnpm lint`, for user-facing text in JSX elements and attributes outside `t()` and `<Trans>` [I1].
 
 - No hard-coded user-facing text (ADR-003), `aria-label` and `alt` included. A line that is not user-facing, such as a product name, is excused with `i18next-instrument-ignore-next-line` and a reason after ` -- `, as with `eslint-disable`. If the linter gives a false positive that neither `i18next.config.ts` nor that comment can silence, the pull request that hits it downgrades the check to a report and says so here.
-- Texts live in `src/i18n/locales/en.ts`, the reference from which the key types come [I2], and `cs.ts`, in one namespace until it grows unwieldy. Keys are semantic and nested by area (`notFound.home`), never English sentences.
+- Texts live in `src/i18n/locales/en.ts`, the reference from which the key types come [I2], and `cs.ts`, in one namespace. Each area keeps its texts in its own module, `en/<area>.ts` and `cs/<area>.ts`, which `en.ts` and `cs.ts` merge; a `cs` module is typed `CsMessages<Messages["<area>"]>`. Keys are semantic and nested by area (`notFound.home`), never English sentences.
 - A sentence is one key with `{{placeholders}}`, never pieces joined in code. `escapeValue: false` is safe because React escapes what it renders; `t()` output never goes into `dangerouslySetInnerHTML` [I3].
 - Markup inside a sentence, such as a link, uses `<Trans>` with named components [I4].
-- Plurals pass `count` [I5]. English keys take `_one` and `_other`; Czech takes `_one`, `_few` (2–4), `_many` (decimals) and `_other` [I6]. `cs: Messages` cannot hold `_few` and `_many` keys that `en` lacks, so the first plural changes the type of `cs` to allow them.
+- Plurals pass `count` [I5]. English keys take `_one` and `_other`; Czech takes `_one`, `_few` (2–4), `_many` (decimals) and `_other` [I6]. `CsMessages` (in `en.ts`) allows `_few` and `_many` for every key whose English reference has `_one` or `_other`, and no other extra key.
 - Places in a standing are numbers, written "1." in Czech; no `ordinal` plurals [I6].
 - Dates and numbers go through `Intl` with `i18n.resolvedLanguage`, or through i18next's `{{val, datetime}}` and `{{val, number}}` inside a sentence (FR-081) [I7].
 - A viewer's language comes from `pickLanguage` in `src/i18n/language.ts`: their stored choice, else `navigator.language` if it is English or Czech, else English. An organizer's comes from `users.language`, and changing it saves through the API before `i18n.changeLanguage` (ADR-003). No language-detector plugin; `supportedLngs` and `fallbackLng: "en"` stay set [I8].

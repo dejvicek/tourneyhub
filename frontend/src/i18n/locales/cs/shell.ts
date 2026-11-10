@@ -1,6 +1,6 @@
-import type { Messages } from "../en";
+import type { CsMessages, Messages } from "../en";
 
-export const shell: Messages["shell"] = {
+export const shell: CsMessages<Messages["shell"]> = {
   nav: {
     label: "Hlavní",
     tournaments: "Turnaje",
