@@ -68,9 +68,14 @@ describe("tournamentHome", () => {
       "groupPhaseDone",
     ],
     [
-      "a Monster DYP whose group phase is done",
+      "a Swiss between rounds",
+      tournament("in_progress", [group("swiss")], "group", true),
+      "betweenRounds",
+    ],
+    [
+      "a Monster DYP between rounds",
       tournament("in_progress", [group("monster_dyp")], "group", true),
-      "startKnockout",
+      "betweenRounds",
     ],
     [
       "a running knockout",

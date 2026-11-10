@@ -131,7 +131,8 @@ export interface TournamentSummary {
   /**
    * Computed on read: every match of the current phase drawn so far has a
    * result. A round robin's schedule is drawn whole, so it is then done; a
-   * Swiss or Monster DYP phase is between rounds.
+   * Swiss or Monster DYP phase is then between rounds, and its organizer
+   * decides on screen 11 whether another round follows.
    */
   current_phase_done: boolean;
 }

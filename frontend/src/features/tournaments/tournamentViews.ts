@@ -39,15 +39,13 @@ export function tournamentHome(t: TournamentSummary): TournamentScreen {
   if (phase === undefined || phase.kind === "knockout") {
     return "knockout";
   }
-  switch (phase.format) {
-    case "round_robin":
-      return t.current_phase_done ? "groupPhaseDone" : "schedule";
-    case "monster_dyp":
-      return t.current_phase_done ? "startKnockout" : "betweenRounds";
-    case "swiss":
-    case "single_elimination":
-      return "betweenRounds";
-  }
+  // Swiss and Monster DYP rounds always open on screen 11, done or not: it
+  // offers another round, the knockout (13) and the finish.
+  return phase.format === "round_robin"
+    ? t.current_phase_done
+      ? "groupPhaseDone"
+      : "schedule"
+    : "betweenRounds";
 }
 
 export interface TournamentTab {
