@@ -82,7 +82,7 @@ deployment {
 
       // The fixed range from compose.yaml; uvicorn trusts X-Forwarded-For only from it (ADR-006)
       net = network "Compose network 172.30.0.0/24" {
-        description "The default network of compose.yaml, with a fixed range so that uvicorn's --forwarded-allow-ips can trust X-Forwarded-For only from it, where Caddy is. Only web publishes ports on the VPS; api and db have none."
+        description "The default network of compose.yaml, with a fixed range so that uvicorn's FORWARDED_ALLOW_IPS (set in compose.prod.yaml) can trust X-Forwarded-For only from it, where Caddy is. Only web publishes ports on the VPS; api and db have none."
         link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-006--authentication-jwt-access-token-and-rotating-refresh-token "ADR-006"
 
         web = dockerContainer "web: Caddy with the SPA build" {

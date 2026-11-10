@@ -68,6 +68,7 @@ USER tourneyhub
 WORKDIR /app
 EXPOSE 8000
 # Migrations run as the container starts (ADR-004, ADR-014). exec makes uvicorn
-# PID 1, so `docker stop` reaches it. X-Forwarded-For is trusted only from the
-# Compose network's fixed range, where Caddy is (ADR-006).
-CMD ["sh", "-c", "tourneyhub migrate && exec uvicorn --factory tourneyhub.app:create_app --host 0.0.0.0 --port 8000 --forwarded-allow-ips 172.30.0.0/24"]
+# PID 1, so `docker stop` reaches it. Which proxies uvicorn trusts for
+# X-Forwarded-For comes from FORWARDED_ALLOW_IPS, which compose.prod.yaml sets
+# (ADR-006); without it only 127.0.0.1 and ::1 are trusted.
+CMD ["sh", "-c", "tourneyhub migrate && exec uvicorn --factory tourneyhub.app:create_app --host 0.0.0.0 --port 8000"]

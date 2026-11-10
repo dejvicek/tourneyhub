@@ -22,8 +22,9 @@ services:
     # No ports: db is reachable only on the Compose network (ADR-005).
 
 # Every service of every Compose file joins the default network. Its range is fixed
-# because uvicorn's --forwarded-allow-ips trusts it, so that X-Forwarded-For counts only
-# from Caddy (ADR-006).
+# because uvicorn's FORWARDED_ALLOW_IPS (set in compose.prod.yaml, to this range)
+# trusts it, so that X-Forwarded-For counts only from Caddy (ADR-006). Change the
+# subnet here and there together.
 networks:
   default:
     ipam:
