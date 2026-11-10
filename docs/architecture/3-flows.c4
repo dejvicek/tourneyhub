@@ -269,7 +269,7 @@ views "III. Flows" {
     organizer -> tourneyhub.spa.organizerUi "starts a new season"
     tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "POST season with the current number"
     tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "locks the league, compares the number"
-    tourneyhub.api.leaguesApi -> tourneyhub.db.tournaments "no unfinished tournament (BR-010)"
+    tourneyhub.api.leaguesApi -> tourneyhub.db.tournaments "no unfinished tournament (BR-010, P7)"
     alt {
       when "the number is current" {
         tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "closes it, starts the next with a copy of the table"

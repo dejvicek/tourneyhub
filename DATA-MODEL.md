@@ -156,9 +156,9 @@ The sign-up code itself is never written to `admin_actions`.
 | `owner_user_id` | FK `users`. One organizer per league in the MVP; co-organizers (RM-01) will add a membership table. |
 | `name` | |
 | `draws_allowed` | `bool` (FR-011, BR-090). |
-| `default_field_count` | `int`, default `1`, CHECK `>= 1` (FR-011, FR-090). |
+| `default_field_count` | `int`, default `1`, CHECK `>= 1 AND <= 32` (FR-011, FR-090). The API refuses more than 32 too. P7's per-tournament field count uses the same cap, because creating a tournament creates that many fields. |
 | `default_match_format` | `bo1`, `bo3` or `bo5`, default `bo1` (FR-011, BR-120). Not `bo2`, which only group phases of leagues with draws can play (BR-121), so a default that a knockout cannot take is never copied. |
-| `default_goals_per_game` | `int`, default `10`, CHECK `> 0` (FR-011, BR-123). |
+| `default_goals_per_game` | `int`, default `10`, CHECK `>= 1 AND <= 99` (FR-011, BR-123). The API refuses more than 99 too. |
 | `share_token` | `text`, unique; at least 128 random bits, URL-safe (FR-071, ADR-008). |
 | `created_at`, `updated_at` | |
 
@@ -178,11 +178,12 @@ The sign-up code itself is never written to `admin_actions`.
 |---|---|
 | `id` | |
 | `league_id` | FK `leagues`, `ON DELETE CASCADE`. |
-| `number` | 1, 2, …; unique on `(league_id, number)`. |
+| `number` | 1, 2, …; unique on `(league_id, number)`. CHECK `ck_seasons_number`: `number >= 1`. |
 | `name` | Nullable. `NULL` means the default name, rendered in the UI language from `number` ("Season 2" / "Sezóna 2"); set when the organizer renames it (FR-020). |
 | `state` | `active` or `closed`. At most one active season per league: partial unique index on `(league_id) WHERE state = 'active'`. |
-| `placement_points` | `int[]`, the season's placement points table, e.g. `{10,8,6,4,2}` (FR-011). CHECK via an immutable SQL helper function: one-dimensional, not empty, no `NULL` elements, no negative values, non-increasing. |
-| `started_at`, `closed_at` | |
+| `placement_points` | `int[]`, the season's placement points table, e.g. `{10,8,6,4,2}` (FR-011). CHECK `ck_seasons_placement_points` via an immutable SQL helper function: one-dimensional, not empty, no `NULL` elements, no negative values, non-increasing. At most 256 places (the most entries ADR-009 sizes a tournament for); this limit is enforced only in the API, not in the database, because it is a limit on what a client may send and the CHECK describes what a valid table is, so raising the limit later needs no migration. |
+| `started_at`, `closed_at` | `closed_at` is `NULL` while the season is active. CHECK `ck_seasons_closed_at`: `closed_at` is set exactly when `state` is `closed`. |
+| `created_at`, `updated_at` | |
 
 The league's defaults are copied, never referenced, like the placement points table below. Creating a tournament (FR-030) copies `default_goals_per_game` to `tournaments.goals_per_game`, creates `default_field_count` fields and gives each phase created in setup `default_match_format`; the create request may set its own values instead. A knockout created after a group phase (FR-045) takes its format from the start request, which the UI fills in from the league's current default. Changing a default never changes an existing tournament.
 
