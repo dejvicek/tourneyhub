@@ -301,7 +301,7 @@ Caddy adds three headers to every response: a Content-Security-Policy that allow
 | Area | Checks |
 |---|---|
 | Backend | `ruff` (lint and format), `mypy --strict`, import-linter, `pytest` under `coverage` (100 % in the engine; 90 % overall from the first feature), `hypothesis` property tests for the engine, integration tests against a real PostgreSQL service container, pytest-alembic's migration tests, `alembic upgrade head` and `alembic check`, OpenAPI drift check (ADR-008), `uv audit` |
-| Frontend | ESLint, Prettier, `tsc --build` over the app, `vite.config.ts` and the Playwright tests (`pnpm typecheck`), against the types generated from the committed OpenAPI schema, Vitest with Testing Library, `pnpm audit --prod` (known vulnerabilities in the production dependencies) |
+| Frontend | ESLint, Prettier, `tsc --build` over the app, `vite.config.ts` and the Playwright tests (`pnpm typecheck`), against the types generated from the committed OpenAPI schema, Vitest with Testing Library, `i18next-cli lint` (no user-facing text outside `t()` and `<Trans>`), `pnpm audit --prod` (known vulnerabilities in the production dependencies) |
 | End to end | Playwright (ADR-013) |
 
 - Jobs are filtered by the changed paths inside the workflow: each job is skipped when its area did not change, and one aggregate job (`ci-ok`) fails if any job it depends on failed. Documentation-only pull requests then skip the heavy jobs, and the checks keep reporting once they become required. A workflow-level `paths` filter would leave a required check waiting forever.

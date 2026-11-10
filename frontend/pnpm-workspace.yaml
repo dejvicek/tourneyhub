@@ -3,7 +3,9 @@
 # any other package that has one. None needs one now: Vite 8 bundles with
 # Rolldown, whose native binary comes as an optional dependency, so
 # esbuild is not in the tree. Review an entry like code before adding it.
-allowBuilds: {}
+allowBuilds:
+  # Denied: its postinstall only checks the native binary, which i18next-cli does not need it for.
+  "@swc/core": false
 
 # Installing on a Node.js other than the one in package.json's engines fails
 # instead of warning (ADR-003 pins Node.js).

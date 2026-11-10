@@ -12,7 +12,7 @@ The ADRs decide what the frontend is built from; this guide decides how its code
 
 - **The tools are the rulebook.** What ESLint, Prettier, `tsc` and the tests check is configured in `frontend/` (§2). Each section opens with the rules its tools check, by rule ID and nothing more; every other rule written here exists because no tool checks it, and names its source.
 - **Mobile-first, two themes.** Every screen is built for the phone first, and Tailwind's breakpoint prefixes add the tablet and desktop layouts; every screen exists in a light and a dark theme drawn from the theme tokens (ADR-003). The phone is the reference for FR-082.
-- **Typed throughout.** `tsc` passes in strict mode on `src`, `vite.config.ts` and `e2e`. API types come only from the generated schema (ADR-008). No `any` of our own; an `as` carries a comment saying why it is safe, as `dataOf` in `src/api/client.ts` does.
+- **Typed throughout.** `tsc` passes in strict mode on `src`, `vite.config.ts`, `i18next.config.ts` and `e2e`. API types come only from the generated schema (ADR-008). No `any` of our own; an `as` carries a comment saying why it is safe, as `dataOf` in `src/api/client.ts` does.
 - **No text in code.** Every string a user sees or hears, `aria-label` included, goes through `t()` (ADR-003, §7).
 - **One way per task.** Use the patterns this guide shows. A second way to do the same thing (another fetch helper, another state store) needs a reason in the pull request.
 - **Business rules are cited.** Code and tests that implement a rule name its ID (`FR-082`, `BR-056`) in a comment or test name.
@@ -20,13 +20,14 @@ The ADRs decide what the frontend is built from; this guide decides how its code
 
 ## 2. Toolchain
 
-The configuration CI runs lives in `frontend/`: `package.json` (scripts and lower bounds), `eslint.config.js`, `.prettierrc.json`, `tsconfig.app.json`, `tsconfig.node.json`, `e2e/tsconfig.json`, `vite.config.ts` (Vite and Vitest), `e2e/playwright.config.ts` and `pnpm-workspace.yaml`. The exact versions live in `pnpm-lock.yaml`.
+The configuration CI runs lives in `frontend/`: `package.json` (scripts and lower bounds), `eslint.config.js`, `.prettierrc.json`, `tsconfig.app.json`, `tsconfig.node.json`, `e2e/tsconfig.json`, `vite.config.ts` (Vite and Vitest), `i18next.config.ts` (the text check, §7), `e2e/playwright.config.ts` and `pnpm-workspace.yaml`. The exact versions live in `pnpm-lock.yaml`.
 
 | Tool | Role |
 |---|---|
 | Node.js 26, pnpm 12 | Runtime and packages; the exact versions are in `.nvmrc`, `engines` and `packageManager` (ADR-003) |
 | TypeScript 6.0 | Type check, strict, with `tsc --build` |
 | ESLint 10 | Lint: typescript-eslint `strictTypeChecked` and `stylisticTypeChecked`, react-hooks `recommended`, react-refresh `vite`, jsx-a11y-x `strict`, better-tailwindcss, simple-import-sort, TanStack Query `flat/recommended-strict`, Testing Library `flat/react`, Playwright `flat/recommended` |
+| i18next-cli 1.87 | `i18next-cli lint`, run by `pnpm lint`: user-facing text outside `t()` and `<Trans>` (§7) |
 | Prettier 3.9 | Format, with prettier-plugin-tailwindcss for class order |
 | Vite 8 | Dev server and build |
 | Vitest 5, jsdom, Testing Library | Unit and component tests (§10) |
@@ -38,8 +39,8 @@ Run every command from `frontend/`:
 pnpm install --frozen-lockfile   # exactly what pnpm-lock.yaml says
 pnpm audit --prod                # known vulnerabilities in the production dependencies; CI fails on one
 pnpm format                      # eslint --fix, then prettier --write
-pnpm lint                        # eslint --max-warnings=0
-pnpm typecheck                   # tsc --build over src, vite.config.ts and e2e
+pnpm lint                        # eslint --max-warnings=0, then i18next-cli lint
+pnpm typecheck                   # tsc --build over src, the two config files and e2e
 pnpm test
 pnpm build
 pnpm e2e                         # needs the production images running (ADR-013)
@@ -64,7 +65,7 @@ Choices in the configuration that are not obvious:
 - Prettier and prettier-plugin-tailwindcss are pinned exactly, since both decide the output [E4], and are upgraded in a pull request that reformats the code. Every Prettier option stays at its default [E5]; `.prettierrc.json` holds the plugin, which must load last [E7], and its two options, `tailwindStylesheet` and `tailwindFunctions`. Prettier reads `.gitignore` [E8], so `.prettierignore` lists only `pnpm-lock.yaml`. No `eslint-plugin-prettier` or `prettier-eslint` [E6]; the presets have no formatting rules, so `eslint-config-prettier` is not needed.
 - `pnpm audit --prod` checks only `dependencies` and `optionalDependencies`, what ships to the browser, and fails the CI job on any advisory [E18]. An advisory the project accepts goes in `audit.ignore` in `pnpm-workspace.yaml`, as its `GHSA-…` id with a comment that links an issue. Dev dependencies are not audited; Dependabot's weekly updates cover them.
 - `format` runs `eslint --fix` before `prettier --write`, so that Prettier formats what the import sort moved.
-- Every pnpm setting is in `pnpm-workspace.yaml`; `.npmrc` would hold only auth or registry. `allowBuilds` is the reviewed allow-list for install scripts, empty today [E12]. `strictDepBuilds`, `minimumReleaseAge` (one day) and `blockExoticSubdeps` keep pnpm 12's defaults [E11]: a version published less than a day ago is not installed. `engineStrict: true` fails an install on any Node.js other than `engines` [E13], so a Node.js bump changes `.nvmrc`, `engines`, the Dockerfile and the README together.
+- Every pnpm setting is in `pnpm-workspace.yaml`; `.npmrc` would hold only auth or registry. `allowBuilds` is the reviewed list for install scripts. It allows none today and denies `@swc/core`, which i18next-cli needs, because that postinstall only checks the native binary [E12]. `strictDepBuilds`, `minimumReleaseAge` (one day) and `blockExoticSubdeps` keep pnpm 12's defaults [E11]: a version published less than a day ago is not installed. `engineStrict: true` fails an install on any Node.js other than `engines` [E13], so a Node.js bump changes `.nvmrc`, `engines`, the Dockerfile and the README together.
 - `@vitejs/plugin-react` 6 needs no Babel [E15]. The React Compiler is not on.
 - Vitest's configuration is the `test` block of `vite.config.ts`; a `vitest.config.ts` would replace it [V4]. Vitest 5 writes reports to `.vitest/` [E14], which is git-ignored.
 
@@ -148,9 +149,9 @@ Checked by tools: ESLint jsx-a11y-x `strict` and `jsx-a11y-x/control-has-associa
 
 ## 7. Translations
 
-Checked by tools: `tsc` (keys of `t()` through `CustomTypeOptions` in `src/i18n/i18next.d.ts`; `cs` has every key of `en` through its `Messages` type); ESLint `no-restricted-properties` (`toLocaleString`, `toLocaleDateString`, `toLocaleTimeString`).
+Checked by tools: `tsc` (keys of `t()` through `CustomTypeOptions` in `src/i18n/i18next.d.ts`; `cs` has every key of `en` through its `Messages` type); ESLint `no-restricted-properties` (`toLocaleString`, `toLocaleDateString`, `toLocaleTimeString`); `i18next-cli lint`, part of `pnpm lint`, for user-facing text in JSX elements and attributes outside `t()` and `<Trans>` [I1].
 
-- No hard-coded user-facing text (ADR-003). No tool checks this yet; §12 proposes one [I1].
+- No hard-coded user-facing text (ADR-003), `aria-label` and `alt` included. A line that is not user-facing, such as a product name, is excused with `i18next-instrument-ignore-next-line` and a reason after ` -- `, as with `eslint-disable`. If the linter gives a false positive that neither `i18next.config.ts` nor that comment can silence, the pull request that hits it downgrades the check to a report and says so here.
 - Texts live in `src/i18n/locales/en.ts`, the reference from which the key types come [I2], and `cs.ts`, in one namespace until it grows unwieldy. Keys are semantic and nested by area (`notFound.home`), never English sentences.
 - A sentence is one key with `{{placeholders}}`, never pieces joined in code. `escapeValue: false` is safe because React escapes what it renders; `t()` output never goes into `dangerouslySetInnerHTML` [I3].
 - Markup inside a sentence, such as a link, uses `<Trans>` with named components [I4].
@@ -270,7 +271,6 @@ From the first feature onward (the skeleton has none of these yet):
 
 | Document | Today | Proposal | Why | Status |
 |---|---|---|---|---|
-| ADR-012, frontend row | No check for hard-coded text | Add `i18next-cli lint` as a check, with its configuration and devDependency | It is the only tool that finds text outside `t()` and `<Trans>` [I1]; until then §7's first rule is left to review. It finds nothing in `src/` today. Held back: its dependency `@swc/core` has an install script, which fails `pnpm install` while `allowBuilds` is empty; `"@swc/core": false` there lets the install pass, and the lint works without the script, which only checks the native binary. Adding that entry is a reviewed decision | Proposed |
 | PRD §6.9 | No requirement for the themes | Add FR-083: every screen has a light and a dark theme and follows the device's setting; and decide whether a manual switch becomes a roadmap item | ADR-003 builds both themes in the MVP, and ROADMAP §1 moves a picked-up item into the PRD | Proposed to the PRD team |
 
 ## 13. Sources
