@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 
 import { cleanup } from "@testing-library/react";
-import { afterAll, afterEach, beforeAll, beforeEach } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, vi } from "vitest";
 
 import { resetDemoStore } from "@/demo/store";
 
@@ -29,6 +29,22 @@ beforeAll(() => {
 beforeEach(() => {
   // Phones first: a test that needs a wider layout stubs its own viewport.
   stubViewport(390);
+  // jsdom has no ResizeObserver; Radix switches, checkboxes and radios inside
+  // a <form> measure themselves with it.
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {
+        // Nothing is laid out in jsdom.
+      }
+      unobserve() {
+        // Nothing is laid out in jsdom.
+      }
+      disconnect() {
+        // Nothing is laid out in jsdom.
+      }
+    },
+  );
 });
 
 afterEach(() => {
