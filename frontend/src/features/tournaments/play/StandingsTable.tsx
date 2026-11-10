@@ -1,8 +1,8 @@
-import { cn } from "cn";
 import { Fragment } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { FormResult, PlayStandingRow } from "@/demo/contract";
+import { cn } from "@/lib/utils";
 
 import { entryPlayers, type PlayModel, shortName } from "./model";
 
@@ -89,11 +89,10 @@ export function StandingsTable({
               <tr className="align-top">
                 <th
                   scope="row"
-                  className={
-                    row.place === 1
-                      ? "w-9 border-t py-3 pr-2 font-display text-score-m text-secondary-foreground"
-                      : "w-9 border-t py-3 pr-2 font-display text-score-m"
-                  }
+                  className={cn(
+                    "w-9 border-t py-3 pr-2 font-display text-score-m",
+                    row.place === 1 && "text-secondary-foreground",
+                  )}
                 >
                   {t("roundRobin.standings.placeValue", { place: row.place })}
                 </th>

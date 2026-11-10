@@ -1,10 +1,10 @@
-import { cn } from "cn";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 
 import { Button } from "@/components/ui/button";
 import type { MatchSideRead } from "@/demo/contract";
+import { cn } from "@/lib/utils";
 
 import { FieldBadge } from "./FieldBadge";
 import {

@@ -1,6 +1,7 @@
-import { cn } from "cn";
 import { useId } from "react";
 import { useTranslation } from "react-i18next";
+
+import { cn } from "@/lib/utils";
 
 interface BeadRodProps {
   /** Goals per game: how many beads (BR-123). */
