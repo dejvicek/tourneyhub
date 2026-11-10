@@ -112,8 +112,21 @@ Checked by tools: ESLint better-tailwindcss `no-unknown-classes`, `no-conflictin
 
 - The theme follows `prefers-color-scheme` (ADR-003). `:root` holds the light tokens, `@media (prefers-color-scheme: dark)` the dark ones, and Tailwind's default `dark:` variant uses the same query. The MVP has no manual switch [W21].
 - `@theme inline` maps each token once for both themes. `index.html` declares `<meta name="color-scheme" content="light dark">` and `:root` sets `color-scheme`, so native controls and scrollbars follow the theme [W4].
-- A new token is a pair, `x` and `x-foreground`, defined in both theme blocks and mapped in `@theme inline` [W14]. Its values come from the Figma design; until the design's tokens are available, no colour is added.
-- `index.html` gets one `<meta name="theme-color">` per scheme, with `media="(prefers-color-scheme: …)"` and the background token's colour, when the Figma tokens arrive [A22]. Contrast and focus are checked in both themes (§6).
+- A new token is a pair, `x` and `x-foreground`, defined in both theme blocks and mapped in `@theme inline` [W14]. Its values come from the Figma design's variables; a colour the design lacks is added only with its contrast ratios recorded below.
+- `index.css` maps the design's variables to the shadcn tokens and adds its extras: `team-a`, `team-b`, `notice-info`, `notice-warning`, `nav`, `nav-active`, `border-surface`, `input-background`, `bead-empty` and `bead-rod` (the last two are a fill and a stroke, not a pair).
+- Fonts are self-hosted from `@fontsource`, because the CSP is `default-src 'self'`: Atkinson Hyperlegible Next 400 and 700 (`font-sans`, body and UI) and Big Shoulders 800 (`font-display`, titles and scores), Latin and Latin Extended only. The Figma text styles are `text-display-*`, `text-score-*`, `text-body-*`, `text-button-*`, `text-caption` and `text-micro`, each with its line height and weight.
+- `index.html` has one `<meta name="theme-color">` per scheme, with `media="(prefers-color-scheme: …)"` and the `--background` colour, `#f2f4f1` and `#1a2430` [A22]. Contrast and focus are checked in both themes (§6).
+- The design has no destructive, focus or chart colours. These were added (ratios against page, card and, for the ring, the nav's active fill; light / dark):
+
+  | Token | Light | Dark | Ratios |
+  |---|---|---|---|
+  | `destructive` / `-foreground` | `#b42318` / `#ffffff` | `#ff9c8f` / `#1a2430` | text on page 5.94 / 7.77, on card 6.57 / 6.56; foreground on fill 6.57 / 7.77 |
+  | `ring` | `#1e7a4c` (primary) | `#edf2f6` (primary) | page 4.81 / 13.92, card 5.33 / 11.76, nav active 4.44 / 10.30 |
+  | `chart-1`…`5` | `#1e7a4c` `#e36414` `#2251c9` `#4e6157` `#7a3409` | `#5cc98a` `#f4b740` `#74b9f0` `#a9b8c6` `#f6d9a6` | on card, at least 3.44 / 6.27 |
+  | `team-a-foreground`, `team-b-foreground` | `#1a2430`, `#ffffff` | `#1a2430`, `#1a2430` | on the team colour 4.56 / 8.73, 6.80 / 7.42 |
+
+- The ring is solid, never `ring/50`, with a 2 px offset in the background colour (technique C40), so it keeps 3:1 next to a primary button of the same colour; `src/components/ui/button.tsx` and the base layer were changed for it. The destructive Button uses its token pair instead of `text-white` and `dark:bg-destructive/60`.
+- Below AA in the design itself, reported to its owners and not changed here: the input border (`#8fa197` on white 2.72, `#5b6f84` on `#233140` 2.56) and the light bead rod (2.72) fall short of 3:1; light `nav-active-foreground` on `nav-active` is 4.44 for 13 px text; light `team-a` on white is 3.44, enough only for large text such as scores.
 
 ### 5.3 shadcn/ui
 
@@ -132,10 +145,10 @@ Checked by tools: ESLint jsx-a11y-x `strict` and `jsx-a11y-x/control-has-associa
 
 - The target is WCAG 2.2 Level AA on every screen, in both themes [A1]; ADR-013 names it as what the axe report measures and what the gate requires from RM-11.
 - Every pointer target is at least 24 × 24 CSS px (WCAG 2.5.8, Level AA) [A19]. Result entry (open the match, choose the result, save, FR-082) and the primary actions on a phone are at least 44 × 44, beyond AA on purpose: 2.5.5 is Level AAA [A2]. The copied Button is 24 to 40 px tall, so the result-entry screen adds a 44 px size (`h-11`, `size-11`) to it.
-- Text contrast is at least 4.5:1 (3:1 for large text), and component boundaries and focus indicators at least 3:1, in each theme [A3]. The Figma `--ring` token is checked for 3:1 against its neighbours when it arrives [A4].
+- Text contrast is at least 4.5:1 (3:1 for large text), and component boundaries and focus indicators at least 3:1, in each theme [A3]. The `--ring` token keeps 3:1 against its neighbours (§5.2) [A4].
 - A sticky header or bottom bar never hides the focused element: give the page `scroll-padding` equal to the bar's height [A5]. A fixed bottom bar adds `env(safe-area-inset-bottom)` to its bottom padding, so the home indicator does not cover its buttons [A20].
 - Our animations use `motion-safe:`. The reduced-motion rule in `index.css` cuts those that shadcn/ui and tw-animate-css ship [A6].
-- Every screen renders its own `<title>`, one at a time [A7]. The skeleton's pages share the app name that `index.html` and `src/i18n/index.ts` set; per-screen titles replace both with the first feature screen.
+- Every screen renders its own `<title>`, one at a time [A7]. `DocumentTitle` renders it as "Screen · TourneyHub"; `index.html` has none.
 - Forms use shadcn's `Field`. After validation fails, the control gets `aria-invalid="true"` and `aria-describedby` pointing at the message, which is text in `FieldError`, never colour alone; before validation there is no `aria-invalid` [A8]. Messages are the translated ADR-008 codes, and each form has a Vitest test of this.
 - "Result saved", the reload after a 409 and error summaries are announced with `role="status"` or `role="alert"` [A9].
 - Landmarks are HTML elements: one `<main>`, plus `<header>`, `<nav>` and `<footer>`, with all content inside one, as in `AppShell` [A10].
@@ -218,7 +231,7 @@ Checked by tools: ESLint Testing Library `flat/react` (among them `prefer-screen
 - `globals` stays off: tests import `describe`, `it` and `expect` from `vitest`, and `src/test/setup.ts` runs `cleanup()` and clears `localStorage` after each test [V2]. `restoreMocks` and `unstubGlobals` are on [V3].
 - Elements are found by role first, then by label, then by text; `getByTestId` only when nothing else works. Finding an element by role also proves that it has a role and a name [V12].
 - A test that needs the app renders `App` with `createMemoryRouter(routes)` and a fresh `QueryClient` with `retry: false`, as `renderAt` in `src/App.test.tsx` does; the helper moves to `src/test/` when a second test file needs it [V5].
-- The API is mocked at the network with MSW's `setupServer` from `msw/node` and `onUnhandledFrame: "error"`, never by mocking the client module [V6] [V7]. MSW arrives with the first test of a screen that loads data; until then a test passes its own `fetch` to `createApi`, as `src/api/client.test.ts` does. Shared handlers live in `src/test/`, a test overrides them with `server.use()`, and response bodies are typed with `satisfies components["schemas"][…]`.
+- The API is mocked at the network with MSW's `setupServer` from `msw/node` and `onUnhandledFrame: "error"`, never by mocking the client module [V6] [V7]. `src/test/server.ts` serves the demo's handlers (`src/demo/handlers/`), so tests and the demo share one fake API; a test overrides them with `server.use()`. The handlers are typed through `route()` in `src/demo/route.ts`. A test that checks the client itself passes its own `fetch` to `createApi`, as `src/api/client.test.ts` does.
 
 ### 10.2 Playwright
 
@@ -247,8 +260,9 @@ frontend/
 │   ├── hooks/            # shared hooks, and those the shadcn CLI writes
 │   ├── lib/              # utils.ts (cn)
 │   ├── pages/            # screens outside any feature: home, not found
-│   ├── features/<area>/  # from the first feature on: api.ts, its components and screens
-│   └── test/             # setup.ts and test helpers
+│   ├── features/<area>/  # api.ts, its components and screens
+│   ├── demo/             # demo mode: the fake API, its contract and rules.ts (src/demo/README.md)
+│   └── test/             # setup.ts, the MSW server and test helpers
 └── e2e/                  # Playwright: configuration, specs, own tsconfig.json
 ```
 
@@ -259,13 +273,12 @@ Checked by tools: ESLint `no-restricted-imports` (imports flow one way: `api`, `
 - No barrel files (an `index.ts` that only re-exports): import each module directly [S2].
 - Only `VITE_` environment variables reach the browser, and none holds a secret. The first one adds `src/vite-env.d.ts` with a typed `ImportMetaEnv` [S3].
 
-From the first feature onward (the skeleton has none of these yet):
-- `src/features/<area>/` with its `api.ts` (§11), and the `QueryClient` defaults and `Register { defaultError: ApiError }` (§8.1).
-- MSW with `onUnhandledFrame: "error"` (§10.1).
-- A `<title>` per screen, and the 44 px Button size on the result-entry screen (§6).
-- `HydrateFallback` and `ErrorBoundary` on the root route (§9).
+Still to come with the first screens that need them:
+- The 44 px Button size on the result-entry screen (§6).
 - The Czech plural type for `cs` (§7).
-- `src/vite-env.d.ts`, with the first `VITE_` variable (above).
+- The `middleware` that guards organizer routes, with the login (§9).
+
+Demo mode (`pnpm dev:demo`, `src/demo/README.md`) runs every screen against an MSW worker. MSW is a dev dependency; `main.tsx` loads the demo behind a `MODE !== "production"` check that the bundler removes, ESLint lets app code import only `@/demo/rules` and `@/demo/contract`, and Vite's MSW plugin, which serves the worker script, is on only in demo mode. Provisional API types live in `src/demo/contract.ts` until the backend's routes are generated into `schema.d.ts`; screens call those routes through `provisionalApi` (`src/api/provisional.ts`). Texts are split per area into `src/i18n/locales/{en,cs}/<area>.ts`, merged into the one namespace. The build puts each `src/features/<area>/` into one chunk.
 
 ## 12. Proposed changes to other documents
 
