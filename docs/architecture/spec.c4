@@ -60,6 +60,9 @@ specification {
   deploymentNode machine {
     notation "Machine"
   }
+  deploymentNode network {
+    notation "Docker network"
+  }
   deploymentNode dockerContainer {
     notation "Docker container"
   }

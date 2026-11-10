@@ -32,12 +32,13 @@ model {
     link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md "ADR"
 
     spa = webapp "Web application (SPA)" {
-      technology "React 19, Vite, TypeScript, Tailwind, shadcn/ui, React Router, TanStack Query, react-i18next"
+      technology "React 19, Vite 8, TypeScript, Tailwind, shadcn/ui, React Router, TanStack Query, react-i18next"
       icon tech:react
       summary "Mobile-first, English and Czech. Every screen works on a phone; entering a result takes three taps."
       description "
         Mobile-first, English and Czech. Every screen works on a phone; entering a result takes at most three taps (FR-082).
-        Runs in the user's browser; served by Vite (development) or Caddy (production), and /api goes through the same origin.
+        Built with Node 26 LTS and pnpm (versions pinned in .nvmrc, engines and packageManager).
+        Runs in the user's browser; served by the Vite dev server (development) or Caddy (production), and /api goes through the same origin.
       "
       link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-003--frontend-react-vite-typescript-tailwind-shadcnui "ADR-003"
       link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#69-language-and-devices "PRD §6.9 Language and devices (FR-080 to FR-082)"
@@ -76,15 +77,18 @@ model {
     }
 
     api = container "API" {
-      technology "Python 3.15, FastAPI on uvicorn, Pydantic v2, SQLAlchemy 2 (synchronous), psycopg 3, Alembic migrations"
+      technology "Python 3.15, FastAPI on uvicorn, Pydantic v2, SQLAlchemy 2.1 (synchronous), psycopg 3, Alembic migrations"
       icon tech:python
       summary "REST under /api/v1. Errors always {code, detail}. League writes lock the league, then the tournament."
       description "
         REST under /api/v1, OpenAPI schema committed in backend/openapi.json. Errors always as {code, detail}; the frontend builds the user-facing text.
         Every write in a league locks the league first, then the tournament (SELECT … FOR UPDATE); unsafe operations carry the state they expect and get 409 on a mismatch.
-        Endpoints are plain def functions; FastAPI runs them in its thread pool. Alembic migrations run when the container starts.
+        Endpoints are plain def functions; FastAPI runs them in its thread pool.
+        When the container starts, tourneyhub migrate runs the Alembic migrations and then uvicorn starts. uvicorn trusts X-Forwarded-For only from the Compose network 172.30.0.0/24, where Caddy is.
       "
       link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-001--backend-python-fastapi-sqlalchemy-alembic "ADR-001"
+      link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-004--repository-layout-and-local-development-in-docker "ADR-004"
+      link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-006--authentication-jwt-access-token-and-rotating-refresh-token "ADR-006"
       link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-008--api-conventions-and-generated-client-types "ADR-008"
 
       authApi = component "API: auth" {
@@ -140,7 +144,9 @@ model {
     cli = tool "tourneyhub CLI" {
       technology "Python, runs in the api container"
       icon tech:python
-      description "create-admin, grant-admin, revoke-admin. No web route can create an admin, so a stranger cannot claim the instance on first start."
+      summary "migrate, run as the api container starts; create-admin, grant-admin, revoke-admin. No web route can create an admin."
+      description "migrate, which the api container runs on start; create-admin, grant-admin, revoke-admin. No web route can create an admin, so a stranger cannot claim the instance on first start."
+      link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-004--repository-layout-and-local-development-in-docker "ADR-004"
       link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-007--instance-admin-admin-flag-admin-screens-cli-bootstrap "ADR-007"
     }
 

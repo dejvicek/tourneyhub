@@ -30,7 +30,7 @@ views "I. Structure" {
       title "REST /api/v1: Bearer JWT, anonymous for viewers, refresh cookie only on /auth"
     }
     include tourneyhub.api -> tourneyhub.db with {
-      title "SQLAlchemy 2, psycopg 3; FOR UPDATE locks"
+      title "SQLAlchemy 2.1, psycopg 3; FOR UPDATE locks"
     }
     autoLayout LeftRight
   }
