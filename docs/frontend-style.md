@@ -48,7 +48,7 @@ pnpm e2e                         # needs the production images running (ADR-013)
 `dev`, `build`, `typecheck`, `lint`, `format` and `test` run `generate:api` first, which writes `src/api/schema.d.ts` from `../backend/openapi.json` (ADR-008). CI (`.github/workflows/ci.yml`) runs `pnpm install --frozen-lockfile`, then `pnpm audit --prod`, `generate:api`, `lint`, `format:check`, `typecheck`, `test` and `build`.
 
 Choices in the configuration that are not obvious:
-- `typescript` stays on `~6.0`. TypeScript 7 ships no compiler API [T1], and both typescript-eslint, which supports `>=4.8.4 <6.1.0` [T2], and openapi-typescript (ADR-008) import it. openapi-typescript 7.13 declares `typescript ^5`; `peerDependencyRules` in `pnpm-workspace.yaml` lets it run on 6 (§12).
+- `typescript` stays on `~6.0`. TypeScript 7 ships no compiler API [T1], and both typescript-eslint, which supports `>=4.8.4 <6.1.0` [T2], and openapi-typescript (ADR-008) import it. openapi-typescript 7.13 declares `typescript ^5`; `peerDependencyRules` in `pnpm-workspace.yaml` lets it run on 6.
 - The tsconfigs differ from create-vite's `react-ts` template [T10] in these: `strict`, `noUncheckedIndexedAccess` and `noUncheckedSideEffectImports` are on, `paths` maps `@/*` without `baseUrl`, which TypeScript 6 deprecates [T3], `allowArbitraryExtensions` is omitted, and `noUnusedLocals` and `noUnusedParameters` are off (next item). Nothing needs `ignoreDeprecations`.
 - `exactOptionalPropertyTypes` stays off: copied shadcn/ui components fail to compile with it [T4].
 - `noUnusedLocals` and `noUnusedParameters` are off. `@typescript-eslint/no-unused-vars` reports unused names alone, as typescript-eslint recommends [T7].
@@ -87,6 +87,7 @@ Checked by tools: ESLint react-hooks `recommended` (among them `rules-of-hooks`,
 - `use()` reads context only, never a promise of API data [R6].
 - An event handler starts async work with `mutation.mutate(…)`, or marks with `void` a promise whose failure needs no handling, as `LanguageSwitch` does with `i18n.changeLanguage` [E1].
 - Optimistic UI follows §8.1 [R7].
+- Forms use no form library and no client-side schema: a form keeps its fields in component state or reads them from `FormData`, submits with `mutation.mutate`, and shows the server's 422 next to the field (ADR-008). A check only the browser can make, such as two password fields matching, is plain code in the handler. The server is the validator, and a schema in the browser would copy the API contract by hand (ADR-008). Revisit if a form needs cross-field rules the server cannot report per field.
 - A component file is named after its component in PascalCase (`AppShell.tsx`), a hook file after its hook (`useLeague.ts`). `src/components/ui/` and the files the shadcn CLI writes into `src/hooks/` keep its kebab-case names [R8].
 
 ## 5. Styling
@@ -121,7 +122,7 @@ Checked by tools: ESLint better-tailwindcss `no-unknown-classes`, `no-conflictin
 - `src/components/ui/` is our code [W17]. Edit it in place only for project-wide decisions (touch sizes, focus ring, `outline-hidden`); a variant one feature needs is a wrapper component outside `ui/`.
 - To update a component, review upstream with `pnpm exec shadcn add <name> --diff` and port the changes by hand; never `--overwrite` an edited file [W18].
 - Never run `shadcn apply` or `shadcn migrate base-color`; both rewrite the theme [W19].
-- Classes are merged with `cn`, imported in app code from `"cn"`, as the generated components do [W15]; `@/lib/utils` re-exports it because `components.json` names that path.
+- Classes are merged with `cn`, imported everywhere from `"cn"`, the package the CLI writes into the copied components [W15]. `src/lib/utils.ts` re-exports it only because `components.json` names that path as its `utils` alias; no file imports from it. If the package disappoints, a three-line helper on `clsx` and `tailwind-merge` takes its place there, and the imports change with it.
 - Icons come only from `lucide-react`, the `iconLibrary` of `components.json`.
 
 ## 6. Accessibility
@@ -269,9 +270,9 @@ From the first feature onward (the skeleton has none of these yet):
 
 | Document | Today | Proposal | Why | Status |
 |---|---|---|---|---|
-| ADR-012, frontend row | No check for hard-coded text | Add `i18next-cli lint` as a check, with its configuration and devDependency | It is the only tool that finds text outside `t()` and `<Trans>` [I1]; until then §7's first rule is left to review | Proposed |
-| ADR-008 | Names openapi-typescript only | Name openapi-fetch as the runtime client | §8.2 relies on it. The `typescript ^5` peer override stays out of the ADR: §2 and `pnpm-workspace.yaml` explain it | Proposed |
+| ADR-012, frontend row | No check for hard-coded text | Add `i18next-cli lint` as a check, with its configuration and devDependency | It is the only tool that finds text outside `t()` and `<Trans>` [I1]; until then §7's first rule is left to review. It finds nothing in `src/` today. Held back: its dependency `@swc/core` has an install script, which fails `pnpm install` while `allowBuilds` is empty; `"@swc/core": false` there lets the install pass, and the lint works without the script, which only checks the native binary. Adding that entry is a reviewed decision | Proposed |
 | ROADMAP RM-11 | "Dark mode and accessibility": "A dark theme, and every screen checked for accessibility" | Accessibility only | ADR-003 puts both themes in the MVP | Proposed |
+| PRD §6.9 | No requirement for the themes | Add FR-083: every screen has a light and a dark theme and follows the device's setting; and decide whether a manual switch becomes a roadmap item | ADR-003 builds both themes in the MVP, and ROADMAP §1 moves a picked-up item into the PRD | Proposed to the PRD team |
 
 ## 13. Sources
 
