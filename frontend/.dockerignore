@@ -6,5 +6,7 @@ dist/
 coverage/
 *.tsbuildinfo
 src/api/schema.d.ts
+# The Playwright tests run against the image, not in it.
+e2e/
 .env
 .env.*

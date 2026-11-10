@@ -12,11 +12,12 @@
     "dev": "vite",
     "build": "pnpm run generate:api && tsc --build && vite build",
     "preview": "vite preview",
-    "typecheck": "pnpm run generate:api && tsc --build --noEmit",
+    "typecheck": "pnpm run generate:api && tsc --build --noEmit . e2e",
     "lint": "pnpm run generate:api && eslint --max-warnings=0 .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "e2e": "playwright test --config e2e"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.107.1",
@@ -33,6 +34,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "1.65.0",
     "@tailwindcss/vite": "^4.3.5",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",

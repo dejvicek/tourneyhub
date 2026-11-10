@@ -21,6 +21,8 @@ jobs:
     timeout-minutes: 5
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      e2e: ${{ steps.filter.outputs.e2e }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -42,12 +44,21 @@ jobs:
           else
             base=
           fi
-          if [ -z "$base" ] || [ -n "$(git diff --no-renames --name-only "$base" HEAD -- backend .github/workflows)" ]; then
-            backend=true
-          else
-            backend=false
-          fi
-          echo "backend=$backend" | tee -a "$GITHUB_OUTPUT"
+          # true when anything under the given paths changed
+          changed() {
+            if [ -z "$base" ] || [ -n "$(git diff --no-renames --name-only "$base" HEAD -- "$@")" ]; then
+              echo true
+            else
+              echo false
+            fi
+          }
+          {
+            echo "backend=$(changed backend .github/workflows)"
+            # The frontend's API types come from backend/openapi.json (ADR-008).
+            echo "frontend=$(changed frontend backend/openapi.json .github/workflows)"
+            # The tests are in frontend/e2e; they run the images of both areas.
+            echo "e2e=$(changed backend frontend compose.yaml compose.prod.yaml .github/e2e.env .github/workflows)"
+          } | tee -a "$GITHUB_OUTPUT"
 
   backend:
     needs: changes
@@ -118,10 +129,89 @@ jobs:
       - run: uv run alembic check
       - run: uv audit --preview-features audit-command
 
+  frontend:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # pnpm before Node, whose pnpm cache needs it: Node 25 and later ship no
+      # Corepack (ADR-003). The version comes from packageManager.
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      # The API types from the committed backend/openapi.json (ADR-008)
+      - run: pnpm generate:api
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+
+  # Playwright against the production images behind Caddy (ADR-013).
+  e2e:
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Every `docker compose` below runs compose.yaml with compose.prod.yaml and
+      # reads the dummy configuration in .github/e2e.env instead of a .env.
+      COMPOSE_FILE: compose.yaml:compose.prod.yaml
+      COMPOSE_ENV_FILES: .github/e2e.env
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: frontend
+      - run: pnpm exec playwright install --with-deps chromium
+        working-directory: frontend
+      # --wait returns once db and api are healthy and web runs; web starts only
+      # after the api's healthcheck passes.
+      - name: Build and start the production stack
+        run: docker compose up --build --detach --wait --wait-timeout 300
+      - run: pnpm e2e
+        working-directory: frontend
+      - name: Logs of the stack
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Upload the traces, screenshots and videos
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-results
+          path: frontend/e2e/test-results/
+          retention-days: 7 # ADR-012, ADR-013
+          if-no-files-found: ignore
+      - name: Stop the stack
+        if: always()
+        run: docker compose down --volumes
+
   # The one check to require (ADR-012): it fails when a needed job failed or was
-  # cancelled, and passes when backend was skipped because nothing in it changed.
+  # cancelled, and passes when a job was skipped because nothing in its area changed.
   ci-ok:
-    needs: [changes, backend]
+    needs: [changes, backend, frontend, e2e]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
