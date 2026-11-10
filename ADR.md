@@ -331,7 +331,8 @@ Caddy adds three headers to every response: a Content-Security-Policy that allow
   - A viewer opening the share link without an account sees the league and cannot change anything; tournaments in setup are hidden (FR-070, FR-072).
   - Switching between English and Czech, and the default language taken from the browser (FR-081).
   - Entering a result in at most three taps from the bracket, schedule or round, plus typing scores (FR-082).
-- Accessibility checks with `@axe-core/playwright` run on the main screens and produce a report that does not fail the build; they become a gate with RM-11 (Stage 1).
+- Accessibility checks with `@axe-core/playwright` run on the main screens, in the light and the dark colour scheme, and produce a report that does not fail the build. They run axe's WCAG 2.0, 2.1 and 2.2 Level A and AA rules (tags `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`), with `target-size` enabled by name because axe leaves the WCAG 2.2 rules off by default, and its `best-practice` rules. WCAG 2.2 Level AA is the level the report measures and the level the gate requires from RM-11 (Stage 1); the `best-practice` rules stay a report.
+- `target-size` checks AA's minimum of 24 × 24 CSS px (SC 2.5.8). The 44 × 44 px of the result-entry controls (FR-082) is the AAA size of SC 2.5.5, chosen because those taps are made on a phone at the table; axe does not check it, so the FR-082 scenario asserts it.
 - On failure, CI keeps the trace and screenshots, and the video (`retain-on-failure`), as build artifacts for 7 days (ADR-012).
 
 **Consequences.** Each pull request pays for one browser. Problems specific to WebKit, including how Safari handles the refresh cookie, may surface only when WebKit is added before the pilot.

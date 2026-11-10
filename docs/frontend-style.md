@@ -126,7 +126,7 @@ Checked by tools: ESLint better-tailwindcss `no-unknown-classes`, `no-conflictin
 
 Checked by tools: ESLint jsx-a11y-x `strict` and `jsx-a11y-x/control-has-associated-label` [E9]; better-tailwindcss `no-restricted-classes` (`outline-none`).
 
-- The target is WCAG 2.2 Level AA on every screen, in both themes [A1]; no ADR names it yet (§12).
+- The target is WCAG 2.2 Level AA on every screen, in both themes [A1]; ADR-013 names it as what the axe report measures and what the gate requires from RM-11.
 - Every pointer target is at least 24 × 24 CSS px (WCAG 2.5.8, Level AA) [A19]. Result entry (open the match, choose the result, save, FR-082) and the primary actions on a phone are at least 44 × 44, beyond AA on purpose: 2.5.5 is Level AAA [A2]. The copied Button is 24 to 40 px tall, so the result-entry screen adds a 44 px size (`h-11`, `size-11`) to it.
 - Text contrast is at least 4.5:1 (3:1 for large text), and component boundaries and focus indicators at least 3:1, in each theme [A3]. The Figma `--ring` token is checked for 3:1 against its neighbours when it arrives [A4].
 - A sticky header or bottom bar never hides the focused element: give the page `scroll-padding` equal to the bar's height [A5]. A fixed bottom bar adds `env(safe-area-inset-bottom)` to its bottom padding, so the home indicator does not cover its buttons [A20].
@@ -140,7 +140,7 @@ Checked by tools: ESLint jsx-a11y-x `strict` and `jsx-a11y-x/control-has-associa
 - Login, sign-up and password fields allow paste and password managers: the right `type` and `autocomplete` (`username`, `current-password`, `new-password`) [A13].
 - Score inputs use `inputMode="numeric"`, so a phone shows a digit keyboard (FR-082) [A14]. Text inputs are at least 16 px (`text-base`) on a phone, or iOS Safari zooms the page on focus [A21].
 - Every screen works at 320 CSS px wide without horizontal scrolling; brackets and data tables may scroll in two dimensions [A15]. Playwright checks it once the mobile projects exist (ADR-013).
-- With the first real screens (ADR-013), Playwright runs axe as a report, not a gate, until RM-11, through one shared fixture, `withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"])`, on each main screen in both colour schemes [A16]. `target-size` is disabled by default [A17]; when the fixture is written, check that the `wcag22aa` tag runs it. Each `disableRules` entry links an issue.
+- With the first real screens (ADR-013), Playwright runs axe as a report, not a gate, until RM-11, through one shared fixture, `withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"])`, on each main screen in both colour schemes, which one test switches with `page.emulateMedia({ colorScheme })`, not a second project [A16]. `target-size` is disabled by default [A17], so the fixture enables it by name, and its first test shows that the rule ran. It checks the 24 px of 2.5.8; the 44 px of 2.5.5 is asserted by the FR-082 scenario. Each `disableRules` entry links an issue.
 - Each new screen gets a manual pass before merge: keyboard only, both themes, 320 px. A screen reader on a phone and forced colours are checked once before the pilot [A18].
 
 ## 7. Translations
@@ -270,8 +270,6 @@ From the first feature onward (the skeleton has none of these yet):
 | ADR-012, frontend row | No check for hard-coded text | Add `i18next-cli lint` as a check, with its configuration and devDependency | It is the only tool that finds text outside `t()` and `<Trans>` [I1]; until then §7's first rule is left to review | Proposed |
 | ADR-012, frontend row | No dependency audit | Add `pnpm audit`, the counterpart of the backend's `uv audit`, first as a report | It checks the installed packages for known security issues [E18] | Proposed |
 | ADR-008 | Names openapi-typescript only | Name openapi-fetch as the runtime client | §8.2 relies on it. The `typescript ^5` peer override stays out of the ADR: §2 and `pnpm-workspace.yaml` explain it | Proposed |
-| ADR-013 | No accessibility level is named | State WCAG 2.2 Level AA, in both themes, as the target of §6 [A1] | Neither ADR nor PRD names one; a PRD change goes to the PRD team as a PR comment | Proposed |
-| ADR-013 | axe runs on the main screens as a report | Name the tags (`wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`, `best-practice`) and run them in both colour schemes | `target-size` is disabled by default [A17] and needs asking for; with both themes in the MVP, the dark theme would otherwise go unchecked | Proposed |
 | ROADMAP RM-11 | "Dark mode and accessibility": "A dark theme, and every screen checked for accessibility" | Accessibility only | ADR-003 puts both themes in the MVP | Proposed |
 
 ## 13. Sources
