@@ -68,6 +68,7 @@ def place_entries(
     *,
     standing: Iterable[Iterable[EntryId]] = (),
     knockout: Iterable[KnockoutResult] = (),
+    third_place_match: bool = False,
 ) -> tuple[EntryPlace, ...]:
     """Place the entries of a finished tournament (BR-100 to BR-104).
 
@@ -80,8 +81,8 @@ def place_entries(
       entry still in at that point (BR-102).
     - **Both:** the knockout entries take the top places and the rest follow
       in their `standing` order, numbered after the knockout entries
-      (BR-103). A group-phase entry went on to the knockout when one of its
-      players is in a knockout entry.
+      (BR-103). A group-phase entry went on to the knockout when its players
+      are all in knockout entries. An entry left without a place is refused.
 
     Places count entries, never players. A knockout pair is one entry, as is
     each non-qualifying player of a Monster DYP, so after 4 knockout pairs
@@ -89,9 +90,14 @@ def place_entries(
     does not say what Monster DYP counts: it follows the examples in PRD
     §5.1 and §5.2.
 
-    A third-place match is recognised by `is_third_place` on a result, not
-    by a setting: without one, the semifinal losers share 3rd. Tie groups
-    that the knockout's cut splits stay together among the rest.
+    `third_place_match` says whether the tournament has a third-place match.
+    A knockout finishes only when every match has a result, the third-place
+    match included (FR-037), so the results must hold an `is_third_place`
+    result exactly when the flag is set. Tie groups that the knockout's cut
+    splits stay together among the rest.
+
+    The bracket's shape (byes only in round 1, BR-040 and BR-041) and the
+    entry sizes are the bracket generator's job and are not validated here.
 
     Returns:
         One `EntryPlace` per placed entry, best place first and by entry id
@@ -100,10 +106,11 @@ def place_entries(
 
     Raises:
         ValueError: A caller bug: an entry is given twice or is unknown, an
-            entry would be placed twice, nothing was given to place, or the
-            knockout has no single final, a second third-place match, an
-            entry that loses twice, or a third-place match that is not
-            between the semifinal losers.
+            entry would be placed twice or none, nothing was given to place,
+            or the knockout has no single final, a third-place match that
+            the flag does not match, a second third-place match, an entry
+            that loses twice, or a third-place match that is not between the
+            semifinal losers.
     """
     entries = tuple(entries)
     ensure_distinct(entry.entry_id for entry in entries)
@@ -111,6 +118,13 @@ def place_entries(
 
     groups = tuple(tuple(group) for group in standing)
     results = tuple(knockout)
+    has_third_place_result = any(result.is_third_place for result in results)
+    if third_place_match and not has_third_place_result:
+        msg = "the third-place match has no result"
+        raise ValueError(msg)
+    if has_third_place_result and not third_place_match:
+        msg = "a third-place result was given for a knockout without that match"
+        raise ValueError(msg)
     blocks = _knockout_blocks(results)
     knockout_players = {
         player_id
@@ -130,6 +144,13 @@ def place_entries(
     if not blocks:
         msg = "there is nothing to place"
         raise ValueError(msg)
+    in_blocks = {entry_id for block in blocks for entry_id in block}
+    for entry in entries:
+        if entry.entry_id not in in_blocks and not knockout_players.issuperset(
+            entry.player_ids
+        ):
+            msg = f"entry {entry.entry_id} is left without a place"
+            raise ValueError(msg)
 
     placed: list[EntryPlace] = []
     place = 1
