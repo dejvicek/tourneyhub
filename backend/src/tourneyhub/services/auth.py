@@ -73,10 +73,13 @@ def log_in(session: Session, *, email: str) -> User:
     """Return the account for `email`.
 
     A placeholder: it checks only that the account exists. The password check and
-    the tokens come with authentication (ADR-006).
+    the tokens come with authentication (ADR-006). The email is compared as the
+    unique index `uq_users_lower_email` folds it, with PostgreSQL's `lower()` on
+    both sides: Python's `str.lower()` folds a word-final capital sigma to U+03C2,
+    PostgreSQL's `lower()` to U+03C3.
     """
     user = session.scalars(
-        select(User).where(func.lower(User.email) == email.lower())
+        select(User).where(func.lower(User.email) == func.lower(email))
     ).one_or_none()
     if user is None:
         raise NotAuthenticatedError(ErrorCode.NOT_AUTHENTICATED)

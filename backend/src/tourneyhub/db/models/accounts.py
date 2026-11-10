@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID, uuid7
 
-from sqlalchemy import Index, false
+from sqlalchemy import Index, false, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from tourneyhub.db.base import Base, str_enum
@@ -14,9 +14,16 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
-    email: Mapped[str] = mapped_column(unique=True)
+    email: Mapped[str]
     is_admin: Mapped[bool] = mapped_column(server_default=false())
     must_change_password: Mapped[bool] = mapped_column(server_default=false())
+
+
+# Unique on lower(email) (DATA-MODEL §4.1, FR-002). Named here, because the naming
+# convention cannot name an expression index. A lookup by email compares
+# func.lower(User.email) with func.lower() of the input, so that it uses this
+# index and folds the case as the index does.
+Index("uq_users_lower_email", func.lower(User.email), unique=True)
 
 
 class AuthAttempt(Base):

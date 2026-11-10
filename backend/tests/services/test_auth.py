@@ -1,8 +1,10 @@
+from collections.abc import Callable
 from datetime import datetime, timedelta
 
 import pytest
 from sqlalchemy.orm import Session
 
+from tourneyhub.db.models.accounts import User
 from tourneyhub.services import auth as auth_service
 
 
@@ -58,3 +60,14 @@ def test_adr006_login_delay_ignores_failures_outside_the_window(
     )
 
     assert result == timedelta(0)
+
+
+def test_fr002_log_in_folds_the_email_as_the_unique_index_does(
+    session: Session, make_user: Callable[..., User]
+) -> None:
+    # str.lower() folds the final capital sigma to U+03C2, PostgreSQL to U+03C3.
+    user = make_user(email="ΟΔΟΣ@example.test")
+
+    found = auth_service.log_in(session, email="ΟΔΟΣ@example.test")
+
+    assert found is user

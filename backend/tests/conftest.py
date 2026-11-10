@@ -17,7 +17,6 @@ from tourneyhub.app import create_app
 from tourneyhub.db.models.accounts import User
 from tourneyhub.db.models.leagues import League
 from tourneyhub.db.session import create_db_engine
-from tourneyhub.engine.leagues import LeagueStatus
 from tourneyhub.settings import Settings
 
 
@@ -125,7 +124,6 @@ def make_league(
             id=uuid7(),
             owner_user_id=owner_user_id or make_user().id,
             name=name or f"League {uuid7()}",
-            status=LeagueStatus.ACTIVE,
             created_at=now,
         )
         session.add(league)
