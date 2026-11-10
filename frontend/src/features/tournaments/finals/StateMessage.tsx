@@ -18,7 +18,7 @@ export function LoadError({ onRetry }: { onRetry: () => void }) {
   return (
     <div role="alert" className="space-y-3">
       <p className="text-body-md">{t("finals.common.loadFailed")}</p>
-      <Button type="button" className="min-h-11" onClick={onRetry}>
+      <Button type="button" onClick={onRetry}>
         {t("finals.common.retry")}
       </Button>
     </div>

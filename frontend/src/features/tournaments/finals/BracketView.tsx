@@ -29,14 +29,15 @@ export function BracketView({ bracket, ctx }: ViewProps) {
     >
       <div className="flex min-w-max gap-10 py-1">
         {bracket.rounds.map((round) => (
-          <section
+          <div
             key={round.round_no}
+            role="group"
             aria-label={t(`finals.roundName.${round.name}`)}
             className="flex w-56 flex-col justify-around gap-3"
           >
-            <h3 className="text-caption font-bold text-muted-foreground">
+            <h2 className="text-caption font-bold text-muted-foreground">
               {t(`finals.roundName.${round.name}`)}
-            </h3>
+            </h2>
             {round.matches.map((match) =>
               match.kind === "standard" && round.name === "final" ? (
                 <FinalCard
@@ -62,7 +63,7 @@ export function BracketView({ bracket, ctx }: ViewProps) {
                 />
               ),
             )}
-          </section>
+          </div>
         ))}
       </div>
     </div>
@@ -97,9 +98,9 @@ export function CompactBracket({ bracket, ctx }: ViewProps) {
           />
         ) : (
           <div key={match.match_id} className="space-y-2">
-            <h3 className="text-body-md font-bold">
+            <h2 className="text-body-md font-bold">
               {t("finals.roundName.final")}
-            </h3>
+            </h2>
             <MatchBox ctx={ctx} round={last} match={match} titled />
           </div>
         ),

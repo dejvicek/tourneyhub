@@ -1,7 +1,6 @@
-// Texty obrazovek finále. Čeština má čtyři plurální tvary (_one, _few, _many,
-// _other), které angličtina nemá; proto modul nemá typ Messages["finals"] a
-// úplnost klíčů hlídá přiřazení v cs.ts.
-export const finals = {
+import type { CsMessages, Messages } from "../en";
+
+export const finals: CsMessages<Messages["finals"]> = {
   common: {
     loadFailed: "Nepodařilo se to načíst.",
     retry: "Zkusit znovu",
@@ -53,6 +52,8 @@ export const finals = {
     rounds: "Kola vyřazovací části",
     bracket: "Pavouk",
     noKnockout: "Tento turnaj nemá vyřazovací část.",
+    finishedTitle: "Vyřazovací část je dohraná",
+    seePlaces: "Zobrazit konečné pořadí",
     match: "Zápas {{number}}",
     played: "Odehráno",
     ready: "Připraveno ke hře",
@@ -148,6 +149,7 @@ export const finals = {
       "Pro {{active}} aktivních hráčů doporučujeme alespoň {{count}} kola, odehráno máte {{played}}. Přidejte další kolo, nebo pokračujte dál.",
     decisionBody_other:
       "Pro {{active}} aktivních hráčů doporučujeme alespoň {{count}} kol, odehráno máte {{played}}. Přidejte další kolo, nebo pokračujte dál.",
+    notRounds: "Tento turnaj nemá kola, která by se přidávala.",
     inProgressTitle: "Kolo {{round}} běží",
     inProgressBody_one: "{{count}} zápas ještě nemá výsledek.",
     inProgressBody_few: "{{count}} zápasy ještě nemají výsledek.",

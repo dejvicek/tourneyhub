@@ -92,7 +92,7 @@ function TiebreakerForm({
               <Button
                 type="button"
                 variant="outline"
-                className="size-11 p-0"
+                size="icon"
                 disabled={index === 0}
                 aria-label={t("finals.tiebreakers.moveUp", { name })}
                 onClick={() => {
@@ -104,7 +104,7 @@ function TiebreakerForm({
               <Button
                 type="button"
                 variant="outline"
-                className="size-11 p-0"
+                size="icon"
                 disabled={index === draft.length - 1}
                 aria-label={t("finals.tiebreakers.moveDown", { name })}
                 onClick={() => {
@@ -125,7 +125,7 @@ function TiebreakerForm({
       <SheetFooter>
         <Button
           type="button"
-          className="min-h-11"
+
           disabled={save.isPending}
           onClick={() => {
             save.mutate(
@@ -158,7 +158,7 @@ export function TiebreakerSheet({
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button type="button" variant="outline" className="min-h-11">
+        <Button type="button" variant="outline">
           {t("finals.tiebreakers.change")}
         </Button>
       </SheetTrigger>

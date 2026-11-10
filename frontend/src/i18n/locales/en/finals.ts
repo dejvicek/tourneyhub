@@ -52,6 +52,8 @@ export const finals = {
     rounds: "Rounds of the knockout",
     bracket: "Bracket",
     noKnockout: "This tournament has no knockout.",
+    finishedTitle: "The knockout is finished",
+    seePlaces: "See the final places",
     match: "Match {{number}}",
     played: "Played",
     ready: "Ready to play",
@@ -147,6 +149,7 @@ export const finals = {
       "For {{active}} active players we recommend at least {{count}} rounds, and you have played {{played}}. Add another round, or move on.",
     decisionBody_other:
       "For {{active}} active players we recommend at least {{count}} rounds, and you have played {{played}}. Add another round, or move on.",
+    notRounds: "This tournament has no rounds to add.",
     inProgressTitle: "Round {{round}} is in progress",
     inProgressBody_one: "{{count}} match has no result yet.",
     inProgressBody_few: "{{count}} matches have no result yet.",

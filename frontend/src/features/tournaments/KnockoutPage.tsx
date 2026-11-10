@@ -1,8 +1,9 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { generatePath, Link, Navigate, useNavigate } from "react-router";
+import { generatePath, Link, Outlet, useNavigate } from "react-router";
 
+import { ApiError } from "@/api/client";
 import { DocumentTitle } from "@/components/DocumentTitle";
 import {
   AlertDialog,
@@ -23,8 +24,6 @@ import {
   finalsMutations,
   finalsQueries,
 } from "@/features/finals/api";
-import { leagueQueries } from "@/features/leagues/api";
-import { useSeasonName } from "@/features/leagues/useSeasonName";
 import { tournamentQueries } from "@/features/tournaments/api";
 import { useLayout } from "@/hooks/useLayout";
 import { useRouteParam } from "@/hooks/useRouteParam";
@@ -35,6 +34,7 @@ import { BracketView, CompactBracket, RoundList } from "./finals/BracketView";
 import { errorText } from "./finals/errorText";
 import { resultPath } from "./finals/links";
 import { useRoster } from "./finals/names";
+import { Notice } from "./finals/Notice";
 import { PlacesSoFar } from "./finals/PlacesSoFar";
 import { ScreenHeader } from "./finals/ScreenHeader";
 import { LoadError, Loading } from "./finals/StateMessage";
@@ -47,6 +47,18 @@ import { LoadError, Loading } from "./finals/StateMessage";
  */
 export function KnockoutPage() {
   const { t } = useTranslation();
+  return (
+    <div className="space-y-6">
+      <DocumentTitle screen={t("finals.knockout.title")} />
+      <ScreenHeader title={t("finals.knockout.title")} />
+      <KnockoutContent />
+      <Outlet />
+    </div>
+  );
+}
+
+function KnockoutContent() {
+  const { t } = useTranslation();
   const layout = useLayout();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -55,14 +67,15 @@ export function KnockoutPage() {
   const tournament = useQuery(tournamentQueries.detail(leagueId, tournamentId));
   const bracket = useQuery(finalsQueries.bracket(leagueId, tournamentId));
   const places = useQuery(finalsQueries.places(leagueId, tournamentId));
-  const league = useQuery(leagueQueries.detail(leagueId));
-  const seasons = useQuery(leagueQueries.seasons(leagueId));
-  const seasonName = useSeasonName();
   const roster = useRoster(leagueId, tournament.data?.entries);
   const removal = useMutation(
     finalsMutations.deleteKnockout(queryClient, leagueId, tournamentId),
   );
 
+  // A tournament without a knockout has no bracket (404).
+  if (bracket.error instanceof ApiError && bracket.error.status === 404) {
+    return <Notice tone="info" title={t("finals.knockout.noKnockout")} />;
+  }
   if (tournament.isError || bracket.isError) {
     return (
       <LoadError
@@ -78,18 +91,7 @@ export function KnockoutPage() {
   if (data === undefined || shape === undefined) {
     return <Loading />;
   }
-  // FR-037: the last result finishes the tournament; its places are screen 10.
-  if (data.state === "finished") {
-    return (
-      <Navigate
-        to={generatePath(paths.finished, { leagueId, tournamentId })}
-        replace
-      />
-    );
-  }
 
-  const format = data.phases.find((phase) => phase.kind === "group")?.format;
-  const season = seasons.data?.find((s) => s.id === data.season_id);
   const ctx: BracketContext = {
     sideName: (side: BracketSide) =>
       side.is_bye
@@ -99,7 +101,7 @@ export function KnockoutPage() {
           : roster.entry(side.entry_id),
     resultHref: (match: BracketMatch) =>
       match.state === "ready" || match.state === "on_field"
-        ? resultPath(leagueId, tournamentId, match.match_id, match.match_format)
+        ? resultPath("knockout", leagueId, tournamentId, match.match_id)
         : null,
     matchTitle: (round: BracketRound, match: BracketMatch) =>
       match.kind === "third_place"
@@ -125,48 +127,16 @@ export function KnockoutPage() {
 
   return (
     <div className="space-y-6">
-      <DocumentTitle screen={t("finals.knockout.title")} />
-      <ScreenHeader
-        kicker={
-          league.data !== undefined && season !== undefined
-            ? t("finals.common.kicker", {
-                league: league.data.name,
-                season: seasonName(season),
-              })
-            : undefined
-        }
-        title={data.name}
-        subtitle={t("finals.knockout.title")}
-      />
-      {shape.has_group_phase && (
-        <nav aria-label={t("finals.knockout.phases")}>
-          <ul className="flex gap-1 rounded-lg bg-nav-active p-1">
-            <li className="flex-1">
-              <Link
-                to={generatePath(
-                  format === "round_robin"
-                    ? paths.tournament
-                    : paths.betweenRounds,
-                  { leagueId, tournamentId },
-                )}
-                className="inline-flex h-11 w-full items-center justify-center rounded-md px-3 text-body-sm text-nav-active-foreground outline-hidden focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              >
-                {format === "round_robin"
-                  ? t("finals.knockout.roundRobin")
-                  : t("finals.rounds.title")}
-              </Link>
-            </li>
-            <li className="flex-1">
-              <Link
-                to="."
-                aria-current="page"
-                className="inline-flex h-11 w-full items-center justify-center rounded-md bg-card px-3 text-body-sm font-bold text-card-foreground outline-hidden focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              >
-                {t("finals.knockout.knockout")}
-              </Link>
-            </li>
-          </ul>
-        </nav>
+      {data.state === "finished" && (
+        // FR-037: the last result finishes the tournament; its places are screen 10.
+        <Notice tone="info" title={t("finals.knockout.finishedTitle")}>
+          <Link
+            to={generatePath(paths.finished, { leagueId, tournamentId })}
+            className="inline-flex min-h-11 items-center font-bold underline underline-offset-4"
+          >
+            {t("finals.knockout.seePlaces")}
+          </Link>
+        </Notice>
       )}
       {layout === "desktop" ? (
         <div className="grid grid-cols-[minmax(0,1fr)_18rem] gap-8">
@@ -188,8 +158,7 @@ export function KnockoutPage() {
           )}
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              {/* TODO(foundation-buttons) */}
-              <Button type="button" variant="outline" className="min-h-11">
+              <Button type="button" variant="outline">
                 {t("finals.knockout.delete")}
               </Button>
             </AlertDialogTrigger>

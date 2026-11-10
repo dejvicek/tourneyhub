@@ -2,6 +2,7 @@ import { cn } from "cn";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 
+import { Button } from "@/components/ui/button";
 import type {
   BracketMatchData as BracketMatch,
   BracketRoundData as BracketRound,
@@ -26,9 +27,6 @@ function winnerSide(match: BracketMatch): 0 | 1 | null {
   return match.outcome === "side_1" ? 0 : match.outcome === "side_2" ? 1 : null;
 }
 
-const RESULT_LINK =
-  "inline-flex min-h-11 items-center justify-center rounded-md px-4 text-button-sm font-bold outline-hidden focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
-
 function ResultLink({
   href,
   label,
@@ -42,19 +40,15 @@ function ResultLink({
 }) {
   const { t } = useTranslation();
   return (
-    <Link
-      to={href}
-      aria-label={label}
-      className={cn(
-        RESULT_LINK,
-        inverse
-          ? "bg-primary-foreground text-primary"
-          : "bg-primary text-primary-foreground",
-        className,
-      )}
+    <Button
+      asChild
+      variant={inverse ? "feature" : "default"}
+      className={className}
     >
-      {t("finals.knockout.enterResult")}
-    </Link>
+      <Link to={href} aria-label={label}>
+        {t("finals.knockout.enterResult")}
+      </Link>
+    </Button>
   );
 }
 
@@ -114,7 +108,7 @@ const BOX_STATE = {
   ready: "border-team-a bg-card text-card-foreground",
   waiting: "border-dashed border-input bg-transparent text-foreground",
   bye: "border-dashed border-input bg-transparent text-muted-foreground",
-  on_field: "border-primary bg-primary text-primary-foreground",
+  on_field: "border-field bg-field text-field-foreground",
 } as const satisfies Record<BracketMatch["state"], string>;
 
 interface MatchBoxProps {
@@ -189,10 +183,10 @@ export function FinalCard({ ctx, round, match }: FinalCardProps) {
   return (
     <section
       aria-label={title}
-      className="space-y-3 rounded-lg bg-primary p-4 text-primary-foreground"
+      className="space-y-3 rounded-lg bg-field p-4 text-field-foreground"
     >
       <div className="flex items-baseline justify-between gap-3">
-        <h3 className="font-display text-display-section">{title}</h3>
+        <h2 className="font-display text-display-section">{title}</h2>
         <p className="text-caption font-bold">
           {match.field_number === null
             ? format
@@ -265,11 +259,11 @@ export function MatchCard({ ctx, round, match }: MatchBoxProps) {
       className={cn("space-y-2 rounded-lg border p-3", boxState)}
     >
       <header className="flex items-baseline justify-between gap-3">
-        <h4 className="text-body-md font-bold">
+        <p className="text-body-md font-bold">
           {match.number === null
             ? title
             : t("finals.knockout.match", { number: match.number })}
-        </h4>
+        </p>
         <p className="text-caption text-muted-foreground">
           {status}
           {match.field_number !== null &&

@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import { ApiError, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
 
+import { DEMO_LEAGUE_ID, demoId } from "./ids";
 import { rules } from "./rules";
-import { DEMO_LEAGUE_ID, demoId } from "./seed";
 
 // Ids of the finals seed (seedFinals.ts).
 const DYP_EVENING = demoId(3200);
@@ -123,7 +123,7 @@ describe("the finals in the fake API", () => {
 
   it("deletes only the newest round, by its id (BR-066)", async () => {
     const tournament = await dataOf(
-      provisionalApi.GET(`${root}`, { params: { path: base(SWISS) } }),
+      provisionalApi.GET(root, { params: { path: base(SWISS) } }),
     );
     const [first, , third] = tournament.rounds;
     const remove = (roundId: string) =>
@@ -183,7 +183,7 @@ describe("the finals in the fake API", () => {
       }),
     );
     const tournament = await dataOf(
-      provisionalApi.GET(`${root}`, { params: { path: base(MONSTER) } }),
+      provisionalApi.GET(root, { params: { path: base(MONSTER) } }),
     );
     const outside = players.find(
       (p) => !tournament.entries.some((e) => e.player_ids.includes(p.id)),
@@ -260,7 +260,7 @@ describe("the finals in the fake API", () => {
         expect(drawn.size).toBe(paired ? 4 : 8);
         expect(drawn.third_place_match).toBe(true);
         const tournament = await dataOf(
-          provisionalApi.GET(`${root}`, { params: { path: base(MONSTER) } }),
+          provisionalApi.GET(root, { params: { path: base(MONSTER) } }),
         );
         expect(tournament.phases.at(-1)).toMatchObject({
           kind: "knockout",
@@ -289,7 +289,7 @@ describe("the finals in the fake API", () => {
       }),
     );
     const tournament = await dataOf(
-      provisionalApi.GET(`${root}`, { params: { path: base(MONSTER) } }),
+      provisionalApi.GET(root, { params: { path: base(MONSTER) } }),
     );
     expect(tournament.phases.some((p) => p.kind === "knockout")).toBe(false);
     expect(tournament.entries.some((e) => e.stage === "knockout")).toBe(false);

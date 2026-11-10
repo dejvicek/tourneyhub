@@ -7,6 +7,8 @@ interface RankingTableProps {
   ranking: RankingRead;
   participants: readonly ParticipantRead[];
   entryName: (entryId: string) => string;
+  /** The table's accessible name, as its heading says it. */
+  caption: string;
 }
 
 function valueOf(row: RankingRow, key: RankingRead["tiebreakers"][number]) {
@@ -25,6 +27,7 @@ export function RankingTable({
   ranking,
   participants,
   entryName,
+  caption,
 }: RankingTableProps) {
   const { t, i18n } = useTranslation();
   const number = new Intl.NumberFormat(i18n.resolvedLanguage, {
@@ -34,7 +37,7 @@ export function RankingTable({
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-72 border-collapse text-body-sm">
-        <caption className="sr-only">{t("finals.rounds.standings")}</caption>
+        <caption className="sr-only">{caption}</caption>
         <thead>
           <tr className="text-caption text-muted-foreground">
             <th scope="col" className="w-9 py-2 pr-2 text-start font-normal">

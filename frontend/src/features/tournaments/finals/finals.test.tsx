@@ -4,9 +4,8 @@ import axe from "axe-core";
 import { generatePath } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
-import { DEMO_LEAGUE_ID, demoId } from "@/demo/seed";
+import { DEMO_LEAGUE_ID, demoId } from "@/demo/ids";
 import { i18n } from "@/i18n";
 import { paths } from "@/lib/paths";
 import { stubViewport } from "@/test/media";
@@ -28,26 +27,23 @@ const ids = (tournamentId: string) => ({
 
 /** Plays the DYP evening's final, so that the tournament finishes (FR-037). */
 async function playFinal(tournamentId: string): Promise<void> {
-  const bracket = await dataOf(
-    provisionalApi.GET(`${root}/bracket`, {
-      params: { path: ids(tournamentId) },
-    }),
-  );
-  const final = bracket.rounds.at(-1)?.matches[0];
-  await dataOf(
-    provisionalApi.PUT(`${root}/matches/{match_id}/result`, {
-      params: {
-        path: { ...ids(tournamentId), match_id: final?.match_id ?? "" },
-      },
-      body: {
-        walkover_winner: null,
-        games: [
-          { winner: "side_1", score_1: 10, score_2: 7 },
-          { winner: "side_1", score_1: 10, score_2: 5 },
-        ],
-      },
-    }),
-  );
+  const bracket = await provisionalApi.GET(`${root}/bracket`, {
+    params: { path: ids(tournamentId) },
+  });
+  const final = bracket.data?.rounds.at(-1)?.matches[0];
+  const saved = await provisionalApi.PUT(`${root}/matches/{match_id}/result`, {
+    params: {
+      path: { ...ids(tournamentId), match_id: final?.match_id ?? "" },
+    },
+    body: {
+      walkover_winner: null,
+      games: [
+        { winner: "side_1", score_1: 10, score_2: 7 },
+        { winner: "side_1", score_1: 10, score_2: 5 },
+      ],
+    },
+  });
+  expect(saved.response.ok).toBe(true);
 }
 
 // jsdom has no layout or colours, so colour-contrast cannot run here; axe
@@ -76,9 +72,9 @@ describe("Knockout (screen 9)", () => {
     renderAt(at(paths.knockout, DYP_EVENING));
 
     expect(
-      await screen.findByRole("heading", { level: 1, name: "DYP evening" }),
+      await screen.findByRole("heading", { level: 1, name: "Knockout" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Semifinal 1")).toBeInTheDocument();
+    expect(await screen.findByText("Semifinal 1")).toBeInTheDocument();
     expect(screen.getByText("Semifinal 2")).toBeInTheDocument();
     const final = screen.getByRole("region", { name: "Final" });
     expect(within(final).getByText("Best of 3, Field 1")).toBeInTheDocument();
@@ -99,16 +95,16 @@ describe("Knockout (screen 9)", () => {
     const bracket = await screen.findByRole("region", { name: "Bracket" });
     expect(within(bracket).getAllByText("Bye")).toHaveLength(2);
     expect(
-      within(bracket).getByRole("region", { name: "Quarterfinals" }),
+      within(bracket).getByRole("group", { name: "Quarterfinals" }),
     ).toBeInTheDocument();
     expect(
-      within(bracket).getByRole("region", { name: "Semifinals" }),
+      within(bracket).getByRole("group", { name: "Semifinals" }),
     ).toBeInTheDocument();
     // The third-place match sits next to the final (BR-044).
     expect(within(bracket).getByText("Third place")).toBeInTheDocument();
     expect(
       within(bracket).getAllByRole("link", { name: /^Enter result/ }),
-    ).toHaveLength(1);
+    ).toHaveLength(2);
   });
 
   it("draws 16 entries with byes as a bracket on a desktop", async () => {
@@ -124,7 +120,7 @@ describe("Knockout (screen 9)", () => {
       "Final",
     ]) {
       expect(
-        within(bracket).getByRole("region", { name: round }),
+        within(bracket).getByRole("group", { name: round }),
       ).toBeInTheDocument();
     }
   });
@@ -133,7 +129,7 @@ describe("Knockout (screen 9)", () => {
     const user = userEvent.setup();
     renderAt(at(paths.knockout, GRAND_PRIX));
 
-    const rounds = await screen.findByRole("group", {
+    const rounds = await screen.findByRole("radiogroup", {
       name: "Rounds of the knockout",
     });
     // The round with matches to play is open first.
@@ -280,9 +276,9 @@ describe("Between rounds (screen 11)", () => {
     );
     // Round 4 has no results, so the decision card gives way to its progress.
     expect(
-      await screen.findByRole("heading", { name: "Round 4 is in progress" }),
+      await screen.findByText("Round 4 is in progress"),
     ).toBeInTheDocument();
-    const chips = screen.getByRole("group", { name: "Round" });
+    const chips = screen.getByRole("radiogroup", { name: "Round" });
     expect(within(chips).getAllByRole("radio")).toHaveLength(4);
 
     await user.click(screen.getByRole("button", { name: "Delete round 4" }));
@@ -298,7 +294,7 @@ describe("Between rounds (screen 11)", () => {
     ).toBeInTheDocument();
     await waitFor(() => {
       expect(
-        within(screen.getByRole("group", { name: "Round" })).getAllByRole(
+        within(screen.getByRole("radiogroup", { name: "Round" })).getAllByRole(
           "radio",
         ),
       ).toHaveLength(3);
@@ -465,9 +461,6 @@ describe("Start the knockout (screen 13)", () => {
       ).toBeInTheDocument();
     }
     // Seeded pairs: 8 players make 4 pairs and semifinals.
-    expect(
-      within(screen.getByRole("list", { name: "" }) ?? document.body),
-    ).toBeTruthy();
     expect(screen.getAllByText("VS")).toHaveLength(2);
     expect(
       screen.getByRole("heading", { name: "Semifinals" }),

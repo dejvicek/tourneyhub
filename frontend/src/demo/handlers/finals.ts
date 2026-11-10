@@ -24,9 +24,9 @@ import {
   setNote,
   syncBracket,
 } from "../finalsEngine";
+import { demoId } from "../ids";
 import { apiError, route } from "../route";
 import { MONSTER_KNOCKOUT_MODES, rules } from "../rules";
-import { demoId } from "../ids";
 import type { StoredTournament } from "../seed";
 import { db, findTournament, tournamentRead } from "../store";
 

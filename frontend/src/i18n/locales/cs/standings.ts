@@ -1,5 +1,6 @@
-// Bez typu Messages["standings"]: čeština má plurální tvary navíc (viz finals.ts).
-export const standings = {
+import type { CsMessages, Messages } from "../en";
+
+export const standings: CsMessages<Messages["standings"]> = {
   season: {
     title: "Pořadí sezóny",
     lead_one: "{{season}}, po {{count}} dohraném turnaji.",

@@ -100,7 +100,6 @@ function LateForm({
         <Button
           type="button"
           size="lg"
-          className="min-h-14"
           disabled={player === undefined || add.isPending}
           onClick={() => {
             if (player === undefined) {
@@ -125,7 +124,7 @@ function LateForm({
               })}
         </Button>
         <SheetClose asChild>
-          <Button type="button" variant="ghost" className="min-h-11">
+          <Button type="button" variant="text">
             {t("finals.common.cancel")}
           </Button>
         </SheetClose>
@@ -145,7 +144,7 @@ export function LatePlayerSheet(props: LatePlayerSheetProps) {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button type="button" size="lg" className="min-h-14 w-full">
+        <Button type="button" size="lg" className="w-full">
           {t("finals.players.addLate")}
         </Button>
       </SheetTrigger>

@@ -51,6 +51,18 @@ function isPaired(mode: MonsterKnockoutMode | null): boolean {
  * from the draw the server would make.
  */
 export function StartKnockoutPage() {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-6">
+      <DocumentTitle screen={t("finals.start.title")} />
+      <ScreenHeader title={t("finals.start.title")} />
+      <StartKnockoutLoader />
+    </div>
+  );
+}
+
+function StartKnockoutLoader() {
+  const { t } = useTranslation();
   const leagueId = useRouteParam("leagueId");
   const tournamentId = useRouteParam("tournamentId");
   const tournament = useQuery(tournamentQueries.detail(leagueId, tournamentId));
@@ -67,6 +79,9 @@ export function StartKnockoutPage() {
   }
   if (data === undefined || group === undefined) {
     return <Loading />;
+  }
+  if (group.format !== "swiss" && group.format !== "monster_dyp") {
+    return <Notice tone="info" title={t("finals.rounds.notRounds")} />;
   }
   if (data.phases.some((phase) => phase.kind === "knockout")) {
     return (
@@ -192,7 +207,6 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
     }
   };
 
-  const stepButton = "size-11 p-0 text-button-lg";
   const form = (
     <div className="space-y-6">
       <div
@@ -211,7 +225,7 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
         <Button
           type="button"
           variant="outline"
-          className={stepButton}
+          size="icon"
           disabled={shown <= minimum}
           aria-label={t("finals.start.decrease")}
           onClick={() => {
@@ -230,7 +244,7 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
         <Button
           type="button"
           variant="outline"
-          className={stepButton}
+          size="icon"
           disabled={shown >= maximum}
           aria-label={t("finals.start.increase")}
           onClick={() => {
@@ -306,7 +320,7 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
             <Button
               type="button"
               variant="outline"
-              className="min-h-11"
+
               onClick={() => {
                 setDraw((d) => d + 1);
               }}
@@ -430,17 +444,15 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
 
   return (
     <div className="space-y-6">
-      <DocumentTitle screen={`${data.name} · ${t("finals.start.title")}`} />
       <Link
         to={generatePath(paths.betweenRounds, { leagueId, tournamentId })}
         className="inline-flex min-h-11 items-center text-body-md font-bold underline underline-offset-4"
       >
         {t("finals.common.back")}
       </Link>
-      <ScreenHeader
-        title={t("finals.start.title")}
-        subtitle={`${data.name}, ${t("finals.common.date", { date: localDate(data.date) })}`}
-      />
+      <p className="text-body-md text-muted-foreground">
+        {t("finals.common.date", { date: localDate(data.date) })}
+      </p>
       {!roundDone && (
         <Notice tone="warning" title={t("finals.common.notReady")} />
       )}
@@ -461,7 +473,7 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
       <Button
         type="button"
         size="lg"
-        className="min-h-14 w-full text-button-lg lg:w-auto"
+        className="w-full lg:w-auto"
         disabled={!canDraw || drawKnockout.isPending}
         onClick={() => {
           drawKnockout.mutate(

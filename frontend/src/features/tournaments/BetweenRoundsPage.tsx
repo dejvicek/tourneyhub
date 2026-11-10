@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "cn";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { generatePath, Link, useNavigate } from "react-router";
+import { generatePath, Link, Outlet, useNavigate } from "react-router";
 
 import { DocumentTitle } from "@/components/DocumentTitle";
 import {
@@ -16,7 +16,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   finalsMutations,
@@ -51,6 +51,18 @@ function recommendedRounds(count: number): number {
  * the standings with BH1 and BH2.
  */
 export function BetweenRoundsPage() {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-6">
+      <DocumentTitle screen={t("finals.rounds.title")} />
+      <ScreenHeader title={t("finals.rounds.title")} />
+      <RoundsContent />
+      <Outlet />
+    </div>
+  );
+}
+
+function RoundsContent() {
   const { t, i18n } = useTranslation();
   const layout = useLayout();
   const navigate = useNavigate();
@@ -91,12 +103,16 @@ export function BetweenRoundsPage() {
   }
 
   const group = data.phases.find((phase) => phase.kind === "group");
+  // Only Swiss and Monster DYP play rounds one by one (FR-040).
+  if (group?.format !== "swiss" && group?.format !== "monster_dyp") {
+    return <Notice tone="info" title={t("finals.rounds.notRounds")} />;
+  }
   const rounds = data.rounds
-    .filter((round) => round.phase_id === group?.id)
+    .filter((round) => round.phase_id === group.id)
     .sort((a, b) => a.round_no - b.round_no);
   const latest = rounds.at(-1);
   const current = rounds.find((r) => r.round_no === picked) ?? latest;
-  const format = group?.match_format ?? "bo1";
+  const format = group.match_format;
   const hasKnockout = data.phases.some((phase) => phase.kind === "knockout");
   const complete = latest?.matches.every((m) => m.outcome !== null) ?? false;
   const mainEntries = data.entries.filter((e) => e.stage === "main");
@@ -137,16 +153,14 @@ export function BetweenRoundsPage() {
           {roster.team(one.player_ids)}
         </span>
         {score === null ? (
-          <Link
-            to={resultPath(leagueId, tournamentId, match.id, format)}
-            aria-label={t("finals.rounds.noResultFor", { match: title })}
-            className={buttonVariants({
-              size: "sm",
-              className: "min-h-11 px-3 text-button-sm",
-            })}
-          >
-            {t("finals.rounds.noResult")}
-          </Link>
+          <Button asChild>
+            <Link
+              to={resultPath("rounds", leagueId, tournamentId, match.id)}
+              aria-label={t("finals.rounds.noResultFor", { match: title })}
+            >
+              {t("finals.rounds.noResult")}
+            </Link>
+          </Button>
         ) : (
           <span className="font-display text-score-m whitespace-nowrap">
             {score[0]} : {score[1]}
@@ -166,7 +180,7 @@ export function BetweenRoundsPage() {
 
   const roundsSection = (
     <section aria-labelledby="rounds-heading" className="space-y-4">
-      <h2 id="rounds-heading" className="font-display text-display-section">
+      <h2 id="rounds-heading" className="sr-only">
         {t("finals.rounds.title")}
       </h2>
       <ToggleGroup
@@ -232,11 +246,9 @@ export function BetweenRoundsPage() {
             })}
           </p>
           <div className="flex flex-col gap-2">
-            {/* TODO(foundation-buttons) */}
             <Button
               type="button"
               size="lg"
-              className="min-h-14 text-button-lg"
               disabled={addRound.isPending}
               onClick={() => {
                 addRound.mutate({ expected_round_no: rounds.length + 1 });
@@ -244,18 +256,19 @@ export function BetweenRoundsPage() {
             >
               {t("finals.rounds.addRound", { round: rounds.length + 1 })}
             </Button>
-            <Link
-              to={generatePath(paths.startKnockout, { leagueId, tournamentId })}
-              className={buttonVariants({
-                variant: "secondary",
-                className: "min-h-11",
-              })}
-            >
-              {t("finals.rounds.startKnockout")}
-            </Link>
+            <Button asChild variant="secondary">
+              <Link
+                to={generatePath(paths.startKnockout, {
+                  leagueId,
+                  tournamentId,
+                })}
+              >
+                {t("finals.rounds.startKnockout")}
+              </Link>
+            </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button type="button" variant="ghost" className="min-h-11">
+                <Button type="button" variant="text">
                   {t("finals.rounds.finish")}
                 </Button>
               </AlertDialogTrigger>
@@ -318,8 +331,8 @@ export function BetweenRoundsPage() {
           <AlertDialogTrigger asChild>
             <Button
               type="button"
-              variant="link"
-              className="min-h-11 px-0 underline"
+              variant="text"
+              className="self-start underline"
             >
               {t("finals.rounds.deleteRound", { round: latest.round_no })}
             </Button>
@@ -365,16 +378,17 @@ export function BetweenRoundsPage() {
     </section>
   );
 
+  const standingsHeading =
+    standings.qualifiers === null
+      ? t("finals.rounds.standings")
+      : t("finals.rounds.standingsQualifiers", { count: standings.qualifiers });
   const standingsSection = (
     <section aria-labelledby="standings-heading" className="space-y-3">
       <h2 id="standings-heading" className="font-display text-display-section">
-        {standings.qualifiers === null
-          ? t("finals.rounds.standings")
-          : t("finals.rounds.standingsQualifiers", {
-              count: standings.qualifiers,
-            })}
+        {standingsHeading}
       </h2>
       <RankingTable
+        caption={standingsHeading}
         ranking={standings}
         participants={participants.data ?? []}
         entryName={(entryId) => roster.entry(entryId)}
@@ -400,14 +414,12 @@ export function BetweenRoundsPage() {
 
   return (
     <div className="space-y-6">
-      <DocumentTitle screen={`${data.name} · ${t("finals.rounds.title")}`} />
-      <ScreenHeader
-        title={data.name}
-        subtitle={t("finals.rounds.summary", {
+      <p className="text-body-md text-muted-foreground">
+        {t("finals.rounds.summary", {
           date: localDate(data.date),
           count: mainEntries.length,
         })}
-      />
+      </p>
       {layout === "desktop" ? (
         <div className="grid grid-cols-2 items-start gap-8">
           {roundsSection}

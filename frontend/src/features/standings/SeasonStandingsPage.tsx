@@ -68,7 +68,7 @@ export function SeasonStandingsPage() {
   );
   const table = season.placement_points;
   const list = new Intl.ListFormat(i18n.resolvedLanguage, {
-    style: "narrow",
+    style: "short",
     type: "unit",
   });
   const number = new Intl.NumberFormat(i18n.resolvedLanguage);

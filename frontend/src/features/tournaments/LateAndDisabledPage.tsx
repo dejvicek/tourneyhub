@@ -22,6 +22,17 @@ import { LoadError, Loading } from "./finals/StateMessage";
  */
 export function LateAndDisabledPage() {
   const { t } = useTranslation();
+  return (
+    <div className="space-y-6">
+      <DocumentTitle screen={t("finals.players.title")} />
+      <ScreenHeader title={t("finals.players.title")} />
+      <PlayersContent />
+    </div>
+  );
+}
+
+function PlayersContent() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const leagueId = useRouteParam("leagueId");
   const tournamentId = useRouteParam("tournamentId");
@@ -107,8 +118,6 @@ export function LateAndDisabledPage() {
 
   return (
     <div className="space-y-6">
-      <DocumentTitle screen={`${data.name} · ${t("finals.players.title")}`} />
-      <ScreenHeader title={data.name} subtitle={t("finals.players.title")} />
       <p className="text-body-sm text-muted-foreground">
         {t("finals.rounds.summary", {
           date: localDate(data.date),
@@ -177,7 +186,7 @@ export function LateAndDisabledPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="min-h-11"
+
                     disabled={pending}
                     aria-label={
                       disabled

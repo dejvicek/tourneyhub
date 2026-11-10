@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { generatePath, Link } from "react-router";
 
 import { DocumentTitle } from "@/components/DocumentTitle";
-import { buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { finalsQueries } from "@/features/finals/api";
 import { leagueQueries } from "@/features/leagues/api";
 import { CopyShareLink } from "@/features/leagues/CopyShareLink";
@@ -13,7 +13,6 @@ import { useLayout } from "@/hooks/useLayout";
 import { useRouteParam } from "@/hooks/useRouteParam";
 import { paths } from "@/lib/paths";
 
-import { landingPath } from "./finals/links";
 import { localDate, useRoster } from "./finals/names";
 import { Notice } from "./finals/Notice";
 import { PlaceRows } from "./finals/PlaceRows";
@@ -22,6 +21,17 @@ import { LoadError, Loading } from "./finals/StateMessage";
 
 /** Screen 10: a finished tournament (BR-100–BR-104, BR-110, BR-111). */
 export function FinishedPage() {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-6">
+      <DocumentTitle screen={t("finals.finished.title")} />
+      <ScreenHeader title={t("finals.finished.title")} />
+      <FinishedContent />
+    </div>
+  );
+}
+
+function FinishedContent() {
   const { t, i18n } = useTranslation();
   const layout = useLayout();
   const leagueId = useRouteParam("leagueId");
@@ -48,21 +58,15 @@ export function FinishedPage() {
   if (data === undefined || result === undefined) {
     return <Loading />;
   }
-  const title = (
-    <DocumentTitle screen={`${data.name} · ${t("finals.finished.title")}`} />
-  );
   if (!result.complete) {
     return (
       <div className="space-y-4">
-        {title}
-        <ScreenHeader title={data.name} />
         <Notice tone="info" title={t("finals.common.notReady")} />
-        <Link
-          to={landingPath(leagueId, data)}
-          className={buttonVariants({ className: "min-h-11" })}
-        >
-          {data.name}
-        </Link>
+        <Button asChild>
+          <Link to={generatePath(paths.tournament, { leagueId, tournamentId })}>
+            {data.name}
+          </Link>
+        </Button>
       </div>
     );
   }
@@ -76,7 +80,7 @@ export function FinishedPage() {
   const first = winners[0];
   const points = season?.placement_points ?? [];
   const list = new Intl.ListFormat(i18n.resolvedLanguage, {
-    style: "narrow",
+    style: "short",
     type: "unit",
   });
   const players = new Map(
@@ -192,13 +196,9 @@ export function FinishedPage() {
 
   return (
     <div className="space-y-6">
-      {title}
-      <ScreenHeader
-        title={data.name}
-        subtitle={`${t("finals.finished.title")}, ${t("finals.common.date", {
-          date: localDate(data.date),
-        })}`}
-      />
+      <p className="text-body-md text-muted-foreground">
+        {t("finals.common.date", { date: localDate(data.date) })}
+      </p>
       <section
         aria-labelledby="winners"
         className="space-y-1 rounded-lg border border-border-surface bg-card p-4 text-card-foreground"

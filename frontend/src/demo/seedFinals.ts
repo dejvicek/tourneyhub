@@ -4,7 +4,7 @@
 // its knockout under way, a Monster DYP of 15 players after round 5, a Swiss
 // after round 3, and two knockouts without a group phase (8 and 16 spots,
 // with byes). Added to the seed by seed.ts.
-import type { EntryRead, MatchRead, PhaseRead, RoundRead } from "./contract";
+import type { MatchRead, PhaseRead, RoundRead } from "./contract";
 import {
   createRng,
   drawDypPairs,
@@ -210,7 +210,7 @@ function monsterDyp(players: StoredPlayer[], kit: SeedKit): StoredTournament {
       }
       if (roundNo === 4) {
         // Disable a player in the top places, so the knockout notice shows.
-        const row = required(rankingOf(b.tournament).rows[4]);
+        const row = required(rankingOf(b.tournament).rows[0]);
         const entry = required(
           b.tournament.entries.find((e) => e.id === row.entry_id),
         );
