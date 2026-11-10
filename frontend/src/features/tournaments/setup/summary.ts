@@ -1,14 +1,14 @@
 import type { TFunction } from "i18next";
 
-import type {
-  GroupPhaseChoice,
-  MatchFormat,
-  TournamentFormatWrite,
-  TournamentType,
-} from "@/demo/contract";
 import { rules } from "@/demo/rules";
 
 import { longDate } from "./dates";
+import type {
+  FormatForm,
+  GroupPhase,
+  MatchFormat,
+  TournamentType,
+} from "./format";
 
 const TYPE_LABELS = {
   singles: "tournaments.setup.type.singles.title",
@@ -28,9 +28,9 @@ export function formatLabel(t: TFunction, format: MatchFormat): string {
 /** "Round robin, once" and the like (Figma: Review > Group phase). */
 export function groupPhaseLabel(
   t: TFunction,
-  format: Pick<TournamentFormatWrite, "group_phase" | "round_robin_legs">,
+  format: Pick<FormatForm, "group_phase" | "round_robin_legs">,
 ): string {
-  switch (format.group_phase satisfies GroupPhaseChoice) {
+  switch (format.group_phase satisfies GroupPhase) {
     case "round_robin":
       return format.round_robin_legs === 2
         ? t("tournaments.setup.groupPhase.roundRobinTwice")

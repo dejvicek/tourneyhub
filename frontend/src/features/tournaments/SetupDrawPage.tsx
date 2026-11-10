@@ -30,9 +30,9 @@ export function SetupDrawPage() {
 
 function DrawStep({ data }: { data: SetupData }) {
   const { t } = useTranslation();
-  const { leagueId, tournamentId, tournament, setup } = data;
+  const { leagueId, tournamentId, setup } = data;
   const entries = seededEntries(data);
-  const type = tournament.type;
+  const type = setup.format.type;
   const unpaired =
     type === "doubles" && entries.length * 2 !== setup.player_ids.length;
   const canContinue =

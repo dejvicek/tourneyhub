@@ -3,32 +3,28 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { generatePath, Link } from "react-router";
 
+import type { components } from "@/api/schema";
 import { DocumentTitle } from "@/components/DocumentTitle";
 import { Skeleton } from "@/components/ui/skeleton";
-import type {
-  PlayerRead,
-  RankingRow,
-  TournamentSetupRead,
-} from "@/demo/contract";
-import {
-  setupQueries,
-  type TournamentDetail,
-  tournamentQueries,
-} from "@/features/tournaments/api";
+import { setupQueries } from "@/features/tournaments/api";
 import { useRouteParam } from "@/hooks/useRouteParam";
 import { paths } from "@/lib/paths";
 
+import { type FormatForm, formOf, type TournamentType } from "./format";
 import { Notice } from "./Notice";
 import { type SetupStep, SetupSteps } from "./SetupSteps";
+
+type Schemas = components["schemas"];
 
 /** What every step after the first needs, loaded and in hand. */
 export interface SetupData {
   leagueId: string;
   tournamentId: string;
-  tournament: TournamentDetail;
-  setup: TournamentSetupRead;
+  setup: Schemas["TournamentSetupRead"];
+  /** The format with every setting filled in; the phases decide which apply. */
+  format: FormatForm;
   /** The league's active players in ranking order (BR-020). */
-  ranking: (RankingRow & { name: string })[];
+  ranking: (Schemas["RankingRow"] & { name: string })[];
   /** A player's name, or "" for an unknown id. */
   nameOf: (playerId: string) => string;
   /** A player's place in the league ranking. */
@@ -38,38 +34,31 @@ export interface SetupData {
 function useSetupData(): {
   data: SetupData | undefined;
   failed: boolean;
-  type: TournamentDetail["type"] | undefined;
+  type: TournamentType | undefined;
 } {
   const leagueId = useRouteParam("leagueId");
   const tournamentId = useRouteParam("tournamentId");
-  const tournament = useQuery(tournamentQueries.detail(leagueId, tournamentId));
   const setup = useQuery(setupQueries.detail(leagueId, tournamentId));
   const players = useQuery(setupQueries.players(leagueId));
-  const ranking = useQuery(setupQueries.ranking(leagueId));
 
-  const failed =
-    tournament.isError || setup.isError || players.isError || ranking.isError;
-  if (
-    tournament.data === undefined ||
-    setup.data === undefined ||
-    players.data === undefined ||
-    ranking.data === undefined
-  ) {
-    return { data: undefined, failed, type: tournament.data?.type };
+  const failed = setup.isError || players.isError;
+  if (setup.data === undefined || players.data === undefined) {
+    return { data: undefined, failed, type: setup.data?.format.type };
   }
-  const names = new Map(
-    players.data.map((player: PlayerRead) => [player.id, player.name]),
+  const names = new Map(players.data.map((player) => [player.id, player.name]));
+  const ranks = new Map(
+    setup.data.ranking.map((row) => [row.player_id, row.rank]),
   );
-  const ranks = new Map(ranking.data.map((row) => [row.player_id, row.rank]));
   return {
     failed,
-    type: tournament.data.type,
+    type: setup.data.format.type,
     data: {
       leagueId,
       tournamentId,
-      tournament: tournament.data,
       setup: setup.data,
-      ranking: ranking.data.map((row) => ({
+      // The unused settings only fill the form; no screen shows them.
+      format: formOf(setup.data.format, "bo1"),
+      ranking: setup.data.ranking.map((row) => ({
         ...row,
         name: names.get(row.player_id) ?? "",
       })),
@@ -82,7 +71,7 @@ function useSetupData(): {
 interface SetupHeaderProps {
   step: SetupStep;
   title: string;
-  type: TournamentDetail["type"] | undefined;
+  type: TournamentType | undefined;
 }
 
 /** The step strip and the screen's title (the <title> and the one h1). */
@@ -104,7 +93,7 @@ export function SetupHeader({ step, title, type }: SetupHeaderProps) {
 
 interface SetupPageProps {
   step: SetupStep;
-  title: (type: TournamentDetail["type"]) => string;
+  title: (type: TournamentType) => string;
   children: (data: SetupData) => ReactNode;
 }
 
@@ -130,7 +119,7 @@ export function SetupPage({ step, title, children }: SetupPageProps) {
             <Skeleton className="h-48" />
           </div>
         )
-      ) : data.tournament.state === "setup" ? (
+      ) : data.setup.state === "setup" ? (
         children(data)
       ) : (
         <Notice variant="info" title={t("tournaments.setup.started.title")}>

@@ -1,4 +1,4 @@
-import type { TournamentType } from "@/demo/contract";
+import type { TournamentType } from "./format";
 
 /** How many entries (players or pairs) a number of picked players makes. */
 export function entryCount(type: TournamentType, players: number): number {

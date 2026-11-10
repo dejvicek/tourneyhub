@@ -1,17 +1,19 @@
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { generatePath, Link } from "react-router";
 
+import type { components } from "@/api/schema";
 import { DocumentTitle } from "@/components/DocumentTitle";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { TournamentSummary } from "@/demo/contract";
 import { leagueQueries } from "@/features/leagues/api";
 import { setupQueries, tournamentQueries } from "@/features/tournaments/api";
 import { useRouteParam } from "@/hooks/useRouteParam";
 import { paths } from "@/lib/paths";
 
 import { TournamentItem } from "./setup/TournamentItem";
+
+type TournamentSummary = components["schemas"]["TournamentSummary"];
 
 const byNewest = (a: TournamentSummary, b: TournamentSummary) =>
   b.date.localeCompare(a.date);
@@ -25,16 +27,9 @@ export function TournamentsPage() {
   const tournaments = useQuery(tournamentQueries.ofSeason(leagueId, seasonId));
   const players = useQuery(setupQueries.players(leagueId));
   const summaries = tournaments.data ?? [];
-  const details = useQueries({
-    queries: summaries.map((summary) =>
-      tournamentQueries.detail(leagueId, summary.id),
-    ),
-  });
 
   const names = new Map(players.data?.map((p) => [p.id, p.name]));
   const nameOf = (playerId: string) => names.get(playerId) ?? "";
-  const detailOf = (id: string) =>
-    details[summaries.findIndex((summary) => summary.id === id)]?.data;
 
   const running = summaries
     .filter((summary) => summary.state !== "finished")
@@ -70,7 +65,6 @@ export function TournamentsPage() {
               key={summary.id}
               leagueId={leagueId}
               summary={summary}
-              detail={detailOf(summary.id)}
               nameOf={nameOf}
             />
           ))}

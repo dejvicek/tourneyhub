@@ -9,20 +9,15 @@
 // What setup stores beyond StoredTournament (the draw counter, the picked
 // players, the halves, the doubles pairs) lives in a draft per tournament,
 // keyed on the store's current state so that resetDemoStore() drops it too.
+import type { components } from "@/api/schema";
+
 import type {
-  DypHalfWrite,
   EntryRead,
-  KnockoutMatchFormat,
-  MatchFormat,
   MatchRead,
   PhaseRead,
   PreviewRound,
-  RankingRow,
   RoundRead,
   SchedulePreview,
-  SeedingMethod,
-  TournamentFormatWrite,
-  TournamentSetupRead,
 } from "./contract";
 import {
   createRng,
@@ -31,8 +26,17 @@ import {
   waitingMatches,
 } from "./engine";
 import { rules } from "./rules";
-import type { DemoState, StoredTournament } from "./seed";
+import type { DemoState, StoredLeague, StoredTournament } from "./seed";
 import { activeSeason, db, seasonStandingsOf } from "./store";
+
+type Schemas = components["schemas"];
+type FormatRead = Schemas["TournamentFormatRead"];
+type FormatWrite = Schemas["TournamentFormatWrite"];
+type TournamentCreate = Schemas["TournamentCreate"];
+type DypHalfRead = Schemas["DypHalfRead"];
+type RankingRow = Schemas["RankingRow"];
+type SeedingMethod = Schemas["SeedingMethod"];
+type ErrorCode = Schemas["ErrorCode"];
 
 /** A UUIDv7: the time in the first 48 bits, the rest random. */
 export function newId(): string {
@@ -50,12 +54,12 @@ export function newId(): string {
 // ---------------------------------------------------------------- draft
 
 interface SetupDraft {
-  format: TournamentFormatWrite;
+  format: FormatRead;
   seedingMethod: SeedingMethod;
   drawCounter: number;
   playerIds: string[];
   halvesMethod: "ranking" | "by_hand";
-  halves: DypHalfWrite[];
+  halves: DypHalfRead[];
   /** Doubles: the pairs the organizer made. */
   pairs: [string, string][];
   topPlayerIds: string[];
@@ -63,30 +67,31 @@ interface SetupDraft {
 
 const drafts = new WeakMap<DemoState, Map<string, SetupDraft>>();
 
-function noBo2(format: MatchFormat): KnockoutMatchFormat {
-  return format === "bo2" ? "bo1" : format;
-}
-
-function formatOf(t: StoredTournament): TournamentFormatWrite {
+/** The stored format; the settings the phases do not use are null (FR-031). */
+function formatOf(t: StoredTournament): FormatRead {
   const group = t.phases.find((phase) => phase.kind === "group");
-  const knockout = t.phases.find((phase) => phase.kind === "knockout");
-  const groupPhase =
-    group === undefined
-      ? "none"
-      : group.format === "swiss" || group.format === "monster_dyp"
-        ? group.format
-        : "round_robin";
+  const knockout = group
+    ? undefined
+    : t.phases.find((phase) => phase.kind === "knockout");
   return {
     name: t.name,
     date: t.date,
     type: t.type,
-    group_phase: groupPhase,
-    round_robin_legs: group?.round_robin_legs ?? 1,
-    sit_out_points: group?.sit_out_points ?? 0,
-    group_match_format: group?.match_format ?? "bo1",
-    knockout_match_format: noBo2(knockout?.match_format ?? "bo1"),
+    group_phase:
+      group === undefined
+        ? "none"
+        : group.format === "single_elimination"
+          ? "round_robin"
+          : group.format,
+    round_robin_legs: group?.round_robin_legs ?? null,
+    sit_out_points: group?.sit_out_points ?? null,
+    group_match_format: group?.match_format ?? null,
+    knockout_match_format:
+      knockout === undefined || knockout.match_format === "bo2"
+        ? null
+        : knockout.match_format,
     final_match_format: knockout?.final_match_format ?? null,
-    third_place_match: knockout?.third_place_match ?? false,
+    third_place_match: knockout?.third_place_match ?? null,
     goals_per_game: t.goals_per_game,
     field_count: t.fields.length,
   };
@@ -133,11 +138,18 @@ function draftOf(t: StoredTournament): SetupDraft {
   return draft;
 }
 
-export function setupRead(t: StoredTournament): TournamentSetupRead {
+/** How many players are picked for a tournament in setup (screen 1). */
+export function pickedCount(t: StoredTournament): number {
+  return draftOf(t).playerIds.length;
+}
+
+export function setupRead(t: StoredTournament): Schemas["TournamentSetupRead"] {
   const draft = draftOf(t);
-  const rank = rankOf(t.league_id);
+  const ranking = leagueRanking(t.league_id);
+  const rank = new Map(ranking.map((r) => [r.player_id, r.rank]));
   return {
     tournament_id: t.id,
+    state: t.state,
     format: draft.format,
     seeding_method: draft.seedingMethod,
     draw_counter: draft.drawCounter,
@@ -145,6 +157,29 @@ export function setupRead(t: StoredTournament): TournamentSetupRead {
     halves_method: draft.halvesMethod,
     halves: draft.halves,
     top_player_ids: draft.topPlayerIds,
+    entries: t.entries
+      .filter((entry) => entry.stage === "main")
+      .toSorted((a, b) => (a.seed ?? 0) - (b.seed ?? 0))
+      .map(
+        ({
+          id,
+          stage,
+          kind,
+          seed,
+          player_ids,
+          is_disabled,
+          is_top_player,
+        }) => ({
+          id,
+          stage,
+          kind,
+          seed,
+          player_ids,
+          is_disabled,
+          is_top_player,
+        }),
+      ),
+    ranking,
   };
 }
 
@@ -189,72 +224,138 @@ function byRank(ids: readonly string[], rank: Map<string, number>): string[] {
 
 // ---------------------------------------------------------------- format
 
-export interface SetupProblem {
-  code: "validation_failed";
-  detail: Record<string, string | number>;
+/** A refusal in the API's shape, as the backend's services make them (ADR-008). */
+export interface SetupFailure {
+  status: 404 | 409 | 422;
+  code: ErrorCode;
+  detail: Schemas["ErrorResponse"]["detail"];
 }
 
-/** The rules the format must keep; null when it keeps them. */
-export function formatProblem(
-  format: TournamentFormatWrite,
+const fail = (
+  status: SetupFailure["status"],
+  code: ErrorCode,
+  detail: SetupFailure["detail"] = {},
+): SetupFailure => ({ status, code, detail });
+
+/** A request body the backend's validation refuses (422 `validation_failed`). */
+const invalidBody = (type: string): SetupFailure =>
+  fail(422, "validation_failed", { errors: [{ loc: ["body"], type }] });
+
+const GROUP_SETTINGS = [
+  "round_robin_legs",
+  "sit_out_points",
+  "group_match_format",
+] as const;
+const KNOCKOUT_SETTINGS = [
+  "knockout_match_format",
+  "final_match_format",
+  "third_place_match",
+] as const;
+
+/**
+ * FR-031 as the backend checks it: Monster DYP plays its own rounds, and the
+ * settings of the phases that are not played are null. With `complete` (the
+ * format PUT), every setting that applies is given.
+ */
+function formatProblem(
+  format: FormatWrite | TournamentCreate,
   drawsAllowed: boolean,
-): SetupProblem | null {
-  const fail = (rule: string): SetupProblem => ({
-    code: "validation_failed",
-    detail: { rule },
-  });
-  if (format.name.trim() === "") {
-    return fail("name_required");
-  }
-  if (format.goals_per_game < 1 || format.field_count < 1) {
-    return fail("positive_numbers");
-  }
-  // The backend's bounds for a league's defaults (backend/openapi.json).
-  if (format.goals_per_game > 99 || format.field_count > 32) {
-    return fail("too_large");
-  }
-  // FR-031: Monster DYP plays its own rounds, the other types do not.
+  complete: boolean,
+): SetupFailure | null {
   if (
     (format.type === "monster_dyp") !==
     (format.group_phase === "monster_dyp")
   ) {
-    return fail("FR-031");
+    return invalidBody("group_phase_mismatch");
+  }
+  if (format.name.trim() === "") {
+    return invalidBody("string_too_short");
+  }
+  const grouped = format.group_phase !== "none";
+  const applies = new Set<string>(grouped ? GROUP_SETTINGS : KNOCKOUT_SETTINGS);
+  if (format.group_phase !== "round_robin") {
+    applies.delete("round_robin_legs");
+  }
+  for (const name of [...GROUP_SETTINGS, ...KNOCKOUT_SETTINGS]) {
+    const value = format[name] ?? null;
+    if (!applies.has(name) && value !== null) {
+      return invalidBody("setting_not_applicable");
+    }
+    if (
+      complete &&
+      applies.has(name) &&
+      name !== "final_match_format" &&
+      value === null
+    ) {
+      return invalidBody("setting_missing");
+    }
   }
   // BR-121: BO2 is a group-phase format of leagues that allow draws.
   if (format.group_match_format === "bo2" && !drawsAllowed) {
-    return fail("BR-121");
+    return fail(422, "draws_not_allowed");
   }
   return null;
 }
 
+/** What the request left out, from the league's defaults (FR-011, FR-030). */
+function resolveFormat(
+  format: FormatWrite | TournamentCreate,
+  league: StoredLeague,
+): FormatRead {
+  const grouped = format.group_phase !== "none";
+  const fallback = league.default_match_format;
+  return {
+    name: format.name.trim(),
+    date: format.date,
+    type: format.type,
+    group_phase: format.group_phase,
+    round_robin_legs:
+      format.group_phase === "round_robin"
+        ? (format.round_robin_legs ?? 1)
+        : null,
+    sit_out_points: grouped ? (format.sit_out_points ?? 0) : null,
+    group_match_format: grouped
+      ? (format.group_match_format ?? fallback)
+      : null,
+    knockout_match_format: grouped
+      ? null
+      : (format.knockout_match_format ?? fallback),
+    final_match_format: grouped ? null : (format.final_match_format ?? null),
+    third_place_match: grouped ? null : (format.third_place_match ?? false),
+    goals_per_game: format.goals_per_game ?? league.default_goals_per_game,
+    field_count: format.field_count ?? league.default_field_count,
+  };
+}
+
 function buildPhases(
   current: readonly PhaseRead[],
-  format: TournamentFormatWrite,
+  format: FormatRead,
 ): PhaseRead[] {
-  const phases: PhaseRead[] = [];
   const keep = (kind: PhaseRead["kind"]) =>
     current.find((phase) => phase.kind === kind)?.id ?? newId();
   if (format.group_phase !== "none") {
-    phases.push({
-      id: keep("group"),
-      position: 1,
-      kind: "group",
-      format: format.group_phase,
-      round_robin_legs:
-        format.group_phase === "round_robin" ? format.round_robin_legs : null,
-      sit_out_points: format.sit_out_points,
-      tiebreakers:
-        format.group_phase === "round_robin"
-          ? null
-          : [...rules.swissTiebreakers],
-      qualifiers: null,
-      third_place_match: null,
-      monster_knockout_mode: null,
-      match_format: format.group_match_format,
-      final_match_format: null,
-    });
-  } else {
-    phases.push({
+    return [
+      {
+        id: keep("group"),
+        position: 1,
+        kind: "group",
+        format: format.group_phase,
+        round_robin_legs: format.round_robin_legs,
+        sit_out_points: format.sit_out_points,
+        tiebreakers:
+          format.group_phase === "round_robin"
+            ? null
+            : [...rules.swissTiebreakers],
+        qualifiers: null,
+        third_place_match: null,
+        monster_knockout_mode: null,
+        match_format: format.group_match_format ?? "bo1",
+        final_match_format: null,
+      },
+    ];
+  }
+  return [
+    {
       id: keep("knockout"),
       position: 1,
       kind: "knockout",
@@ -263,24 +364,28 @@ function buildPhases(
       sit_out_points: null,
       tiebreakers: null,
       qualifiers: null,
-      third_place_match: format.third_place_match,
+      third_place_match: format.third_place_match ?? false,
       monster_knockout_mode: null,
-      match_format: format.knockout_match_format,
+      match_format: format.knockout_match_format ?? "bo1",
       final_match_format: format.final_match_format,
-    });
-  }
-  return phases;
+    },
+  ];
 }
 
+/** POST …/tournaments: the checks, then a new tournament in the active season. */
 export function createTournament(
-  id: string,
-  leagueId: string,
+  body: TournamentCreate,
+  league: StoredLeague,
   seasonId: string,
-  format: TournamentFormatWrite,
-): StoredTournament {
+): StoredTournament | SetupFailure {
+  const problem = formatProblem(body, league.draws_allowed, false);
+  if (problem) {
+    return problem;
+  }
+  const format = resolveFormat(body, league);
   const t: StoredTournament = {
-    id,
-    league_id: leagueId,
+    id: body.id,
+    league_id: league.id,
     season_id: seasonId,
     name: format.name,
     date: format.date,
@@ -296,7 +401,7 @@ export function createTournament(
   db().tournaments.push(t);
   const map = drafts.get(db()) ?? new Map<string, SetupDraft>();
   drafts.set(db(), map);
-  map.set(id, {
+  map.set(t.id, {
     format,
     seedingMethod: "ranking",
     drawCounter: 0,
@@ -317,10 +422,17 @@ function syncFields(t: StoredTournament, count: number): void {
   );
 }
 
+/** PUT …/format: the whole format as the target state (FR-030). */
 export function applyFormat(
   t: StoredTournament,
-  format: TournamentFormatWrite,
-): void {
+  body: FormatWrite,
+  league: StoredLeague,
+): SetupFailure | null {
+  const problem = formatProblem(body, league.draws_allowed, true);
+  if (problem) {
+    return problem;
+  }
+  const format = resolveFormat(body, league);
   const draft = draftOf(t);
   const typeChanged = t.type !== format.type;
   draft.format = format;
@@ -337,6 +449,7 @@ export function applyFormat(
     draft.topPlayerIds = [];
     rebuildEntries(t, draft, "draw");
   }
+  return null;
 }
 
 // ---------------------------------------------------------------- draws
@@ -362,7 +475,7 @@ function shuffled<T>(items: readonly T[], rng: () => number): T[] {
 function halfOf(
   draft: SetupDraft,
   playerId: string,
-): DypHalfWrite["half"] | undefined {
+): DypHalfRead["half"] | undefined {
   return draft.halves.find((row) => row.player_id === playerId)?.half;
 }
 
@@ -370,9 +483,13 @@ function halfOf(
 function halvesByRanking(
   ranked: readonly string[],
   rng: () => number,
-): DypHalfWrite[] {
+): DypHalfRead[] {
+  // BR-031: fewer than four players have no halves yet.
+  if (ranked.length < 4) {
+    return [];
+  }
   let pool = [...ranked];
-  const rows: DypHalfWrite[] = [];
+  const rows: DypHalfRead[] = [];
   if (pool.length % 2 === 1) {
     const index = Math.floor(rng() * pool.length);
     rows.push({ player_id: pool[index] ?? "", half: "left_out" });
@@ -421,7 +538,11 @@ function rebuildEntries(
         }
         const top = ranked.filter((id) => halfOf(draft, id) === "top");
         const bottom = ranked.filter((id) => halfOf(draft, id) === "bottom");
-        const complete = ranked.every((id) => halfOf(draft, id) !== undefined);
+        const leftOut = ranked.filter((id) => halfOf(draft, id) === "left_out");
+        const complete =
+          ranked.length >= 4 &&
+          leftOut.length <= 1 &&
+          ranked.every((id) => halfOf(draft, id) !== undefined);
         // BR-033: each top-half player gets a partner by lot.
         const partners = shuffled(bottom, rng);
         groups =
@@ -478,38 +599,20 @@ function seed(
 }
 
 // ---------------------------------------------------------------- setup writes
+// The backend's rules and codes (backend/src/tourneyhub/services/tournaments.py).
 
-export type SetupFailure =
-  | {
-      status: 409;
-      code:
-        | "draw_counter_changed"
-        | "seed_order_changed"
-        | "tournament_not_in_setup";
-    }
-  | {
-      status: 422;
-      code: "validation_failed";
-      detail: Record<string, string | number>;
-    };
+const typeChanged = (t: StoredTournament): SetupFailure =>
+  fail(409, "tournament_type_changed", { type: t.type });
 
-const invalid = (
-  rule: string,
-  extra: Record<string, string | number> = {},
-): SetupFailure => ({
-  status: 422,
-  code: "validation_failed",
-  detail: { rule, ...extra },
-});
-
-function leaguePlayerIds(t: StoredTournament): Set<string> {
-  return new Set(
-    db()
-      .players.filter(
-        (p) => p.league_id === t.league_id && p.removed_at === null,
-      )
-      .map((p) => p.id),
-  );
+/** 409 when a player is not picked: the screen that sent it is stale. */
+function notPicked(
+  draft: SetupDraft,
+  playerIds: readonly string[],
+): SetupFailure | null {
+  const missing = playerIds.find((id) => !draft.playerIds.includes(id));
+  return missing === undefined
+    ? null
+    : fail(409, "player_not_picked", { player_id: missing });
 }
 
 export function setPlayers(
@@ -517,24 +620,37 @@ export function setPlayers(
   playerIds: readonly string[],
 ): SetupFailure | null {
   const draft = draftOf(t);
-  const known = leaguePlayerIds(t);
-  const unique = [...new Set(playerIds)];
+  if (new Set(playerIds).size !== playerIds.length) {
+    return invalidBody("given_twice");
+  }
+  const league = db().players.filter((p) => p.league_id === t.league_id);
+  const unknown = playerIds.find((id) => !league.some((p) => p.id === id));
+  if (unknown !== undefined) {
+    return fail(404, "player_not_found", { player_id: unknown });
+  }
   // BR-002: a removed player cannot be picked.
-  if (!unique.every((id) => known.has(id))) {
-    return invalid("BR-002");
+  const removed = playerIds.find(
+    (id) => league.find((p) => p.id === id)?.removed_at !== null,
+  );
+  if (removed !== undefined) {
+    return fail(422, "player_removed", { player_id: removed });
   }
   const same =
-    unique.length === draft.playerIds.length &&
-    unique.every((id) => draft.playerIds.includes(id));
+    playerIds.length === draft.playerIds.length &&
+    playerIds.every((id) => draft.playerIds.includes(id));
   if (same) {
     return null;
   }
-  draft.playerIds = unique;
+  draft.playerIds = [...playerIds];
   draft.pairs = draft.pairs.filter(
-    ([a, b]) => unique.includes(a) && unique.includes(b),
+    ([a, b]) => playerIds.includes(a) && playerIds.includes(b),
   );
-  draft.halves = draft.halves.filter((row) => unique.includes(row.player_id));
-  draft.topPlayerIds = draft.topPlayerIds.filter((id) => unique.includes(id));
+  draft.halves = draft.halves.filter((row) =>
+    playerIds.includes(row.player_id),
+  );
+  draft.topPlayerIds = draft.topPlayerIds.filter((id) =>
+    playerIds.includes(id),
+  );
   rebuildEntries(t, draft, "draw");
   return null;
 }
@@ -542,18 +658,35 @@ export function setPlayers(
 export function setHalves(
   t: StoredTournament,
   method: "ranking" | "by_hand",
-  halves: readonly DypHalfWrite[],
+  halves: readonly DypHalfRead[],
 ): SetupFailure | null {
   const draft = draftOf(t);
   if (t.type !== "dyp") {
-    return invalid("BR-032");
+    return typeChanged(t);
+  }
+  if (new Set(halves.map((row) => row.player_id)).size !== halves.length) {
+    return invalidBody("given_twice");
+  }
+  if (method === "by_hand") {
+    const stale = notPicked(
+      draft,
+      halves.map((row) => row.player_id),
+    );
+    if (stale) {
+      return stale;
+    }
+    const same =
+      draft.halvesMethod === "by_hand" &&
+      halves.length === draft.halves.length &&
+      halves.every((row) => halfOf(draft, row.player_id) === row.half);
+    if (same) {
+      return null;
+    }
+    draft.halves = halves.map(({ player_id, half }) => ({ player_id, half }));
+  } else if (draft.halvesMethod === method) {
+    return null;
   }
   draft.halvesMethod = method;
-  if (method === "by_hand") {
-    draft.halves = halves.filter((row) =>
-      draft.playerIds.includes(row.player_id),
-    );
-  }
   rebuildEntries(t, draft, "draw");
   return null;
 }
@@ -563,14 +696,25 @@ export function setPairs(
   pairs: readonly [string, string][],
 ): SetupFailure | null {
   const draft = draftOf(t);
+  if (t.type !== "doubles") {
+    return typeChanged(t);
+  }
   const members = pairs.flat();
-  // BR-003, BR-030: two different, picked players, each in one pair.
+  // BR-003, BR-030: two different players, each in one pair.
+  if (new Set(members).size !== members.length) {
+    return invalidBody("given_twice");
+  }
+  const stale = notPicked(draft, members);
+  if (stale) {
+    return stale;
+  }
+  const key = (pair: readonly string[]) => [...pair].sort().join("+");
+  const wanted = new Set(pairs.map(key));
   if (
-    t.type !== "doubles" ||
-    new Set(members).size !== members.length ||
-    !members.every((id) => draft.playerIds.includes(id))
+    wanted.size === draft.pairs.length &&
+    draft.pairs.every((pair) => wanted.has(key(pair)))
   ) {
-    return invalid("BR-003");
+    return null;
   }
   draft.pairs = pairs.map(([a, b]) => [a, b]);
   rebuildEntries(t, draft, "draw");
@@ -582,11 +726,12 @@ export function setTopPlayers(
   playerIds: readonly string[],
 ): SetupFailure | null {
   const draft = draftOf(t);
-  if (
-    t.type !== "monster_dyp" ||
-    !playerIds.every((id) => draft.playerIds.includes(id))
-  ) {
-    return invalid("FR-041");
+  if (t.type !== "monster_dyp") {
+    return typeChanged(t);
+  }
+  const stale = notPicked(draft, playerIds);
+  if (stale) {
+    return stale;
   }
   draft.topPlayerIds = [...playerIds];
   for (const entry of t.entries) {
@@ -603,12 +748,13 @@ export function setSeeding(
 ): SetupFailure | null {
   const draft = draftOf(t);
   if (t.type === "monster_dyp") {
-    return invalid("FR-034");
+    return typeChanged(t);
+  }
+  if (draft.seedingMethod === method) {
+    return null;
   }
   draft.seedingMethod = method;
-  if (method === "random") {
-    draft.drawCounter += 1;
-  }
+  draft.drawCounter += 1;
   rebuildEntries(t, draft, "keep");
   return null;
 }
@@ -617,18 +763,58 @@ export function setSeedOrder(
   t: StoredTournament,
   entryIds: readonly string[],
 ): SetupFailure | null {
+  if (t.type === "monster_dyp") {
+    return typeChanged(t);
+  }
+  if (new Set(entryIds).size !== entryIds.length) {
+    return invalidBody("given_twice");
+  }
   const current = t.entries.filter((entry) => entry.stage === "main");
   // ADR-008: an order that does not list exactly the current entries is stale.
   if (
     entryIds.length !== current.length ||
     !current.every((entry) => entryIds.includes(entry.id))
   ) {
-    return { status: 409, code: "seed_order_changed" };
+    return fail(409, "seed_order_changed");
   }
   t.entries = entryIds.flatMap((id, index) => {
     const entry = current.find((e) => e.id === id);
     return entry ? [{ ...entry, seed: index + 1 }] : [];
   });
+  return null;
+}
+
+/** Why a new DYP draw cannot make pairs (BR-031, BR-032); null when it can. */
+function dypDrawProblem(draft: SetupDraft): SetupFailure | null {
+  const players = draft.playerIds.length;
+  if (draft.halvesMethod === "ranking") {
+    return players < 4
+      ? fail(422, "not_enough_players", { minimum: 4, given: players })
+      : null;
+  }
+  const missing = draft.playerIds.filter(
+    (id) => halfOf(draft, id) === undefined,
+  ).length;
+  if (missing > 0) {
+    return fail(422, "dyp_halves_incomplete", { missing });
+  }
+  if (players < 4) {
+    return fail(422, "not_enough_players", { minimum: 4, given: players });
+  }
+  const count = (half: DypHalfRead["half"]) =>
+    draft.halves.filter((row) => row.half === half).length;
+  if (count("left_out") > 1) {
+    return fail(422, "too_many_left_out", {
+      maximum: 1,
+      given: count("left_out"),
+    });
+  }
+  if (count("top") !== count("bottom")) {
+    return fail(422, "dyp_halves_unequal", {
+      top: count("top"),
+      bottom: count("bottom"),
+    });
+  }
   return null;
 }
 
@@ -639,9 +825,19 @@ export function drawAgain(
 ): SetupFailure | null {
   const draft = draftOf(t);
   if (draft.drawCounter !== expectedCounter) {
-    return { status: 409, code: "draw_counter_changed" };
+    return fail(409, "draw_counter_changed", {
+      draw_counter: draft.drawCounter,
+    });
   }
   if (target === "seeds") {
+    if (t.type === "monster_dyp") {
+      return typeChanged(t);
+    }
+    if (draft.seedingMethod !== "random") {
+      return fail(409, "seeding_method_changed", {
+        seeding_method: draft.seedingMethod,
+      });
+    }
     draft.drawCounter += 1;
     rebuildEntries(t, draft, "keep");
     return null;
@@ -660,6 +856,13 @@ export function drawAgain(
     }
     rebuildEntries(t, draft, "draw");
     return null;
+  }
+  if (t.type !== "dyp") {
+    return typeChanged(t);
+  }
+  const problem = dypDrawProblem(draft);
+  if (problem) {
+    return problem;
   }
   rebuildEntries(t, draft, "draw");
   return null;
@@ -852,6 +1055,12 @@ export function preview(t: StoredTournament): SchedulePreview {
 }
 
 /** The reason the tournament cannot start (FR-032, BR-031); null when it can. */
+/** A refusal of the provisional start and "back to setup", which name their rule. */
+const invalid = (
+  rule: string,
+  extra: Record<string, number> = {},
+): SetupFailure => fail(422, "validation_failed", { rule, ...extra });
+
 export function startProblem(t: StoredTournament): SetupFailure | null {
   const draft = draftOf(t);
   const entries = t.entries.filter((entry) => entry.stage === "main");
@@ -874,10 +1083,12 @@ export function start(
 ): SetupFailure | null {
   const draft = draftOf(t);
   if (t.state !== "setup") {
-    return { status: 409, code: "tournament_not_in_setup" };
+    return fail(409, "tournament_not_in_setup", { state: t.state });
   }
   if (draft.drawCounter !== expectedCounter) {
-    return { status: 409, code: "draw_counter_changed" };
+    return fail(409, "draw_counter_changed", {
+      draw_counter: draft.drawCounter,
+    });
   }
   const problem = startProblem(t);
   if (problem) {
@@ -939,7 +1150,7 @@ export function backToSetup(
   expectedState: string,
 ): SetupFailure | null {
   if (t.state !== expectedState) {
-    return { status: 409, code: "tournament_not_in_setup" };
+    return fail(409, "tournament_not_in_setup", { state: t.state });
   }
   if (t.state !== "in_progress") {
     return invalid("FR-036");
@@ -962,7 +1173,7 @@ export function deleteTournament(t: StoredTournament): SetupFailure | null {
   const season = db().seasons.find((s) => s.id === t.season_id);
   // FR-038: not in a closed season.
   if (season?.state === "closed") {
-    return invalid("FR-038");
+    return fail(409, "season_closed");
   }
   const state = db();
   state.tournaments = state.tournaments.filter((other) => other.id !== t.id);

@@ -358,15 +358,14 @@ export const tournamentsSetup: CsMessages<typeof english> = {
     load: "Turnaj se nepodařilo načíst.",
     rules: {
       name_required: "Zadejte název turnaje.",
-      positive_numbers: "Branek ve hře a hracích polí musí být alespoň 1.",
-      too_large: "Použijte nejvýš 99 branek ve hře a 32 hracích polí.",
-      fr031: "Tento typ turnaje takovou skupinovou fázi nedovoluje.",
       fr032: "Hráčů je málo, potřeba je alespoň {{min}}.",
       br121: "BO2 nabízíme jen v ligách s remízami.",
       br002: "Odebraného hráče nelze vybrat.",
-      br003: "Hráč může být jen v jedné dvojici.",
+      br032Unequal:
+        "Obě poloviny musí mít stejně hráčů: nahoře {{top}}, dole {{bottom}}.",
+      br032LeftOut: "Vynechat lze jen jednoho hráče.",
+      br032Incomplete: "Nejdřív zařaďte každého hráče do poloviny.",
       fr036: "Do přípravy se lze vrátit jen do prvního výsledku.",
-      fr038: "Turnaj v uzavřené sezóně nelze smazat.",
     },
   },
 };

@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { ApiError, dataOf } from "@/api/client";
+import { api, ApiError, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
 
 import { DEMO_LEAGUE_ID, DEMO_SEASON_ID } from "./ids";
 import {
   createDraft,
+  dypFormat,
+  nth,
   pickPlayers,
   setupOf,
   tournamentOf,
@@ -32,44 +34,32 @@ describe("the fake API for tournament setup", () => {
   it("creates a tournament with the client's id, once", async () => {
     const id = await createDraft({ name: "Friday DYP" });
     const again = await dataOf(
-      provisionalApi.POST("/api/v1/leagues/{league_id}/tournaments", {
+      api.POST("/api/v1/leagues/{league_id}/tournaments", {
         params: { path: league },
-        body: {
-          id,
-          name: "Friday DYP",
-          date: "2026-10-22",
-          type: "dyp",
-          group_phase: "round_robin",
-          round_robin_legs: 1,
-          sit_out_points: 0,
-          group_match_format: "bo1",
-          knockout_match_format: "bo1",
-          final_match_format: null,
-          third_place_match: false,
-          goals_per_game: 10,
-          field_count: 2,
-        },
+        body: { ...dypFormat, id, name: "Friday DYP" },
       }),
     );
     const list = await dataOf(
-      provisionalApi.GET(
-        "/api/v1/leagues/{league_id}/seasons/{season_id}/tournaments",
-        { params: { path: { ...league, season_id: DEMO_SEASON_ID } } },
-      ),
+      api.GET("/api/v1/leagues/{league_id}/seasons/{season_id}/tournaments", {
+        params: { path: { ...league, season_id: DEMO_SEASON_ID } },
+      }),
     );
 
-    expect(again.id).toBe(id);
+    expect(again.tournament_id).toBe(id);
     expect(list.filter((t) => t.id === id)).toHaveLength(1);
     expect(again.state).toBe("setup");
-    expect(again.fields).toHaveLength(2);
+    expect(again.format.field_count).toBe(2);
   });
 
   it("refuses BO2 in a league without draws and a group phase the type does not allow", async () => {
     const bo2 = await failure(createDraft({ group_match_format: "bo2" }));
     const monster = await failure(createDraft({ type: "monster_dyp" }));
 
-    expect([bo2.status, bo2.detail.rule]).toEqual([422, "BR-121"]);
-    expect([monster.status, monster.detail.rule]).toEqual([422, "FR-031"]);
+    expect([bo2.status, bo2.code]).toEqual([422, "draws_not_allowed"]);
+    expect([monster.status, monster.code]).toEqual([422, "validation_failed"]);
+    expect(monster.detail.errors).toEqual([
+      { loc: ["body"], type: "group_phase_mismatch" },
+    ]);
   });
 
   it("splits 13 players into halves, leaves one out by lot and draws 6 pairs", async () => {
@@ -89,7 +79,7 @@ describe("the fake API for tournament setup", () => {
     const id = await createDraft();
     const before = await pickPlayers(id, 12);
     const call = (expected: number) =>
-      provisionalApi.POST(
+      api.POST(
         "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/draw",
         {
           ...at(id),
@@ -112,7 +102,7 @@ describe("the fake API for tournament setup", () => {
     const reversed = entries.map((entry) => entry.id).reverse();
     const put = (entry_ids: string[]) =>
       dataOf(
-        provisionalApi.PUT(
+        api.PUT(
           "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/seed-order",
           { ...at(id), body: { entry_ids } },
         ),
@@ -208,10 +198,82 @@ describe("the fake API for tournament setup", () => {
     ]);
   });
 
+  it("answers with the backend's codes: a removed player, a stale pair, incomplete halves", async () => {
+    const dyp = await createDraft();
+    const ranking = (await setupOf(dyp)).ranking.map((row) => row.player_id);
+    const removedId = nth(ranking, 0);
+    await dataOf(
+      api.PUT("/api/v1/leagues/{league_id}/players/{player_id}/removed", {
+        params: { path: { ...league, player_id: removedId } },
+        body: { removed: true },
+      }),
+    );
+    const removed = await failure(
+      dataOf(
+        api.PUT(
+          "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/players",
+          { ...at(dyp), body: { player_ids: [removedId] } },
+        ),
+      ),
+    );
+    const picked = await dataOf(
+      api.PUT(
+        "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/players",
+        { ...at(dyp), body: { player_ids: ranking.slice(1, 5) } },
+      ),
+    );
+    const halves = await dataOf(
+      api.PUT(
+        "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/halves",
+        {
+          ...at(dyp),
+          body: {
+            method: "by_hand",
+            halves: [{ player_id: nth(ranking, 1), half: "top" }],
+          },
+        },
+      ),
+    );
+    const incomplete = await failure(
+      dataOf(
+        api.POST(
+          "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/draw",
+          {
+            ...at(dyp),
+            body: {
+              expected_draw_counter: halves.draw_counter,
+              target: "pairs",
+            },
+          },
+        ),
+      ),
+    );
+    const pairs = await failure(
+      dataOf(
+        api.PUT(
+          "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/pairs",
+          { ...at(dyp), body: { pairs: [] } },
+        ),
+      ),
+    );
+
+    expect([removed.status, removed.code]).toEqual([422, "player_removed"]);
+    expect(picked.entries).toHaveLength(2);
+    expect(halves.entries).toEqual([]);
+    expect([incomplete.status, incomplete.detail]).toEqual([
+      422,
+      { missing: 3 },
+    ]);
+    expect([pairs.status, pairs.code]).toEqual([
+      409,
+      "tournament_type_changed",
+    ]);
+  });
+
   it("deletes a tournament, and a repeated delete is a 404", async () => {
     const id = await createDraft();
     const remove = () =>
-      provisionalApi.DELETE(
+      api.DELETE(
         "/api/v1/leagues/{league_id}/tournaments/{tournament_id}",
         at(id),
       );

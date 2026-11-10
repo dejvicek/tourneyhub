@@ -40,8 +40,7 @@ function Review({ data }: { data: SetupData }) {
   const { t } = useTranslation();
   const layout = useLayout();
   const navigate = useNavigate();
-  const { leagueId, tournamentId, tournament, setup, nameOf } = data;
-  const format = setup.format;
+  const { leagueId, tournamentId, setup, format, nameOf } = data;
   const settings = useQuery(leagueQueries.detail(leagueId));
   const preview = useQuery(setupQueries.preview(leagueId, tournamentId));
   // Once the tournament is started this screen unmounts (the gate in
@@ -58,7 +57,7 @@ function Review({ data }: { data: SetupData }) {
   });
   const params = { leagueId, tournamentId };
 
-  const entries = tournament.entries.filter((entry) => entry.stage === "main");
+  const entries = setup.entries.filter((entry) => entry.stage === "main");
   const noGroup = format.group_phase === "none";
   const roundRobin = format.group_phase === "round_robin";
   const rounds = preview.data?.rounds ?? [];
@@ -67,7 +66,7 @@ function Review({ data }: { data: SetupData }) {
   const sides = (ids: readonly string[]) => ids.map(nameOf);
 
   const entryRow = (() => {
-    switch (tournament.type) {
+    switch (format.type) {
       case "dyp":
         return t("tournaments.setup.review.pairsDrawn", {
           count: entries.length,
@@ -116,17 +115,17 @@ function Review({ data }: { data: SetupData }) {
       <CardContent>
         <dl>
           <SummaryRow label={t("tournaments.setup.summary.name")}>
-            {tournament.name}
+            {format.name}
           </SummaryRow>
           <SummaryRow label={t("tournaments.setup.summary.date")}>
-            {dateLabel(tournament.date)}
+            {dateLabel(format.date)}
           </SummaryRow>
           <SummaryRow label={t("tournaments.setup.summary.type")}>
-            {typeLabel(t, tournament.type)}
+            {typeLabel(t, format.type)}
           </SummaryRow>
           <SummaryRow
             label={
-              tournament.type === "singles" || tournament.type === "monster_dyp"
+              format.type === "singles" || format.type === "monster_dyp"
                 ? t("tournaments.setup.summary.playersLabel")
                 : t("tournaments.setup.summary.pairs")
             }

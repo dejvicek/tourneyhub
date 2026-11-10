@@ -1,8 +1,9 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { type CSSProperties, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { generatePath, Link, useNavigate } from "react-router";
 
+import type { components } from "@/api/schema";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,12 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { TournamentSummary } from "@/demo/contract";
-import {
-  setupMutations,
-  setupQueries,
-  type TournamentDetail,
-} from "@/features/tournaments/api";
+import { setupMutations } from "@/features/tournaments/api";
 import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 
@@ -35,42 +31,14 @@ import { entryName } from "./summary";
 
 interface TournamentItemProps {
   leagueId: string;
-  summary: TournamentSummary;
-  /** Absent while the tournament's details are loading. */
-  detail: TournamentDetail | undefined;
+  summary: components["schemas"]["TournamentSummary"];
   nameOf: (playerId: string) => string;
-}
-
-/** The first phase's rounds and how many matches were played so far. */
-function progressOf(detail: TournamentDetail) {
-  const matches = detail.rounds.flatMap((round) => round.matches);
-  const group = detail.phases.find((phase) => phase.kind === "group");
-  const knockout = detail.phases.find((phase) => phase.kind === "knockout");
-  const groupRounds = detail.rounds.filter(
-    (round) => round.phase_id === group?.id,
-  );
-  const inKnockout =
-    knockout !== undefined &&
-    detail.rounds.some((round) => round.phase_id === knockout.id);
-  const current =
-    groupRounds.find((round) =>
-      round.matches.some((match) => match.outcome === null),
-    ) ?? groupRounds.at(-1);
-  return {
-    played: matches.filter((match) => match.outcome !== null).length,
-    total: matches.length,
-    group,
-    inKnockout,
-    round: current?.round_no ?? 1,
-    rounds: groupRounds.length,
-  };
 }
 
 /** The design's Tournament item: status, title, date, detail and progress. */
 export function TournamentItem({
   leagueId,
   summary,
-  detail,
   nameOf,
 }: TournamentItemProps) {
   const { t } = useTranslation();
@@ -80,67 +48,55 @@ export function TournamentItem({
   const backToSetup = useMutation(
     setupMutations.backToSetup(leagueId, summary.id),
   );
-  const setup = useQuery(
-    setupQueries.detail(
-      leagueId,
-      summary.state === "setup" ? summary.id : undefined,
-    ),
-  );
-
-  const loaded =
-    detail === undefined ? undefined : { detail, progress: progressOf(detail) };
-  const progress = loaded?.progress;
-  const canGoBack = summary.state === "in_progress" && progress?.played === 0;
+  const progress = summary.progress;
+  const canGoBack =
+    summary.state === "in_progress" && progress?.matches_played === 0;
 
   const detailText = (() => {
     if (summary.state === "setup") {
-      return setup.data === undefined
-        ? ""
-        : t("tournaments.list.picked", { count: setup.data.player_ids.length });
+      return t("tournaments.list.picked", { count: summary.player_count });
     }
-    if (loaded === undefined) {
-      return "";
-    }
-    const { detail: read, progress: made } = loaded;
     if (summary.state === "finished") {
-      const winner = read.places?.find((row) => row.place === 1);
-      const entry = read.entries.find((e) => e.id === winner?.entry_id);
-      const players = read.entries
-        .filter((e) => e.stage === "main")
-        .flatMap((e) => e.player_ids).length;
+      const winner = summary.winner_player_ids;
       return [
-        entry === undefined
+        winner === null || winner.length === 0
           ? ""
           : t("tournaments.list.wonBy", {
-              names: entryName(t, entry.player_ids.map(nameOf)),
+              names: entryName(t, winner.map(nameOf)),
             }),
-        t("tournaments.list.players", { count: players }),
+        t("tournaments.list.players", { count: summary.player_count }),
       ]
         .filter((text) => text !== "")
         .join(" ");
     }
-    const phase = made.inKnockout
+    if (progress === null) {
+      return "";
+    }
+    const group = summary.phases.find((phase) => phase.kind === "group");
+    const phase = progress.in_knockout
       ? t("tournaments.list.phase.knockout")
-      : made.group?.format === "round_robin"
+      : group?.format === "round_robin"
         ? t("tournaments.list.phase.roundRobin", {
-            round: made.round,
-            rounds: made.rounds,
+            round: progress.round_no,
+            rounds: progress.round_count,
           })
-        : made.group?.format === "swiss"
-          ? t("tournaments.list.phase.swiss", { round: made.round })
-          : made.group?.format === "monster_dyp"
-            ? t("tournaments.list.phase.monsterDyp", { round: made.round })
+        : group?.format === "swiss"
+          ? t("tournaments.list.phase.swiss", { round: progress.round_no })
+          : group?.format === "monster_dyp"
+            ? t("tournaments.list.phase.monsterDyp", {
+                round: progress.round_no,
+              })
             : t("tournaments.list.phase.knockout");
     return `${phase} ${t("tournaments.list.played", {
-      played: made.played,
-      count: made.total,
+      played: progress.matches_played,
+      count: progress.match_count,
     })}`;
   })();
 
   const percent =
-    progress === undefined || progress.total === 0
+    progress === null || progress.match_count === 0
       ? 0
-      : Math.round((progress.played / progress.total) * 100);
+      : Math.round((progress.matches_played / progress.match_count) * 100);
 
   return (
     <li
@@ -177,13 +133,13 @@ export function TournamentItem({
           </span>
         </span>
         <span className="text-body-sm text-muted-foreground">{detailText}</span>
-        {summary.state === "in_progress" && progress !== undefined && (
+        {summary.state === "in_progress" && progress !== null && (
           <span
             role="progressbar"
             aria-label={t("tournaments.list.progress", { name: summary.name })}
             aria-valuemin={0}
-            aria-valuemax={progress.total}
-            aria-valuenow={progress.played}
+            aria-valuemax={progress.match_count}
+            aria-valuenow={progress.matches_played}
             className="mt-1 block h-2 overflow-hidden rounded-full bg-nav-active"
           >
             {/* A value from the API reaches CSS through a custom property (§5.1). */}
