@@ -69,7 +69,7 @@ export function FieldsView({
               {errorText}
             </p>
           )}
-          <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <ul className="grid gap-3 sm:grid-cols-2">
             {model.fields.map((field) => (
               <li key={field.id}>
                 <FieldCard
