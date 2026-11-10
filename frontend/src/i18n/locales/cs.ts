@@ -1,6 +1,7 @@
 import { auth } from "./cs/auth";
 import { common } from "./cs/common";
 import { fields } from "./cs/fields";
+import { finals } from "./cs/finals";
 import { leagues } from "./cs/leagues";
 import { players } from "./cs/players";
 import { publicView } from "./cs/publicView";
@@ -24,4 +25,5 @@ export const cs: CsMessages = {
   publicView,
   // play
   roundRobin,
+  finals,
 };
