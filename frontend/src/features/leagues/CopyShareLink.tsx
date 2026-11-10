@@ -19,7 +19,7 @@ export function CopyShareLink({ leagueId }: { leagueId: string }) {
       <Button
         type="button"
         variant="outline"
-        className="min-h-11 w-full"
+        className="w-full"
         disabled={shareToken === undefined}
         onClick={() => {
           if (shareToken === undefined) {

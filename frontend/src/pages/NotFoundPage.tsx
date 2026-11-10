@@ -15,7 +15,7 @@ export function NotFoundPage() {
         {t("notFound.title")}
       </h1>
       <p className="text-body-md text-muted-foreground">{t("notFound.body")}</p>
-      <Button asChild variant="outline" className="min-h-11">
+      <Button asChild variant="outline">
         <Link to={paths.home}>{t("notFound.home")}</Link>
       </Button>
     </section>

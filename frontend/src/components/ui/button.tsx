@@ -3,12 +3,24 @@ import { cn } from "cn";
 import { Slot } from "radix-ui";
 import * as React from "react";
 
-// Project-wide changes (docs/frontend-style.md §5.2): a solid focus ring with
-// a background-coloured offset, 3:1 against every surface and the button
-// itself (WCAG 1.4.11, technique C40); destructive uses its token pair.
+// Project-wide changes (docs/frontend-style.md §5.2, §6): a solid focus ring
+// with a background-coloured offset, 3:1 against every surface and the
+// button itself (WCAG 1.4.11, technique C40); destructive uses its token
+// pair. Sizes and variants follow the Figma Button (components.md): no size
+// is below 44 px, the phone's touch target.
+//
+// size default  Compact, 44 px, radius 8, Button/Small
+// size lg       Primary, 56 px, radius 10, Button/Large
+// size icon     44 × 44, round, like the Back button
+// feature       the white button on the green playfield, 52 px, radius 10
+// text          a plain label without fill, e.g. "Back" or "Cancel"
+//
+// The text styles are written as text-(length:…) and leading-(…), not
+// text-button-sm: cn does not know the theme's text styles and would take
+// text-button-sm for a colour, dropping text-primary-foreground.
 
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap outline-hidden transition-all focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap outline-hidden transition-all focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-5",
   {
     variants: {
       variant: {
@@ -21,19 +33,30 @@ const buttonVariants = cva(
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost:
           "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
-        link: "text-primary underline-offset-4 hover:underline",
+        feature: "bg-feature text-feature-foreground hover:bg-feature/90",
+        text: "text-foreground underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-9 px-4 py-2 has-[>svg]:px-3",
-        xs: "h-6 gap-1 rounded-md px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5",
-        lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
-        icon: "size-9",
-        "icon-xs": "size-6 rounded-md [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm": "size-8",
-        "icon-lg": "size-10",
+        default:
+          "h-11 rounded-md px-4 text-(length:--text-button-sm) leading-(--text-button-sm--line-height) font-bold has-[>svg]:px-3",
+        lg: "h-14 rounded-lg px-6 text-(length:--text-button-lg) leading-(--text-button-lg--line-height) font-bold has-[>svg]:px-5",
+        icon: "size-11 rounded-full",
       },
     },
+    compoundVariants: [
+      {
+        variant: "feature",
+        size: ["default", "lg"],
+        class:
+          "h-13 rounded-lg px-6 text-(length:--text-button-lg) leading-(--text-button-lg--line-height) font-bold",
+      },
+      {
+        variant: "text",
+        size: ["default", "lg"],
+        class:
+          "px-2 text-(length:--text-body-md) leading-(--text-body-md--line-height) font-normal",
+      },
+    ],
     defaultVariants: {
       variant: "default",
       size: "default",

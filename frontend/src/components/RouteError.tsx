@@ -29,7 +29,6 @@ export function RouteError() {
       <Button
         type="button"
         variant="outline"
-        className="min-h-11"
         onClick={() => {
           window.location.reload();
         }}
