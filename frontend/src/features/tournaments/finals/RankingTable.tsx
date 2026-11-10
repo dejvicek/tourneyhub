@@ -1,6 +1,10 @@
 import { useTranslation } from "react-i18next";
 
-import type { ParticipantRead, RankingRead, RankingRow } from "@/demo/contract";
+import type {
+  ParticipantRead,
+  RankingRead,
+  SwissRankingRow,
+} from "@/demo/contract";
 import { cn } from "@/lib/utils";
 
 interface RankingTableProps {
@@ -11,7 +15,10 @@ interface RankingTableProps {
   caption: string;
 }
 
-function valueOf(row: RankingRow, key: RankingRead["tiebreakers"][number]) {
+function valueOf(
+  row: SwissRankingRow,
+  key: RankingRead["tiebreakers"][number],
+) {
   switch (key) {
     case "bh1":
       return row.bh1;

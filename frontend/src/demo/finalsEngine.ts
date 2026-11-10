@@ -23,8 +23,8 @@ import type {
   PlaceReason,
   PlacesRead,
   RankingRead,
-  RankingRow,
   RoundRead,
+  SwissRankingRow,
 } from "./contract";
 import { createRng, roundRobinStandings, withPoints } from "./engine";
 import {
@@ -436,7 +436,7 @@ export function bracketOf(t: StoredTournament): BracketRead | null {
 
 // ---------------------------------------------------------------- ranking
 
-type Compared = Omit<RankingRow, "place">;
+type Compared = Omit<SwissRankingRow, "place">;
 
 /**
  * demo only: Swiss and Monster DYP standings (BR-070–BR-073). Entries are
@@ -563,7 +563,7 @@ export function rankingOf(t: StoredTournament): RankingRead {
       compare(a, b) ||
       (seedOf.get(a.entry_id) ?? 0) - (seedOf.get(b.entry_id) ?? 0),
   );
-  const ranked: RankingRow[] = [];
+  const ranked: SwissRankingRow[] = [];
   ordered.forEach((row, index) => {
     const previous = ordered[index - 1];
     const shared = previous !== undefined && compare(previous, row) === 0;

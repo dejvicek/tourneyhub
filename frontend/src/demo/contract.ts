@@ -650,6 +650,13 @@ export interface KnockoutPreview {
   skipped_entry_ids: Uuid[];
 }
 
+interface Delete<P> {
+  parameters: P;
+  requestBody?: never;
+  responses: {
+    204: { headers: Record<string, unknown>; content?: never };
+  } & Errors;
+}
 interface Action<P, B, R> {
   parameters: P;
   requestBody: { content: { "application/json": B } };
@@ -740,7 +747,6 @@ export interface ProvisionalPaths {
     post: Action<Tournament, FinishWrite, TournamentRead>;
   };
 }
-
 
 type TournamentEntry = Params<{
   league_id: Uuid;
