@@ -138,6 +138,16 @@ def auth_header(settings: Settings, now: datetime) -> Callable[..., dict[str, st
     return auth_header
 
 
+@pytest.fixture(autouse=True, scope="session")
+def _real_dummy_hash() -> None:
+    """Hash the login's dummy before any test replaces the Argon2 hasher.
+
+    `_dummy_hash()` is cached for the process. Made first inside a test that
+    patches `PasswordHasher.hash`, it would stay invalid for every later test.
+    """
+    auth_service._dummy_hash()
+
+
 @functools.cache
 def _password_hash(password: str) -> str:
     return auth_service.hash_password(password)  # 64 MiB and some time; once each
