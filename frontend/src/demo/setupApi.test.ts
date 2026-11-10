@@ -2,14 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import { ApiError, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
+
+import { DEMO_LEAGUE_ID, DEMO_SEASON_ID } from "./seed";
 import {
   createDraft,
   pickPlayers,
   setupOf,
   tournamentOf,
-} from "@/features/tournaments/setup/testHelpers";
-
-import { DEMO_LEAGUE_ID, DEMO_SEASON_ID } from "./seed";
+} from "./setupTestHelpers";
 
 const league = { league_id: DEMO_LEAGUE_ID };
 const at = (tournament_id: string) => ({
