@@ -10,6 +10,7 @@ from pydantic import (
 
 from tourneyhub.engine.accounts import Language
 from tourneyhub.errors import ErrorCode
+from tourneyhub.services.instance import SIGNUP_CODE_MAX_LENGTH
 
 
 class RequestModel(BaseModel):
@@ -59,7 +60,9 @@ class LoginRequest(RequestModel):
 class SignUpRequest(RequestModel):
     """A new account and the instance's sign-up code (FR-001); the throttle reads it."""
 
-    signup_code: Annotated[SecretStr, StringConstraints(max_length=256)]
+    signup_code: Annotated[
+        SecretStr, StringConstraints(max_length=SIGNUP_CODE_MAX_LENGTH)
+    ]
     email: Email
     display_name: DisplayName
     password: NewPassword

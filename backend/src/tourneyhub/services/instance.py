@@ -5,6 +5,11 @@ from sqlalchemy.orm import Session
 
 from tourneyhub.db.models.accounts import InstanceSettings
 
+# The code is typed by organizers on a phone and guessed by strangers: not too
+# short. The maximum is what the sign-up request accepts.
+SIGNUP_CODE_MIN_LENGTH = 12
+SIGNUP_CODE_MAX_LENGTH = 256
+
 
 def set_signup_code(session: Session, *, code: str | None, now: datetime) -> None:
     """Set the sign-up code, or close sign-up with None (ADR-007).

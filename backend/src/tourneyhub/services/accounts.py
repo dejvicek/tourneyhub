@@ -1,4 +1,5 @@
 import secrets
+import unicodedata
 from datetime import datetime
 from uuid import UUID
 
@@ -65,12 +66,18 @@ def sign_up(
 def _code_matches(stored: str | None, given: str) -> bool:
     """Compare in constant time on UTF-8 bytes; `str` would fail on a Czech letter.
 
+    Both sides are normalized to NFC, so that a letter typed as a base letter and
+    a combining mark, as some keyboards do, matches the one the admin set.
     NULL means sign-up is closed. It is compared with an empty code all the same,
     so that the time does not tell a closed sign-up from a wrong code.
     """
-    expected = (stored or "").encode()
-    matches = secrets.compare_digest(expected, given.strip().encode())
+    expected = _normalize(stored or "").encode()
+    matches = secrets.compare_digest(expected, _normalize(given).encode())
     return stored is not None and matches
+
+
+def _normalize(code: str) -> str:
+    return unicodedata.normalize("NFC", code.strip())
 
 
 def start_password_change_attempt(

@@ -1,6 +1,8 @@
 import threading
+import unicodedata
 from collections.abc import Callable, Iterator
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 
 import httpx2
 import pytest
@@ -173,6 +175,35 @@ def test_fr001_a_non_ascii_code_against_an_ascii_one_is_refused_not_a_500(
 
     assert response.status_code == 422
     assert response.json()["code"] == "invalid_signup_code"
+
+
+@pytest.mark.parametrize(
+    ("stored_form", "given_form"), [("NFC", "NFD"), ("NFD", "NFC")]
+)
+def test_fr001_a_letter_typed_as_a_base_letter_and_a_mark_matches_the_composed_one(
+    client: TestClient,
+    set_signup_code: Callable[[str | None], None],
+    stored_form: Literal["NFC", "NFD"],
+    given_form: Literal["NFC", "NFD"],
+) -> None:
+    code = "Žluťoučký kůň"
+    set_signup_code(unicodedata.normalize(stored_form, code))
+    typed = unicodedata.normalize(given_form, code)
+    assert typed != unicodedata.normalize(stored_form, code)
+
+    response = _sign_up(client, code=typed)
+
+    assert response.status_code == 201
+
+
+def test_fr001_a_different_letter_still_does_not_match_after_normalizing(
+    client: TestClient, set_signup_code: Callable[[str | None], None]
+) -> None:
+    set_signup_code("Žluťoučký kůň")
+
+    response = _sign_up(client, code=unicodedata.normalize("NFD", "Zluťoučký kůň"))
+
+    assert response.status_code == 422
 
 
 def test_fr001_spaces_around_the_code_are_ignored(

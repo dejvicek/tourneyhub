@@ -19,6 +19,10 @@ from tourneyhub.db.models.accounts import (
 from tourneyhub.engine.accounts import Language
 from tourneyhub.engine.auth import AuthAttemptKind
 from tourneyhub.services import auth as auth_service
+from tourneyhub.services.instance import (
+    SIGNUP_CODE_MAX_LENGTH,
+    SIGNUP_CODE_MIN_LENGTH,
+)
 from tourneyhub.settings import Settings
 
 
@@ -108,20 +112,20 @@ def test_adr007_set_signup_code_never_prints_the_code_back(
 def test_adr007_a_new_code_replaces_the_old_one(
     cli_environment: Engine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _answer_prompt(monkeypatch, "first")
+    _answer_prompt(monkeypatch, "first-code-123")
     _run("set-signup-code")
-    _answer_prompt(monkeypatch, "second")
+    _answer_prompt(monkeypatch, "second-code-123")
 
     _run("set-signup-code")
 
-    assert _stored_code(cli_environment) == "second"
+    assert _stored_code(cli_environment) == "second-code-123"
 
 
 @pytest.mark.concurrency
 def test_adr007_clear_closes_sign_up(
     cli_environment: Engine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    prompts = _answer_prompt(monkeypatch, "open")
+    prompts = _answer_prompt(monkeypatch, "open-code-12345")
     _run("set-signup-code")
 
     code, stdout, _ = _run("set-signup-code", "--clear")
@@ -133,19 +137,80 @@ def test_adr007_clear_closes_sign_up(
 
 
 @pytest.mark.concurrency
-@pytest.mark.parametrize("answer", ["", "   "])
-def test_adr007_an_empty_code_is_refused_and_changes_nothing(
+@pytest.mark.parametrize(
+    "answer",
+    [
+        pytest.param("", id="empty"),
+        pytest.param("   ", id="blank"),
+        pytest.param("x" * 11, id="too-short"),
+        pytest.param(f"  {'x' * 11}  ", id="too-short-after-stripping"),
+        pytest.param("x" * 257, id="too-long"),
+    ],
+)
+def test_adr007_a_code_of_the_wrong_length_is_refused_and_changes_nothing(
     cli_environment: Engine, monkeypatch: pytest.MonkeyPatch, answer: str
 ) -> None:
-    _answer_prompt(monkeypatch, "kept")
+    _answer_prompt(monkeypatch, "kept-code-12345")
     _run("set-signup-code")
     _answer_prompt(monkeypatch, answer)
 
     code, stdout, _ = _run("set-signup-code")
 
     assert code == 1
-    assert "--clear" in stdout
-    assert _stored_code(cli_environment) == "kept"
+    assert "12 to 256 characters" in stdout
+    assert not answer.strip() or answer.strip() not in stdout
+    assert _stored_code(cli_environment) == "kept-code-12345"
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize("length", [12, 256])
+def test_adr007_a_code_of_the_limit_lengths_is_accepted(
+    cli_environment: Engine, monkeypatch: pytest.MonkeyPatch, length: int
+) -> None:
+    _answer_prompt(monkeypatch, "x" * length)
+
+    code, _, _ = _run("set-signup-code")
+
+    assert code == 0
+    assert _stored_code(cli_environment) == "x" * length
+
+
+@pytest.mark.concurrency
+def test_adr007_generate_stores_a_random_code_and_prints_only_it(
+    cli_environment: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prompts = _answer_prompt(monkeypatch, "unused")
+
+    code, stdout, _ = _run("set-signup-code", "--generate")
+    again = _run("set-signup-code", "--generate")[1]
+
+    assert code == 0
+    printed = stdout.removesuffix("\n")
+    assert "\n" not in stdout.removesuffix("\n")  # the code, and nothing else
+    assert len(printed) == 22
+    assert printed.isascii()
+    assert printed != again.strip()  # random
+    assert _stored_code(cli_environment) == again.strip()
+    assert prompts == []  # nothing is asked
+
+
+@pytest.mark.concurrency
+def test_adr007_a_generated_code_is_within_the_length_limits(
+    cli_environment: Engine,
+) -> None:
+    _run("set-signup-code", "--generate")
+
+    stored = _stored_code(cli_environment)
+    assert stored is not None
+    assert SIGNUP_CODE_MIN_LENGTH <= len(stored) <= SIGNUP_CODE_MAX_LENGTH
+
+
+@pytest.mark.parametrize("flags", [["--clear", "--generate"]])
+def test_adr007_clear_and_generate_exclude_each_other(flags: list[str]) -> None:
+    with redirect_stderr(io.StringIO()), pytest.raises(SystemExit) as raised:
+        main(["set-signup-code", *flags])
+
+    assert raised.value.code == 2
 
 
 def test_adr007_the_code_is_not_an_argument() -> None:

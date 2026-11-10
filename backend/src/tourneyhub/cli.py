@@ -1,6 +1,7 @@
 import argparse
 import getpass
 import logging.config
+import secrets
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -26,8 +27,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         "set-signup-code",
         help="set the sign-up code, read from a prompt, or close sign-up",
     )
-    signup_code.add_argument(
+    how = signup_code.add_mutually_exclusive_group()
+    how.add_argument(
         "--clear", action="store_true", help="close sign-up instead (ADR-007)"
+    )
+    how.add_argument(
+        "--generate",
+        action="store_true",
+        help="make a random code and print it, as the only output, once",
     )
     commands.add_parser(
         "cleanup", help="delete expired refresh tokens and old sign-in attempts"
@@ -36,7 +43,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "migrate":
         migrate()
     elif args.command == "set-signup-code":
-        return set_signup_code(clear=args.clear)
+        return set_signup_code(clear=args.clear, generate=args.generate)
     else:
         cleanup()
     return 0
@@ -60,21 +67,33 @@ def _transaction() -> Iterator[Session]:
         engine.dispose()
 
 
-def set_signup_code(*, clear: bool) -> int:
+def set_signup_code(*, clear: bool, generate: bool = False) -> int:
     """Set the sign-up code from a prompt, or close sign-up (ADR-007, FR-005).
 
     The code is read with `getpass`, so it is in no argument, no shell history
-    and no process list, and it is never printed back.
+    and no process list, and it is never printed back. The one exception is
+    `generate`: a code made here is shown once, as the only output, because
+    nobody else knows it.
     """
     code = None
-    if not clear:
+    if generate:
+        code = secrets.token_urlsafe(16)  # 22 characters, 128 bits
+    elif not clear:
         code = getpass.getpass("Sign-up code: ").strip()
-        if not code:
-            print("The code is empty; use --clear to close sign-up.")
+        shortest = instance_service.SIGNUP_CODE_MIN_LENGTH
+        longest = instance_service.SIGNUP_CODE_MAX_LENGTH
+        if not shortest <= len(code) <= longest:
+            print(
+                f"The code needs {shortest} to {longest} characters;"
+                " use --clear to close sign-up."
+            )
             return 1
     with _transaction() as session:
         instance_service.set_signup_code(session, code=code, now=datetime.now(UTC))
-    print("Sign-up is closed." if code is None else "The sign-up code is set.")
+    if generate:
+        print(code)
+    else:
+        print("Sign-up is closed." if code is None else "The sign-up code is set.")
     return 0
 
 
