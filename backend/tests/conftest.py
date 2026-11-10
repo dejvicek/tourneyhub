@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from tourneyhub.api.deps import get_now, get_session, get_session_factory
 from tourneyhub.app import create_app
-from tourneyhub.db.models.accounts import User
+from tourneyhub.db.models.accounts import InstanceSettings, User
 from tourneyhub.db.models.leagues import League
 from tourneyhub.db.session import create_db_engine
 from tourneyhub.engine.accounts import Language
@@ -167,6 +167,17 @@ def make_user(session: Session, now: datetime) -> Callable[..., User]:
         return user
 
     return make_user
+
+
+@pytest.fixture
+def set_signup_code(session: Session) -> Callable[[str | None], None]:
+    """Set the sign-up code of the one `instance_settings` row; None closes sign-up."""
+
+    def set_signup_code(code: str | None) -> None:
+        session.get_one(InstanceSettings, 1).signup_code = code
+        session.flush()
+
+    return set_signup_code
 
 
 @pytest.fixture

@@ -18,6 +18,10 @@ class ErrorCode(StrEnum):
     PASSWORD_CHANGE_REQUIRED = "password_change_required"
     FORBIDDEN = "forbidden"
     TOO_MANY_ATTEMPTS = "too_many_attempts"
+    INVALID_SIGNUP_CODE = "invalid_signup_code"  # wrong, or sign-up is closed
+    EMAIL_TAKEN = "email_taken"
+    WRONG_PASSWORD = "wrong_password"  # the current password of a change
+    PASSWORD_UNCHANGED = "password_unchanged"
     # Leagues
     LEAGUE_NOT_FOUND = "league_not_found"
     LEAGUE_ID_TAKEN = "league_id_taken"

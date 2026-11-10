@@ -25,9 +25,26 @@ ACCESS_TOKEN_LIFETIME = timedelta(minutes=15)
 REFRESH_TOKEN_LIFETIME = timedelta(days=90)  # restarted by every refresh
 REUSE_WINDOW = timedelta(seconds=60)
 
-_WINDOW = timedelta(minutes=15)
-_FREE_FAILURES = 3
-_MAX_DELAY = timedelta(seconds=8)
+
+@dataclass(frozen=True, slots=True)
+class _Limits:
+    """How failed attempts of one kind add up to a waiting period (ADR-006)."""
+
+    window: timedelta  # failures older than this are forgotten
+    free_failures: int
+    max_delay: timedelta
+
+
+# Guessing a password is slowed by Argon2 as well; guessing the sign-up code is
+# not, so its limits are stricter and its window longer.
+_LOGIN_LIMITS = _Limits(
+    window=timedelta(minutes=15), free_failures=3, max_delay=timedelta(seconds=8)
+)
+_SIGNUP_LIMITS = _Limits(
+    window=timedelta(hours=1), free_failures=5, max_delay=timedelta(minutes=15)
+)
+# Older rows count for nothing and are deleted by `tourneyhub cleanup`.
+ATTEMPT_RETENTION = max(_LOGIN_LIMITS.window, _SIGNUP_LIMITS.window)
 
 # argon2-cffi's defaults (RFC 9106's low-memory profile) take 64 MiB per hash. One
 # process-wide semaphore lets at most 4 run at once (ADR-006, §10).
@@ -46,8 +63,8 @@ class IssuedTokens:
 
 
 @dataclass(frozen=True, slots=True)
-class LoginAttempt:
-    """The `auth_attempts` rows of one login: failed until the login succeeds."""
+class Attempt:
+    """The `auth_attempts` rows of one login or sign-up: failed until it succeeds."""
 
     attempt_ids: tuple[UUID, ...]
 
@@ -94,7 +111,7 @@ def _dummy_hash() -> str:
 
 def start_login_attempt(
     session: Session, *, email: str, ip: str, now: datetime
-) -> LoginAttempt:
+) -> Attempt:
     """Count a login before its password is checked, or refuse it (ADR-006).
 
     Attempts are counted per email and per client IP. Each key is locked with a
@@ -105,15 +122,45 @@ def start_login_attempt(
     refused with `TooManyAttemptsError`, is not counted and never reaches the
     password check. Nothing sleeps, and the account is never locked.
     """
-    keys = {
-        # As the login's lookup folds it, with PostgreSQL's lower() (FR-002).
-        AuthAttemptKind.LOGIN_EMAIL: session.scalars(select(func.lower(email))).one(),
-        AuthAttemptKind.LOGIN_IP: _ip_key(ip),
-    }
+    return _start_attempt(
+        session,
+        keys={
+            # As the login's lookup folds it, with PostgreSQL's lower() (FR-002).
+            AuthAttemptKind.LOGIN_EMAIL: session.scalars(
+                select(func.lower(email))
+            ).one(),
+            AuthAttemptKind.LOGIN_IP: _ip_key(ip),
+        },
+        limits=_LOGIN_LIMITS,
+        now=now,
+    )
+
+
+def start_signup_attempt(session: Session, *, ip: str, now: datetime) -> Attempt:
+    """Count a sign-up before its code is checked, or refuse it (ADR-006).
+
+    Counted per client IP, like a login, with the stricter limits of sign-up.
+    """
+    return _start_attempt(
+        session,
+        keys={AuthAttemptKind.SIGNUP_IP: _ip_key(ip)},
+        limits=_SIGNUP_LIMITS,
+        now=now,
+    )
+
+
+def _start_attempt(
+    session: Session,
+    *,
+    keys: dict[AuthAttemptKind, str],
+    limits: _Limits,
+    now: datetime,
+) -> Attempt:
     for lock_id in sorted(_lock_id(kind, key) for kind, key in keys.items()):
         session.execute(select(func.pg_advisory_xact_lock(lock_id)))
     wait = max(
-        _wait(session, kind=kind, key=key, now=now) for kind, key in keys.items()
+        _wait(session, kind=kind, key=key, limits=limits, now=now)
+        for kind, key in keys.items()
     )
     if wait > timedelta(0):
         raise TooManyAttemptsError(retry_after=math.ceil(wait.total_seconds()))
@@ -123,7 +170,16 @@ def start_login_attempt(
     ]
     session.add_all(attempts)
     session.flush()
-    return LoginAttempt(attempt_ids=tuple(attempt.id for attempt in attempts))
+    return Attempt(attempt_ids=tuple(attempt.id for attempt in attempts))
+
+
+def mark_attempt_succeeded(session: Session, *, attempt: Attempt) -> None:
+    """Stop counting `attempt` as a failure."""
+    session.execute(
+        update(AuthAttempt)
+        .where(AuthAttempt.id.in_(attempt.attempt_ids))
+        .values(succeeded=True)
+    )
 
 
 def _ip_key(ip: str) -> str:
@@ -145,26 +201,33 @@ def _lock_id(kind: AuthAttemptKind, key: str) -> int:
 
 
 def _wait(
-    session: Session, *, kind: AuthAttemptKind, key: str, now: datetime
+    session: Session,
+    *,
+    kind: AuthAttemptKind,
+    key: str,
+    limits: _Limits,
+    now: datetime,
 ) -> timedelta:
     failures, newest = session.execute(
         select(func.count(), func.max(AuthAttempt.created_at)).where(
             AuthAttempt.kind == kind,
             AuthAttempt.key == key,
             AuthAttempt.succeeded.is_(False),
-            AuthAttempt.created_at > now - _WINDOW,
+            AuthAttempt.created_at > now - limits.window,
         )
     ).one()
-    if failures < _FREE_FAILURES:
+    if failures < limits.free_failures:
         return timedelta(0)
-    delay = min(2 ** (failures - _FREE_FAILURES), _MAX_DELAY.total_seconds())
+    delay = min(
+        2 ** (failures - limits.free_failures), limits.max_delay.total_seconds()
+    )
     return newest + timedelta(seconds=delay) - now
 
 
 def log_in(
     session: Session,
     *,
-    attempt: LoginAttempt,
+    attempt: Attempt,
     email: str,
     password: str,
     key: SecretStr,
@@ -196,13 +259,16 @@ def log_in(
             .where(User.id == user.id, User.password_hash == user.password_hash)
             .values(password_hash=hash_password(password), updated_at=now)
         )
-    session.execute(
-        update(AuthAttempt)
-        .where(AuthAttempt.id.in_(attempt.attempt_ids))
-        .values(succeeded=True)
-    )
+    mark_attempt_succeeded(session, attempt=attempt)
+    return start_session(session, user_id=user.id, key=key, now=now)
+
+
+def start_session(
+    session: Session, *, user_id: UUID, key: SecretStr, now: datetime
+) -> IssuedTokens:
+    """Log a user in on a new device: a new refresh-token family (ADR-006)."""
     return _issue_tokens(
-        session, user_id=user.id, family_id=uuid7(), parent_id=None, key=key, now=now
+        session, user_id=user_id, family_id=uuid7(), parent_id=None, key=key, now=now
     )
 
 
@@ -279,6 +345,35 @@ def log_out(session: Session, *, refresh_token: str | None, now: datetime) -> No
     if family_id is not None:
         _revoke(_lock_family(session, family_id=family_id), now=now)
         session.flush()
+
+
+def revoke_other_families(
+    session: Session, *, user_id: UUID, keep_family_id: UUID, now: datetime
+) -> None:
+    """Revoke every family of the user but one: a password change (ADR-006).
+
+    The rows are locked in id order, the order in which `_lock_family` takes
+    them, so that a refresh holding one family cannot deadlock with this. A
+    refresh that holds a family may add a token meanwhile. In READ COMMITTED
+    the first pass does not see it, so a second pass, with a new snapshot,
+    revokes it too (see `_lock_family`).
+    """
+    for _ in range(2):
+        token_ids = session.scalars(
+            select(RefreshToken.id)
+            .where(
+                RefreshToken.user_id == user_id,
+                RefreshToken.family_id != keep_family_id,
+                RefreshToken.revoked_at.is_(None),
+            )
+            .order_by(RefreshToken.id)
+            .with_for_update()
+        ).all()
+        session.execute(
+            update(RefreshToken)
+            .where(RefreshToken.id.in_(token_ids))
+            .values(revoked_at=now)
+        )
 
 
 def _lock_family(session: Session, *, family_id: UUID) -> Sequence[RefreshToken]:

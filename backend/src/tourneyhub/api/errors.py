@@ -36,6 +36,8 @@ _STATUS_BY_ERROR: dict[type[AppError], HTTPStatus] = {
 # that a race can reach belong here: creating a league locks nothing (§4.4).
 _CONFLICT_BY_CONSTRAINT: dict[str, ErrorCode] = {
     "pk_leagues": ErrorCode.LEAGUE_ID_TAKEN,
+    # Two parallel sign-ups with one email: the check before the insert saw neither.
+    "uq_users_lower_email": ErrorCode.EMAIL_TAKEN,
 }
 
 
@@ -80,7 +82,14 @@ async def handle_validation_error(_request: Request, exc: Exception) -> JSONResp
             for key, value in item.get("ctx", {}).items()
             if isinstance(value, int | float) and not isinstance(value, bool)
         }
-        problems.append({"loc": list(item["loc"]), "type": item["type"]} | numeric_ctx)
+        problem: JsonValue = {
+            "loc": list(item["loc"]),
+            "type": item["type"],
+        } | numeric_ctx
+        # A body that a dependency reads too, such as a throttle's, is reported
+        # once by each.
+        if problem not in problems:
+            problems.append(problem)
     return error_response(
         HTTPStatus.UNPROCESSABLE_CONTENT,
         ErrorCode.VALIDATION_FAILED,
