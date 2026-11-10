@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Status | Proposed — awaiting review by another developer |
-| Date | 2026-10-16, revised 2026-10-21 after review, 2026-11-03 (ADR-001: Python 3.15, SQLAlchemy 2.1) and 2026-11-05 (ADR-001, ADR-006, ADR-008, ADR-010, ADR-012: decisions of the style-guide review) |
+| Date | 2026-10-16, revised 2026-10-21 after review, 2026-11-03 (ADR-001: Python 3.15, SQLAlchemy 2.1), 2026-11-05 (ADR-001, ADR-006, ADR-008, ADR-010, ADR-012: decisions of the style-guide review) and 2026-11-10 (ADR-003: mobile-first layout, light and dark themes in the MVP) |
 | Scope | Technical decisions for the MVP in `PRD.md`. Once accepted, a changed decision gets a new ADR that supersedes the old one; accepted ADRs are not rewritten. |
 
 Each ADR states its status, the context, the decision, its consequences and the alternatives considered. Requirement IDs (FR-, BR-, RM-) refer to `PRD.md` and `ROADMAP.md`.
@@ -79,7 +79,7 @@ Each ADR states its status, the context, the decision, its consequences and the 
 
 **Status.** Proposed.
 
-**Context.** Every screen must work on a phone, and entering a result takes at most three taps (FR-082). The UI is in English and Czech (FR-080, FR-081).
+**Context.** Every screen must work on a phone, and entering a result takes at most three taps (FR-082). The UI is in English and Czech (FR-080, FR-081). The design is in [Figma](https://www.figma.com/design/Vqxx2eyO6oNaLprB9wewHo/TourneyHub): every screen has a phone, a tablet and a desktop layout, each in a light and a dark theme.
 
 **Decision.**
 
@@ -87,16 +87,19 @@ Each ADR states its status, the context, the decision, its consequences and the 
 |---|---|
 | Framework and build | React 19, Vite, TypeScript in strict mode |
 | Styling and components | Tailwind CSS, shadcn/ui (Radix-based components copied into the project) |
+| Layout | Mobile-first: every screen is built for the phone first, and Tailwind's breakpoint prefixes add the tablet and desktop layouts the design shows; nothing is designed for the desktop and squeezed down. The phone is the reference for FR-082 |
 | Server state | TanStack Query |
 | Routing | React Router |
 | Translations | react-i18next; no hard-coded user-facing strings; dates formatted with `Intl` in the chosen language |
 | Remembered language (FR-081) | Organizers: a field on their account (`users.language`). Viewers: the browser's language if it is English or Czech, otherwise English; a viewer's own choice is kept in `localStorage` |
+| Themes | A light and a dark theme for every screen, as the design in Figma has them; the theme follows the device's setting (`prefers-color-scheme`). Colours come from theme tokens (Tailwind and shadcn/ui CSS variables), never from hard-coded values |
 | API types | Generated at build time from the committed OpenAPI schema with `openapi-typescript` (ADR-008) |
 | Node.js | The current Active LTS (26 from 2026-10-28), pinned in `.nvmrc` and `engines` |
 | Package manager | pnpm, its version pinned in the `packageManager` field; `pnpm-lock.yaml` committed |
 
 **Consequences.**
-- The design is mobile-first. The knockout options keep their English names in both languages (FR-080). Dark mode (RM-11) can later be added through Tailwind's theme without restructuring components.
+- The knockout options keep their English names in both languages (FR-080).
+- Both themes ship in the MVP, as the design has them. Every screen and component is built and checked in both, which costs more than one theme; tokens keep that cost to the colours, not the layout. A manual theme switch is not in the MVP.
 - pnpm keeps `node_modules` strict: code can import only what its own `package.json` declares.
 - pnpm does not run dependency install scripts unless the package is on an allow-list (`allowBuilds` in `pnpm-workspace.yaml`; `onlyBuiltDependencies` in pnpm 10). An unlisted install script fails `pnpm install`, so the list (typically esbuild for Vite) is reviewed like code.
 - Node 25 and later no longer ship Corepack, so pnpm is installed explicitly: in CI with `pnpm/action-setup`, which reads the pinned version, before `actions/setup-node` with `cache: pnpm`, then `pnpm install --frozen-lockfile`; in the Dockerfile with the same pinned version. Playwright browsers are installed with `pnpm exec playwright install --with-deps`.
