@@ -9,6 +9,7 @@ import { leagues } from "./en/leagues";
 import { players } from "./en/players";
 import { publicView } from "./en/publicView";
 import { results } from "./en/results";
+import { roundRobin } from "./en/roundRobin";
 import { shell } from "./en/shell";
 import { standings } from "./en/standings";
 import { tournaments } from "./en/tournaments";
@@ -24,6 +25,8 @@ export const en = {
   fields,
   results,
   publicView,
+  // play
+  roundRobin,
 };
 
 export type Messages = typeof en;

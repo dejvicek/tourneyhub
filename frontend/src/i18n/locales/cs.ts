@@ -5,6 +5,7 @@ import { leagues } from "./cs/leagues";
 import { players } from "./cs/players";
 import { publicView } from "./cs/publicView";
 import { results } from "./cs/results";
+import { roundRobin } from "./cs/roundRobin";
 import { shell } from "./cs/shell";
 import { standings } from "./cs/standings";
 import { tournaments } from "./cs/tournaments";
@@ -21,4 +22,6 @@ export const cs: CsMessages = {
   fields,
   results,
   publicView,
+  // play
+  roundRobin,
 };

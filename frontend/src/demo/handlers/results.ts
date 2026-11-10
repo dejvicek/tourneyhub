@@ -1,22 +1,16 @@
-// Demo handlers: results (FR-050–FR-053, FR-094, BR-090–BR-094, BR-120–BR-124).
-import type { MatchRead } from "../contract";
-import { fillFields, waitingMatches } from "../engine";
+// Demo handlers: results (FR-050–FR-053, FR-094, BR-053, BR-090–BR-095,
+// BR-120–BR-124). A result is written whole, every game or the walkover;
+// the empty result clears it (ADR-008).
+import {
+  checkResult,
+  findMatch,
+  formatOf,
+  groupLocked,
+  phaseOf,
+  writeResult,
+} from "../playEngine";
 import { apiError, route } from "../route";
-import { rules } from "../rules";
-import { findTournament } from "../store";
-
-/** demo only, the engine decides: whether a phase needs every game's score (BR-092). */
-function scoresRequired(
-  format: string,
-  scoreDifferenceCounts: boolean,
-): boolean {
-  switch (rules.gameScoresRequired) {
-    case "swiss_and_monster_dyp":
-      return format === "swiss" || format === "monster_dyp";
-    case "when_score_difference_counts":
-      return scoreDifferenceCounts;
-  }
-}
+import { findLeague, findTournament } from "../store";
 
 export const resultHandlers = [
   route(
@@ -24,58 +18,33 @@ export const resultHandlers = [
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/matches/{match_id}/result",
     ({ params, body }) => {
       const t = findTournament(params.league_id, params.tournament_id);
-      const round = t?.rounds.find((r) =>
-        r.matches.some((m) => m.id === params.match_id),
-      );
-      const match = round?.matches.find((m) => m.id === params.match_id);
-      const phase = t?.phases.find((p) => p.id === round?.phase_id);
+      const match = t && findMatch(t, params.match_id);
+      const phase = t && match && phaseOf(t, match);
       if (!t || !match || !phase) {
         return apiError(404, "not_found", { match_id: params.match_id });
       }
-      const walkover = body.walkover_winner !== null;
-      if (!walkover && body.games.length === 0) {
-        return apiError(422, "validation_failed", { games: "missing" });
+      if (match.sides.some((side) => side.player_ids.length === 0)) {
+        return apiError(422, "validation_failed", { rule: "BR-091" });
       }
-      const counts = (phase.tiebreakers ?? []).includes("score_difference");
-      if (
-        !walkover &&
-        scoresRequired(phase.format, counts) &&
-        body.games.some((g) => g.score_1 === null || g.score_2 === null)
-      ) {
+      if (groupLocked(t, match)) {
         return apiError(422, "validation_failed", {
-          games: "scores_required",
-          rule: "BR-092",
+          rule: "BR-053",
+          reason: "results_locked",
         });
       }
-      const wins = { side_1: 0, side_2: 0, draw: 0 };
-      for (const game of body.games) {
-        wins[game.winner] += 1;
+      const clearing = body.walkover_winner === null && body.games.length === 0;
+      if (!clearing) {
+        const refusal = checkResult(
+          body,
+          formatOf(t, match),
+          phase,
+          findLeague(t.league_id)?.draws_allowed ?? false,
+        );
+        if (refusal) {
+          return apiError(refusal.status, "validation_failed", refusal.detail);
+        }
       }
-      match.is_walkover = walkover;
-      match.games = walkover
-        ? []
-        : body.games.map((game, i) => ({ game_no: i + 1, ...game }));
-      match.outcome =
-        body.walkover_winner ??
-        (wins.side_1 > wins.side_2
-          ? "side_1"
-          : wins.side_2 > wins.side_1
-            ? "side_2"
-            : "draw");
-      match.result_entered_at = new Date().toISOString();
-
-      // FR-094: the match's field is free and takes the next waiting match.
-      const freed = t.fields.map((field) =>
-        field.match_id === match.id ? { ...field, match_id: null } : field,
-      );
-      const matchesById = new Map<string, MatchRead>(
-        t.rounds.flatMap((r) => r.matches).map((m) => [m.id, m]),
-      );
-      t.fields = fillFields(
-        freed,
-        waitingMatches(t.rounds, freed),
-        matchesById,
-      );
+      writeResult(t, match, body);
       return match;
     },
   ),

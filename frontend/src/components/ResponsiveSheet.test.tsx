@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { generatePath } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -30,9 +30,15 @@ describe("ResponsiveSheet", () => {
     const view = renderAt(moveMatch);
 
     const sheet = await screen.findByRole("dialog", {
-      name: "Fields: move a match",
+      // The match waits, so the overlay puts it on a field (G2's 6c).
+      name: "Put this match on a field",
     });
-    expect(sheet).toHaveAccessibleDescription("Design screen 6c");
+    await waitFor(
+      () => {
+        expect(sheet).toHaveAccessibleDescription(/in line\.$/);
+      },
+      { timeout: 3000 },
+    );
     // Modal: the screen behind it is hidden from assistive technology.
     expect(
       screen.queryByRole("heading", {
@@ -58,7 +64,7 @@ describe("ResponsiveSheet", () => {
     const user = userEvent.setup();
     const view = renderAt(moveMatch);
 
-    await screen.findByRole("dialog", { name: "Fields: move a match" });
+    await screen.findByRole("dialog", { name: "Put this match on a field" });
     await user.keyboard("{Escape}");
 
     expect(
@@ -75,7 +81,7 @@ describe("ResponsiveSheet", () => {
     const user = userEvent.setup();
     const view = renderAt(moveMatch);
 
-    await screen.findByRole("dialog", { name: "Fields: move a match" });
+    await screen.findByRole("dialog", { name: "Put this match on a field" });
     const parent = screen.getByRole("heading", {
       level: 1,
       name: "Fields: now playing and waiting",
