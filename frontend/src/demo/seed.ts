@@ -9,7 +9,7 @@ import type {
   LeagueRead,
   MatchRead,
   PhaseRead,
-  Player,
+  PlayerRead,
   RoundRead,
   SeasonRead,
   TournamentRead,
@@ -42,7 +42,7 @@ import { seedParts } from "./seedParts";
 export interface StoredLeague extends Omit<LeagueRead, "seasons"> {
   owner_id: string;
 }
-export interface StoredPlayer extends Player {
+export interface StoredPlayer extends PlayerRead {
   league_id: string;
 }
 export interface StoredSeason extends SeasonRead {

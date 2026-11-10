@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { dataOf } from "@/api/client";
+import { api, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
 
 import {
@@ -39,7 +39,7 @@ describe("the demo's fake API", () => {
       }),
     );
     const players = await dataOf(
-      provisionalApi.GET("/api/v1/leagues/{league_id}/players", {
+      api.GET("/api/v1/leagues/{league_id}/players", {
         params: { path: league },
       }),
     );
@@ -53,6 +53,63 @@ describe("the demo's fake API", () => {
       seasons: [{ number: 1, state: "active", name: null }],
     });
     expect(players).toHaveLength(16);
+  });
+
+  it("keeps player names unique, removed holders included, and renames removed players (BR-001)", async () => {
+    const added = await dataOf(
+      api.POST("/api/v1/leagues/{league_id}/players", {
+        params: { path: league },
+        body: { name: "  Zdeněk \u00a0  Nový " },
+      }),
+    );
+    expect(added.name).toBe("Zdeněk Nový");
+
+    const removed = await dataOf(
+      api.PUT("/api/v1/leagues/{league_id}/players/{player_id}/removed", {
+        params: { path: { ...league, player_id: added.id } },
+        body: { removed: true },
+      }),
+    );
+    expect(removed.removed_at).not.toBeNull();
+
+    const listed = (include: boolean) =>
+      dataOf(
+        api.GET("/api/v1/leagues/{league_id}/players", {
+          params: { path: league, query: { include_removed: include } },
+        }),
+      );
+    expect(await listed(false)).toHaveLength(16);
+    expect(await listed(true)).toHaveLength(17);
+
+    await expect(
+      dataOf(
+        api.POST("/api/v1/leagues/{league_id}/players", {
+          params: { path: league },
+          body: { name: "zdeněk nový" },
+        }),
+      ),
+    ).rejects.toMatchObject({
+      status: 422,
+      code: "player_name_taken",
+      detail: { player_id: added.id, name: "Zdeněk Nový", removed: true },
+    });
+
+    const renamed = await dataOf(
+      api.PUT("/api/v1/leagues/{league_id}/players/{player_id}/name", {
+        params: { path: { ...league, player_id: added.id } },
+        body: { name: "Zdeněk Novák" },
+      }),
+    );
+    expect(renamed).toMatchObject({ name: "Zdeněk Novák" });
+
+    await expect(
+      dataOf(
+        api.PUT("/api/v1/leagues/{league_id}/players/{player_id}/name", {
+          params: { path: { ...league, player_id: crypto.randomUUID() } },
+          body: { name: "X" },
+        }),
+      ),
+    ).rejects.toMatchObject({ status: 404, code: "player_not_found" });
   });
 
   it("starts a season only from the number it expects, and keeps a closed table (FR-021, BR-011)", async () => {
