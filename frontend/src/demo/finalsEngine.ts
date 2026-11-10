@@ -37,6 +37,14 @@ import type { StoredTournament } from "./seed";
 
 type Ids = () => string;
 
+/** The value, which the caller's own checks guarantee. */
+export function need<T>(value: T | null | undefined): T {
+  if (value === null || value === undefined) {
+    throw new Error("The demo engine is inconsistent");
+  }
+  return value;
+}
+
 // ---------------------------------------------------------------- notes
 
 /** What the data model keeps per entry that the contract's EntryRead has no field for. */
@@ -303,13 +311,10 @@ function scoreOf(
     return null;
   }
   const first = match.games[0];
-  if (
-    format === "bo1" &&
-    first &&
-    first.score_1 !== null &&
-    first.score_2 !== null
-  ) {
-    return [first.score_1, first.score_2];
+  const one = first?.score_1;
+  const two = first?.score_2;
+  if (format === "bo1" && typeof one === "number" && typeof two === "number") {
+    return [one, two];
   }
   const tally: [number, number] = [0, 0];
   for (const game of match.games) {
@@ -346,7 +351,16 @@ export function bracketOf(t: StoredTournament): BracketRead | null {
   if (!first) {
     return null;
   }
-  const seedOf = new Map(t.entries.map((entry) => [entry.id, entry.seed]));
+  // The knockout's own seeds: where the first round put each entry (BR-042).
+  const slots = seedSlots(first.matches.length * 2);
+  const seedOf = new Map<string, number>();
+  first.matches.forEach((match, j) => {
+    match.sides.forEach((side, k) => {
+      if (side.entry_id !== null) {
+        seedOf.set(side.entry_id, slots[2 * j + k] ?? 0);
+      }
+    });
+  });
   const fieldOf = new Map(
     t.fields.flatMap((field) =>
       field.match_id === null ? [] : [[field.match_id, field.number] as const],
@@ -660,8 +674,8 @@ export function placesOf(
       const flipped = score ? ([score[1], score[0]] as [number, number]) : null;
       const winnerScore = match.outcome === "side_1" ? score : flipped;
       const loserScore = match.outcome === "side_1" ? flipped : score;
-      const winnerId = winner.entry_id as string;
-      const loserId = loser.entry_id as string;
+      const winnerId = need(winner.entry_id);
+      const loserId = need(loser.entry_id);
       if (isFinal && match.kind === "standard") {
         decided.push(
           {
@@ -842,9 +856,7 @@ function playedBefore(rounds: readonly RoundRead[]) {
       }
       for (const side of match.sides) {
         if (side.player_ids.length === 2) {
-          partners.add(
-            key(side.player_ids[0] as string, side.player_ids[1] as string),
-          );
+          partners.add(key(need(side.player_ids[0]), need(side.player_ids[1])));
         }
       }
     }
@@ -880,7 +892,7 @@ export function drawNextRound(t: StoredTournament): DrawnRound {
       : standing.filter((id) => active.some((e) => e.id === id));
   const entryById = new Map(t.entries.map((e) => [e.id, e]));
   const side = (ids: string[]): MatchSideRead => ({
-    entry_id: ids.length === 1 ? (ids[0] as string) : null,
+    entry_id: ids.length === 1 ? need(ids[0]) : null,
     player_ids: ids.flatMap((id) => entryById.get(id)?.player_ids ?? []),
     is_bye: false,
   });
@@ -901,14 +913,14 @@ export function drawNextRound(t: StoredTournament): DrawnRound {
       return {
         matches: playing
           .slice(0, half)
-          .map((id, i) => [side([id]), side([playing[half + i] as string])]),
+          .map((id, i) => [side([id]), side([need(playing[half + i])])]),
         sitting_out: sitting,
       };
     }
     const left = [...playing];
     const matches: [MatchSideRead, MatchSideRead][] = [];
     while (left.length > 1) {
-      const a = left.shift() as string;
+      const a = need(left.shift());
       const index = left.findIndex(
         (b) =>
           !history.opponents.has(
@@ -919,7 +931,7 @@ export function drawNextRound(t: StoredTournament): DrawnRound {
           ),
       );
       const [b] = left.splice(index === -1 ? 0 : index, 1);
-      matches.push([side([a]), side([b as string])]);
+      matches.push([side([a]), side([need(b)])]);
     }
     return { matches, sitting_out: sitting };
   }
@@ -960,16 +972,16 @@ export function drawNextRound(t: StoredTournament): DrawnRound {
       // BR-060: #1 + #4 v #2 + #3; BR-062: change the partners if they met.
       const options: [[string, string], [string, string]][] = [
         [
-          [a as string, d as string],
-          [b as string, c as string],
+          [need(a), need(d)],
+          [need(b), need(c)],
         ],
         [
-          [a as string, c as string],
-          [b as string, d as string],
+          [need(a), need(c)],
+          [need(b), need(d)],
         ],
         [
-          [a as string, b as string],
-          [c as string, d as string],
+          [need(a), need(b)],
+          [need(c), need(d)],
         ],
       ];
       const repeats = (option: (typeof options)[number]) =>
@@ -1054,14 +1066,14 @@ export function planKnockout(args: {
     case "seeded_pairs":
       entries = top.map((id, i) => ({
         seed: i + 1,
-        member_ids: [id, bottom[i] as string],
+        member_ids: [id, need(bottom[i])],
       }));
       break;
     case "a_little_mercy": {
       const partners = shuffled(bottom, rng);
       entries = top.map((id, i) => ({
         seed: i + 1,
-        member_ids: [id, partners[i] as string],
+        member_ids: [id, need(partners[i])],
       }));
       break;
     }
@@ -1069,7 +1081,7 @@ export function planKnockout(args: {
       const mixed = shuffled(chosen, rng);
       entries = Array.from({ length: half }, (_, i) => ({
         seed: i + 1,
-        member_ids: [mixed[2 * i] as string, mixed[2 * i + 1] as string],
+        member_ids: [need(mixed[2 * i]), need(mixed[2 * i + 1])],
       }));
       break;
     }

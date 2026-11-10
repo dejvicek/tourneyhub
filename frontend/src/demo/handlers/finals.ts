@@ -13,6 +13,7 @@ import {
   groupPhase,
   highestIdNumber,
   knockoutPhase,
+  need,
   participantsOf,
   placesOf,
   planKnockout,
@@ -29,7 +30,10 @@ import { demoId } from "../ids";
 import type { StoredTournament } from "../seed";
 import { db, findTournament, tournamentRead } from "../store";
 
-type Ids = { league_id: string; tournament_id: string };
+interface Ids {
+  league_id: string;
+  tournament_id: string;
+}
 
 function notFound(ids: Ids) {
   return apiError(404, "not_found", { tournament_id: ids.tournament_id });
@@ -260,7 +264,7 @@ export const finalsHandlers = [
       };
       t.entries.push(entry);
       setNote(t, entry.id, { joined_round: next });
-      return participant(t, entry.id) as ParticipantRead;
+      return need(participant(t, entry.id));
     },
     201,
   ),
@@ -288,7 +292,7 @@ export const finalsHandlers = [
             : null,
         });
       }
-      return participant(t, entry.id) as ParticipantRead;
+      return need(participant(t, entry.id));
     },
   ),
 
@@ -442,7 +446,7 @@ export const finalsHandlers = [
       );
       syncBracket(t);
       refillFields(t);
-      return bracketOf(t) as BracketRead;
+      return need(bracketOf(t));
     },
   ),
 
@@ -452,7 +456,7 @@ export const finalsHandlers = [
     ({ params }) => {
       const t = findTournament(params.league_id, params.tournament_id);
       const phase = t ? knockoutPhase(t) : undefined;
-      if (!t || !phase || phase.id !== params.phase_id) {
+      if (phase?.id !== params.phase_id || !t) {
         return apiError(404, "not_found", { phase_id: params.phase_id });
       }
       // BR-087: the group phase is unlocked and the organizer chooses again.
