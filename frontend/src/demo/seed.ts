@@ -7,14 +7,13 @@ import type {
   EntryRead,
   GameRead,
   LeagueRead,
-  LeagueSettings,
   MatchRead,
-  Me,
   PhaseRead,
   Player,
   RoundRead,
   SeasonRead,
   TournamentRead,
+  UserRead,
 } from "./contract";
 import {
   createRng,
@@ -39,10 +38,9 @@ import {
 import { DEFAULT_PLACEMENT_POINTS } from "./rules";
 import { seedParts } from "./seedParts";
 
-export interface StoredLeague {
-  league: LeagueRead;
+/** A league as stored; its seasons are rows of their own. */
+export interface StoredLeague extends Omit<LeagueRead, "seasons"> {
   owner_id: string;
-  settings: Omit<LeagueSettings, "name" | "placement_points">;
 }
 export interface StoredPlayer extends Player {
   league_id: string;
@@ -58,7 +56,7 @@ export interface StoredTournament extends Omit<
 }
 
 export interface DemoState {
-  me: Me;
+  me: UserRead;
   leagues: StoredLeague[];
   players: StoredPlayer[];
   seasons: StoredSeason[];
@@ -376,23 +374,20 @@ export function createSeed(today: Date = new Date()): DemoState {
       display_name: "Alex Organizer",
       language: "en",
       is_admin: false,
+      must_change_password: false,
     },
     leagues: [
       {
-        league: {
-          id: DEMO_LEAGUE_ID,
-          name: "Thursday Foosball",
-          created_at: "2026-09-01T18:00:00Z",
-          updated_at: null,
-        },
+        id: DEMO_LEAGUE_ID,
+        name: "Thursday Foosball",
+        draws_allowed: false,
+        default_field_count: 2,
+        default_match_format: "bo1",
+        default_goals_per_game: 10,
+        share_token: DEMO_SHARE_TOKEN,
+        created_at: "2026-09-01T18:00:00Z",
+        updated_at: null,
         owner_id: DEMO_USER_ID,
-        settings: {
-          draws_allowed: false,
-          default_field_count: 2,
-          default_match_format: "bo1",
-          default_goals_per_game: 10,
-          share_token: DEMO_SHARE_TOKEN,
-        },
       },
     ],
     players,

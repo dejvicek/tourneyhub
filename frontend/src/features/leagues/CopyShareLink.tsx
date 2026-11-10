@@ -10,9 +10,9 @@ import { paths } from "@/lib/paths";
 /** Copies the league's share link (FR-070) and announces the outcome. */
 export function CopyShareLink({ leagueId }: { leagueId: string }) {
   const { t } = useTranslation();
-  const settings = useQuery(leagueQueries.settings(leagueId));
+  const league = useQuery(leagueQueries.detail(leagueId));
   const [status, setStatus] = useState<"copied" | "failed" | null>(null);
-  const shareToken = settings.data?.share_token;
+  const shareToken = league.data?.share_token;
 
   return (
     <div className="space-y-1">

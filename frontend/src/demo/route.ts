@@ -6,7 +6,7 @@ import { http, HttpResponse, type JsonBodyType } from "msw";
 
 import type { DemoPaths, ErrorResponse } from "./contract";
 
-type Method = "get" | "post" | "put" | "delete";
+type Method = "get" | "post" | "put" | "patch" | "delete";
 
 type PathsWith<M extends Method> = {
   [P in keyof DemoPaths]: DemoPaths[P] extends Record<M, unknown> ? P : never;
@@ -62,7 +62,7 @@ export function route<M extends Method, P extends PathsWith<M>>(
   status: 200 | 201 = 200,
 ) {
   return http[method](mswPath(path), async ({ request, params }) => {
-    const hasBody = request.method === "POST" || request.method === "PUT";
+    const hasBody = ["POST", "PUT", "PATCH"].includes(request.method);
     const result: unknown = await resolve({
       // MSW parses the parameters the contract names from the same path.
       params: params as PathParams<Operation<P, M>>,

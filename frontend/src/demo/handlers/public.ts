@@ -15,12 +15,12 @@ export const publicHandlers = [
     "/api/v1/public/{share_token}/tournaments/{tournament_id}",
     ({ params }) => {
       const league = db().leagues.find(
-        (row) => row.settings.share_token === params.share_token,
+        (row) => row.share_token === params.share_token,
       );
       const t = db().tournaments.find(
         (row) =>
           row.id === params.tournament_id &&
-          row.league_id === league?.league.id &&
+          row.league_id === league?.id &&
           row.state !== "setup",
       );
       return t

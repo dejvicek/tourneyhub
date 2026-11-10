@@ -2,8 +2,7 @@
 // again from the seed. Handlers read and change it through the functions
 // here, which also compute what the backend computes on read (ADR-009).
 import type {
-  LeagueSettings,
-  LeagueSummary,
+  LeagueRead,
   PlaceRow,
   PublicLeague,
   SeasonStandingRow,
@@ -50,7 +49,7 @@ export function resetDemoStore(): void {
 }
 
 export function findLeague(leagueId: string): StoredLeague | undefined {
-  return state.leagues.find((row) => row.league.id === leagueId);
+  return state.leagues.find((row) => row.id === leagueId);
 }
 
 export function activeSeason(leagueId: string): StoredSeason | undefined {
@@ -68,27 +67,21 @@ export function findTournament(
   );
 }
 
-export function leagueSettings(row: StoredLeague): LeagueSettings {
-  return {
-    ...row.settings,
-    name: row.league.name,
-    placement_points: activeSeason(row.league.id)?.placement_points ?? [],
-  };
+/** The seasons of a league, oldest first, as the API returns them. */
+export function seasonsOf(leagueId: string): StoredSeason[] {
+  return state.seasons
+    .filter((season) => season.league_id === leagueId)
+    .toSorted((a, b) => a.number - b.number);
 }
 
-export function leagueSummary(row: StoredLeague): LeagueSummary | undefined {
-  const season = activeSeason(row.league.id);
-  if (!season) {
-    return undefined;
-  }
+/** A league as GET /api/v1/leagues/{league_id} returns it (LeagueRead). */
+export function leagueRead(row: StoredLeague): LeagueRead {
+  const league: Partial<StoredLeague> = { ...row };
+  delete league.owner_id;
   return {
-    id: row.league.id,
-    name: row.league.name,
-    active_season: withoutLeague(season),
-    player_count: state.players.filter(
-      (player) =>
-        player.league_id === row.league.id && player.removed_at === null,
-    ).length,
+    // Only owner_id was removed, and it was present.
+    ...(league as Omit<StoredLeague, "owner_id">),
+    seasons: seasonsOf(row.id).map(withoutLeague),
   };
 }
 
@@ -198,16 +191,14 @@ export function seasonStandingsOf(seasonId: string): SeasonStandingRow[] {
 }
 
 export function publicLeague(shareToken: string): PublicLeague | undefined {
-  const row = state.leagues.find(
-    (league) => league.settings.share_token === shareToken,
-  );
+  const row = state.leagues.find((league) => league.share_token === shareToken);
   if (!row) {
     return undefined;
   }
-  const leagueId = row.league.id;
+  const leagueId = row.id;
   const season = activeSeason(leagueId);
   return {
-    name: row.league.name,
+    name: row.name,
     seasons: state.seasons
       .filter((s) => s.league_id === leagueId)
       .map(withoutLeague),

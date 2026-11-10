@@ -33,23 +33,62 @@ async function tournament(id: string) {
 describe("the demo's fake API", () => {
   it("serves one league with 16 players and its active season", async () => {
     const leagues = await dataOf(provisionalApi.GET("/api/v1/leagues"));
+    const detail = await dataOf(
+      provisionalApi.GET("/api/v1/leagues/{league_id}", {
+        params: { path: league },
+      }),
+    );
     const players = await dataOf(
       provisionalApi.GET("/api/v1/leagues/{league_id}/players", {
         params: { path: league },
       }),
     );
 
-    expect(leagues).toHaveLength(1);
-    expect(leagues[0]).toMatchObject({
-      id: DEMO_LEAGUE_ID,
-      name: "Thursday Foosball",
-      player_count: 16,
-    });
-    expect(leagues[0]?.active_season).toMatchObject({
-      number: 1,
-      state: "active",
+    expect(leagues).toEqual([
+      { id: DEMO_LEAGUE_ID, name: "Thursday Foosball" },
+    ]);
+    expect(detail).toMatchObject({
+      share_token: DEMO_SHARE_TOKEN,
+      default_field_count: 2,
+      seasons: [{ number: 1, state: "active", name: null }],
     });
     expect(players).toHaveLength(16);
+  });
+
+  it("starts a season only from the number it expects, and keeps a closed table (FR-021, BR-011)", async () => {
+    const stale = dataOf(
+      provisionalApi.POST("/api/v1/leagues/{league_id}/seasons", {
+        params: { path: league },
+        body: { expected_current_number: 2 },
+      }),
+    );
+    await expect(stale).rejects.toMatchObject({
+      status: 409,
+      code: "season_number_changed",
+      detail: { current_number: 1 },
+    });
+
+    const second = await dataOf(
+      provisionalApi.POST("/api/v1/leagues/{league_id}/seasons", {
+        params: { path: league },
+        body: { expected_current_number: 1 },
+      }),
+    );
+    const closedTable = dataOf(
+      provisionalApi.PUT(
+        "/api/v1/leagues/{league_id}/seasons/{season_id}/placement-points",
+        {
+          params: { path: { ...league, season_id: DEMO_SEASON_ID } },
+          body: { placement_points: [10, 5] },
+        },
+      ),
+    );
+
+    expect(second).toMatchObject({ number: 2, state: "active" });
+    await expect(closedTable).rejects.toMatchObject({
+      status: 409,
+      code: "season_closed",
+    });
   });
 
   it("has two finished tournaments with places and a DYP running its round robin", async () => {

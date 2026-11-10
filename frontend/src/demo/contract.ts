@@ -19,53 +19,18 @@ type IsoDate = string;
 type IsoDateTime = string;
 
 export type ErrorResponse = components["schemas"]["ErrorResponse"];
+// Generated types the provisional ones below build on.
 export type LeagueRead = components["schemas"]["LeagueRead"];
+export type SeasonRead = components["schemas"]["SeasonRead"];
+export type UserRead = components["schemas"]["UserRead"];
 
 // ---------------------------------------------------------------- shared
 
-export type Language = "en" | "cs";
 export type MatchFormat = "bo1" | "bo2" | "bo3" | "bo5";
 export type TournamentType = "singles" | "doubles" | "dyp" | "monster_dyp";
 export type TournamentState = "setup" | "in_progress" | "finished";
 export type Side = "side_1" | "side_2";
 export type Outcome = Side | "draw";
-
-// ---------------------------------------------------------------- auth
-
-export interface Me {
-  id: Uuid;
-  email: string;
-  display_name: string;
-  language: Language;
-  is_admin: boolean;
-}
-
-export interface SignUpRequest {
-  email: string;
-  display_name: string;
-  password: string;
-  signup_code: string;
-}
-
-// ---------------------------------------------------------------- leagues
-
-export interface LeagueSummary {
-  id: Uuid;
-  name: string;
-  active_season: SeasonRead;
-  player_count: number;
-}
-
-export interface LeagueSettings {
-  name: string;
-  draws_allowed: boolean;
-  default_field_count: number;
-  default_match_format: Exclude<MatchFormat, "bo2">;
-  default_goals_per_game: number;
-  /** The active season's table (DATA-MODEL §4.2). */
-  placement_points: number[];
-  share_token: string;
-}
 
 // ---------------------------------------------------------------- players
 
@@ -80,17 +45,6 @@ export interface PlayerCreate {
 }
 
 // ---------------------------------------------------------------- seasons and standings
-
-export interface SeasonRead {
-  id: Uuid;
-  number: number;
-  /** Null means the default name, "Season {number}" in the UI language. */
-  name: string | null;
-  state: "active" | "closed";
-  placement_points: number[];
-  started_at: IsoDateTime;
-  closed_at: IsoDateTime | null;
-}
 
 export interface SeasonStandingRow {
   place: number;
@@ -263,12 +217,6 @@ interface Json<T> {
 interface Errors {
   default: Json<ErrorResponse>;
 }
-interface NoParams {
-  query?: never;
-  header?: never;
-  path?: never;
-  cookie?: never;
-}
 interface Params<P> {
   query?: never;
   header?: never;
@@ -298,25 +246,13 @@ type Match = Params<{ league_id: Uuid; tournament_id: Uuid; match_id: Uuid }>;
 
 /** Routes the demo serves that the generated schema does not have yet. */
 export interface ProvisionalPaths {
-  // auth
-  "/api/v1/me": { get: Get<NoParams, Me> };
-  "/api/v1/auth/signup": { post: Post<NoParams, SignUpRequest, Me> };
-
-  // leagues
-  "/api/v1/leagues": { get: Get<NoParams, LeagueSummary[]> };
-  "/api/v1/leagues/{league_id}/settings": {
-    get: Get<League, LeagueSettings>;
-    put: Put<League, Omit<LeagueSettings, "share_token">, LeagueSettings>;
-  };
-
   // players
   "/api/v1/leagues/{league_id}/players": {
     get: Get<League, Player[]>;
     post: Post<League, PlayerCreate, Player>;
   };
 
-  // seasons and standings
-  "/api/v1/leagues/{league_id}/seasons": { get: Get<League, SeasonRead[]> };
+  // season standings
   "/api/v1/leagues/{league_id}/seasons/{season_id}/standings": {
     get: Get<Season, SeasonStandingRow[]>;
   };
