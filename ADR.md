@@ -137,6 +137,8 @@ Each ADR states its status, the context, the decision, its consequences and the 
 
 **Decision.** In production, Caddy is the only public entry point. It obtains HTTPS certificates automatically (Let's Encrypt), serves the built frontend on `/` (falling back to `index.html` for client-side routes) and proxies `/api/*` to the `api` container.
 
+Caddy adds three headers to every response: a Content-Security-Policy that allows only the app's own origin, plus inline styles (Radix UI injects them) and `data:` images, and forbids framing; `X-Content-Type-Options: nosniff`; and `Referrer-Policy: same-origin`, so a share token in an address (ADR-008) never reaches another site. `Strict-Transport-Security` is switched on in the deployment phase (ADR-014).
+
 **Consequences.** No CORS configuration. The refresh cookie (ADR-006) is first-party. Only Caddy's ports 80 and 443 are exposed; `api` and `db` are reachable only on the internal Docker network.
 
 **Alternatives considered.** Nginx with certbot (more configuration, separate certificate renewal). Separate domains for app and API (CORS and cookie scoping without benefit).
@@ -352,7 +354,7 @@ Each ADR states its status, the context, the decision, its consequences and the 
 
 **Order.** Local development of the MVP features → deployment to the VPS with HTTPS, backups and basic monitoring → the pilot season. Backups are a precondition for the pilot: losing a season's results would fail the MVP. Before the pilot, the monitoring must alert a person, since a down instance on a tournament evening sends the group back to paper, and hosting in the EU with a short privacy note is decided with the PRD owner, since real names and email addresses of EU residents are stored.
 
-**Designed in that phase.** Backups (scheduled `pg_dump` stored off the VPS, with a tested restore), monitoring and who it alerts, log retention (including whether share tokens in access logs are redacted, ADR-008) and secret handling on the VPS.
+**Designed in that phase.** Backups (scheduled `pg_dump` stored off the VPS, with a tested restore), monitoring and who it alerts, log retention (including whether share tokens in access logs are redacted, ADR-008) and secret handling on the VPS. HSTS, once Let's Encrypt works on the real domain: first with a `max-age` of one day, raised to one year after the first automatic renewal; no `includeSubDomains`, no `preload`.
 
 **Consequences.** What runs on the VPS is what CI tested. Updating needs a person with access to the VPS, which suits a pilot with one instance.
 

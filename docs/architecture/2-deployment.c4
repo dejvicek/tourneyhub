@@ -91,7 +91,7 @@ deployment {
           description "
             The only public entry point and the only service with host ports: 80, which redirects to HTTPS, and 443, also over UDP for HTTP/3.
             Serves the SPA build, falling back to index.html for client-side routes, and proxies /api and /api/* to api:8000; Caddy sets X-Forwarded-For itself. No CORS; the refresh cookie is first-party.
-            Sets security headers (a Content-Security-Policy, nosniff, Referrer-Policy) and HSTS for every host except localhost.
+            Sets security headers (a Content-Security-Policy, nosniff, Referrer-Policy); HSTS comes in the deployment phase (ADR-014).
             HTTPS from Let's Encrypt for the domain on the VPS; with SITE_ADDRESS=localhost (end-to-end tests) from Caddy's internal CA. Certificates and the CA live in the caddy-data volume.
           "
           link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-005--one-origin-behind-caddy "ADR-005"

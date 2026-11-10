@@ -15,10 +15,6 @@
 		X-Content-Type-Options nosniff
 		Referrer-Policy same-origin
 	}
-	# Browsers would keep HSTS for localhost and then refuse the Vite dev
-	# server on http://localhost:5173.
-	@not_localhost not host localhost
-	header @not_localhost Strict-Transport-Security "max-age=31536000"
 
 	# /api itself too, so that no API path ever gets index.html.
 	@api path /api /api/*
