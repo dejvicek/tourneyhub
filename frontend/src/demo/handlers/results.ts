@@ -38,7 +38,7 @@ export const resultHandlers = [
           body,
           formatOf(t, match),
           phase,
-          findLeague(t.league_id)?.settings.draws_allowed ?? false,
+          findLeague(t.league_id)?.draws_allowed ?? false,
         );
         if (refusal) {
           return apiError(refusal.status, "validation_failed", refusal.detail);

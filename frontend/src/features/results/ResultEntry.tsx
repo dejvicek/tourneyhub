@@ -69,7 +69,7 @@ export function ResultEntry({
 }: ResultEntryProps) {
   const { t } = useTranslation();
   const names = useNames(model);
-  const settings = useQuery(leagueQueries.settings(leagueId));
+  const league = useQuery(leagueQueries.detail(leagueId));
   const save = useMutation(
     resultMutations.save(leagueId, model.tournament.id, matchId),
   );
@@ -100,7 +100,7 @@ export function ResultEntry({
     seeds: [seedOf(sideA.entry_id), seedOf(sideB.entry_id)],
     goalsPerGame: model.tournament.goals_per_game,
     required: scoresRequired(phase),
-    drawAllowed: drawsAllowed(phase, settings.data?.draws_allowed ?? false),
+    drawAllowed: drawsAllowed(phase, league.data?.draws_allowed ?? false),
     locked,
     pending: save.isPending,
     standings: play?.standings,
