@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import delete, or_
+from sqlalchemy import delete, or_, select
 from sqlalchemy.orm import Session
 
 from tourneyhub.db.models.accounts import AuthAttempt, RefreshToken
@@ -26,11 +26,20 @@ def clean_up(session: Session, *, now: datetime) -> CleanupResult:
 
     `auth_attempts`: rows older than the longest throttle window count for nothing.
     """
-    tokens = session.scalars(
-        delete(RefreshToken)
+    # Locked in id order first, the order in which a refresh locks a family
+    # (`_lock_family`) and a password change revokes the rest, so that none of
+    # them deadlocks with this.
+    stale = (
+        select(RefreshToken.id)
         .where(
             or_(RefreshToken.expires_at <= now, RefreshToken.revoked_at.is_not(None))
         )
+        .order_by(RefreshToken.id)
+        .with_for_update()
+    )
+    tokens = session.scalars(
+        delete(RefreshToken)
+        .where(RefreshToken.id.in_(stale.scalar_subquery()))
         .returning(RefreshToken.id)
     ).all()
     attempts = session.scalars(

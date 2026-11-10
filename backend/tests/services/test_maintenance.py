@@ -92,8 +92,10 @@ def test_adr006_cleanup_deletes_attempts_older_than_the_longest_throttle_window(
     assert old.id not in {on_the_edge.id, recent.id}
 
 
-def test_adr006_the_retention_covers_the_longest_window_of_any_throttle() -> None:
-    assert timedelta(hours=1) == auth_service.ATTEMPT_RETENTION
+def test_adr006_the_retention_covers_the_window_of_every_throttle() -> None:
+    windows = [auth_service._LOGIN_LIMITS.window, auth_service._SIGNUP_LIMITS.window]
+
+    assert all(window <= auth_service.ATTEMPT_RETENTION for window in windows)
 
 
 def test_adr006_cleanup_of_a_clean_database_deletes_nothing(
