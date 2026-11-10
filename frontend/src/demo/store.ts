@@ -17,6 +17,7 @@ import {
   waitingMatches,
   withPoints,
 } from "./engine";
+import { placesOf } from "./finalsEngine";
 import { rules } from "./rules";
 import {
   createSeed,
@@ -145,6 +146,11 @@ function places(t: StoredTournament): PlaceRow[] | null {
   const table =
     state.seasons.find((season) => season.id === t.season_id)
       ?.placement_points ?? [];
+  // finals: knockouts of any size, Swiss and Monster DYP (finalsEngine.ts)
+  const detailed = placesOf(t, table);
+  if (detailed) {
+    return detailed.rows;
+  }
   const groupOrder = tournamentStandings(t);
   const knockout = t.phases.find((phase) => phase.kind === "knockout");
   if (!knockout) {

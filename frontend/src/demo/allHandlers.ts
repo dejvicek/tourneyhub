@@ -1,6 +1,7 @@
 // Every handler of the demo's fake API, one module per area (src/demo/README.md).
 import { authHandlers } from "./handlers/auth";
 import { fieldHandlers } from "./handlers/fields";
+import { finalsHandlers } from "./handlers/finals";
 import { leagueHandlers } from "./handlers/leagues";
 import { playHandlers } from "./handlers/play";
 import { playerHandlers } from "./handlers/players";
@@ -20,4 +21,6 @@ export const demoHandlers = [
   ...publicHandlers,
   // play
   ...playHandlers,
+  // finals
+  ...finalsHandlers,
 ];
