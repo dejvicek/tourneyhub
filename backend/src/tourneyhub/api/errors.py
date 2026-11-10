@@ -18,6 +18,7 @@ from tourneyhub.errors import (
     NotAuthenticatedError,
     NotFoundError,
     RuleViolationError,
+    TooManyAttemptsError,
 )
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,7 @@ _STATUS_BY_ERROR: dict[type[AppError], HTTPStatus] = {
     NotFoundError: HTTPStatus.NOT_FOUND,
     ConflictError: HTTPStatus.CONFLICT,
     RuleViolationError: HTTPStatus.UNPROCESSABLE_CONTENT,
+    TooManyAttemptsError: HTTPStatus.TOO_MANY_REQUESTS,
 }
 
 # Constraint name -> the 409 code of a violation (DATA-MODEL §2). Only constraints
@@ -37,7 +39,7 @@ _CONFLICT_BY_CONSTRAINT: dict[str, ErrorCode] = {
 }
 
 
-def _error_response(
+def error_response(
     status: HTTPStatus,
     code: ErrorCode,
     detail: dict[str, JsonValue] | None = None,
@@ -62,7 +64,10 @@ async def handle_app_error(_request: Request, exc: Exception) -> JSONResponse:
         ),
         HTTPStatus.INTERNAL_SERVER_ERROR,
     )
-    return _error_response(status, error.code, error.detail)
+    headers = None
+    if isinstance(error, TooManyAttemptsError):
+        headers = {"Retry-After": str(error.retry_after)}
+    return error_response(status, error.code, error.detail, headers)
 
 
 async def handle_validation_error(_request: Request, exc: Exception) -> JSONResponse:
@@ -76,7 +81,7 @@ async def handle_validation_error(_request: Request, exc: Exception) -> JSONResp
             if isinstance(value, int | float) and not isinstance(value, bool)
         }
         problems.append({"loc": list(item["loc"]), "type": item["type"]} | numeric_ctx)
-    return _error_response(
+    return error_response(
         HTTPStatus.UNPROCESSABLE_CONTENT,
         ErrorCode.VALIDATION_FAILED,
         {"errors": problems},
@@ -91,7 +96,7 @@ async def handle_http_exception(_request: Request, exc: Exception) -> JSONRespon
         HTTPStatus.METHOD_NOT_ALLOWED: ErrorCode.METHOD_NOT_ALLOWED,
     }
     code = codes.get(error.status_code, ErrorCode.BAD_REQUEST)
-    return _error_response(
+    return error_response(
         HTTPStatus(error.status_code), code, headers=dict(error.headers or {})
     )
 
@@ -109,16 +114,16 @@ async def handle_integrity_error(_request: Request, exc: Exception) -> JSONRespo
             extra={"constraint": constraint},
             exc_info=error,
         )
-        return _error_response(
+        return error_response(
             HTTPStatus.INTERNAL_SERVER_ERROR, ErrorCode.INTERNAL_ERROR
         )
-    return _error_response(HTTPStatus.CONFLICT, code)
+    return error_response(HTTPStatus.CONFLICT, code)
 
 
 async def handle_unexpected_error(_request: Request, _exc: Exception) -> JSONResponse:
     # Not logged here: Starlette re-raises the exception after this response, and
     # uvicorn logs it with its traceback (§4.4).
-    return _error_response(HTTPStatus.INTERNAL_SERVER_ERROR, ErrorCode.INTERNAL_ERROR)
+    return error_response(HTTPStatus.INTERNAL_SERVER_ERROR, ErrorCode.INTERNAL_ERROR)
 
 
 def install_error_handlers(app: FastAPI) -> None:

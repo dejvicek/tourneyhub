@@ -20,14 +20,16 @@ def _admin_only(admin: AdminDep) -> str:
 
 
 @pytest.fixture
-def routes(client: TestClient) -> Callable[[str, UUID], tuple[int, object]]:
+def routes(
+    client: TestClient, auth_header: Callable[..., dict[str, str]]
+) -> Callable[[str, UUID], tuple[int, object]]:
     app = client.app
     assert isinstance(app, FastAPI)
     app.add_api_route("/whoami", _whoami)
     app.add_api_route("/admin", _admin_only)
 
     def get(path: str, user_id: UUID) -> tuple[int, object]:
-        response = client.get(path, headers={"X-User-Id": str(user_id)})
+        response = client.get(path, headers=auth_header(user_id))
         return response.status_code, response.json()
 
     return get

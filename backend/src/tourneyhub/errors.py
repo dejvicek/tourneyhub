@@ -17,6 +17,7 @@ class ErrorCode(StrEnum):
     NOT_AUTHENTICATED = "not_authenticated"
     PASSWORD_CHANGE_REQUIRED = "password_change_required"
     FORBIDDEN = "forbidden"
+    TOO_MANY_ATTEMPTS = "too_many_attempts"
     # Leagues
     LEAGUE_NOT_FOUND = "league_not_found"
     LEAGUE_ID_TAKEN = "league_id_taken"
@@ -51,3 +52,14 @@ class ConflictError(AppError):
 
 class RuleViolationError(AppError):
     """A business rule refused the request (HTTP 422)."""
+
+
+class TooManyAttemptsError(AppError):
+    """Too many failed logins; try again after `retry_after` seconds (HTTP 429).
+
+    The response carries the seconds in `detail` and in `Retry-After` (ADR-006).
+    """
+
+    def __init__(self, *, retry_after: int) -> None:
+        super().__init__(ErrorCode.TOO_MANY_ATTEMPTS, retry_after=retry_after)
+        self.retry_after = retry_after

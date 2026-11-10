@@ -10,14 +10,18 @@ from tourneyhub.services import leagues as league_service
 
 
 def test_created_at_and_updated_at_come_from_one_clock(
-    client: TestClient, session: Session, make_user: Callable[..., User], now: datetime
+    client: TestClient,
+    session: Session,
+    make_user: Callable[..., User],
+    auth_header: Callable[..., dict[str, str]],
+    now: datetime,
 ) -> None:
     owner = make_user()
     league_id = uuid7()
     client.post(
         "/api/v1/leagues",
         json={"id": str(league_id), "name": "Old"},
-        headers={"X-User-Id": str(owner.id)},
+        headers=auth_header(owner.id),
     )
 
     league = league_service.rename_league(

@@ -1,6 +1,20 @@
 {
   "components": {
     "schemas": {
+      "AccessTokenRead": {
+        "description": "An access token for `Authorization: Bearer`, valid 15 minutes (ADR-006).\n\nThe SPA keeps it in memory only; the refresh token comes as a cookie.",
+        "properties": {
+          "access_token": {
+            "title": "Access Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "access_token"
+        ],
+        "title": "AccessTokenRead",
+        "type": "object"
+      },
       "ErrorCode": {
         "description": "Every stable error code of the API (ADR-008).",
         "enum": [
@@ -13,6 +27,7 @@
           "not_authenticated",
           "password_change_required",
           "forbidden",
+          "too_many_attempts",
           "league_not_found",
           "league_id_taken",
           "league_name_changed",
@@ -130,21 +145,12 @@
         ],
         "title": "LoginRequest",
         "type": "object"
-      },
-      "LoginResult": {
-        "description": "The account that logged in.",
-        "properties": {
-          "user_id": {
-            "format": "uuid",
-            "title": "User Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "user_id"
-        ],
-        "title": "LoginResult",
-        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "scheme": "bearer",
+        "type": "http"
       }
     }
   },
@@ -156,7 +162,7 @@
   "paths": {
     "/api/v1/auth/login": {
       "post": {
-        "description": "Log in. Repeated failures make the answer slower; nothing is locked.",
+        "description": "Log in with email and password and start a login on this device.\n\nA wrong password and an unknown email get the same 401. After repeated\nfailures, an attempt within a growing waiting period gets 429 with\n`Retry-After`; nothing is locked.",
         "operationId": "log_in",
         "requestBody": {
           "content": {
@@ -173,7 +179,150 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LoginResult"
+                  "$ref": "#/components/schemas/AccessTokenRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the next attempt is checked.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Log In",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "description": "End this device's login and remove the cookie; repeating it is harmless.",
+        "operationId": "log_out",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Requested-With",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "title": "X-Requested-With",
+              "type": "string"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "refresh_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "summary": "Log Out",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "description": "Exchange the refresh cookie for a new access token and a new cookie.\n\nA 401 means: log in again.",
+        "operationId": "refresh",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Requested-With",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "title": "X-Requested-With",
+              "type": "string"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "refresh_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Refresh Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessTokenRead"
                 }
               }
             },
@@ -200,7 +349,7 @@
             "description": "Unprocessable Content"
           }
         },
-        "summary": "Log In",
+        "summary": "Refresh",
         "tags": [
           "auth"
         ]
@@ -210,25 +359,6 @@
       "post": {
         "description": "Create a league, or return it again when the request is repeated.\n\nAn id of another organizer's league, or a repeat racing its first attempt,\nis 409: reload.",
         "operationId": "create_league",
-        "parameters": [
-          {
-            "in": "header",
-            "name": "x-user-id",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-User-Id"
-            }
-          }
-        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -281,6 +411,11 @@
             "description": "Unprocessable Content"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Create League",
         "tags": [
           "leagues"
@@ -300,23 +435,6 @@
               "format": "uuid",
               "title": "League Id",
               "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "x-user-id",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-User-Id"
             }
           }
         ],
@@ -362,6 +480,11 @@
             "description": "Unprocessable Content"
           }
         },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "summary": "Read League",
         "tags": [
           "leagues"

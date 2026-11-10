@@ -220,7 +220,7 @@ LOGGING_CONFIG: dict[str, object] = {
 - Use `lifespan`, never `on_event`. The lifespan disposes of the database engine.
 - One `APIRouter` per area, with a `prefix` and `tags`.
 - Every endpoint and dependency is `def`; FastAPI runs them in its thread pool. Exception handlers and middleware are `async def` and never block.
-- Dependencies are `Annotated` aliases defined once in `api/deps.py`: `SessionDep`, `SettingsDep`, `NowDep` (`get_now`, which returns `datetime.now(UTC)`), `CurrentUserDep`, `AdminDep`, `LoginThrottleDep`. Endpoints use the aliases, never an inline `Depends(...)`.
+- Dependencies are `Annotated` aliases defined once in `api/deps.py`: `SessionDep`, `SettingsDep`, `NowDep` (`get_now`, which returns `datetime.now(UTC)`), `CurrentUserDep`, `AdminDep`, `LoginThrottleDep`, `CustomHeaderDep`. Endpoints use the aliases, never an inline `Depends(...)`.
 - **The request owns the transaction:**
 
 ```python
@@ -236,27 +236,30 @@ SessionDep = Annotated[Session, Depends(get_session, scope="function")]
 
   - With the default scope, the code after `yield` runs after the response has been sent, so a commit could fail after the client received a 2xx. With `scope="function"`, a failing commit reaches the error handlers, and an `AppError` raised in the endpoint rolls back before its error response goes out.
   - Use `get_session` only through `SessionDep`. A plain `Depends(get_session)` in the same request opens a second session.
-  - The CLI and the login throttle (below) open their own transaction with `with session_factory.begin() as session:` around one service call.
+  - The CLI and the auth dependencies (below) open their own transaction with `with session_factory.begin() as session:` around one service call. The dependencies take the factory from `SessionFactoryDep`.
+  - A write that must survive an error response cannot be followed by a raised error, because `SessionDep` rolls back. Either it commits in a short transaction of its own before the request's work starts, as `throttle_login` counts a login attempt, or the endpoint returns the error response instead of raising, built with `error_response()` from `api/errors.py`. Only the refresh endpoint does the latter: it revokes a reused token's family under the locks it already holds and returns 401 (ADR-001, ADR-006).
   - Integration tests pin this: a commit that fails returns 500 `internal_error`, and one that fails on a known unique constraint returns its 409 code.
 - `CurrentUserDep` loads the user row on every request, gives it to the endpoint as a `User`, and raises `ForbiddenError(ErrorCode.PASSWORD_CHANGE_REQUIRED)` while `must_change_password` is set. The `auth` router and `GET /api/v1/me` use a variant without that check (ADR-006). `AdminDep` reads `is_admin` from the same row (ADR-007). Missing tokens are handled with `HTTPBearer(auto_error=False)` and our own `NotAuthenticatedError`, so they get an ADR-008 code instead of FastAPI's English `detail`.
-- The login throttle (ADR-006) waits outside every transaction, so a burst of failed logins cannot take the pool's connections. `throttle_login` reads the delay through a service in a short transaction of its own and sleeps after that transaction has ended. `log_in` lists it first: `def log_in(_throttle: LoginThrottleDep, body: LoginRequest, session: SessionDep, …)`.
+- The login throttle (ADR-006) never sleeps: an attempt inside the waiting period gets 429 `too_many_attempts` with `Retry-After`, and a burst of logins holds neither threads nor connections. `throttle_login` counts the attempt before the password is checked, in a short transaction of its own: per email and per client IP, under transaction-level advisory locks, it counts the failures and inserts the attempt as a failure, so parallel attempts count each other, and the row stays when the login rolls back with its 401. A successful `log_in` marks the attempt as succeeded in its own transaction. `log_in` lists it first: `def log_in(attempt: LoginThrottleDep, body: LoginRequest, session: SessionDep, …)`.
 
 ```python
-def throttle_login(request: Request, body: LoginRequest, now: NowDep) -> None:
-    """Delay a login after repeated failures (ADR-006), holding no connection."""
-    session_factory: sessionmaker[Session] = request.app.state.session_factory
-    with session_factory.begin() as session:  # a short transaction of its own
-        delay = auth_service.login_delay(
-            session, email=body.email, ip=_client_ip(request), now=now
+def throttle_login(
+    session_factory: SessionFactoryDep,
+    body: LoginRequest,
+    client_ip: ClientIpDep,
+    now: NowDep,
+) -> auth_service.LoginAttempt:
+    with session_factory.begin() as session:  # commits the attempt at once
+        return auth_service.start_login_attempt(
+            session, email=body.email, ip=client_ip, now=now
         )
-    time.sleep(delay.total_seconds())  # its connection is back in the pool
 
 
-LoginThrottleDep = Annotated[None, Depends(throttle_login)]
+LoginThrottleDep = Annotated[auth_service.LoginAttempt, Depends(throttle_login)]
 ```
 
   - FastAPI resolves dependencies in the order of the signature. `SessionDep`'s session takes a connection only at its first query, so the throttle comes before any dependency that queries through `SessionDep`.
-  - With the delay inside `SessionDep`'s transaction, 15 delayed logins hold all 15 connections of the pool (§7), and the 16th request fails after `pool_timeout`.
+  - The email key is folded with PostgreSQL's `lower()`, as the login's lookup folds it. An IPv6 client is counted per /64; an IPv4-mapped address counts as its IPv4 address.
 - Every id in a path or body is loaded through the current organizer's league, under its lock when writing (ADR-008). Another organizer's id is then simply not found (OWASP API1).
 - The return annotation is the response model. Routers return Pydantic models built from service results (`LeagueRead.model_validate(league)`), never dicts or ORM objects.
 - Status codes go on the decorator, as `http.HTTPStatus` members: `@router.post("", status_code=HTTPStatus.CREATED)`.
@@ -390,7 +393,7 @@ league = session.scalars(
   - The refresh endpoint locks a token family's rows the same way before reading them (ADR-006).
   - Creating a league has no league row to lock, and no ADR names another lock, so its checks run unlocked. Two requests that race with one id meet at the primary key, and the later one gets 409 (§4.4).
 - SQLAlchemy 2.1 flushes before every statement, `text()` included. Use `with session.no_autoflush:` while an intermediate state must not reach the database.
-- The engine is `create_engine("postgresql+psycopg://…", pool_pre_ping=True)`. Keep the pool defaults (5 + 10 connections) until a measurement shows FastAPI's 40 worker threads waiting for them. Nothing sleeps inside a transaction; the login throttle sleeps after its own has ended (§5).
+- The engine is `create_engine("postgresql+psycopg://…", pool_pre_ping=True)`. Keep the pool defaults (5 + 10 connections) until a measurement shows FastAPI's 40 worker threads waiting for them. Nothing sleeps; the login throttle answers 429 instead of waiting (§5).
 - ORM objects stay in the session that loaded them: never hand them to another session or a cache, and never use a session or its objects from two threads concurrently. One after the other is fine: FastAPI runs a request's dependencies, endpoint and commit on whichever threads of its pool are free, and the test client of §9 hands the test's session to them. A lock test (§9) that uses threads gives each its own session.
 - Use `with` blocks for every session and connection.
 
@@ -496,7 +499,14 @@ def client(settings: Settings, session: Session) -> Iterator[TestClient]:
             yield session
         session.commit()  # releases the test's savepoint and runs the deferred checks
 
+    def test_session_factory() -> sessionmaker[Session]:
+        # The auth dependencies' own transactions become savepoints of the test's.
+        return sessionmaker(
+            bind=session.get_bind(), join_transaction_mode="create_savepoint"
+        )
+
     app.dependency_overrides[get_session] = test_session
+    app.dependency_overrides[get_session_factory] = test_session_factory
     with TestClient(app) as client:  # the context manager runs the lifespan
         yield client
 ```
@@ -506,7 +516,7 @@ def client(settings: Settings, session: Session) -> Iterator[TestClient]:
   - A test that provokes a database error does so inside `with session.begin_nested():`, like the `client` override. Outside a savepoint the failed statement aborts the transaction, and the commit in teardown fails.
   - `assert_invariants` grows with the tables that DATA-MODEL §5's queries need.
   - A test of a 500 response creates its client with `raise_server_exceptions=False`; otherwise the test client raises the error instead of returning the response. The test sees no log record of the error; uvicorn writes it (§4.4).
-  - The `client` override replaces only `get_session`. `throttle_login` opens its own session from `app.state` (§5) and does not see the rows a test added, so the login delay is tested at the service level, through `login_delay` with the test session.
+  - The `client` fixture also overrides `get_session_factory`, with a `sessionmaker` bound to the test's connection with `join_transaction_mode="create_savepoint"`. The auth dependencies' own transactions (§5) then become savepoints of the test's transaction: they see the test's rows, and the rollback at the end removes what they wrote. The waiting period is tested through `start_login_attempt` and through the login route; the races between parallel attempts are lock tests (below).
   - `httpx2` is installed; Starlette's test client warns about plain `httpx`, and the warning fails the run.
 - pytest-alembic's tests (§7) run on a database of their own, from `TOURNEYHUB_TEST_MIGRATIONS_DATABASE_URL`, emptied before each test. On the database the `engine` fixture migrated, `test_upgrade` would start at head and run nothing, and `test_up_down_consistency` would drop and rebuild the schema the other tests share, so one broken downgrade would fail unrelated tests in some orders:
 
@@ -543,8 +553,8 @@ def test_a_module_logger_emits_a_json_line(settings: Settings) -> None:
 
 ## 10. Security
 
-- Passwords: argon2-cffi `PasswordHasher()` with its defaults (RFC 9106's low-memory profile). Call `check_needs_rehash` after a successful login (ADR-006). An unknown email is verified against a dummy hash, so the response time does not reveal which accounts exist.
-- Every Argon2 hash and verification (login, password change, the `check_needs_rehash` rehash, the dummy hash for an unknown email) runs under one process-wide `threading.BoundedSemaphore(4)`, so at most 4 hashes of 64 MiB run at once, however many of FastAPI's 40 threads are logging in (ADR-006). A login waits for the semaphore inside its transaction and holds its connection; the wait lasts only while the hashes ahead of it run, unlike the throttle's delay (§5).
+- Passwords: argon2-cffi `PasswordHasher()` with its defaults (RFC 9106's low-memory profile). Call `check_needs_rehash` after a successful login (ADR-006). An unknown email, and an account whose hash is not an Argon2 hash, is verified against a dummy hash, so the response time does not reveal which accounts exist. The rehash is a conditional `UPDATE … WHERE id = :id AND password_hash = :old`, so it never overwrites a password changed meanwhile.
+- Every Argon2 hash and verification (login, password change, the `check_needs_rehash` rehash, the dummy hash for an unknown email) runs under one process-wide `threading.BoundedSemaphore(4)`, so at most 4 hashes of 64 MiB run at once, however many of FastAPI's 40 threads are logging in (ADR-006). A login waits for the semaphore inside its transaction and holds its connection; the wait lasts only while the hashes ahead of it run.
 - Access tokens with PyJWT; the algorithm list is fixed in code, never read from the token:
 
 ```python
@@ -552,16 +562,31 @@ def test_a_module_logger_emits_a_json_line(settings: Settings) -> None:
 _jwt = jwt.PyJWT(options={"enforce_minimum_key_length": True})
 
 
-# Any: PyJWT returns the decoded payload as dict[str, Any].
-def decode_access_token(token: str, key: SecretStr) -> dict[str, Any]:
-    return _jwt.decode(
-        token,
-        key.get_secret_value(),
-        algorithms=["HS256"],
-        # fid: the refresh-token family (ADR-006)
-        options={"require": ["exp", "iat", "sub", "fid"]},
-    )
+def read_access_token(token: str, *, key: SecretStr, now: datetime) -> AccessClaims:
+    try:
+        payload = _jwt.decode(
+            token,
+            key.get_secret_value(),
+            algorithms=["HS256"],
+            # fid: the refresh-token family (ADR-006)
+            options={
+                "require": ["exp", "iat", "sub", "fid"],
+                "verify_exp": False,  # compared with `now` below
+                "verify_iat": False,
+            },
+        )
+        claims = AccessClaims(
+            user_id=UUID(payload["sub"]), family_id=UUID(str(payload["fid"]))
+        )
+        expires_at = int(payload["exp"])
+    except jwt.InvalidTokenError, ValueError, TypeError:
+        raise NotAuthenticatedError(ErrorCode.NOT_AUTHENTICATED) from None
+    if expires_at <= now.timestamp():
+        raise NotAuthenticatedError(ErrorCode.TOKEN_EXPIRED)
+    return claims
 ```
+
+  - PyJWT checks `exp` and `iat` against the system clock and takes no other time. The expiry is compared with the `now` from `NowDep` instead (§4.3), so tests that fix the clock can issue and expire tokens.
 
 - Refresh tokens are `secrets.token_urlsafe(32)`, stored only as `hashlib.sha256(token.encode()).digest()` in `token_hash` (ADR-006). Share tokens are at least `secrets.token_urlsafe(16)` and are stored as they are, because the organizer must be able to see the link again (DATA-MODEL §4.2).
 - Secrets compared in Python (the sign-up code) use `hmac.compare_digest` on UTF-8 bytes; on `str` it raises `TypeError` for a Czech letter (DATA-MODEL §4.1).
