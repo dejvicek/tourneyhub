@@ -340,3 +340,26 @@ def test_fr013_delete_league_removes_its_seasons(
     assert session.get(League, league.id) is None
     seasons = session.scalars(select(Season).where(Season.league_id == league.id))
     assert seasons.all() == []
+
+
+def test_adr002_a_league_without_an_active_season_is_an_internal_error(
+    session: Session, make_league: Callable[..., League], now: datetime
+) -> None:
+    league = make_league()
+    [season] = league.seasons
+    # The invariant check after the test needs the broken state rolled back.
+    broken = session.begin_nested()
+    season.state = SeasonState.CLOSED
+    season.closed_at = now
+    session.flush()
+
+    with pytest.raises(RuntimeError, match="has no active season"):
+        league_service.start_season(
+            session,
+            league_id=league.id,
+            user_id=league.owner_user_id,
+            expected_current_number=1,
+            now=now,
+        )
+
+    broken.rollback()

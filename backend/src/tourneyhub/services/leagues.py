@@ -160,9 +160,15 @@ def _season_of(league: League, season_id: UUID) -> Season:
 def _active_season(league: League) -> Season:
     # Every league has exactly one: Season 1 comes with it, and a new season
     # closes the active one in the same transaction.
-    return next(
-        season for season in league.seasons if season.state is SeasonState.ACTIVE
+    season = next(
+        (season for season in league.seasons if season.state is SeasonState.ACTIVE),
+        None,
     )
+    if season is None:
+        # Not a StopIteration, which would reach the client as an anonymous 500.
+        msg = f"league {league.id} has no active season"
+        raise RuntimeError(msg)
+    return season
 
 
 def rename_season(
