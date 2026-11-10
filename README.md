@@ -11,7 +11,7 @@ The images pin the rest: Python 3.15.2 with uv 0.13.7 (`backend/Dockerfile`), Po
 
 ## Configuration
 
-Settings come from `.env` in the repository root, which is never committed. Copy [.env.example](.env.example), which describes every variable, and replace the values marked "replace":
+Settings come from `.env` in the repository root, which is never committed. Copy [.env.example](.env.example), which describes every variable, and fill in the empty values (the two secrets; `openssl rand -hex 24` makes one):
 
 ```sh
 cp .env.example .env
