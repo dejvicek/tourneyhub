@@ -162,12 +162,14 @@ def upgrade() -> None:
     )
     # Autogenerate misses CHECKs added to an existing table.
     op.create_check_constraint(
-        op.f("ck_leagues_default_field_count"), "leagues", "default_field_count >= 1"
+        op.f("ck_leagues_default_field_count"),
+        "leagues",
+        "default_field_count >= 1 AND default_field_count <= 32",
     )
     op.create_check_constraint(
         op.f("ck_leagues_default_goals_per_game"),
         "leagues",
-        "default_goals_per_game > 0",
+        "default_goals_per_game >= 1 AND default_goals_per_game <= 99",
     )
     op.add_column("leagues", sa.Column("share_token", sa.String(), nullable=True))
     _backfill_leagues()

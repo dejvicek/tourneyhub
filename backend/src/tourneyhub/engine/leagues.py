@@ -25,6 +25,13 @@ DEFAULT_PLACEMENT_POINTS: tuple[int, ...] = (10, 8, 6, 4, 2)
 """The placement points table of a new league's Season 1 (FR-011)."""
 
 
+MAX_FIELD_COUNT = 32
+"""The most fields a league default, and later a tournament, may name (DATA-MODEL §4.2)."""
+
+MAX_GOALS_PER_GAME = 99
+"""The most goals per game a league default may name (DATA-MODEL §4.2)."""
+
+
 def first_increase(points: Sequence[int]) -> int | None:
     """Return the index of the first place worth more than the place above it.
 

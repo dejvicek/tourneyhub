@@ -14,7 +14,12 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from tourneyhub.db.base import Base, str_enum
-from tourneyhub.engine.leagues import DefaultMatchFormat, SeasonState
+from tourneyhub.engine.leagues import (
+    MAX_FIELD_COUNT,
+    MAX_GOALS_PER_GAME,
+    DefaultMatchFormat,
+    SeasonState,
+)
 
 
 class League(Base):
@@ -22,8 +27,15 @@ class League(Base):
 
     __tablename__ = "leagues"
     __table_args__ = (
-        CheckConstraint("default_field_count >= 1", name="default_field_count"),
-        CheckConstraint("default_goals_per_game > 0", name="default_goals_per_game"),
+        CheckConstraint(
+            f"default_field_count >= 1 AND default_field_count <= {MAX_FIELD_COUNT}",
+            name="default_field_count",
+        ),
+        CheckConstraint(
+            "default_goals_per_game >= 1"
+            f" AND default_goals_per_game <= {MAX_GOALS_PER_GAME}",
+            name="default_goals_per_game",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True)  # supplied by the client
