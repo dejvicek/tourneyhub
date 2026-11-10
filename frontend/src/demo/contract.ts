@@ -430,6 +430,57 @@ export interface SchedulePreview {
   bracket_size: number | null;
 }
 
+// ================================================================ play
+// The running group phase, its fields and its end (screens 6–8, FR-040,
+// FR-060, FR-090–FR-094). Owned by the play screens; other areas append
+// their own sections. These declarations merge into ProvisionalPaths above.
+
+/** A match waiting for a field, in the order it will get one (FR-092). */
+export interface WaitingMatchRead {
+  match_id: Uuid;
+  /** The match's players who are on a field now, by field (BR-131). */
+  busy: { field_id: Uuid; player_ids: Uuid[] }[];
+}
+
+export type FormResult = "won" | "drawn" | "lost";
+
+export interface PlayStandingRow extends TournamentStandingRow {
+  /** The entry's last five results, oldest first. */
+  form: FormResult[];
+  /**
+   * The tie-breaker that ranks this entry above the next one, level on
+   * points (BR-101); null when points decide or the place is shared.
+   */
+  ahead_by: import("./rules").RoundRobinTiebreaker | null;
+}
+
+/** What the running group phase looks like now, computed on read (ADR-009). */
+export interface PlayRead {
+  /** Requeued matches first, then schedule order (BR-130, BR-132). */
+  waiting: WaitingMatchRead[];
+  standings: PlayStandingRow[];
+  /** Every group-phase match has a result: knockout or finish (FR-040). */
+  group_done: boolean;
+}
+
+/**
+ * Field placements as target states (ADR-008, DATA-MODEL §4.6): a match on
+ * a field, or waiting (`field_id: null`). A swap names both matches.
+ */
+export interface PlacementWrite {
+  placements: { match_id: Uuid; field_id: Uuid | null }[];
+}
+
+/** A new field carries the number it expects to get, the lowest free one (BR-132). */
+export interface FieldCreate {
+  number: number;
+}
+
+/** Finishing carries the state it expects (ADR-008); a repeat gets 409. */
+export interface FinishWrite {
+  expected_state: "in_progress";
+}
+
 interface Delete<P> {
   parameters: P;
   requestBody?: never;
@@ -499,5 +550,32 @@ export interface SetupPaths {
       { expected_state: TournamentState },
       TournamentRead
     >;
+  };
+}
+
+
+type PlayField = Params<{
+  league_id: Uuid;
+  tournament_id: Uuid;
+  field_id: Uuid;
+}>;
+
+// Clearing a result (FR-053) is a PUT of the empty target state to
+// …/matches/{match_id}/result: no walkover and no games.
+export interface ProvisionalPaths {
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/play": {
+    get: Get<Tournament, PlayRead>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/placements": {
+    put: Put<Tournament, PlacementWrite, TournamentRead>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/fields": {
+    post: Post<Tournament, FieldCreate, FieldRead>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/fields/{field_id}": {
+    delete: Delete<PlayField>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/finish": {
+    post: Action<Tournament, FinishWrite, TournamentRead>;
   };
 }

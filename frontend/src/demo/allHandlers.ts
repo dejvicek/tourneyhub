@@ -2,6 +2,7 @@
 import { authHandlers } from "./handlers/auth";
 import { fieldHandlers } from "./handlers/fields";
 import { leagueHandlers } from "./handlers/leagues";
+import { playHandlers } from "./handlers/play";
 import { playerHandlers } from "./handlers/players";
 import { publicHandlers } from "./handlers/public";
 import { resultHandlers } from "./handlers/results";
@@ -17,4 +18,6 @@ export const demoHandlers = [
   ...fieldHandlers,
   ...resultHandlers,
   ...publicHandlers,
+  // play
+  ...playHandlers,
 ];
