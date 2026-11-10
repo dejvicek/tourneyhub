@@ -17,6 +17,7 @@ from tourneyhub.app import create_app
 from tourneyhub.db.models.accounts import User
 from tourneyhub.db.models.leagues import League
 from tourneyhub.db.session import create_db_engine
+from tourneyhub.engine.accounts import Language
 from tourneyhub.settings import Settings
 
 
@@ -94,7 +95,7 @@ def client(settings: Settings, session: Session, now: datetime) -> Iterator[Test
 
 
 @pytest.fixture
-def make_user(session: Session) -> Callable[..., User]:
+def make_user(session: Session, now: datetime) -> Callable[..., User]:
     def make_user(
         *,
         email: str | None = None,
@@ -103,8 +104,12 @@ def make_user(session: Session) -> Callable[..., User]:
     ) -> User:
         user = User(
             email=email or f"{uuid7()}@example.test",
+            display_name="Ana",
+            password_hash="!",
             is_admin=is_admin,
             must_change_password=must_change_password,
+            language=Language.EN,
+            created_at=now,
         )
         session.add(user)
         session.flush()

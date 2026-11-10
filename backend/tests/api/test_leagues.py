@@ -13,6 +13,7 @@ from tourneyhub.api.schemas import ErrorResponse
 from tourneyhub.app import create_app
 from tourneyhub.db.models.accounts import User
 from tourneyhub.db.models.leagues import League
+from tourneyhub.engine.accounts import Language
 from tourneyhub.services import leagues as league_service
 from tourneyhub.settings import Settings
 
@@ -201,7 +202,13 @@ def test_adr008_a_retry_racing_its_uncommitted_first_attempt_is_a_conflict(
     settings: Settings, committing_engine: Engine, now: datetime
 ) -> None:
     with Session(committing_engine) as setup:
-        owner = User(email="racer@example.test")
+        owner = User(
+            email="racer@example.test",
+            display_name="Racer",
+            password_hash="!",
+            language=Language.EN,
+            created_at=now,
+        )
         setup.add(owner)
         setup.commit()
         owner_id = owner.id
