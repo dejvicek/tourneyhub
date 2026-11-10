@@ -9,6 +9,7 @@ import {
   DEMO_SHARE_TOKEN,
   demoId,
 } from "./ids";
+import { db } from "./store";
 
 const league = { league_id: DEMO_LEAGUE_ID };
 
@@ -113,6 +114,10 @@ describe("the demo's fake API", () => {
   });
 
   it("starts a season only from the number it expects, and keeps a closed table (FR-021, BR-011)", async () => {
+    // BR-010: a new season only once every tournament is finished.
+    for (const tournament of db().tournaments) {
+      tournament.state = "finished";
+    }
     const stale = dataOf(
       provisionalApi.POST("/api/v1/leagues/{league_id}/seasons", {
         params: { path: league },

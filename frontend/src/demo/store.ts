@@ -26,6 +26,7 @@ import {
   type StoredSeason,
   type StoredTournament,
 } from "./seed";
+import { createOutsideState, type OutsideState } from "./seedOutside";
 
 let state: DemoState = createSeed();
 
@@ -219,4 +220,20 @@ export function publicLeague(shareToken: string): PublicLeague | undefined {
       .map(tournamentSummary),
     standings: season ? seasonStandingsOf(season.id) : [],
   };
+}
+
+// ---------------------------------------------------------------- outside (auth)
+// Accounts and sessions are no rows of DemoState; they live next to it and
+// start again with it: a new DemoState after resetDemoStore() gets a fresh
+// OutsideState.
+
+const outsideByState = new WeakMap<DemoState, OutsideState>();
+
+export function outsideDb(): OutsideState {
+  let outside = outsideByState.get(state);
+  if (outside === undefined) {
+    outside = createOutsideState(state.me);
+    outsideByState.set(state, outside);
+  }
+  return outside;
 }

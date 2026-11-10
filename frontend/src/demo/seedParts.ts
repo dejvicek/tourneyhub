@@ -8,6 +8,7 @@
 //   outside  seedOutside.ts  4000–4999
 import type { SeedPart } from "./seed";
 import { seedFinals } from "./seedFinals";
+import { seedOutside } from "./seedOutside";
 import { seedSetup } from "./seedSetup";
 
-export const seedParts: SeedPart[] = [seedSetup, seedFinals];
+export const seedParts: SeedPart[] = [seedSetup, seedFinals, seedOutside];

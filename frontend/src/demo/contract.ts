@@ -33,6 +33,15 @@ export type TournamentState = "setup" | "in_progress" | "finished";
 export type Side = "side_1" | "side_2";
 export type Outcome = Side | "draw";
 
+// ---------------------------------------------------------------- demo only
+
+/** Never in the backend: the seeded account the login shows in demo mode. */
+export interface DemoAccount {
+  email: string;
+  password: string;
+  signup_code: string;
+}
+
 // ---------------------------------------------------------------- seasons and standings
 
 export interface SeasonStandingRow {
@@ -206,6 +215,12 @@ interface Json<T> {
 interface Errors {
   default: Json<ErrorResponse>;
 }
+interface NoParams {
+  query?: never;
+  header?: never;
+  path?: never;
+  cookie?: never;
+}
 interface Params<P> {
   query?: never;
   header?: never;
@@ -266,6 +281,15 @@ export interface ProvisionalPaths {
       TournamentRead
     >;
   };
+  "/api/v1/public/{share_token}/tournaments/{tournament_id}/standings": {
+    get: Get<
+      Params<{ share_token: string; tournament_id: Uuid }>,
+      TournamentStandingRow[]
+    >;
+  };
+
+  // demo only: the backend never has this route
+  "/api/v1/demo/account": { get: Get<NoParams, DemoAccount> };
 }
 
 /**
