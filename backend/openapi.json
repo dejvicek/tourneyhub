@@ -215,7 +215,7 @@
           "default_field_count": {
             "anyOf": [
               {
-                "maximum": 2147483647.0,
+                "maximum": 32.0,
                 "minimum": 1.0,
                 "type": "integer"
               },
@@ -228,7 +228,7 @@
           "default_goals_per_game": {
             "anyOf": [
               {
-                "maximum": 2147483647.0,
+                "maximum": 99.0,
                 "minimum": 1.0,
                 "type": "integer"
               },

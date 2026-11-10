@@ -358,6 +358,12 @@ def test_fr011_patch_sets_the_given_settings_only(
         pytest.param(
             "default_goals_per_game", 0, "greater_than_equal", id="FR-011-0-goals"
         ),
+        pytest.param(
+            "default_field_count", 33, "less_than_equal", id="FR-011-33-fields"
+        ),
+        pytest.param(
+            "default_goals_per_game", 100, "less_than_equal", id="FR-011-100-goals"
+        ),
         pytest.param("default_match_format", "bo2", "enum", id="BR-121-no-bo2"),
         pytest.param("name", " ", "string_too_short", id="FR-011-blank-name"),
     ],
@@ -382,6 +388,24 @@ def test_fr011_patch_refuses_settings_the_database_would_refuse(
     [error] = response.json()["detail"]["errors"]
     assert error["loc"] == ["body", field]
     assert error["type"] == error_type
+
+
+def test_fr011_patch_accepts_the_largest_field_count_and_goals(
+    client: TestClient,
+    make_league: Callable[..., League],
+    auth_header: Callable[..., dict[str, str]],
+) -> None:
+    league = make_league()
+
+    response = client.patch(
+        f"/api/v1/leagues/{league.id}",
+        json={"default_field_count": 32, "default_goals_per_game": 99},
+        headers=auth_header(league.owner_user_id),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["default_field_count"] == 32
+    assert response.json()["default_goals_per_game"] == 99
 
 
 def test_fr013_delete_removes_the_league_and_every_season(

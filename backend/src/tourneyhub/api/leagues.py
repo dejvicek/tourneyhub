@@ -16,7 +16,12 @@ from tourneyhub.api.schemas import (
     ResponseModel,
     SeasonName,
 )
-from tourneyhub.engine.leagues import DefaultMatchFormat, SeasonState
+from tourneyhub.engine.leagues import (
+    MAX_FIELD_COUNT,
+    MAX_GOALS_PER_GAME,
+    DefaultMatchFormat,
+    SeasonState,
+)
 from tourneyhub.services import leagues as league_service
 
 router = APIRouter(
@@ -43,9 +48,11 @@ class LeagueUpdate(RequestModel):
 
     name: LeagueName | None = None
     draws_allowed: bool | None = None
-    default_field_count: Annotated[int, Field(ge=1, le=INT_MAX)] | None = None
+    default_field_count: Annotated[int, Field(ge=1, le=MAX_FIELD_COUNT)] | None = None
     default_match_format: DefaultMatchFormat | None = None
-    default_goals_per_game: Annotated[int, Field(ge=1, le=INT_MAX)] | None = None
+    default_goals_per_game: (
+        Annotated[int, Field(ge=1, le=MAX_GOALS_PER_GAME)] | None
+    ) = None
 
 
 class SeasonStart(RequestModel):
