@@ -220,7 +220,7 @@ LOGGING_CONFIG: dict[str, object] = {
 - Use `lifespan`, never `on_event`. The lifespan disposes of the database engine.
 - One `APIRouter` per area, with a `prefix` and `tags`.
 - Every endpoint and dependency is `def`; FastAPI runs them in its thread pool. Exception handlers and middleware are `async def` and never block.
-- Dependencies are `Annotated` aliases defined once in `api/deps.py`: `SessionDep`, `SettingsDep`, `NowDep` (`get_now`, which returns `datetime.now(UTC)`), `CurrentUserDep`, `AccountDep`, `AccessClaimsDep`, `AdminDep`, `LoginThrottleDep`, `SignUpThrottleDep`, `CustomHeaderDep`. Endpoints use the aliases, never an inline `Depends(...)`.
+- Dependencies are `Annotated` aliases defined once in `api/deps.py`: `SessionDep`, `SettingsDep`, `NowDep` (`get_now`, which returns `datetime.now(UTC)`), `CurrentUserDep`, `AccountDep`, `AccessClaimsDep`, `AdminDep`, `LoginThrottleDep`, `SignUpThrottleDep`, `PasswordChangeThrottleDep`, `CustomHeaderDep`. Endpoints use the aliases, never an inline `Depends(...)`.
 - **The request owns the transaction:**
 
 ```python
@@ -261,6 +261,7 @@ LoginThrottleDep = Annotated[auth_service.Attempt, Depends(throttle_login)]
   - FastAPI resolves dependencies in the order of the signature. `SessionDep`'s session takes a connection only at its first query, so the throttle comes before any dependency that queries through `SessionDep`.
   - The email key is folded with PostgreSQL's `lower()`, as the login's lookup folds it. An IPv6 client is counted per /64; an IPv4-mapped address counts as its IPv4 address.
 - `SignUpThrottleDep` is the same for sign-up (`start_signup_attempt`, kind `signup_ip`, per client IP). It takes the request body as a parameter, so that a body that fails validation is refused before it is counted. Sign-up has its own limits, as the guessing of a code is not slowed by Argon2: 5 free failures in an hour, then a doubling waiting period up to 15 minutes. `tourneyhub cleanup` deletes attempts older than the longest window.
+  - `PasswordChangeThrottleDep` counts a password change on the login's budget (`login_email` of the token's user, `login_ip`), since checking the current password is a password guess. `log_in` re-reads the user's hash `FOR NO KEY UPDATE` after verifying, so that a login racing a password change cannot keep the old password.
   - Both throttles read the body, and so does the route, so a validation error is reported by each. The validation handler lists an error once.
 - Every id in a path or body is loaded through the current organizer's league, under its lock when writing (ADR-008). Another organizer's id is then simply not found (OWASP API1).
 - The return annotation is the response model. Routers return Pydantic models built from service results (`LeagueRead.model_validate(league)`), never dicts or ORM objects.

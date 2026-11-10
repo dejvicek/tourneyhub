@@ -86,14 +86,22 @@ views "III. Flows" {
     organizer -> tourneyhub.spa.organizerUi "enters the current and a new password"
     tourneyhub.spa.organizerUi -> tourneyhub.spa.authClient "change password"
     tourneyhub.spa.authClient -> tourneyhub.api.authApi "POST /api/v1/auth/password (Bearer JWT)"
-    tourneyhub.api.authApi -> tourneyhub.db.accounts "locks the user row and verifies the current password"
+    tourneyhub.api.authApi -> tourneyhub.db.accounts "counts the attempt on the login's budget (email, IP), in a transaction of its own"
     alt {
-      when "current password wrong, or new one equal to it" {
-        tourneyhub.spa.authClient <- tourneyhub.api.authApi "422 wrong_password or password_unchanged; nothing changes"
+      when "inside the waiting period after repeated failures" {
+        tourneyhub.spa.authClient <- tourneyhub.api.authApi "429 too_many_attempts with Retry-After; password not checked"
       }
       when "otherwise" {
-        tourneyhub.api.authApi -> tourneyhub.db.accounts "new hash, clears must_change_password, revokes the other families"
-        tourneyhub.spa.authClient <- tourneyhub.api.authApi "204; other devices are logged out"
+        tourneyhub.api.authApi -> tourneyhub.db.accounts "locks the user row and verifies the current password"
+        alt {
+          when "current password wrong, or new one equal to it" {
+            tourneyhub.spa.authClient <- tourneyhub.api.authApi "422 wrong_password or password_unchanged; nothing changes"
+          }
+          when "otherwise" {
+            tourneyhub.api.authApi -> tourneyhub.db.accounts "new hash, clears must_change_password, revokes the other families, marks the attempt succeeded"
+            tourneyhub.spa.authClient <- tourneyhub.api.authApi "204; other devices are logged out"
+          }
+        }
       }
     }
   }
