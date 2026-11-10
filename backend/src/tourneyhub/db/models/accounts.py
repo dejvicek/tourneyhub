@@ -1,7 +1,15 @@
 from datetime import datetime
 from uuid import UUID, uuid7
 
-from sqlalchemy import ForeignKey, Index, LargeBinary, false, func
+from sqlalchemy import (
+    CheckConstraint,
+    ForeignKey,
+    Index,
+    LargeBinary,
+    SmallInteger,
+    false,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from tourneyhub.db.base import Base, str_enum
@@ -38,7 +46,10 @@ class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
-    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    # Indexed for a password change, which revokes the user's other families.
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
     # All tokens of one login; the refresh endpoint locks them together.
     family_id: Mapped[UUID] = mapped_column(index=True)
     # The token this one was rotated from; a parent expires before its children.
@@ -67,3 +78,17 @@ class AuthAttempt(Base):
     key: Mapped[str]
     succeeded: Mapped[bool]
     created_at: Mapped[datetime]
+
+
+class InstanceSettings(Base):
+    """The instance's one row of settings (DATA-MODEL §4.1)."""
+
+    __tablename__ = "instance_settings"
+    __table_args__ = (CheckConstraint("id = 1", name="single_row"),)
+
+    id: Mapped[int] = mapped_column(
+        SmallInteger, primary_key=True, autoincrement=False, default=1
+    )
+    # Plain text, so that the admin can see and share it; NULL: sign-up is closed.
+    signup_code: Mapped[str | None]
+    updated_at: Mapped[datetime | None]

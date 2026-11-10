@@ -105,7 +105,7 @@ Standalone tables: `instance_settings` (one row) and `auth_attempts` (rate limit
 | Column | Notes |
 |---|---|
 | `id` | |
-| `user_id` | FK `users`, `ON DELETE CASCADE`. |
+| `user_id` | FK `users`, `ON DELETE CASCADE`. Indexed: a password change revokes the user's other families (ADR-006). |
 | `family_id` | `uuid`; all tokens of one login share it. Indexed. The refresh endpoint locks the family's rows (`SELECT … FOR UPDATE`) before reading them, so presentations within one family are handled one at a time. |
 | `parent_id` | FK `refresh_tokens`, nullable, `ON DELETE SET NULL`: the token this one was rotated from. Indexed. Siblings are tokens with the same `family_id` and the same non-null `parent_id`; a normal rotation revokes the presented token's unrotated siblings. A parent expires before its children, hence `SET NULL`. |
 | `token_hash` | `bytea`, SHA-256 of the token. Unique. |
