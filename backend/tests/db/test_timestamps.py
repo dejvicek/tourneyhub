@@ -25,3 +25,4 @@ def test_a_row_without_created_at_fails_at_the_flush(
         )
 
     assert isinstance(raised.value.orig, NotNullViolation)
+    assert raised.value.orig.diag.column_name == "created_at"

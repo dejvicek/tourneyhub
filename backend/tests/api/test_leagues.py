@@ -3,7 +3,7 @@ import threading
 from collections.abc import Callable
 from contextlib import redirect_stderr
 from datetime import UTC, datetime, timedelta
-from uuid import uuid7
+from uuid import UUID, uuid7
 
 import pytest
 from fastapi.testclient import TestClient
@@ -770,3 +770,110 @@ def test_adr008_of_two_starts_of_season_2_exactly_one_wins(
         (1, SeasonState.CLOSED),
         (2, SeasonState.ACTIVE),
     ]
+
+
+def _commit_league(
+    engine: Engine, now: datetime, email: str
+) -> tuple[UUID, UUID, UUID]:
+    """Commit an owner and a league with Season 1; return their ids."""
+    with Session(engine) as setup:
+        owner = User(
+            email=email,
+            display_name="Racer",
+            password_hash="!",
+            language=Language.EN,
+            created_at=now,
+        )
+        setup.add(owner)
+        setup.flush()
+        league = league_service.create_league(
+            setup, league_id=uuid7(), owner_user_id=owner.id, name="Race", now=now
+        )
+        setup.commit()
+        season_id = setup.scalars(select(Season.id)).one()
+        return owner.id, league.id, season_id
+
+
+@pytest.mark.concurrency
+def test_adr008_a_season_start_racing_a_league_delete_is_not_found(
+    committing_settings: Settings,
+    committing_engine: Engine,
+    now: datetime,
+    auth_header: Callable[..., dict[str, str]],
+    wait_for_a_lock_wait: Callable[[], None],
+) -> None:
+    owner_id, league_id, _ = _commit_league(
+        committing_engine, now, "delete-race@example.test"
+    )
+    outcome: list[tuple[int, object]] = []
+
+    with (
+        Session(committing_engine) as first,
+        TestClient(create_app(committing_settings)) as client,
+    ):
+        league_service.delete_league(first, league_id=league_id, user_id=owner_id)
+
+        def start_second() -> None:
+            response = client.post(
+                f"/api/v1/leagues/{league_id}/seasons",
+                json={"expected_current_number": 1},
+                # The app reads the system clock here, not the test's `now`.
+                headers=auth_header(owner_id, issued_at=datetime.now(UTC)),
+            )
+            outcome.append((response.status_code, response.json()))
+
+        second = threading.Thread(target=start_second)
+        second.start()
+        wait_for_a_lock_wait()  # it waits for the league lock the delete holds
+        first.commit()
+        second.join()
+
+    assert outcome == [(404, {"code": "league_not_found", "detail": {}})]
+    with Session(committing_engine) as check:
+        assert check.scalars(select(League.id)).all() == []
+        assert check.scalars(select(Season.id)).all() == []
+
+
+@pytest.mark.concurrency
+def test_br012_a_table_edit_racing_the_season_close_is_a_conflict(
+    committing_settings: Settings,
+    committing_engine: Engine,
+    now: datetime,
+    auth_header: Callable[..., dict[str, str]],
+    wait_for_a_lock_wait: Callable[[], None],
+) -> None:
+    owner_id, league_id, season_1_id = _commit_league(
+        committing_engine, now, "table-race@example.test"
+    )
+    outcome: list[tuple[int, object]] = []
+
+    with (
+        Session(committing_engine) as first,
+        TestClient(create_app(committing_settings)) as client,
+    ):
+        league_service.start_season(
+            first,
+            league_id=league_id,
+            user_id=owner_id,
+            expected_current_number=1,
+            now=now,
+        )
+
+        def edit_second() -> None:
+            response = client.put(
+                f"/api/v1/leagues/{league_id}/seasons/{season_1_id}/placement-points",
+                json={"placement_points": [99, 1]},
+                headers=auth_header(owner_id, issued_at=datetime.now(UTC)),
+            )
+            outcome.append((response.status_code, response.json()))
+
+        second = threading.Thread(target=edit_second)
+        second.start()
+        wait_for_a_lock_wait()  # it waits for the league lock the close holds
+        first.commit()
+        second.join()
+
+    assert outcome == [(409, {"code": "season_closed", "detail": {}})]
+    with Session(committing_engine) as check:
+        table = check.scalar(select(Season.placement_points).where(Season.number == 1))
+    assert table == [10, 8, 6, 4, 2]
