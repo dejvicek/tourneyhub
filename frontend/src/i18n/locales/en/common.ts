@@ -30,6 +30,7 @@ export const common = {
     notFound: "This page does not exist, or it was deleted.",
     reload: "Reload the page",
   },
+  close: "Close",
   loading: "Loading…",
   demo: {
     notice: "Demo mode: the data is made up and starts over when you reload.",

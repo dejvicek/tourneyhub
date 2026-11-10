@@ -30,6 +30,7 @@ export const common: typeof reference = {
     notFound: "Tahle stránka neexistuje, nebo byla smazána.",
     reload: "Načíst stránku znovu",
   },
+  close: "Zavřít",
   loading: "Načítání…",
   demo: {
     notice:

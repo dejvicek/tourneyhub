@@ -268,7 +268,14 @@ export default defineConfig([
     extends: [jsxA11yX.configs.strict],
     settings: {
       // Each copied component that renders a native control is listed here.
-      "jsx-a11y-x": { components: { Button: "button" } },
+      "jsx-a11y-x": {
+        components: {
+          Button: "button",
+          Input: "input",
+          Textarea: "textarea",
+          Label: "label",
+        },
+      },
     },
     rules: {
       // Off in both of the plugin's configs; every control needs a name.
