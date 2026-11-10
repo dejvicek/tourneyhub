@@ -2,8 +2,24 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- viewport-fit=cover makes env(safe-area-inset-*) report the home
+         indicator's height to the bottom bar. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
     <meta name="color-scheme" content="light dark" />
+    <!-- The --background token of each theme (src/index.css). -->
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: light)"
+      content="#f2f4f1"
+    />
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: dark)"
+      content="#1a2430"
+    />
     <title>TourneyHub</title>
   </head>
   <body>
