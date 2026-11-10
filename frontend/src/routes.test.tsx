@@ -85,8 +85,8 @@ const SCREENS: Screen[] = [
   ["seasonStandings", "Season standings", "Pořadí sezóny"],
   ["players", "Players", "Hráči"],
   ["leagueSettings", "League settings", "Nastavení ligy"],
-  ["publicLeague", "League", "Liga"],
-  ["publicTournament", "Tournament", "Turnaj"],
+  ["publicLeague", "Thursday Foosball", "Thursday Foosball"],
+  ["publicTournament", "Thursday DYP", "Thursday DYP"],
 ];
 
 async function findTitle(title: string, overlay = false) {

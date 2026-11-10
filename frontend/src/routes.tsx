@@ -13,6 +13,9 @@ import { Navigate } from "react-router";
 import { AppShell } from "@/components/AppShell";
 import { PageFallback } from "@/components/PageFallback";
 import { RouteError } from "@/components/RouteError";
+import { AccountMenu } from "@/features/auth/AccountMenu";
+import { requireSession } from "@/features/auth/requireSession";
+import { RootWithSession } from "@/features/auth/SessionEndedRedirect";
 import { paths } from "@/lib/paths";
 import type { RouteHandle } from "@/lib/routeHandle";
 import { HomePage } from "@/pages/HomePage";
@@ -27,11 +30,13 @@ const enterResult = async () => ({
 
 export const routes: RouteObject[] = [
   {
+    // Goes to the login when the session ends on any screen (ADR-006).
+    Component: RootWithSession,
     HydrateFallback: PageFallback,
     ErrorBoundary: RouteError,
     children: [
       {
-        Component: AppShell,
+        element: <AppShell account={<AccountMenu />} />,
         children: [
           { index: true, Component: HomePage },
           {
@@ -53,6 +58,7 @@ export const routes: RouteObject[] = [
               },
               {
                 path: paths.changePassword,
+                middleware: [requireSession],
                 lazy: async () => ({
                   Component: (
                     await import("@/features/auth/ChangePasswordPage")
@@ -61,6 +67,7 @@ export const routes: RouteObject[] = [
               },
               {
                 path: paths.admin,
+                middleware: [requireSession],
                 lazy: async () => ({
                   Component: (await import("@/features/auth/AdminPage"))
                     .AdminPage,
@@ -68,6 +75,7 @@ export const routes: RouteObject[] = [
               },
               {
                 path: paths.myLeagues,
+                middleware: [requireSession],
                 lazy: async () => ({
                   Component: (await import("@/features/leagues/MyLeaguesPage"))
                     .MyLeaguesPage,
@@ -101,10 +109,12 @@ export const routes: RouteObject[] = [
       },
       {
         path: paths.league,
-        lazy: async () => ({
-          Component: (await import("@/features/leagues/LeagueShell"))
-            .LeagueShell,
-        }),
+        middleware: [requireSession],
+        lazy: async () => {
+          const { LeagueShell } =
+            await import("@/features/leagues/LeagueShell");
+          return { element: <LeagueShell account={<AccountMenu />} /> };
+        },
         ErrorBoundary: RouteError,
         children: [
           { index: true, element: <Navigate to="tournaments" replace /> },
