@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from datetime import datetime
 from uuid import UUID
 
@@ -5,6 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from tourneyhub.db.models.leagues import Player
+from tourneyhub.engine.leagues import MAX_PLAYERS_PER_LEAGUE
 from tourneyhub.errors import ErrorCode, NotFoundError, RuleViolationError
 from tourneyhub.services.leagues import get_league, lock_league
 
@@ -69,19 +71,33 @@ def _refuse_a_taken_name(
 
 
 def add_player(
-    session: Session, *, league_id: UUID, user_id: UUID, name: str, now: datetime
+    session: Session,
+    *,
+    league_id: UUID,
+    user_id: UUID,
+    name: str,
+    clock: Callable[[], datetime],
 ) -> Player:
     """Add a player to the league's list (FR-012).
 
     A name that a player of the league has, in any case, is refused, and so is
     one that a removed player has: the organizer restores that player instead
-    (BR-001, ADR-002). Two adds of one name race at the unique index only when
+    (BR-001, ADR-002). A league holds at most `MAX_PLAYERS_PER_LEAGUE` players,
+    removed ones included, counted under the lock. `clock` is read after the
+    lock is held, so "order added" is the commit order. Two adds of one name race at the unique index only when
     the league lock does not cover them, and the loser gets a 409 there
     (`api/errors.py`).
     """
     league = lock_league(session, league_id=league_id, user_id=user_id)
     _refuse_a_taken_name(session, league_id=league.id, name=name, except_player_id=None)
-    player = Player(league_id=league.id, name=name, created_at=now)
+    count = session.scalar(
+        select(func.count()).select_from(Player).where(Player.league_id == league.id)
+    )
+    if count is not None and count >= MAX_PLAYERS_PER_LEAGUE:
+        raise RuleViolationError(
+            ErrorCode.PLAYER_LIMIT_REACHED, limit=MAX_PLAYERS_PER_LEAGUE
+        )
+    player = Player(league_id=league.id, name=name, created_at=clock())
     session.add(player)
     session.flush()
     return player
@@ -94,26 +110,25 @@ def rename_player(
     player_id: UUID,
     user_id: UUID,
     name: str,
-    now: datetime,
+    clock: Callable[[], datetime],
 ) -> Player:
     """Give a player a new name; the new name shows in past results too (FR-012).
 
     The name is the target state, so a repeat changes nothing (ADR-008). A
-    change of case only is the same player's name. A removed player stays as
-    they are until restored. Renaming is allowed in any season (BR-011).
+    change of case only is the same player's name. A removed player can be renamed
+    too: a rename always applies (BR-011), and the new name must be free like
+    any other, removed holders included. `clock` is read after the lock.
     """
     player = _lock_player(
         session, league_id=league_id, player_id=player_id, user_id=user_id
     )
-    if player.removed_at is not None:
-        raise RuleViolationError(ErrorCode.PLAYER_REMOVED)
     if player.name == name:
         return player
     _refuse_a_taken_name(
         session, league_id=league_id, name=name, except_player_id=player.id
     )
     player.name = name
-    player.updated_at = now
+    player.updated_at = clock()
     session.flush()
     return player
 
@@ -125,25 +140,27 @@ def set_player_removed(
     player_id: UUID,
     user_id: UUID,
     removed: bool,
-    now: datetime,
+    clock: Callable[[], datetime],
 ) -> Player:
     """Remove a player from the list, or put them back (FR-012, BR-002).
 
     A removal only sets `removed_at`: the row, its name and its history stay
     (DATA-MODEL D6). The flag is the target state, so repeating a removal keeps
     the first `removed_at`, and restoring a player on the list changes nothing
-    (ADR-008). A restored player is the same player, with the same id. The
-    name cannot have been taken meanwhile: removed players hold their names
-    (BR-001) and cannot be renamed. BR-002, no removal from an unfinished
+    (ADR-008). A restored player is the same player, with the same id. A restore
+    needs no name check: the unique index includes removed players, so a name is
+    never freed, and every add and rename checks against all players (BR-001).
+    `clock` is read after the lock. BR-002, no removal from an unfinished
     tournament, joins these checks with the tournaments.
     """
     player = _lock_player(
         session, league_id=league_id, player_id=player_id, user_id=user_id
     )
     if removed and player.removed_at is None:
-        player.removed_at = now
+        player.removed_at = now = clock()
     elif not removed and player.removed_at is not None:
         player.removed_at = None
+        now = clock()
     else:
         return player
     player.updated_at = now

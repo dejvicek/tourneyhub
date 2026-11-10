@@ -3,8 +3,9 @@ from http import HTTPStatus
 from uuid import UUID
 
 from fastapi import APIRouter
+from pydantic import StrictBool
 
-from tourneyhub.api.deps import CurrentUserDep, NowDep, SessionDep
+from tourneyhub.api.deps import ClockDep, CurrentUserDep, SessionDep
 from tourneyhub.api.schemas import (
     ErrorResponse,
     PlayerName,
@@ -38,7 +39,7 @@ class PlayerRename(RequestModel):
 class PlayerRemoval(RequestModel):
     """Whether the player is removed from the list, the target state (BR-002)."""
 
-    removed: bool
+    removed: StrictBool
 
 
 class PlayerRead(ResponseModel):
@@ -81,7 +82,7 @@ def add_player(
     body: PlayerCreate,
     session: SessionDep,
     user: CurrentUserDep,
-    now: NowDep,
+    clock: ClockDep,
 ) -> PlayerRead:
     """Add a player to the league (FR-012).
 
@@ -89,10 +90,11 @@ def add_player(
     with the holder's `player_id`, `name` and `removed` (BR-001). When the
     holder is removed, the UI asks whether it is the same person and restores
     them (ADR-002). A parallel add of the same name that wins the race to the
-    unique index makes this one 409 `player_name_taken`: reload.
+    unique index makes this one 409 `player_name_taken`: reload. A league holds at
+    most 500 players, removed ones included: more is 422 `player_limit_reached`.
     """
     player = player_service.add_player(
-        session, league_id=league_id, user_id=user.id, name=body.name, now=now
+        session, league_id=league_id, user_id=user.id, name=body.name, clock=clock
     )
     return PlayerRead.model_validate(player)
 
@@ -110,12 +112,12 @@ def rename_player(
     body: PlayerRename,
     session: SessionDep,
     user: CurrentUserDep,
-    now: NowDep,
+    clock: ClockDep,
 ) -> PlayerRead:
     """Rename a player; the new name shows in past results too (FR-012).
 
-    422 `player_name_taken` as for an add, 409 for the race. A removed player
-    is 422 `player_removed`: restore them first. Allowed in any season (BR-011).
+    422 `player_name_taken` as for an add, 409 for the race. A removed player can
+    be renamed too, and the new name must be free as well (BR-011).
     """
     player = player_service.rename_player(
         session,
@@ -123,7 +125,7 @@ def rename_player(
         player_id=player_id,
         user_id=user.id,
         name=body.name,
-        now=now,
+        clock=clock,
     )
     return PlayerRead.model_validate(player)
 
@@ -135,7 +137,7 @@ def set_player_removed(
     body: PlayerRemoval,
     session: SessionDep,
     user: CurrentUserDep,
-    now: NowDep,
+    clock: ClockDep,
 ) -> PlayerRead:
     """Remove a player from the list, or restore them (FR-012, BR-002).
 
@@ -148,6 +150,6 @@ def set_player_removed(
         player_id=player_id,
         user_id=user.id,
         removed=body.removed,
-        now=now,
+        clock=clock,
     )
     return PlayerRead.model_validate(player)

@@ -15,7 +15,7 @@ from pydantic import SecretStr
 from sqlalchemy import Engine, event, func, make_url, select, text
 from sqlalchemy.orm import Session, sessionmaker
 
-from tourneyhub.api.deps import get_now, get_session, get_session_factory
+from tourneyhub.api.deps import get_clock, get_now, get_session, get_session_factory
 from tourneyhub.app import create_app
 from tourneyhub.db.models.accounts import InstanceSettings, User
 from tourneyhub.db.models.leagues import League, Season
@@ -115,6 +115,7 @@ def client(settings: Settings, session: Session, now: datetime) -> Iterator[Test
     app.dependency_overrides[get_session] = test_session
     app.dependency_overrides[get_session_factory] = test_session_factory
     app.dependency_overrides[get_now] = lambda: now
+    app.dependency_overrides[get_clock] = lambda: lambda: now
     with TestClient(app) as client:  # the context manager runs the lifespan
         yield client
 
@@ -127,6 +128,7 @@ def travel(client: TestClient, now: datetime) -> Callable[[timedelta], datetime]
 
     def travel(offset: timedelta) -> datetime:
         app.dependency_overrides[get_now] = lambda: now + offset
+        app.dependency_overrides[get_clock] = lambda: lambda: now + offset
         return now + offset
 
     return travel

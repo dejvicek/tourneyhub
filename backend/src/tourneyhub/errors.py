@@ -32,7 +32,7 @@ class ErrorCode(StrEnum):
     # Players
     PLAYER_NOT_FOUND = "player_not_found"
     PLAYER_NAME_TAKEN = "player_name_taken"  # also a removed player's name (BR-001)
-    PLAYER_REMOVED = "player_removed"  # a removed player cannot be renamed
+    PLAYER_LIMIT_REACHED = "player_limit_reached"  # 500 players, removed included
 
 
 class AppError(Exception):

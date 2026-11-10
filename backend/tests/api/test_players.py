@@ -1,4 +1,5 @@
 import threading
+import unicodedata
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -125,6 +126,10 @@ def test_fr012_get_with_a_malformed_include_removed_is_a_validation_failure(
         pytest.param("   ", "string_too_short", id="FR-012-blank"),
         pytest.param("x" * 101, "string_too_long", id="FR-012-too-long"),
         pytest.param("An\u200ba", "invisible_characters", id="BR-001-zero-width"),
+        pytest.param("An\u2028a", "invisible_characters", id="BR-001-line-separator"),
+        pytest.param("An\u2029a", "invisible_characters", id="BR-001-paragraph-sep"),
+        pytest.param("An\u3164a", "invisible_characters", id="BR-001-hangul-filler"),
+        pytest.param("An\u2800a", "invisible_characters", id="BR-001-braille-blank"),
     ],
 )
 def test_fr012_post_refuses_a_name_that_is_not_a_name(
@@ -188,6 +193,156 @@ def test_br001_post_refuses_the_name_of_a_removed_player_until_restored(
     assert restored == (200, ana)
     again = client.post(_players_url(league), json={"name": "čeněk"}, headers=headers)
     assert again.json()["detail"]["removed"] is False
+
+
+def test_br001_post_refuses_a_decomposed_spelling_of_a_stored_name(
+    client: TestClient,
+    make_league: Callable[..., League],
+    auth_header: Callable[..., dict[str, str]],
+    session: Session,
+) -> None:
+    league = make_league()
+    headers = auth_header(league.owner_user_id)
+    composed = unicodedata.normalize("NFC", "Čeněk")
+    decomposed = unicodedata.normalize("NFD", "Čeněk")
+    assert composed != decomposed
+    ana = _add(client, league, decomposed, headers)
+
+    response = client.post(
+        _players_url(league), json={"name": composed}, headers=headers
+    )
+
+    assert ana["name"] == composed
+    assert response.status_code == 422
+    assert response.json() == {
+        "code": "player_name_taken",
+        "detail": {"player_id": ana["id"], "name": composed, "removed": False},
+    }
+    [stored] = session.scalars(select(Player.name)).all()
+    assert unicodedata.is_normalized("NFC", stored)
+
+
+def test_br001_post_refuses_the_nfd_spelling_of_a_name_added_as_nfc(
+    client: TestClient,
+    make_league: Callable[..., League],
+    auth_header: Callable[..., dict[str, str]],
+    session: Session,
+) -> None:
+    league = make_league()
+    headers = auth_header(league.owner_user_id)
+    composed = unicodedata.normalize("NFC", "Čeněk")
+    first = _add(client, league, composed, headers)
+
+    response = client.post(
+        _players_url(league),
+        json={"name": unicodedata.normalize("NFD", "Čeněk")},
+        headers=headers,
+    )
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "player_name_taken"
+    assert response.json()["detail"]["player_id"] == first["id"]
+    assert session.scalars(select(Player.name)).all() == [composed]
+
+
+@pytest.mark.parametrize("spaced", ["Ana  Bo", "Ana\u00a0Bo", "Ana \u2003 Bo"])
+def test_br001_post_collapses_whitespace_so_that_look_alike_names_collide(
+    client: TestClient,
+    make_league: Callable[..., League],
+    auth_header: Callable[..., dict[str, str]],
+    spaced: str,
+) -> None:
+    league = make_league()
+    headers = auth_header(league.owner_user_id)
+    first = _add(client, league, "Ana Bo", headers)
+
+    response = client.post(_players_url(league), json={"name": spaced}, headers=headers)
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "code": "player_name_taken",
+        "detail": {"player_id": first["id"], "name": "Ana Bo", "removed": False},
+    }
+
+
+def test_br001_post_stores_a_name_with_inner_whitespace_collapsed(
+    client: TestClient,
+    make_league: Callable[..., League],
+    auth_header: Callable[..., dict[str, str]],
+) -> None:
+    league = make_league()
+
+    added = _add(client, league, "Ana \u00a0 Bo", auth_header(league.owner_user_id))
+
+    assert added["name"] == "Ana Bo"
+
+
+def test_br001_post_strips_the_name_before_it_collides(
+    client: TestClient,
+    make_league: Callable[..., League],
+    auth_header: Callable[..., dict[str, str]],
+) -> None:
+    league = make_league()
+    headers = auth_header(league.owner_user_id)
+    ana = _add(client, league, "Ana", headers)
+
+    response = client.post(
+        _players_url(league), json={"name": "  Ana "}, headers=headers
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"]["player_id"] == ana["id"]
+
+
+def test_fr012_post_accepts_a_name_of_exactly_100_characters(
+    client: TestClient,
+    make_league: Callable[..., League],
+    auth_header: Callable[..., dict[str, str]],
+) -> None:
+    league = make_league()
+
+    added = _add(client, league, "x" * 100, auth_header(league.owner_user_id))
+
+    assert added["name"] == "x" * 100
+
+
+def test_fr012_post_refuses_the_player_over_the_cap_removed_ones_included(
+    client: TestClient,
+    make_league: Callable[..., League],
+    auth_header: Callable[..., dict[str, str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(player_service, "MAX_PLAYERS_PER_LEAGUE", 2)
+    league = make_league()
+    headers = auth_header(league.owner_user_id)
+    ana = _add(client, league, "Ana", headers)
+    _put(client, league, ana["id"], "removed", {"removed": True}, headers)
+    _add(client, league, "Bob", headers)  # the 2nd of 2 is still accepted
+
+    response = client.post(
+        _players_url(league), json={"name": "Cyril"}, headers=headers
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {"code": "player_limit_reached", "detail": {"limit": 2}}
+    listed = client.get(
+        _players_url(league), params={"include_removed": "true"}, headers=headers
+    ).json()
+    assert [player["name"] for player in listed] == ["Ana", "Bob"]
+
+
+def test_fr012_the_player_cap_is_per_league(
+    client: TestClient,
+    make_league: Callable[..., League],
+    auth_header: Callable[..., dict[str, str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(player_service, "MAX_PLAYERS_PER_LEAGUE", 1)
+    league, other = make_league(), make_league()
+    headers = auth_header(league.owner_user_id)
+    _add(client, league, "Ana", headers)
+
+    assert _add(client, other, "Ana", auth_header(other.owner_user_id))["name"] == "Ana"
 
 
 def test_br001_two_leagues_of_one_organizer_can_have_the_same_name(
@@ -268,7 +423,7 @@ def test_br001_put_name_refuses_the_name_of_any_other_player(
     assert [player["name"] for player in listed] == ["Ana", "Bob"]
 
 
-def test_br002_put_name_refuses_a_removed_player_until_restored(
+def test_br011_put_name_renames_a_removed_player_who_stays_removed(
     client: TestClient,
     make_league: Callable[..., League],
     auth_header: Callable[..., dict[str, str]],
@@ -276,15 +431,78 @@ def test_br002_put_name_refuses_a_removed_player_until_restored(
     league = make_league()
     headers = auth_header(league.owner_user_id)
     ana = _add(client, league, "Ana", headers)
+    _, removed = _put(client, league, ana["id"], "removed", {"removed": True}, headers)
+
+    status, renamed = _put(client, league, ana["id"], "name", {"name": "Anna"}, headers)
+
+    assert status == 200
+    assert renamed == {**removed, "name": "Anna"}
+
+
+def test_br001_put_name_of_a_removed_player_still_checks_the_name_is_free(
+    client: TestClient,
+    make_league: Callable[..., League],
+    auth_header: Callable[..., dict[str, str]],
+) -> None:
+    league = make_league()
+    headers = auth_header(league.owner_user_id)
+    ana = _add(client, league, "Ana", headers)
+    bob = _add(client, league, "Bob", headers)
     _put(client, league, ana["id"], "removed", {"removed": True}, headers)
 
-    refused = _put(client, league, ana["id"], "name", {"name": "Anna"}, headers)
-    _put(client, league, ana["id"], "removed", {"removed": False}, headers)
-    renamed = _put(client, league, ana["id"], "name", {"name": "Anna"}, headers)
+    refused = _put(client, league, ana["id"], "name", {"name": "bob"}, headers)
 
-    assert refused == (422, {"code": "player_removed", "detail": {}})
-    assert renamed[0] == 200
-    assert renamed[1]["name"] == "Anna"
+    assert refused == (
+        422,
+        {
+            "code": "player_name_taken",
+            "detail": {"player_id": bob["id"], "name": "Bob", "removed": False},
+        },
+    )
+
+
+def test_br001_put_name_decomposed_spelling_of_another_name_collides(
+    client: TestClient,
+    make_league: Callable[..., League],
+    auth_header: Callable[..., dict[str, str]],
+) -> None:
+    league = make_league()
+    headers = auth_header(league.owner_user_id)
+    _add(client, league, "Čeněk", headers)
+    bob = _add(client, league, "Bob", headers)
+
+    status, body = _put(
+        client,
+        league,
+        bob["id"],
+        "name",
+        {"name": unicodedata.normalize("NFD", "Čeněk")},
+        headers,
+    )
+
+    assert (status, body["code"]) == (422, "player_name_taken")
+
+
+@pytest.mark.parametrize("value", ["yes", 1, 0, "true", None])
+def test_adr008_put_removed_takes_only_a_real_boolean(
+    client: TestClient,
+    make_league: Callable[..., League],
+    auth_header: Callable[..., dict[str, str]],
+    value: object,
+) -> None:
+    league = make_league()
+    headers = auth_header(league.owner_user_id)
+    ana = _add(client, league, "Ana", headers)
+
+    status, body = _put(
+        client, league, ana["id"], "removed", {"removed": value}, headers
+    )
+
+    assert (status, body["code"]) == (422, "validation_failed")
+    [problem] = body["detail"]["errors"]
+    assert problem["loc"] == ["body", "removed"]
+    listed = client.get(_players_url(league), headers=headers).json()
+    assert listed == [ana]
 
 
 def test_br002_put_removed_removes_and_restores_the_same_player(
@@ -477,7 +695,7 @@ def test_br001_an_add_racing_a_rename_to_the_same_name_is_a_conflict(
     owner_id, league_id = _commit_league(committing_engine, now, "add@example.test")
     with Session(committing_engine) as setup:
         temp = player_service.add_player(
-            setup, league_id=league_id, user_id=owner_id, name="Temp", now=now
+            setup, league_id=league_id, user_id=owner_id, name="Temp", clock=lambda: now
         )
         setup.commit()
         temp_id = temp.id
@@ -525,10 +743,10 @@ def test_br001_a_rename_racing_a_rename_to_the_same_name_is_a_conflict(
     owner_id, league_id = _commit_league(committing_engine, now, "rename@example.test")
     with Session(committing_engine) as setup:
         temp = player_service.add_player(
-            setup, league_id=league_id, user_id=owner_id, name="Temp", now=now
+            setup, league_id=league_id, user_id=owner_id, name="Temp", clock=lambda: now
         )
         bob = player_service.add_player(
-            setup, league_id=league_id, user_id=owner_id, name="Bob", now=now
+            setup, league_id=league_id, user_id=owner_id, name="Bob", clock=lambda: now
         )
         setup.commit()
         temp_id, bob_id = temp.id, bob.id
@@ -577,7 +795,7 @@ def test_adr008_two_adds_of_one_name_under_the_league_lock_leave_one_player(
         TestClient(create_app(committing_settings)) as client,
     ):
         ana = player_service.add_player(
-            first, league_id=league_id, user_id=owner_id, name="Ana", now=now
+            first, league_id=league_id, user_id=owner_id, name="Ana", clock=lambda: now
         )
 
         def add_second() -> None:
@@ -607,7 +825,7 @@ def test_adr008_two_adds_of_one_name_under_the_league_lock_leave_one_player(
 
 
 @pytest.mark.concurrency
-def test_br002_a_rename_racing_a_removal_is_refused_after_the_removal(
+def test_br011_a_rename_racing_a_removal_applies_after_the_removal(
     committing_settings: Settings,
     committing_engine: Engine,
     now: datetime,
@@ -617,7 +835,7 @@ def test_br002_a_rename_racing_a_removal_is_refused_after_the_removal(
     owner_id, league_id = _commit_league(committing_engine, now, "remove@example.test")
     with Session(committing_engine) as setup:
         ana = player_service.add_player(
-            setup, league_id=league_id, user_id=owner_id, name="Ana", now=now
+            setup, league_id=league_id, user_id=owner_id, name="Ana", clock=lambda: now
         )
         setup.commit()
         ana_id = ana.id
@@ -633,7 +851,7 @@ def test_br002_a_rename_racing_a_removal_is_refused_after_the_removal(
             player_id=ana_id,
             user_id=owner_id,
             removed=True,
-            now=now,
+            clock=lambda: now,
         )
 
         def rename_second() -> None:
@@ -650,6 +868,7 @@ def test_br002_a_rename_racing_a_removal_is_refused_after_the_removal(
         first.commit()
         second.join()
 
-    assert outcome == [(422, {"code": "player_removed", "detail": {}})]
+    assert [status for status, _ in outcome] == [200]
     with Session(committing_engine) as check:
-        assert check.scalars(select(Player.name)).all() == ["Ana"]
+        [player] = check.scalars(select(Player)).all()
+        assert (player.name, player.removed_at is not None) == ("Anna", True)

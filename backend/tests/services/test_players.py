@@ -16,7 +16,11 @@ from tourneyhub.services import players as player_service
 
 def _add(session: Session, league: League, name: str, now: datetime) -> Player:
     return player_service.add_player(
-        session, league_id=league.id, user_id=league.owner_user_id, name=name, now=now
+        session,
+        league_id=league.id,
+        user_id=league.owner_user_id,
+        name=name,
+        clock=lambda: now,
     )
 
 
@@ -29,7 +33,7 @@ def _rename(
         player_id=player.id,
         user_id=league.owner_user_id,
         name=name,
-        now=now,
+        clock=lambda: now,
     )
 
 
@@ -42,7 +46,7 @@ def _set_removed(
         player_id=player.id,
         user_id=league.owner_user_id,
         removed=removed,
-        now=now,
+        clock=lambda: now,
     )
 
 
@@ -154,7 +158,7 @@ def test_fr012_rename_player_changes_the_name_and_the_update_time(
         player_id=player.id,
         user_id=league.owner_user_id,
         name="Anna",
-        now=later,
+        clock=lambda: later,
     )
 
     assert renamed.id == player.id
@@ -173,7 +177,7 @@ def test_adr008_renaming_to_the_current_name_changes_nothing(
         player_id=player.id,
         user_id=league.owner_user_id,
         name="Ana",
-        now=now + timedelta(hours=1),
+        clock=lambda: now + timedelta(hours=1),
     )
 
     assert renamed.updated_at is None
@@ -191,7 +195,7 @@ def test_br001_a_player_can_change_the_case_of_their_own_name(
         player_id=player.id,
         user_id=league.owner_user_id,
         name="Ana",
-        now=now,
+        clock=lambda: now,
     )
 
     assert renamed.name == "Ana"
@@ -217,7 +221,7 @@ def test_br001_rename_player_refuses_a_name_another_player_has(
             player_id=ana.id,
             user_id=league.owner_user_id,
             name="bOB",
-            now=now,
+            clock=lambda: now,
         )
 
     assert raised.value.code is ErrorCode.PLAYER_NAME_TAKEN
@@ -226,19 +230,21 @@ def test_br001_rename_player_refuses_a_name_another_player_has(
     assert ana.name == "Ana"
 
 
-def test_br002_a_removed_player_cannot_be_renamed_until_restored(
+def test_br011_a_removed_player_can_be_renamed_and_stays_removed(
     session: Session, make_league: Callable[..., League], now: datetime
 ) -> None:
     league = make_league()
     player = _add(session, league, "Ana", now)
+    bob = _add(session, league, "Bob", now)
     _set_removed(session, league, player, now, removed=True)
 
+    renamed = _rename(session, league, player, "Anna", now)
     with pytest.raises(RuleViolationError) as raised:
-        _rename(session, league, player, "Anna", now)
-    assert raised.value.code is ErrorCode.PLAYER_REMOVED
+        _rename(session, league, player, "bob", now)
 
-    _set_removed(session, league, player, now, removed=False)
-    assert _rename(session, league, player, "Anna", now).name == "Anna"
+    assert (renamed.name, renamed.removed_at) == ("Anna", now)
+    assert raised.value.code is ErrorCode.PLAYER_NAME_TAKEN
+    assert raised.value.detail["player_id"] == str(bob.id)
 
 
 def test_br002_removing_keeps_the_player_and_repeating_keeps_the_first_time(
@@ -276,9 +282,8 @@ def test_br002_restoring_brings_back_the_same_player(
 def test_br001_the_name_of_a_removed_player_cannot_be_taken_meanwhile(
     session: Session, make_league: Callable[..., League], now: datetime
 ) -> None:
-    # "The name was taken while the player was removed" cannot happen: removed
-    # players hold their names (BR-001) and nobody can rename them, so a restore
-    # has nothing to collide with.
+    # A restore cannot collide: the unique index includes removed players, so a
+    # name is never freed, and every add and rename checks against all players.
     league = make_league()
     ana = _add(session, league, "Ana", now)
     _set_removed(session, league, ana, now, removed=True)
@@ -308,16 +313,16 @@ def test_owasp_api1_another_organizers_league_is_not_found(
         player_service.list_players(session, include_removed=True, **mine)
     assert raised.value.code is ErrorCode.LEAGUE_NOT_FOUND
     with pytest.raises(NotFoundError) as raised:
-        player_service.add_player(session, name="Bob", now=now, **mine)
+        player_service.add_player(session, name="Bob", clock=lambda: now, **mine)
     assert raised.value.code is ErrorCode.LEAGUE_NOT_FOUND
     with pytest.raises(NotFoundError) as raised:
         player_service.rename_player(
-            session, player_id=ana.id, name="Bob", now=now, **mine
+            session, player_id=ana.id, name="Bob", clock=lambda: now, **mine
         )
     assert raised.value.code is ErrorCode.LEAGUE_NOT_FOUND
     with pytest.raises(NotFoundError) as raised:
         player_service.set_player_removed(
-            session, player_id=ana.id, removed=True, now=now, **mine
+            session, player_id=ana.id, removed=True, clock=lambda: now, **mine
         )
     assert raised.value.code is ErrorCode.LEAGUE_NOT_FOUND
 
@@ -335,10 +340,89 @@ def test_owasp_api1_a_player_of_another_league_is_not_found(
             player_id=foreign.id,
             user_id=league.owner_user_id,
             name="Bob",
-            now=now,
+            clock=lambda: now,
         )
     assert raised.value.code is ErrorCode.PLAYER_NOT_FOUND
     with pytest.raises(NotFoundError) as raised:
         _set_removed(session, league, foreign, now, removed=True)
     assert raised.value.code is ErrorCode.PLAYER_NOT_FOUND
     assert (foreign.name, foreign.removed_at) == ("Ana", None)
+
+
+def test_owasp_api1_a_removal_in_another_organizers_league_leaves_the_row_unchanged(
+    session: Session,
+    make_league: Callable[..., League],
+    make_user: Callable[..., User],
+    now: datetime,
+) -> None:
+    league = make_league()
+    ana = _add(session, league, "Ana", now)
+    stranger = make_user()
+
+    with pytest.raises(NotFoundError) as raised:
+        player_service.set_player_removed(
+            session,
+            league_id=league.id,
+            player_id=ana.id,
+            user_id=stranger.id,
+            removed=True,
+            clock=lambda: now + timedelta(hours=1),
+        )
+    session.refresh(ana)
+
+    assert raised.value.code is ErrorCode.LEAGUE_NOT_FOUND
+    assert (ana.name, ana.removed_at, ana.updated_at) == ("Ana", None, None)
+
+
+def test_fr012_the_league_holds_at_most_the_cap_removed_players_included(
+    session: Session,
+    make_league: Callable[..., League],
+    now: datetime,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(player_service, "MAX_PLAYERS_PER_LEAGUE", 2)
+    league, other = make_league(), make_league()
+    ana = _add(session, league, "Ana", now)
+    _set_removed(session, league, ana, now, removed=True)
+    _add(session, league, "Bob", now)
+
+    with pytest.raises(RuleViolationError) as raised:
+        _add(session, league, "Cyril", now)
+    _add(session, other, "Cyril", now)
+
+    assert raised.value.code is ErrorCode.PLAYER_LIMIT_REACHED
+    assert raised.value.detail == {"limit": 2}
+    assert _names(session, league, include_removed=True) == ["Ana", "Bob"]
+
+
+def test_adr008_the_clock_is_read_after_the_league_lock(
+    session: Session,
+    make_league: Callable[..., League],
+    make_user: Callable[..., User],
+    now: datetime,
+) -> None:
+    league = make_league()
+    reads: list[datetime] = []
+
+    def clock() -> datetime:
+        reads.append(now)
+        return now
+
+    with pytest.raises(NotFoundError):
+        player_service.add_player(
+            session,
+            league_id=league.id,
+            user_id=make_user().id,
+            name="Ana",
+            clock=clock,
+        )
+    assert reads == []
+
+    player_service.add_player(
+        session,
+        league_id=league.id,
+        user_id=league.owner_user_id,
+        name="Ana",
+        clock=clock,
+    )
+    assert reads == [now]

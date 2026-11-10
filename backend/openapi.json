@@ -59,7 +59,7 @@
           "season_number_changed",
           "player_not_found",
           "player_name_taken",
-          "player_removed"
+          "player_limit_reached"
         ],
         "title": "ErrorCode",
         "type": "string"
@@ -1402,7 +1402,7 @@
         ]
       },
       "post": {
-        "description": "Add a player to the league (FR-012).\n\nA name that another player has, in any case, is 422 `player_name_taken`\nwith the holder's `player_id`, `name` and `removed` (BR-001). When the\nholder is removed, the UI asks whether it is the same person and restores\nthem (ADR-002). A parallel add of the same name that wins the race to the\nunique index makes this one 409 `player_name_taken`: reload.",
+        "description": "Add a player to the league (FR-012).\n\nA name that another player has, in any case, is 422 `player_name_taken`\nwith the holder's `player_id`, `name` and `removed` (BR-001). When the\nholder is removed, the UI asks whether it is the same person and restores\nthem (ADR-002). A parallel add of the same name that wins the race to the\nunique index makes this one 409 `player_name_taken`: reload. A league holds at\nmost 500 players, removed ones included: more is 422 `player_limit_reached`.",
         "operationId": "add_player",
         "parameters": [
           {
@@ -1491,7 +1491,7 @@
     },
     "/api/v1/leagues/{league_id}/players/{player_id}/name": {
       "put": {
-        "description": "Rename a player; the new name shows in past results too (FR-012).\n\n422 `player_name_taken` as for an add, 409 for the race. A removed player\nis 422 `player_removed`: restore them first. Allowed in any season (BR-011).",
+        "description": "Rename a player; the new name shows in past results too (FR-012).\n\n422 `player_name_taken` as for an add, 409 for the race. A removed player can\nbe renamed too, and the new name must be free as well (BR-011).",
         "operationId": "rename_player",
         "parameters": [
           {
