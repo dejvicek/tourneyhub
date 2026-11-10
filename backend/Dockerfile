@@ -39,7 +39,8 @@ COPY src/ src/
 # Non-editable: the project goes into the venv as a wheel, which ships migrations/
 # but no pyproject.toml, hence `tourneyhub migrate` (§7).
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-dev --no-editable
+    uv sync --locked --no-dev --no-editable \
+    && rm /app/.venv/.lock
 
 
 FROM uv AS dev
