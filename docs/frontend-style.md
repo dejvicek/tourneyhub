@@ -123,7 +123,7 @@ Checked by tools: ESLint better-tailwindcss `no-unknown-classes`, `no-conflictin
 - To update a component, review upstream with `pnpm exec shadcn add <name> --diff` and port the changes by hand; never `--overwrite` an edited file [W18].
 - Never run `shadcn apply` or `shadcn migrate base-color`; both rewrite the theme [W19].
 - Classes are merged with `cn`, imported everywhere from `"cn"`, the package the CLI writes into the copied components [W15]. `src/lib/utils.ts` re-exports it only because `components.json` names that path as its `utils` alias; no file imports from it. If the package disappoints, a three-line helper on `clsx` and `tailwind-merge` takes its place there, and the imports change with it.
-- Icons come only from `lucide-react`, the `iconLibrary` of `components.json`.
+- Icons come only from `lucide-react`, the `iconLibrary` of `components.json`. The package is not installed until an icon uses it; the pull request that renders the first icon adds it.
 
 ## 6. Accessibility
 
