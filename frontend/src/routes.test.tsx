@@ -53,33 +53,25 @@ const SCREENS: Screen[] = [
   // The running round robin opens on its schedule.
   ["tournament", "Round robin in progress", "Probíhá každý s každým"],
   ["schedule", "Round robin in progress", "Probíhá každý s každým"],
-  ["scheduleResult", "Enter a result", "Zadat výsledek", { overlay: true }],
+  // The play screens' overlays are titled by what they show (G2).
+  ["scheduleResult", "Round 5", "5. kolo", { overlay: true }],
   ["fields", "Fields: now playing and waiting", "Hřiště: hraje se a čeká"],
   [
     "moveMatch",
-    "Fields: move a match",
-    "Hřiště: přesunout zápas",
+    "Put this match on a field",
+    "Dát zápas na hřiště",
     { overlay: true },
   ],
-  [
-    "editFields",
-    "Fields: add or remove",
-    "Hřiště: přidat nebo odebrat",
-    { overlay: true },
-  ],
-  ["fieldsResult", "Enter a result", "Zadat výsledek", { overlay: true }],
+  ["editFields", "Fields", "Hřiště", { overlay: true }],
+  ["fieldsResult", "Round 5", "5. kolo", { overlay: true }],
   ["tournamentStandings", "Tournament standings", "Pořadí turnaje"],
-  [
-    "groupPhaseDone",
-    "Group phase done: knockout or finish",
-    "Skupinová fáze skončila: vyřazovací fáze, nebo konec",
-  ],
+  ["groupPhaseDone", "Round robin done", "Každý s každým skončil"],
   ["knockout", "Knockout in progress", "Probíhá vyřazovací fáze"],
   // The final of Autumn Open DYP is best of three (7b).
   [
     "knockoutResult",
-    "Best-of results: BO2, BO3, BO5",
-    "Výsledky na více her: BO2, BO3, BO5",
+    "Final",
+    "Finále",
     {
       overlay: true,
       params: { tournamentId: autumn.id, matchId: autumnFinal },
@@ -100,7 +92,7 @@ const SCREENS: Screen[] = [
     "Swiss and Monster DYP: between rounds",
     "Švýcarský systém a Monster DYP: mezi koly",
   ],
-  ["roundsResult", "Enter a result", "Zadat výsledek", { overlay: true }],
+  ["roundsResult", "Round 5", "5. kolo", { overlay: true }],
   [
     "lateAndDisabled",
     "Swiss and Monster DYP: late and disabled players",
@@ -114,9 +106,11 @@ const SCREENS: Screen[] = [
 ];
 
 async function findTitle(title: string, overlay = false) {
+  // A screen's title can wait for its data, slowly under a full run.
+  const wait = { timeout: 3000 };
   return overlay
-    ? screen.findByRole("dialog", { name: title })
-    : screen.findByRole("heading", { level: 1, name: title });
+    ? screen.findByRole("dialog", { name: title }, wait)
+    : screen.findByRole("heading", { level: 1, name: title }, wait);
 }
 
 describe("the route table", () => {

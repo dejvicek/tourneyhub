@@ -22,7 +22,7 @@ import { type PlayModel, sidesOf } from "@/features/tournaments/play/model";
 import { Notice } from "@/features/tournaments/play/Notice";
 import { useNames } from "@/features/tournaments/play/useNames";
 
-import { BestOfResultForm } from "./BestOfResultForm";
+import { BestOfResultPage } from "./BestOfResultPage";
 import type { ResultFormContext } from "./formContext";
 import { drawsAllowed, scoresRequired } from "./resultDraft";
 import { SimpleResultForm } from "./SimpleResultForm";
@@ -133,7 +133,7 @@ export function ResultEntry({
       ) : info.format === "bo1" ? (
         <SimpleResultForm context={context} />
       ) : (
-        <BestOfResultForm context={context} />
+        <BestOfResultPage context={context} />
       )}
       {errorText !== null && (
         <p role="alert" className="text-body-md font-bold text-destructive">
@@ -143,13 +143,12 @@ export function ResultEntry({
       {!walkover && !locked && (
         <Button
           type="button"
-          variant="ghost"
-          className="h-11 w-full text-body-md"
+          variant="text"
+          className="w-full"
           onClick={() => {
             setWalkover(true);
           }}
         >
-          {/* TODO(foundation-buttons): the text variant after the rebase. */}
           {t("results.walkover.open")}
         </Button>
       )}
@@ -158,10 +157,9 @@ export function ResultEntry({
           <AlertDialogTrigger asChild>
             <Button
               type="button"
-              variant="ghost"
-              className="h-11 w-full text-body-md text-destructive"
+              variant="text"
+              className="w-full text-destructive"
             >
-              {/* TODO(foundation-buttons): the text variant after the rebase. */}
               {t("results.clear.open")}
             </Button>
           </AlertDialogTrigger>

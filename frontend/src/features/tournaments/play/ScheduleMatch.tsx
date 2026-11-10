@@ -86,8 +86,7 @@ export function ScheduleMatch({ model, info, resultHref }: ScheduleMatchProps) {
         {sides(
           <span className="flex flex-col items-center gap-1.5">
             <FieldBadge number={field.number} />
-            <Button asChild className="h-11 px-3 text-button-sm">
-              {/* TODO(foundation-buttons): Compact 44 px is the default size after the rebase. */}
+            <Button asChild className="px-3">
               <Link to={resultHref}>
                 {t("roundRobin.schedule.enterResult")}
                 <span className="sr-only">

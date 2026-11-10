@@ -22,9 +22,12 @@ export function FieldBadge({
   return (
     <Badge
       variant={free ? "secondary" : "default"}
-      className={cn(size === "large" && "px-3 py-1 text-body-md", className)}
+      className={cn(size === "large" && "px-3 py-1", className)}
     >
-      {t("roundRobin.field", { number })}
+      {/* The size stays out of cn, which takes text styles for colours. */}
+      <span className={size === "large" ? "text-body-md" : undefined}>
+        {t("roundRobin.field", { number })}
+      </span>
     </Badge>
   );
 }

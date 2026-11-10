@@ -19,7 +19,7 @@ import type {
   TournamentStandingRow,
 } from "./contract";
 import { fillFields } from "./engine";
-import { type RoundRobinTiebreaker, rules } from "./rules";
+import { MATCH_POINTS, type RoundRobinTiebreaker, rules } from "./rules";
 import type { StoredTournament } from "./seed";
 import { tournamentStandings } from "./store";
 
@@ -420,21 +420,167 @@ export function groupLocked(t: StoredTournament, match: MatchRead): boolean {
   );
 }
 
+/** The entries a side stands for: its entry, or its players' own entries (Monster DYP). */
+function sideEntries(t: StoredTournament, side: MatchRead["sides"][number]) {
+  if (side.entry_id !== null) {
+    return [side.entry_id];
+  }
+  return t.entries
+    .filter(
+      (entry) =>
+        entry.stage === "main" &&
+        entry.player_ids.some((id) => side.player_ids.includes(id)),
+    )
+    .map((entry) => entry.id);
+}
+
 function form(t: StoredTournament, entryId: string): FormResult[] {
   return groupMatches(t)
-    .filter(
-      (m) =>
-        m.outcome !== null && m.sides.some((side) => side.entry_id === entryId),
-    )
-    .map((m): FormResult => {
-      const mine: Side = m.sides[0].entry_id === entryId ? "side_1" : "side_2";
-      return m.outcome === "draw"
-        ? "drawn"
-        : m.outcome === mine
-          ? "won"
-          : "lost";
+    .flatMap((m): FormResult[] => {
+      const index = m.sides.findIndex((side) =>
+        sideEntries(t, side).includes(entryId),
+      );
+      if (m.outcome === null || index === -1) {
+        return [];
+      }
+      const mine: Side = index === 0 ? "side_1" : "side_2";
+      return [
+        m.outcome === "draw" ? "drawn" : m.outcome === mine ? "won" : "lost",
+      ];
     })
     .slice(-5);
+}
+
+type SwissRow = Omit<PlayStandingRow, "place" | "form" | "ahead_by"> & {
+  opponents: string[];
+};
+
+/**
+ * Swiss and Monster DYP standings, simply (BR-070–BR-073): points, then the
+ * phase's tie-breakers (FR-043, rules.swissTiebreakers by default); entries
+ * still level share the place (BR-074).
+ */
+function swissStandings(
+  t: StoredTournament,
+  group: PhaseRead,
+): Omit<PlayStandingRow, "form" | "ahead_by">[] {
+  const sitOutPoints =
+    group.sit_out_points === 1 ? rules.sitOutPointsWhenOn : 0;
+  const rows = new Map<string, SwissRow>(
+    t.entries
+      .filter((entry) => entry.stage === "main")
+      .map((entry) => [
+        entry.id,
+        {
+          entry_id: entry.id,
+          played: 0,
+          won: 0,
+          drawn: 0,
+          lost: 0,
+          sat_out: 0,
+          points: 0,
+          score_difference: 0,
+          bh1: 0,
+          bh2: 0,
+          opponents: [],
+        },
+      ]),
+  );
+  for (const round of t.rounds.filter((r) => r.phase_id === group.id)) {
+    for (const id of round.sitting_out) {
+      const row = rows.get(id);
+      if (row) {
+        row.sat_out += 1;
+        row.points += sitOutPoints;
+      }
+    }
+    for (const match of round.matches) {
+      if (match.outcome === null) {
+        continue;
+      }
+      const sides = match.sides.map((side) => sideEntries(t, side));
+      sides.forEach((ids, index) => {
+        const mine: Side = index === 0 ? "side_1" : "side_2";
+        const others = sides[index === 0 ? 1 : 0] ?? [];
+        let difference = 0;
+        for (const game of match.games) {
+          if (game.score_1 !== null && game.score_2 !== null) {
+            difference +=
+              index === 0
+                ? game.score_1 - game.score_2
+                : game.score_2 - game.score_1;
+          }
+        }
+        for (const id of ids) {
+          const row = rows.get(id);
+          if (!row) {
+            continue;
+          }
+          row.played += 1;
+          row.score_difference += difference;
+          row.opponents.push(...others);
+          if (match.outcome === "draw") {
+            row.drawn += 1;
+            row.points += MATCH_POINTS.draw;
+          } else if (match.outcome === mine) {
+            row.won += 1;
+            row.points += MATCH_POINTS.win;
+          } else {
+            row.lost += 1;
+          }
+        }
+      });
+    }
+  }
+  const points = (id: string) => rows.get(id)?.points ?? 0;
+  for (const row of rows.values()) {
+    row.bh1 = row.opponents.reduce((sum, id) => sum + points(id), 0);
+  }
+  for (const row of rows.values()) {
+    row.bh2 = row.opponents.reduce(
+      (sum, id) => sum + (rows.get(id)?.bh1 ?? 0),
+      0,
+    );
+  }
+  const tiebreakers = group.tiebreakers ?? rules.swissTiebreakers;
+  const compare = (a: SwissRow, b: SwissRow): number => {
+    if (a.points !== b.points) {
+      return b.points - a.points;
+    }
+    for (const tiebreaker of tiebreakers) {
+      const value = (row: SwissRow) =>
+        tiebreaker === "bh1"
+          ? (row.bh1 ?? 0)
+          : tiebreaker === "bh2"
+            ? (row.bh2 ?? 0)
+            : row.score_difference;
+      if (value(a) !== value(b)) {
+        return value(b) - value(a);
+      }
+    }
+    return 0;
+  };
+  const sorted = [...rows.values()].sort(compare);
+  const places: number[] = [];
+  return sorted.map((row, index) => {
+    const above = sorted[index - 1];
+    const level = above !== undefined && compare(above, row) === 0;
+    const place = level ? (places[index - 1] ?? index + 1) : index + 1;
+    places.push(place);
+    return {
+      place,
+      entry_id: row.entry_id,
+      played: row.played,
+      won: row.won,
+      drawn: row.drawn,
+      lost: row.lost,
+      sat_out: row.sat_out,
+      points: row.points,
+      score_difference: row.score_difference,
+      bh1: row.bh1,
+      bh2: row.bh2,
+    };
+  });
 }
 
 function headToHead(t: StoredTournament, a: string, b: string): number {
@@ -486,12 +632,26 @@ export function playRead(t: StoredTournament): PlayRead {
       field.match_id === null ? undefined : findMatch(t, field.match_id);
     return match ? [{ field_id: field.id, players: playerIds(match) }] : [];
   });
-  const rows = tournamentStandings(t);
-  const standings: PlayStandingRow[] = rows.map((row, i) => ({
-    ...row,
-    form: form(t, row.entry_id),
-    ahead_by: aheadBy(t, rows, row, rows[i + 1]),
-  }));
+  const group = t.phases.find((phase) => phase.kind === "group");
+  const swiss =
+    group?.format === "swiss" || group?.format === "monster_dyp"
+      ? group
+      : undefined;
+  const rows = swiss ? [] : tournamentStandings(t);
+  const standings: PlayStandingRow[] =
+    swiss === undefined
+      ? rows.map((row, i) => ({
+          ...row,
+          form: form(t, row.entry_id),
+          ahead_by: aheadBy(t, rows, row, rows[i + 1]),
+          bh1: null,
+          bh2: null,
+        }))
+      : swissStandings(t, swiss).map((row) => ({
+          ...row,
+          form: form(t, row.entry_id),
+          ahead_by: null,
+        }));
   return {
     waiting: waitingOrder(t).map((match) => {
       const players = new Set(playerIds(match));

@@ -6,15 +6,14 @@ import type { ReactNode } from "react";
  */
 export function Playfield({ children }: { children: ReactNode }) {
   return (
-    // TODO(foundation-buttons): bg-field once the field token arrives.
-    <div className="relative isolate space-y-7 overflow-hidden rounded-xl bg-primary p-3.5">
+    <div className="relative isolate space-y-7 overflow-hidden rounded-xl bg-field p-3.5">
       <span
         aria-hidden="true"
-        className="absolute inset-x-0 top-1/2 -z-10 h-0.5 bg-primary-foreground/40"
+        className="absolute inset-x-0 top-1/2 -z-10 h-0.5 bg-field-foreground/40"
       />
       <span
         aria-hidden="true"
-        className="absolute top-1/2 left-1/2 -z-10 size-24 -translate-1/2 rounded-full border-2 border-primary-foreground/40"
+        className="absolute top-1/2 left-1/2 -z-10 size-24 -translate-1/2 rounded-full border-2 border-field-foreground/40"
       />
       {children}
     </div>

@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { configure, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -11,23 +11,29 @@ import {
   playEverything,
   playPath,
   runningDyp,
-  stubResizeObserver,
 } from "@/test/play";
 import { renderAt } from "@/test/renderApp";
+
+// The first screen of a file loads its lazy route, slowly under a full run.
+configure({ asyncUtilTimeout: 3000 });
 
 describe("the running round robin (screen 6)", () => {
   beforeEach(async () => {
     await i18n.changeLanguage("en");
-    stubResizeObserver();
   });
 
   it("shows progress, the fields and the schedule by round", async () => {
-    renderAt(playPath(paths.tournament));
+    renderAt(playPath(paths.schedule));
 
     expect(
-      await screen.findByRole("heading", { level: 1, name: "Thursday DYP" }),
+      await screen.findByRole("heading", {
+        level: 1,
+        name: "Round robin in progress",
+      }),
     ).toBeInTheDocument();
-    expect(screen.getByText("7 of 15 matches played")).toBeInTheDocument();
+    expect(
+      await screen.findByText("7 of 15 matches played"),
+    ).toBeInTheDocument();
     expect(screen.getByRole("progressbar")).toHaveAttribute(
       "aria-valuenow",
       "7",
@@ -45,7 +51,7 @@ describe("the running round robin (screen 6)", () => {
 
   it("shows the live standings beside the schedule from the tablet up (FR-060)", async () => {
     stubViewport(1280);
-    renderAt(playPath(paths.tournament));
+    renderAt(playPath(paths.schedule));
 
     const table = await screen.findByRole("table", { name: "Standings" });
     expect(within(table).getAllByRole("row")).toHaveLength(7);
@@ -53,7 +59,7 @@ describe("the running round robin (screen 6)", () => {
 
   it("links to the end of the group phase once every match is played (FR-040)", async () => {
     playEverything();
-    renderAt(playPath(paths.tournament));
+    renderAt(playPath(paths.schedule));
 
     expect(
       await screen.findByRole("link", {
@@ -66,7 +72,6 @@ describe("the running round robin (screen 6)", () => {
 describe("group phase done (screen 8)", () => {
   beforeEach(async () => {
     await i18n.changeLanguage("en");
-    stubResizeObserver();
   });
 
   it("finishes the tournament after confirming (FR-040)", async () => {
@@ -140,11 +145,10 @@ async function violations(): Promise<string[]> {
 describe("axe on the play screens", () => {
   beforeEach(async () => {
     await i18n.changeLanguage("en");
-    stubResizeObserver();
   });
 
   const screens = [
-    ["6 round robin", () => playPath(paths.tournament), "Thursday DYP"],
+    ["6 round robin", () => playPath(paths.schedule), "Schedule"],
     ["6b fields", () => playPath(paths.fields), "Waiting for a field"],
     [
       "6c move a match",
@@ -154,7 +158,7 @@ describe("axe on the play screens", () => {
     ["6d add or remove fields", () => playPath(paths.editFields), "Fields"],
     [
       "7 enter a result",
-      () => playPath(paths.enterResult, { matchId: onField(1).match.id }),
+      () => playPath(paths.scheduleResult, { matchId: onField(1).match.id }),
       "Round 3",
     ],
     [
@@ -177,7 +181,7 @@ describe("axe on the play screens", () => {
     for (const phase of runningDyp().phases) {
       phase.match_format = "bo3";
     }
-    renderAt(playPath(paths.enterResult, { matchId: onField(1).match.id }));
+    renderAt(playPath(paths.scheduleResult, { matchId: onField(1).match.id }));
     await screen.findByRole("tab", { name: "Winners only" });
     expect(await violations()).toEqual([]);
   });

@@ -1,4 +1,3 @@
-import { cn } from "cn";
 import { useTranslation } from "react-i18next";
 
 import { BeadRod } from "./BeadRod";
@@ -52,10 +51,12 @@ export function SidePanel({
             const digits = event.target.value.replace(/\D/g, "").slice(0, 3);
             onChange(digits === "" ? null : Number(digits));
           }}
-          className={cn(
-            "h-18 w-24 shrink-0 rounded-md border-b-2 border-input bg-transparent text-right font-display text-score-xl outline-hidden placeholder:text-muted-foreground focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-            side === "a" ? "text-team-a" : "text-team-b",
-          )}
+          // Size and colour stay out of cn, which takes text styles for colours.
+          className={
+            side === "a"
+              ? "h-18 w-24 shrink-0 rounded-md border-b-2 border-input bg-transparent text-right font-display text-score-xl text-team-a outline-hidden placeholder:text-muted-foreground focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              : "h-18 w-24 shrink-0 rounded-md border-b-2 border-input bg-transparent text-right font-display text-score-xl text-team-b outline-hidden placeholder:text-muted-foreground focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          }
         />
       </div>
       <BeadRod

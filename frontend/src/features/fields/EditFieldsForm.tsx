@@ -80,7 +80,6 @@ export function EditFieldsForm({
               <Button
                 type="button"
                 variant="outline"
-                className="h-11"
                 disabled={last || remove.isPending}
                 aria-label={t("fields.edit.removeField", {
                   number: field.number,
@@ -133,12 +132,7 @@ export function EditFieldsForm({
           {errorText}
         </p>
       )}
-      <Button
-        type="button"
-        className="h-14 w-full rounded-lg text-button-lg"
-        onClick={onDone}
-      >
-        {/* TODO(foundation-buttons): size lg after the rebase. */}
+      <Button type="button" size="lg" className="w-full" onClick={onDone}>
         {t("fields.edit.done")}
       </Button>
 

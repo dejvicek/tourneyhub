@@ -1,32 +1,30 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { configure, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { i18n } from "@/i18n";
-import {
-  onField,
-  paths,
-  playPath,
-  runningDyp,
-  stubResizeObserver,
-} from "@/test/play";
+import { onField, paths, playPath, runningDyp } from "@/test/play";
 import { renderAt } from "@/test/renderApp";
+
+// The first screen of a file loads its lazy route, slowly under a full run.
+configure({ asyncUtilTimeout: 3000 });
 
 describe("result entry (screens 7 and 7b)", () => {
   beforeEach(async () => {
     await i18n.changeLanguage("en");
-    stubResizeObserver();
   });
 
   it("saves a simple result in three taps from the schedule (FR-082)", async () => {
     const user = userEvent.setup();
     const { match } = onField(1);
-    renderAt(playPath(paths.tournament));
+    renderAt(playPath(paths.schedule));
 
     // 1: open the match on Field 1.
-    const [enter] = await screen.findAllByRole("link", {
-      name: /^Enter result,/,
-    });
+    const [enter] = await screen.findAllByRole(
+      "link",
+      { name: /^Enter result,/ },
+      { timeout: 3000 },
+    );
     await user.click(enter ?? document.body);
     const sheet = await screen.findByRole("dialog");
     // 2: the winner's last bead.
@@ -56,7 +54,7 @@ describe("result entry (screens 7 and 7b)", () => {
   it("saves goals for both pairs and says who goes top", async () => {
     const user = userEvent.setup();
     const { match } = onField(2);
-    renderAt(playPath(paths.enterResult, { matchId: match.id }));
+    renderAt(playPath(paths.scheduleResult, { matchId: match.id }));
 
     const sheet = await screen.findByRole("dialog");
     const [a] = await within(sheet).findAllByRole("textbox");
@@ -78,7 +76,7 @@ describe("result entry (screens 7 and 7b)", () => {
   it("rejects a draw in a league without draws (BR-090)", async () => {
     const user = userEvent.setup();
     const { match } = onField(1);
-    renderAt(playPath(paths.enterResult, { matchId: match.id }));
+    renderAt(playPath(paths.scheduleResult, { matchId: match.id }));
 
     const sheet = await screen.findByRole("dialog");
     for (const bead of await within(sheet).findAllByRole("radio", {
@@ -99,7 +97,7 @@ describe("result entry (screens 7 and 7b)", () => {
   it("records a walkover (FR-052, BR-093)", async () => {
     const user = userEvent.setup();
     const { match } = onField(1);
-    renderAt(playPath(paths.enterResult, { matchId: match.id }));
+    renderAt(playPath(paths.scheduleResult, { matchId: match.id }));
 
     const sheet = await screen.findByRole("dialog");
     await user.click(
@@ -123,7 +121,7 @@ describe("result entry (screens 7 and 7b)", () => {
   it("clears a result after confirming (FR-053, BR-134)", async () => {
     const user = userEvent.setup();
     const played = runningDyp().rounds[0]?.matches[0];
-    renderAt(playPath(paths.enterResult, { matchId: played?.id ?? "" }));
+    renderAt(playPath(paths.scheduleResult, { matchId: played?.id ?? "" }));
 
     const sheet = await screen.findByRole("dialog");
     await user.click(
@@ -149,7 +147,7 @@ describe("result entry (screens 7 and 7b)", () => {
       phase.match_format = "bo3";
     }
     const { match } = onField(1);
-    renderAt(playPath(paths.enterResult, { matchId: match.id }));
+    renderAt(playPath(paths.scheduleResult, { matchId: match.id }));
 
     const sheet = await screen.findByRole("dialog");
     await user.click(
@@ -184,7 +182,7 @@ describe("result entry (screens 7 and 7b)", () => {
       phase.match_format = "bo3";
     }
     const { match } = onField(1);
-    renderAt(playPath(paths.enterResult, { matchId: match.id }));
+    renderAt(playPath(paths.scheduleResult, { matchId: match.id }));
 
     const sheet = await screen.findByRole("dialog");
     await within(sheet).findAllByRole("textbox");

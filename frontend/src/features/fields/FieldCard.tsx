@@ -62,14 +62,13 @@ export function FieldCard({
         {model.waiting.length > 0 && (
           <Button
             type="button"
-            variant="link"
+            variant="text"
             aria-expanded={picking}
-            className="h-11 px-0 text-body-md font-bold text-secondary-foreground"
+            className="px-0 font-bold text-secondary-foreground"
             onClick={() => {
               setPicking(!picking);
             }}
           >
-            {/* TODO(foundation-buttons): the text variant after the rebase. */}
             {t("fields.card.putHere")}
           </Button>
         )}
@@ -99,7 +98,6 @@ export function FieldCard({
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-11"
                     disabled={blocked || putPending}
                     onClick={() => {
                       onPut(w.match_id);
@@ -155,8 +153,7 @@ export function FieldCard({
           </li>
         ))}
       </ul>
-      <Button asChild className="h-14 w-full rounded-lg text-button-lg">
-        {/* TODO(foundation-buttons): size lg after the rebase. */}
+      <Button asChild size="lg" className="w-full">
         <Link to={resultHref(match.id)}>
           {t("roundRobin.schedule.enterResult")}
           <span className="sr-only">
@@ -166,8 +163,7 @@ export function FieldCard({
           </span>
         </Link>
       </Button>
-      <Button asChild variant="ghost" className="h-11 w-full text-body-md">
-        {/* TODO(foundation-buttons): the text variant after the rebase. */}
+      <Button asChild variant="text" className="w-full">
         <Link to={moveHref(match.id)}>
           {t("fields.card.move")}
           <span className="sr-only">

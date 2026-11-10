@@ -1,8 +1,6 @@
-import type { Messages } from "../en";
+import type { CsMessages, Messages } from "../en";
 
-// TODO(cs-plurals): add the _few (2–4) and _many forms once CsMessages
-// allows them; until then 2–4 falls back to _other.
-export const roundRobin: Messages["roundRobin"] = {
+export const roundRobin: CsMessages<Messages["roundRobin"]> = {
   names: {
     pair: "{{a}} & {{b}}",
     versus: "{{a}} – {{b}}",
@@ -14,8 +12,12 @@ export const roundRobin: Messages["roundRobin"] = {
   entries: {
     players_one: "{{count}} hráč",
     players_other: "{{count}} hráčů",
+    players_few: "{{count}} hráči",
+    players_many: "{{count}} hráčů",
     pairs_one: "{{count}} dvojice",
     pairs_other: "{{count}} dvojic",
+    pairs_few: "{{count}} dvojice",
+    pairs_many: "{{count}} dvojic",
   },
   format: { bo1: "BO1", bo2: "BO2", bo3: "BO3", bo5: "BO5" },
   loadFailed: "Turnaj se nepodařilo načíst. Zkuste stránku načíst znovu.",
@@ -28,6 +30,8 @@ export const roundRobin: Messages["roundRobin"] = {
   progress: {
     played_one: "Odehrán {{played}} z {{count}} zápasu",
     played_other: "Odehráno {{played}} z {{count}} zápasů",
+    played_few: "Odehráno {{played}} z {{count}} zápasů",
+    played_many: "Odehráno {{played}} z {{count}} zápasů",
     round: "{{round}}. kolo z {{rounds}}",
   },
   fields: {
@@ -49,12 +53,20 @@ export const roundRobin: Messages["roundRobin"] = {
     roundWaiting: "Čeká na volné hřiště",
     played_one: "{{count}} odehrán",
     played_other: "{{count}} odehráno",
+    played_few: "{{count}} odehrány",
+    played_many: "{{count}} odehráno",
     onFields_one: "{{count}} na hřišti",
     onFields_other: "{{count}} na hřištích",
+    onFields_few: "{{count}} na hřištích",
+    onFields_many: "{{count}} na hřištích",
     waitingCount_one: "{{count}} čeká",
     waitingCount_other: "{{count}} čeká",
+    waitingCount_few: "{{count}} čekají",
+    waitingCount_many: "{{count}} čeká",
     sittingOut_one: "{{count}} v tomto kole stojí.",
     sittingOut_other: "{{count}} v tomto kole stojí.",
+    sittingOut_few: "{{count}} v tomto kole stojí.",
+    sittingOut_many: "{{count}} v tomto kole stojí.",
   },
   standings: {
     title: "Pořadí",
@@ -69,20 +81,34 @@ export const roundRobin: Messages["roundRobin"] = {
       "{{played}} odehráno, {{won}} výher, {{drawn}} remíz, {{lost}} proher",
     recordWithSatOut:
       "{{played}} odehráno, {{won}} výher, {{drawn}} remíz, {{lost}} proher, stál(a) {{satOut}}×",
+    empty: "Pořadí zatím není: skupina nemá žádné účastníky.",
+    buchholz: "BH1 {{bh1}}, BH2 {{bh2}}",
     cut_one: "Postupuje první {{count}}",
     cut_other: "Postupuje prvních {{count}}",
+    cut_few: "Postupují první {{count}}",
+    cut_many: "Postupuje prvních {{count}}",
   },
   notes: {
     headToHead_one: "{{a}} je před {{b}} díky vzájemnému zápasu.",
     headToHead_other: "{{a}} jsou před {{b}} díky vzájemnému zápasu.",
+    headToHead_few: "{{a}} jsou před {{b}} díky vzájemnému zápasu.",
+    headToHead_many: "{{a}} jsou před {{b}} díky vzájemnému zápasu.",
     headToHeadMatch_one:
       "{{a}} je před {{b}} díky vzájemnému zápasu: vyhrál(a) {{score}} v {{round}}. kole.",
     headToHeadMatch_other:
       "{{a}} jsou před {{b}} díky vzájemnému zápasu: vyhráli {{score}} v {{round}}. kole.",
+    headToHeadMatch_few:
+      "{{a}} jsou před {{b}} díky vzájemnému zápasu: vyhráli {{score}} v {{round}}. kole.",
+    headToHeadMatch_many:
+      "{{a}} jsou před {{b}} díky vzájemnému zápasu: vyhráli {{score}} v {{round}}. kole.",
     scoreDifference_one: "{{a}} je před {{b}} díky rozdílu skóre.",
     scoreDifference_other: "{{a}} jsou před {{b}} díky rozdílu skóre.",
+    scoreDifference_few: "{{a}} jsou před {{b}} díky rozdílu skóre.",
+    scoreDifference_many: "{{a}} jsou před {{b}} díky rozdílu skóre.",
     gameDifference_one: "{{a}} je před {{b}} díky rozdílu her.",
     gameDifference_other: "{{a}} jsou před {{b}} díky rozdílu her.",
+    gameDifference_few: "{{a}} jsou před {{b}} díky rozdílu her.",
+    gameDifference_many: "{{a}} jsou před {{b}} díky rozdílu her.",
   },
   done: {
     title: "Každý s každým je dohrán",
@@ -92,6 +118,8 @@ export const roundRobin: Messages["roundRobin"] = {
     notYetTitle: "Ještě není dohráno",
     notYet_one: "Výsledek chybí ještě {{count}} zápasu.",
     notYet_other: "Výsledek chybí ještě {{count}} zápasům.",
+    notYet_few: "Výsledek chybí ještě {{count}} zápasům.",
+    notYet_many: "Výsledek chybí ještě {{count}} zápasům.",
     backToSchedule: "Zpět na rozpis",
     standings: "Konečné pořadí",
     next: "Co dál?",
@@ -103,6 +131,8 @@ export const roundRobin: Messages["roundRobin"] = {
     qualifiers: "Postupující dvojice",
     qualifiersHint_one: "Nejlepší v pořadí, aspoň {{count}}.",
     qualifiersHint_other: "Nejlepší v pořadí, aspoň {{count}}.",
+    qualifiersHint_few: "Nejlepší v pořadí, aspoň {{count}}.",
+    qualifiersHint_many: "Nejlepší v pořadí, aspoň {{count}}.",
     fewer: "O jednu méně",
     more: "O jednu víc",
     thirdPlace: "Zápas o 3. místo",
@@ -117,6 +147,8 @@ export const roundRobin: Messages["roundRobin"] = {
       versus: "VS",
       byes_one: "Nejvýše nasazený jde rovnou do druhého kola.",
       byes_other: "{{count}} nejvýše nasazených jde rovnou do druhého kola.",
+      byes_few: "{{count}} nejvýše nasazení jdou rovnou do druhého kola.",
+      byes_many: "{{count}} nejvýše nasazených jde rovnou do druhého kola.",
     },
     lockTitle: "Výsledky skupiny se zamknou",
     lockBody:

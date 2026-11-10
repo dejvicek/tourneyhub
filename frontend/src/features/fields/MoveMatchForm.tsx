@@ -157,13 +157,7 @@ export function MoveMatchForm({
   };
 
   return (
-    <form
-      className="space-y-4"
-      onSubmit={(event) => {
-        event.preventDefault();
-        submit();
-      }}
-    >
+    <div className="space-y-4">
       <RadioGroup
         aria-label={t("fields.move.options")}
         value={choice}
@@ -193,13 +187,14 @@ export function MoveMatchForm({
         </p>
       )}
       <Button
-        type="submit"
+        type="button"
+        onClick={submit}
         disabled={place.isPending || chosen?.disabled === true}
-        className="h-14 w-full rounded-lg text-button-lg"
+        size="lg"
+        className="w-full"
       >
-        {/* TODO(foundation-buttons): size lg after the rebase. */}
         {label}
       </Button>
-    </form>
+    </div>
   );
 }

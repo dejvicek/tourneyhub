@@ -1,12 +1,12 @@
-import type { Messages } from "../en";
+import type { CsMessages, Messages } from "../en";
 
-// TODO(cs-plurals): add the _few (2–4) and _many forms once CsMessages
-// allows them; until then 2–4 falls back to _other.
-export const fields: Messages["fields"] = {
+export const fields: CsMessages<Messages["fields"]> = {
   now: {
     title: "Hřiště: hraje se a čeká",
     summary_one: "{{count}} hřiště, hraje se na {{playing}}",
     summary_other: "{{count}} hřišť, hraje se na {{playing}}",
+    summary_few: "{{count}} hřiště, hraje se na {{playing}}",
+    summary_many: "{{count}} hřišť, hraje se na {{playing}}",
   },
   card: {
     free: "Volné",
@@ -29,6 +29,10 @@ export const fields: Messages["fields"] = {
       "{{round}}. kolo. Čeká na {{names}}, který hraje na hřišti {{field}}.",
     reasonBusy_other:
       "{{round}}. kolo. Čeká na {{names}}, kteří hrají na hřišti {{field}}.",
+    reasonBusy_few:
+      "{{round}}. kolo. Čeká na {{names}}, kteří hrají na hřišti {{field}}.",
+    reasonBusy_many:
+      "{{round}}. kolo. Čeká na {{names}}, kteří hrají na hřišti {{field}}.",
     reasonBoth: "{{round}}. kolo. Obě strany ještě hrají na hřišti.",
   },
   move: {
@@ -42,6 +46,8 @@ export const fields: Messages["fields"] = {
     busy: "Hraje se tu {{match}}.",
     blocked_one: "{{names}} hraje na hřišti {{field}}.",
     blocked_other: "{{names}} hrají na hřišti {{field}}.",
+    blocked_few: "{{names}} hrají na hřišti {{field}}.",
+    blocked_many: "{{names}} hrají na hřišti {{field}}.",
     free: "Volné.",
     waitingTitle: "Zpět mezi čekající",
     waitingText:

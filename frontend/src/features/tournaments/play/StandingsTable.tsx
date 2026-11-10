@@ -89,10 +89,11 @@ export function StandingsTable({
               <tr className="align-top">
                 <th
                   scope="row"
-                  className={cn(
-                    "w-9 border-t py-3 pr-2 font-display text-score-m",
-                    row.place === 1 && "text-secondary-foreground",
-                  )}
+                  className={
+                    row.place === 1
+                      ? "w-9 border-t py-3 pr-2 font-display text-score-m text-secondary-foreground"
+                      : "w-9 border-t py-3 pr-2 font-display text-score-m"
+                  }
                 >
                   {t("roundRobin.standings.placeValue", { place: row.place })}
                 </th>
@@ -124,6 +125,14 @@ export function StandingsTable({
                         },
                       )}
                     </span>
+                    {row.bh1 !== null && (
+                      <span>
+                        {t("roundRobin.standings.buchholz", {
+                          bh1: row.bh1,
+                          bh2: row.bh2 ?? 0,
+                        })}
+                      </span>
+                    )}
                   </span>
                 </td>
                 <td className="border-t py-3 pr-2 text-right text-body-sm text-muted-foreground">

@@ -140,9 +140,9 @@ export function SimpleResultForm({ context }: { context: ResultFormContext }) {
       <Button
         type="submit"
         disabled={body === null || context.pending || context.locked}
-        className="h-14 w-full rounded-lg text-button-lg"
+        size="lg"
+        className="w-full"
       >
-        {/* TODO(foundation-buttons): size lg after the rebase. */}
         {t("results.save")}
       </Button>
     </form>

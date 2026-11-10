@@ -1,17 +1,11 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { configure, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { provisionalApi } from "@/api/provisional";
-import { DEMO_LEAGUE_ID } from "@/demo/seed";
+import { DEMO_LEAGUE_ID } from "@/demo/ids";
 import { i18n } from "@/i18n";
-import {
-  onField,
-  paths,
-  playPath,
-  runningDyp,
-  stubResizeObserver,
-} from "@/test/play";
+import { onField, paths, playPath, runningDyp } from "@/test/play";
 import { renderAt } from "@/test/renderApp";
 
 /** BR-131: nobody is on two fields at once. */
@@ -25,10 +19,12 @@ function playersOnFields(): string[] {
   });
 }
 
+// The first screen of a file loads its lazy route, slowly under a full run.
+configure({ asyncUtilTimeout: 3000 });
+
 describe("fields (screens 6b–6d)", () => {
   beforeEach(async () => {
     await i18n.changeLanguage("en");
-    stubResizeObserver();
   });
 
   it("shows who plays where and why the others wait (6b)", async () => {

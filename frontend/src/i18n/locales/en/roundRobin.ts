@@ -67,6 +67,8 @@ export const roundRobin = {
     record: "{{played}} played, {{won}} won, {{drawn}} drawn, {{lost}} lost",
     recordWithSatOut:
       "{{played}} played, {{won}} won, {{drawn}} drawn, {{lost}} lost, sat out {{satOut}}",
+    empty: "No standings yet: the group phase has no entries.",
+    buchholz: "BH1 {{bh1}}, BH2 {{bh2}}",
     cut_one: "Top {{count}} goes through",
     cut_other: "Top {{count}} go through",
   },

@@ -1,8 +1,6 @@
-import type { Messages } from "../en";
+import type { CsMessages, Messages } from "../en";
 
-// TODO(cs-plurals): add the _few (2–4) and _many forms once CsMessages
-// allows them; until then 2–4 falls back to _other.
-export const results: Messages["results"] = {
+export const results: CsMessages<Messages["results"]> = {
   enter: { title: "Zadat výsledek" },
   bestOf: {
     title: "Výsledky na více her: BO2, BO3, BO5",
@@ -19,10 +17,14 @@ export const results: Messages["results"] = {
     win: "{{names}} vyhrávají {{score}} na hry.",
     draw_one: "Remíza 1:1 na hry. Každá dvojice dostane {{count}} bod.",
     draw_other: "Remíza 1:1 na hry. Každá dvojice dostane {{count}} bodů.",
+    draw_few: "Remíza 1:1 na hry. Každá dvojice dostane {{count}} body.",
+    draw_many: "Remíza 1:1 na hry. Každá dvojice dostane {{count}} bodů.",
     drawNotAllowed:
       "Remízy tu nejsou povolené: jedna strana musí vyhrát obě hry.",
     notNeeded_one: "Není potřeba: {{names}} už vyhráli {{count}} hru.",
     notNeeded_other: "Není potřeba: {{names}} už vyhráli {{count}} her.",
+    notNeeded_few: "Není potřeba: {{names}} už vyhráli {{count}} hry.",
+    notNeeded_many: "Není potřeba: {{names}} už vyhráli {{count}} her.",
     winnerOf: "Vítěz {{number}}. hry",
   },
   documentTitle: "Výsledek: {{match}}",
@@ -31,6 +33,12 @@ export const results: Messages["results"] = {
     bo2: "Na 2 hry: vždy dvě hry. {{tournament}}.",
     bo3: "Na 3 hry. {{tournament}}.",
     bo5: "Na 5 her. {{tournament}}.",
+  },
+  subtitleOnField: {
+    bo1: "Hřiště {{field}}. {{tournament}}.",
+    bo2: "Hřiště {{field}}. Na 2 hry: vždy dvě hry. {{tournament}}.",
+    bo3: "Hřiště {{field}}. Na 3 hry. {{tournament}}.",
+    bo5: "Hřiště {{field}}. Na 5 her. {{tournament}}.",
   },
   titles: {
     final: "Finále",
@@ -48,6 +56,8 @@ export const results: Messages["results"] = {
     legend: "Góly: {{names}}",
     bead_one: "{{count}} gól: {{names}}",
     bead_other: "{{count}} gólů: {{names}}",
+    bead_few: "{{count}} góly: {{names}}",
+    bead_many: "{{count}} gólů: {{names}}",
   },
   simple: {
     hint: "Ťukněte na kuličku se skóre každé dvojice.",
@@ -65,8 +75,14 @@ export const results: Messages["results"] = {
       "{{names}} vyhrávají {{score}} a jdou do čela s {{count}} bodem.",
     winTop_other:
       "{{names}} vyhrávají {{score}} a jdou do čela s {{count}} body.",
+    winTop_few:
+      "{{names}} vyhrávají {{score}} a jdou do čela s {{count}} body.",
+    winTop_many:
+      "{{names}} vyhrávají {{score}} a jdou do čela s {{count}} body.",
     draw_one: "Remíza {{score}}. Každá dvojice dostane {{count}} bod.",
     draw_other: "Remíza {{score}}. Každá dvojice dostane {{count}} bodů.",
+    draw_few: "Remíza {{score}}. Každá dvojice dostane {{count}} body.",
+    draw_many: "Remíza {{score}}. Každá dvojice dostane {{count}} bodů.",
     drawNotAllowed:
       "V této lize nejsou remízy povolené: jedna dvojice potřebuje víc gólů.",
   },

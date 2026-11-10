@@ -28,6 +28,12 @@ export const results = {
     bo3: "Best of 3. {{tournament}}.",
     bo5: "Best of 5. {{tournament}}.",
   },
+  subtitleOnField: {
+    bo1: "Field {{field}}. {{tournament}}.",
+    bo2: "Field {{field}}. Best of 2: always two games. {{tournament}}.",
+    bo3: "Field {{field}}. Best of 3. {{tournament}}.",
+    bo5: "Field {{field}}. Best of 5. {{tournament}}.",
+  },
   titles: {
     final: "Final",
     thirdPlace: "Third-place match",

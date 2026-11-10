@@ -28,7 +28,6 @@ import { Notice } from "./play/Notice";
 import { OptionCard } from "./play/OptionCard";
 import { StandingsNotes } from "./play/StandingsNotes";
 import { StandingsTable } from "./play/StandingsTable";
-import { TempChrome } from "./play/TempChrome";
 import { usePlay } from "./play/usePlay";
 
 type Next = "knockout" | "finish";
@@ -64,12 +63,13 @@ export function GroupPhaseDonePage() {
 
   if (!model || !play) {
     return (
-      <>
+      <section className="space-y-4">
         <DocumentTitle screen={title} />
+        <h1 className="font-display text-display-screen">{title}</h1>
         <p role={failed ? "alert" : "status"}>
           {failed ? t("roundRobin.loadFailed") : t("loading")}
         </p>
-      </>
+      </section>
     );
   }
   const progress = groupProgress(model);
@@ -86,16 +86,17 @@ export function GroupPhaseDonePage() {
   };
 
   return (
-    <TempChrome
-      leagueId={leagueId}
-      tournamentId={tournamentId}
-      title={title}
-      subtitle={t("roundRobin.done.subtitle", {
-        tournament: model.tournament.name,
-        played: progress.played,
-        total: progress.total,
-      })}
-    >
+    <section className="space-y-6">
+      <div className="space-y-1">
+        <h1 className="font-display text-display-screen">{title}</h1>
+        <p className="text-body-md text-muted-foreground">
+          {t("roundRobin.done.subtitle", {
+            tournament: model.tournament.name,
+            played: progress.played,
+            total: progress.total,
+          })}
+        </p>
+      </div>
       <DocumentTitle screen={title} />
       {!play.group_done && (
         <Notice variant="warning" title={t("roundRobin.done.notYetTitle")}>
@@ -105,7 +106,7 @@ export function GroupPhaseDonePage() {
             })}
           </p>
           <Link
-            to={generatePath(paths.tournament, params)}
+            to={generatePath(paths.schedule, params)}
             className="inline-flex min-h-11 items-center font-bold underline underline-offset-4"
           >
             {t("roundRobin.done.backToSchedule")}
@@ -175,14 +176,13 @@ export function GroupPhaseDonePage() {
                     <Button
                       type="button"
                       variant="outline"
-                      className="size-11"
+                      size="icon"
                       disabled={count <= min}
                       aria-label={t("roundRobin.done.fewer")}
                       onClick={() => {
                         setQualifiers(count - 1);
                       }}
                     >
-                      {/* TODO(foundation-buttons): size icon is 44 px after the rebase. */}
                       <MinusIcon className="size-5" />
                     </Button>
                     <output
@@ -194,7 +194,7 @@ export function GroupPhaseDonePage() {
                     <Button
                       type="button"
                       variant="outline"
-                      className="size-11"
+                      size="icon"
                       disabled={count >= entries}
                       aria-label={t("roundRobin.done.more")}
                       onClick={() => {
@@ -279,7 +279,8 @@ export function GroupPhaseDonePage() {
                 </Notice>
                 <Button
                   type="button"
-                  className="h-14 w-full rounded-lg text-button-lg"
+                  size="lg"
+                  className="w-full"
                   onClick={() => {
                     // The knockout is drawn on screen 13 (FR-045), with these choices.
                     const search = new URLSearchParams({
@@ -291,7 +292,6 @@ export function GroupPhaseDonePage() {
                     );
                   }}
                 >
-                  {/* TODO(foundation-buttons): size lg after the rebase. */}
                   {t("roundRobin.done.draw")}
                 </Button>
               </>
@@ -312,10 +312,10 @@ export function GroupPhaseDonePage() {
                   <AlertDialogTrigger asChild>
                     <Button
                       type="button"
-                      className="h-14 w-full rounded-lg text-button-lg"
+                      size="lg"
+                      className="w-full"
                       disabled={finish.isPending}
                     >
-                      {/* TODO(foundation-buttons): size lg after the rebase. */}
                       {t("roundRobin.done.finishButton")}
                     </Button>
                   </AlertDialogTrigger>
@@ -353,6 +353,6 @@ export function GroupPhaseDonePage() {
           </section>
         )}
       </div>
-    </TempChrome>
+    </section>
   );
 }

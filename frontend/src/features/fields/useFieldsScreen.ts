@@ -14,10 +14,9 @@ export function useFieldsScreen() {
     ...play,
     leagueId,
     tournamentId,
-    fieldsPath: generatePath(paths.fields, params),
     manageHref: generatePath(paths.editFields, params),
     resultHref: (matchId: string) =>
-      `${generatePath(paths.enterResult, { ...params, matchId })}?from=fields`,
+      generatePath(paths.fieldsResult, { ...params, matchId }),
     moveHref: (matchId: string) =>
       generatePath(paths.moveMatch, { ...params, matchId }),
   };

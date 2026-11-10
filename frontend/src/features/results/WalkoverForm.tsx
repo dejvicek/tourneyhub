@@ -29,15 +29,7 @@ export function WalkoverForm({
   const [winner, setWinner] = useState<Side | null>(initial);
 
   return (
-    <form
-      className="space-y-4"
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (winner !== null) {
-          onSave({ walkover_winner: winner, games: [] });
-        }
-      }}
-    >
+    <div className="space-y-4">
       <p className="text-body-md">{t("results.walkover.hint")}</p>
       <RadioGroup
         aria-label={t("results.walkover.legend")}
@@ -57,22 +49,26 @@ export function WalkoverForm({
         />
       </RadioGroup>
       <Button
-        type="submit"
+        type="button"
+        onClick={() => {
+          if (winner !== null) {
+            onSave({ walkover_winner: winner, games: [] });
+          }
+        }}
         disabled={winner === null || pending}
-        className="h-14 w-full rounded-lg text-button-lg"
+        size="lg"
+        className="w-full"
       >
-        {/* TODO(foundation-buttons): size lg after the rebase. */}
         {t("results.walkover.save")}
       </Button>
       <Button
         type="button"
-        variant="ghost"
-        className="h-11 w-full text-body-md"
+        variant="text"
+        className="w-full"
         onClick={onCancel}
       >
-        {/* TODO(foundation-buttons): the text variant after the rebase. */}
         {t("results.walkover.cancel")}
       </Button>
-    </form>
+    </div>
   );
 }

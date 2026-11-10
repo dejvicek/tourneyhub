@@ -452,9 +452,15 @@ export interface PlayStandingRow extends TournamentStandingRow {
    * points (BR-101); null when points decide or the place is shared.
    */
   ahead_by: import("./rules").RoundRobinTiebreaker | null;
+  /** Swiss and Monster DYP (BR-073); null in a round robin. */
+  bh1: number | null;
+  bh2: number | null;
 }
 
-/** What the running group phase looks like now, computed on read (ADR-009). */
+/**
+ * What the running group phase looks like now, computed on read (ADR-009).
+ * Its standings serve every format's Standings tab (FR-060).
+ */
 export interface PlayRead {
   /** Requeued matches first, then schedule order (BR-130, BR-132). */
   waiting: WaitingMatchRead[];

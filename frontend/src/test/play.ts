@@ -1,9 +1,8 @@
 // Test helpers of the play screens (screens 6–8): the running DYP of the
 // demo's seed.
 import { generatePath } from "react-router";
-import { vi } from "vitest";
 
-import { DEMO_LEAGUE_ID } from "@/demo/seed";
+import { DEMO_LEAGUE_ID } from "@/demo/ids";
 import { db } from "@/demo/store";
 import { paths } from "@/lib/paths";
 
@@ -52,24 +51,3 @@ export function playEverything(): void {
 }
 
 export { paths };
-
-/**
- * jsdom has no ResizeObserver, which Radix's radios use inside a <form>.
- * Call from beforeEach; unstubGlobals restores it.
- */
-export function stubResizeObserver(): void {
-  vi.stubGlobal(
-    "ResizeObserver",
-    class {
-      observe() {
-        return undefined;
-      }
-      unobserve() {
-        return undefined;
-      }
-      disconnect() {
-        return undefined;
-      }
-    },
-  );
-}

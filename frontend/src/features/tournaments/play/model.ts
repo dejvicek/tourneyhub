@@ -13,6 +13,7 @@ import type {
   PlayRead,
   Side,
 } from "@/demo/contract";
+import { matchFormat } from "@/features/results/matchFormat";
 import type { tournamentQueries } from "@/features/tournaments/api";
 
 /** The tournament as the client returns it (its sides are an array, not a pair). */
@@ -61,22 +62,6 @@ export function firstName(fullName: string): string {
   return fullName.trim().split(/\s+/)[0] ?? fullName;
 }
 
-function formatOf(
-  phase: PhaseRead,
-  match: MatchData,
-  phaseRounds: readonly RoundData[],
-): MatchFormat {
-  if (
-    phase.kind === "knockout" &&
-    phase.final_match_format !== null &&
-    match.kind === "standard" &&
-    phaseRounds.at(-1)?.id === match.round_id
-  ) {
-    return phase.final_match_format;
-  }
-  return phase.match_format;
-}
-
 export function buildModel(
   tournament: TournamentData,
   players: readonly Player[],
@@ -100,7 +85,7 @@ export function buildModel(
           match,
           round,
           phase,
-          format: formatOf(phase, match, phaseRounds),
+          format: matchFormat(tournament, match.id) ?? phase.match_format,
           field: fields.find((field) => field.match_id === match.id),
           queue: queue.get(match.id),
         });

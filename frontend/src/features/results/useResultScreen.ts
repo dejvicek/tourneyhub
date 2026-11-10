@@ -1,10 +1,8 @@
 import { useTranslation } from "react-i18next";
-import { generatePath, useSearchParams } from "react-router";
 
 import type { MatchInfo, PlayModel } from "@/features/tournaments/play/model";
 import { usePlay } from "@/features/tournaments/play/usePlay";
 import { useRouteParam } from "@/hooks/useRouteParam";
-import { paths } from "@/lib/paths";
 
 /** "Round 4", "Semifinal 1", "Final": the match's name in its phase. */
 export function useMatchTitle() {
@@ -39,18 +37,11 @@ export function useMatchTitle() {
   };
 }
 
-/** The result screen's data and where it goes back to. */
+/** The result overlay's data. */
 export function useResultScreen() {
   const leagueId = useRouteParam("leagueId");
   const tournamentId = useRouteParam("tournamentId");
   const matchId = useRouteParam("matchId");
-  const [search] = useSearchParams();
   const play = usePlay(leagueId, tournamentId);
-  const params = { leagueId, tournamentId };
-  // TODO(foundation-routes): the overlay's parent route decides this.
-  const backTo =
-    search.get("from") === "fields"
-      ? generatePath(paths.fields, params)
-      : generatePath(paths.tournament, params);
-  return { ...play, leagueId, tournamentId, matchId, backTo };
+  return { ...play, leagueId, tournamentId, matchId };
 }
