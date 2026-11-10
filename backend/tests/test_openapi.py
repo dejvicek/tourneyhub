@@ -22,11 +22,17 @@ def test_main_prints_a_schema_with_function_names_as_operation_ids(
     assert operation_ids == {
         "change_password",
         "create_league",
+        "delete_league",
+        "list_leagues",
         "log_in",
         "log_out",
         "read_league",
         "read_me",
         "refresh",
+        "rename_season",
+        "set_placement_points",
         "sign_up",
+        "start_season",
+        "update_league",
         "update_me",
     }

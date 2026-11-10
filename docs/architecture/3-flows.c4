@@ -253,4 +253,31 @@ views "III. Flows" {
     }
     tourneyhub.api.publicApi -> tourneyhub.api.engine "round robin, bracket and season standings"
   }
+
+  dynamic view leagueSeasons {
+    variant sequence
+    title "16. League and seasons"
+    order 20
+    description "FR-010, FR-011, FR-021 and ADR-008: a league comes with Season 1. The placement points table lives on the season. A new season carries the current season's number, so a repeat or a second device gets 409."
+    organizer -> tourneyhub.spa.organizerUi "creates a league"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "POST league with a client id"
+    tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "league, share token, Season 1: one transaction"
+    tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "league with Season 1"
+    organizer -> tourneyhub.spa.organizerUi "changes the placement points"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "PUT the active season's table"
+    tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "locks the league; a closed season: 409"
+    organizer -> tourneyhub.spa.organizerUi "starts a new season"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "POST season with the current number"
+    tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "locks the league, compares the number"
+    tourneyhub.api.leaguesApi -> tourneyhub.db.tournaments "no unfinished tournament (BR-010, P7)"
+    alt {
+      when "the number is current" {
+        tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "closes it, starts the next with a copy of the table"
+        tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "201: the new season"
+      }
+      when "stale or repeated" {
+        tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "409 season_number_changed: reload"
+      }
+    }
+  }
 }

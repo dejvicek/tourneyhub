@@ -5,6 +5,7 @@ from pydantic import (
     AfterValidator,
     BaseModel,
     ConfigDict,
+    Field,
     JsonValue,
     SecretStr,
     StringConstraints,
@@ -12,8 +13,12 @@ from pydantic import (
 from pydantic_core import PydanticCustomError
 
 from tourneyhub.engine.accounts import Language
+from tourneyhub.engine.leagues import first_increase
 from tourneyhub.errors import ErrorCode
 from tourneyhub.services.instance import SIGNUP_CODE_MAX_LENGTH
+
+# The largest value of a PostgreSQL int column (DATA-MODEL §2: scores and points).
+INT_MAX = 2_147_483_647
 
 
 class RequestModel(BaseModel):
@@ -26,6 +31,31 @@ class ResponseModel(BaseModel):
 
 type LeagueName = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)
+]
+
+type SeasonName = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)
+]
+
+
+def _check_non_increasing(points: list[int]) -> list[int]:
+    index = first_increase(points)
+    if index is not None:
+        raise PydanticCustomError(
+            "placement_points_increase",
+            "place {place} is worth more than the place above it",
+            {"place": index + 1},
+        )
+    return points
+
+
+# FR-011, the rule of the database's placement_points_valid(): not empty, whole
+# numbers, none negative, none worth more than the place above. At most 256
+# places: the most entries a tournament is sized for (ADR-009).
+type PlacementPoints = Annotated[
+    list[Annotated[int, Field(ge=0, le=INT_MAX)]],
+    Field(min_length=1, max_length=256),
+    AfterValidator(_check_non_increasing),
 ]
 
 
