@@ -6,7 +6,9 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from tourneyhub.db.models.leagues import Player
+from tourneyhub.db.models.tournaments import Tournament, TournamentPlayer
 from tourneyhub.engine.leagues import MAX_PLAYERS_PER_LEAGUE
+from tourneyhub.engine.tournaments import TournamentState
 from tourneyhub.errors import ErrorCode, NotFoundError, RuleViolationError
 from tourneyhub.services.leagues import get_league, lock_league
 
@@ -150,13 +152,28 @@ def set_player_removed(
     (ADR-008). A restored player is the same player, with the same id. A restore
     needs no name check: the unique index includes removed players, so a name is
     never freed, and every add and rename checks against all players (BR-001).
-    `clock` is read after the lock. BR-002, no removal from an unfinished
-    tournament, joins these checks with the tournaments.
+    `clock` is read after the lock. A player picked for a tournament that is not
+    finished cannot be removed (BR-002): 422 `player_in_unfinished_tournament`
+    with the tournaments' ids. Picking takes the same league lock (ADR-008).
     """
     player = _lock_player(
         session, league_id=league_id, player_id=player_id, user_id=user_id
     )
     if removed and player.removed_at is None:
+        unfinished = session.scalars(
+            select(Tournament.id)
+            .join(TournamentPlayer, TournamentPlayer.tournament_id == Tournament.id)
+            .where(
+                TournamentPlayer.player_id == player.id,
+                Tournament.state != TournamentState.FINISHED,
+            )
+            .order_by(Tournament.date, Tournament.id)
+        ).all()
+        if unfinished:
+            raise RuleViolationError(
+                ErrorCode.PLAYER_IN_UNFINISHED_TOURNAMENT,
+                tournament_ids=[str(tournament_id) for tournament_id in unfinished],
+            )
         player.removed_at = now = clock()
     elif not removed and player.removed_at is not None:
         player.removed_at = None
