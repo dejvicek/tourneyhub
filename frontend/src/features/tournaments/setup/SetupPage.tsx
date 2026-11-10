@@ -5,7 +5,11 @@ import { generatePath, Link } from "react-router";
 
 import { DocumentTitle } from "@/components/DocumentTitle";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Player, RankingRow, TournamentSetupRead } from "@/demo/contract";
+import type {
+  PlayerRead,
+  RankingRow,
+  TournamentSetupRead,
+} from "@/demo/contract";
 import {
   setupQueries,
   type TournamentDetail,
@@ -54,7 +58,7 @@ function useSetupData(): {
     return { data: undefined, failed, type: tournament.data?.type };
   }
   const names = new Map(
-    players.data.map((player: Player) => [player.id, player.name]),
+    players.data.map((player: PlayerRead) => [player.id, player.name]),
   );
   const ranks = new Map(ranking.data.map((row) => [row.player_id, row.rank]));
   return {

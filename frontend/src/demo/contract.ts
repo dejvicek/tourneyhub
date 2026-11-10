@@ -217,12 +217,18 @@ interface Get<P, R> {
   requestBody?: never;
   responses: { 200: Json<R> } & Errors;
 }
+interface Post<P, B, R> {
+  parameters: P;
+  requestBody: { content: { "application/json": B } };
+  responses: { 201: Json<R> } & Errors;
+}
 interface Put<P, B, R> {
   parameters: P;
   requestBody: { content: { "application/json": B } };
   responses: { 200: Json<R> } & Errors;
 }
 
+type League = Params<{ league_id: Uuid }>;
 type Season = Params<{ league_id: Uuid; season_id: Uuid }>;
 type Tournament = Params<{ league_id: Uuid; tournament_id: Uuid }>;
 type Match = Params<{ league_id: Uuid; tournament_id: Uuid; match_id: Uuid }>;
