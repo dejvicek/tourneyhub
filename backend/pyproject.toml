@@ -28,7 +28,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 test = [
-  "coverage>=7.17", "httpx2>=2.16", "hypothesis>=6.170",
+  "coverage>=7.17", "httpx2>=2.16", "hypothesis>=6.170.15",
   "pytest>=9.2", "pytest-alembic>=0.13.2", "pytest-randomly>=5.0",
 ]
 lint = ["import-linter>=2.16", "mypy>=2.4.1", "ruff>=0.17.3", "types-networkx"]
