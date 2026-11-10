@@ -23,13 +23,14 @@ services:
 
 # Every service of every Compose file joins the default network. Its range is fixed
 # because uvicorn's FORWARDED_ALLOW_IPS (set in compose.prod.yaml, to this range)
-# trusts it, so that X-Forwarded-For counts only from Caddy (ADR-006). Change the
-# subnet here and there together.
+# trusts it, so that X-Forwarded-For counts only from Caddy (ADR-006). Both files read
+# COMPOSE_SUBNET (default 172.30.0.0/24), so they cannot drift. Set it in .env or the
+# shell to run two stacks side by side, e.g. from different worktrees.
 networks:
   default:
     ipam:
       config:
-        - subnet: 172.30.0.0/24
+        - subnet: ${COMPOSE_SUBNET:-172.30.0.0/24}
 
 volumes:
   db-data:

@@ -27,7 +27,7 @@ Both stacks use the Compose project `tourneyhub` and the same database volume; s
 docker compose up --build
 ```
 
-`db`, `api` (uvicorn with reload, migrations at start) and `frontend` (Vite with hot reload). Open http://localhost:5173, or `http://<the machine's LAN address>:5173` on a phone; Vite passes `/api` on to the api. The api itself is on http://localhost:8000 only.
+`db`, `api` (uvicorn with reload, migrations at start) and `frontend` (Vite with hot reload). Open http://localhost:5173, or `http://<the machine's LAN address>:5173` on a phone; Vite passes `/api` on to the api. The api itself is on http://localhost:8000 only. To run a second stack (another worktree) beside this one, give it its own Compose network range with `COMPOSE_SUBNET=172.31.20.0/24` in `.env` (default `172.30.0.0/24`; it also sets the api's `FORWARDED_ALLOW_IPS` in production).
 
 ## Production stack locally
 
