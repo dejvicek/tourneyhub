@@ -559,7 +559,6 @@ export interface SetupPaths {
   };
 }
 
-
 type PlayField = Params<{
   league_id: Uuid;
   tournament_id: Uuid;
