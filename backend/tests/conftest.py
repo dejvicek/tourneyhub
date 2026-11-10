@@ -1,24 +1,30 @@
+import functools
 import os
+import time
 from collections.abc import Callable, Iterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import UUID, uuid7
 
 import pytest
 from alembic import command
 from alembic.config import Config
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
-from sqlalchemy import Engine, event, select, text
-from sqlalchemy.orm import Session
+from sqlalchemy import Engine, event, make_url, select, text
+from sqlalchemy.orm import Session, sessionmaker
 
-from tourneyhub.api.deps import get_now, get_session
+from tourneyhub.api.deps import get_now, get_session, get_session_factory
 from tourneyhub.app import create_app
 from tourneyhub.db.models.accounts import User
 from tourneyhub.db.models.leagues import League
 from tourneyhub.db.session import create_db_engine
 from tourneyhub.engine.accounts import Language
+from tourneyhub.services import auth as auth_service
 from tourneyhub.settings import Settings
+
+PASSWORD = "correct horse battery staple"
 
 
 @pytest.fixture
@@ -88,10 +94,53 @@ def client(settings: Settings, session: Session, now: datetime) -> Iterator[Test
             yield session
         session.commit()  # releases the test's savepoint and runs the deferred checks
 
+    def test_session_factory() -> sessionmaker[Session]:
+        # The auth dependencies' own transactions become savepoints of the test's.
+        return sessionmaker(
+            bind=session.get_bind(), join_transaction_mode="create_savepoint"
+        )
+
     app.dependency_overrides[get_session] = test_session
+    app.dependency_overrides[get_session_factory] = test_session_factory
     app.dependency_overrides[get_now] = lambda: now
     with TestClient(app) as client:  # the context manager runs the lifespan
         yield client
+
+
+@pytest.fixture
+def travel(client: TestClient, now: datetime) -> Callable[[timedelta], datetime]:
+    """Move the clock that the client's requests see to `now + offset`."""
+    app = client.app
+    assert isinstance(app, FastAPI)
+
+    def travel(offset: timedelta) -> datetime:
+        app.dependency_overrides[get_now] = lambda: now + offset
+        return now + offset
+
+    return travel
+
+
+@pytest.fixture
+def auth_header(settings: Settings, now: datetime) -> Callable[..., dict[str, str]]:
+    """An `Authorization: Bearer` header for a user, issued at `now`."""
+
+    def auth_header(
+        user_id: UUID, *, issued_at: datetime | None = None
+    ) -> dict[str, str]:
+        token = auth_service.issue_access_token(
+            user_id=user_id,
+            family_id=uuid7(),
+            key=settings.jwt_secret,
+            now=issued_at or now,
+        )
+        return {"Authorization": f"Bearer {token}"}
+
+    return auth_header
+
+
+@functools.cache
+def _password_hash(password: str) -> str:
+    return auth_service.hash_password(password)  # 64 MiB and some time; once each
 
 
 @pytest.fixture
@@ -99,13 +148,15 @@ def make_user(session: Session, now: datetime) -> Callable[..., User]:
     def make_user(
         *,
         email: str | None = None,
+        password: str = PASSWORD,
+        password_hash: str | None = None,
         is_admin: bool = False,
         must_change_password: bool = False,
     ) -> User:
         user = User(
             email=email or f"{uuid7()}@example.test",
             display_name="Ana",
-            password_hash="!",
+            password_hash=password_hash or _password_hash(password),
             is_admin=is_admin,
             must_change_password=must_change_password,
             language=Language.EN,
@@ -136,3 +187,44 @@ def make_league(
         return league
 
     return make_league
+
+
+@pytest.fixture
+def committing_engine(engine: Engine) -> Iterator[Engine]:
+    """The test database for tests that commit; emptied afterwards (§9)."""
+    yield engine
+    with engine.begin() as connection:
+        connection.execute(text("TRUNCATE leagues, users, auth_attempts CASCADE"))
+
+
+@pytest.fixture
+def committing_settings(settings: Settings) -> Settings:
+    """The test settings with a lock_timeout for apps that commit (§9).
+
+    A lock that nobody will release then fails the test instead of hanging it.
+    """
+    url = make_url(settings.database_url.get_secret_value()).update_query_dict(
+        {"options": "-c lock_timeout=5s"}
+    )
+    return settings.model_copy(
+        update={"database_url": SecretStr(url.render_as_string(hide_password=False))}
+    )
+
+
+@pytest.fixture
+def wait_for_a_lock_wait(committing_engine: Engine) -> Callable[[], None]:
+    """Wait until another connection waits for a row lock (§9)."""
+    query = text(
+        "SELECT count(*) FROM pg_stat_activity"
+        " WHERE datname = current_database() AND wait_event_type = 'Lock'"
+    )
+
+    def wait() -> None:
+        for _ in range(500):
+            with committing_engine.connect() as connection:  # a new snapshot
+                if connection.scalar(query):
+                    return
+            time.sleep(0.01)
+        pytest.fail("the second request never waited for the first")
+
+    return wait

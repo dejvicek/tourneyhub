@@ -19,7 +19,7 @@ cp .env.example .env
 
 Both stacks use the Compose project `tourneyhub` and the same database volume; stop one with `docker compose down` before starting the other.
 
-> Until ADR-006 lands, login is a placeholder: any account's id in `X-User-Id` acts as that user. Expose neither stack beyond a trusted local network.
+> Sign-up (P2b) and the login screens (P2c) are not there yet, so accounts are created by hand. Expose neither stack beyond a trusted local network.
 
 ## Development stack
 
