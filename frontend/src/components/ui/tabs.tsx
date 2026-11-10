@@ -1,6 +1,7 @@
-import { cn } from "cn";
 import { Tabs as TabsPrimitive } from "radix-ui";
 import * as React from "react";
+
+import { cn } from "@/lib/utils";
 
 // The design's segmented switch: a tinted track with 4 px padding and gap, the
 // selected segment a card-coloured pill with a bold label.

@@ -1,5 +1,6 @@
-import { cn } from "cn";
 import * as React from "react";
+
+import { cn } from "@/lib/utils";
 
 // The design's surface: bg/surface, a 1 px border/surface line, 10 px radius.
 

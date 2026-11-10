@@ -1,5 +1,6 @@
-import { cn } from "cn";
 import * as React from "react";
+
+import { cn } from "@/lib/utils";
 
 // The design's text field: 48 px high, a 2 px border in the input token,
 // the input-background fill and a 10 px radius.

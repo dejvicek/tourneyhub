@@ -1,7 +1,8 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import { cn } from "cn";
 import { ToggleGroup as ToggleGroupPrimitive } from "radix-ui";
 import * as React from "react";
+
+import { cn } from "@/lib/utils";
 
 // Items are the design's Chip: a pill with an outline, filled with the primary
 // colour when selected.

@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { cn } from "cn";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, Outlet, useMatches } from "react-router";
@@ -15,6 +14,7 @@ import { useLayout } from "@/hooks/useLayout";
 import { useRouteParam } from "@/hooks/useRouteParam";
 import { paths } from "@/lib/paths";
 import { hidesLeagueChrome } from "@/lib/routeHandle";
+import { cn } from "@/lib/utils";
 
 /**
  * The organizer's shell inside a league (Figma: app shell). Phone: the league

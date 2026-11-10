@@ -1,7 +1,8 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import { cn } from "cn";
 import { Slot } from "radix-ui";
 import * as React from "react";
+
+import { cn } from "@/lib/utils";
 
 // default and secondary also serve as the design's Field badge (on a field /
 // free field); warning and info use the Notice colours.

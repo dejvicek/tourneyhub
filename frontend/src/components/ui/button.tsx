@@ -1,7 +1,8 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import { cn } from "cn";
 import { Slot } from "radix-ui";
 import * as React from "react";
+
+import { cn } from "@/lib/utils";
 
 // Project-wide changes (docs/frontend-style.md §5.2, §6): a solid focus ring
 // with a background-coloured offset, 3:1 against every surface and the
@@ -14,10 +15,6 @@ import * as React from "react";
 // size icon     44 × 44, round, like the Back button
 // feature       the white button on the green playfield, 52 px, radius 10
 // text          a plain label without fill, e.g. "Back" or "Cancel"
-//
-// The text styles are written as text-(length:…) and leading-(…), not
-// text-button-sm: cn does not know the theme's text styles and would take
-// text-button-sm for a colour, dropping text-primary-foreground.
 
 const buttonVariants = cva(
   "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap outline-hidden transition-all focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-5",
@@ -37,9 +34,8 @@ const buttonVariants = cva(
         text: "text-foreground underline-offset-4 hover:underline",
       },
       size: {
-        default:
-          "h-11 rounded-md px-4 text-(length:--text-button-sm) leading-(--text-button-sm--line-height) font-bold has-[>svg]:px-3",
-        lg: "h-14 rounded-lg px-6 text-(length:--text-button-lg) leading-(--text-button-lg--line-height) font-bold has-[>svg]:px-5",
+        default: "h-11 rounded-md px-4 text-button-sm has-[>svg]:px-3",
+        lg: "h-14 rounded-lg px-6 text-button-lg has-[>svg]:px-5",
         icon: "size-11 rounded-full",
       },
     },
@@ -47,14 +43,12 @@ const buttonVariants = cva(
       {
         variant: "feature",
         size: ["default", "lg"],
-        class:
-          "h-13 rounded-lg px-6 text-(length:--text-button-lg) leading-(--text-button-lg--line-height) font-bold",
+        class: "h-13 rounded-lg px-6 text-button-lg",
       },
       {
         variant: "text",
         size: ["default", "lg"],
-        class:
-          "px-2 text-(length:--text-body-md) leading-(--text-body-md--line-height) font-normal",
+        class: "px-2 text-body-md",
       },
     ],
     defaultVariants: {

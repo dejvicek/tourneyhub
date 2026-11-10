@@ -85,11 +85,21 @@ const forwardRefSyntax = [
   },
 ];
 
+// One cn for the whole app, configured with the theme's text styles; the
+// package alone takes text-caption for a colour (guide §5.3).
+const cnPackage = {
+  group: ["cn", "cn/*"],
+  message: "Import cn from @/lib/utils, which knows the theme's text styles.",
+};
+
 /** @param {object[]} patterns */
 function restrictImports(...patterns) {
   return /** @type {const} */ ([
     "error",
-    { paths: restrictedPaths, patterns: [unstableRouterApis, ...patterns] },
+    {
+      paths: restrictedPaths,
+      patterns: [unstableRouterApis, cnPackage, ...patterns],
+    },
   ]);
 }
 
@@ -228,6 +238,24 @@ export default defineConfig([
         appFromShared,
         demoInternals,
       ),
+    },
+  },
+  {
+    // The one file that configures the cn package.
+    files: ["src/lib/utils.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: restrictedPaths,
+          patterns: [
+            unstableRouterApis,
+            apiClient,
+            appFromShared,
+            demoInternals,
+          ],
+        },
+      ],
     },
   },
   {

@@ -1,6 +1,7 @@
-import { cn } from "cn";
 import { Switch as SwitchPrimitive } from "radix-ui";
 import * as React from "react";
+
+import { cn } from "@/lib/utils";
 
 // 52 x 30 as drawn; the ::after widens the touch target to 44 px high.
 

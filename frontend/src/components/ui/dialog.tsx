@@ -1,7 +1,8 @@
-import { cn } from "cn";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
+
+import { cn } from "@/lib/utils";
 
 import { CloseIcon } from "./icons";
 
