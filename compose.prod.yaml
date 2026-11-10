@@ -19,6 +19,17 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # Healthy once uvicorn listens, which it does only after the migrations,
+    # the app factory and the app's startup. The image has Python but no
+    # curl; a connection without a request leaves no access-log line, as an
+    # HTTP probe every interval would.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8000), timeout=2).close()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+      start_interval: 1s
     # No ports: only web reaches it, on the Compose network (ADR-005).
 
   # Caddy with the built frontend, the only service with host ports (ADR-005).
@@ -42,8 +53,11 @@ services:
     # also keeps Let's Encrypt from issuing again at every update.
     volumes:
       - caddy-data:/data
+    # Started once api accepts connections, so that /api never gets a 502
+    # while the api is still migrating.
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
 volumes:
   caddy-data:

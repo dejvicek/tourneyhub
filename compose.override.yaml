@@ -36,8 +36,12 @@ services:
       - ./frontend:/src/frontend
       - frontend-node-modules:/src/frontend/node_modules
       - ./backend/openapi.json:/src/backend/openapi.json:ro
+    # On every interface of the host, so that a phone on the LAN opens
+    # http://<the machine's LAN address>:5173 (ADR-004). It reaches the api
+    # through the proxy, on the same origin; the api itself stays on
+    # 127.0.0.1.
     ports:
-      - "127.0.0.1:5173:5173"
+      - "5173:5173"
     # tini as PID 1 passes `docker stop` on to pnpm and Vite.
     init: true
     depends_on:

@@ -23,8 +23,8 @@ RUN mkdir node_modules && chown node:node node_modules
 USER node
 EXPOSE 5173
 # The volume is installed from the lockfile at every start, so it follows
-# pnpm-lock.yaml. Vite listens on all of the container's interfaces;
-# Compose publishes the port on the host's localhost only.
+# pnpm-lock.yaml. Vite listens on all of the container's interfaces, and
+# Compose publishes the port on all of the host's, for a phone (ADR-004).
 CMD ["sh", "-c", "pnpm install --frozen-lockfile && exec pnpm dev --host 0.0.0.0"]
 
 
