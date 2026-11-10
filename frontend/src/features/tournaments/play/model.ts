@@ -9,7 +9,7 @@ import type {
   MatchFormat,
   MatchSideRead,
   PhaseRead,
-  Player,
+  PlayerRead,
   PlayRead,
   Side,
 } from "@/demo/contract";
@@ -64,7 +64,7 @@ export function firstName(fullName: string): string {
 
 export function buildModel(
   tournament: TournamentData,
-  players: readonly Player[],
+  players: readonly PlayerRead[],
   play: PlayRead | undefined,
 ): PlayModel {
   const group = tournament.phases.find((phase) => phase.kind === "group");
