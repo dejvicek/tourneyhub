@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Status | Proposed — awaiting review by another developer |
-| Date | 2026-10-17, revised 2026-10-20 after the first review and 2026-11-05 (§2, §5: decisions of the style-guide review) |
+| Date | 2026-10-17, revised 2026-10-20 after the first review, 2026-11-05 (§2, §5: decisions of the style-guide review) and 2026-11-10 (D9–D11: ordered phases, fields, games, match formats and league defaults, decided while the lead reviewer is away) |
 | Scope | PostgreSQL schema for the MVP in `PRD.md`: the tables, their relationships and the key decisions behind them. Column lists show what matters for review; exact types, names and the first Alembic migration are settled during implementation within these rules. |
 
 The schema follows the proposed ADRs in `ADR.md`, in particular ADR-002 (PostgreSQL), ADR-006 (authentication), ADR-007 (instance admin), ADR-008 (API conventions and locking), ADR-009 (pure engine, derived data computed on read), ADR-010 (lots) and ADR-011 (pairing). Requirement IDs (FR-, BR-) refer to `PRD.md`.
@@ -20,6 +20,9 @@ The schema follows the proposed ADRs in `ADR.md`, in particular ADR-002 (Postgre
 | D6 | **Hard delete, except players.** Deleting a league or a tournament removes everything under it (FR-013, FR-038). A removed player is only marked removed and keeps their history (BR-002). | Matches the PRD; no `deleted_at` filters everywhere. |
 | D7 | **History only for admin actions.** `admin_actions` records who did what to whom and when (ADR-007). Matches keep only the time of the last result entry. | The organizer is the only person changing a league in the MVP. |
 | D8 | **Draws are stored, lots are seeded.** Tournaments carry an immutable random seed and a draw counter; every lot, including the league ranking's (BR-020), uses the tournament's seed (ADR-010). | Reproducible draws; lots inside computed standings give the same answer on every read. |
+| D9 | **Phases are ordered.** A tournament's phases carry a `position`; the MVP's rule of at most one group phase and one knockout is a partial unique index on `kind`, not a unique key on the tournament. | Later formats add phases (RM-05, RM-06). With the order in the first tournament migration, no stored tournament needs a backfill when they arrive, and the tournament tables do not wait for the review of the post-MVP ADRs. |
+| D10 | **Field assignments are stored; the waiting list is computed.** Each field holds the match being played on it. Placements are written in the same transaction as the event that causes them: a result, a field added or removed, a match placed or taken off by hand (BR-130–BR-134). The waiting list is computed on read (FR-092). | Which match is on which field depends on the order of events, not on the stored results alone. Recomputing it on read would need a log of field changes and would move a match being played whenever an earlier result is corrected (ADR-009). |
+| D11 | **A result is an outcome plus its games.** Every game played has a row with its winner and, if entered, its score; a BO1 match has one. `matches.outcome` is written from the games, or is the walkover's winner. | One path for BO1–BO5 and for score difference over games (BR-073, BR-092). The outcome stays a column because a walkover has no games (BR-124) and the result lock (BR-094) and finishing (FR-037) only need to know whether a match has a result. |
 
 ## 2. Conventions
 
@@ -30,12 +33,13 @@ The schema follows the proposed ADRs in `ADR.md`, in particular ADR-002 (Postgre
 - **Numbers:** scores and placement points are `int`. Season points are whole numbers because BR-111 rounds down.
 - **Timestamps:** `created_at` on every table; `updated_at` on tables whose rows are edited, set by the application.
 - **Deletes:** two kinds of foreign keys.
-  - A child that its parent owns is `ON DELETE CASCADE`: league → season → tournament → phase → round → match → side → side players, and below a tournament also its entries, their members, the DYP halves and the round participation rows.
+  - A child that its parent owns is `ON DELETE CASCADE`: league → season → tournament → phase → round → match → side → side players, and below a tournament also its entries, their members, the DYP halves, the round participation rows and the fields; below a match also its games.
   - A reference that does not own anything is `NO ACTION DEFERRABLE INITIALLY DEFERRED`: the three references to `players` (`entry_members`, `dyp_halves`, `match_side_players`) and `match_sides.entry_id`. The check runs at commit, after the cascades have removed every referencing row. Deleting a league, a tournament or a knockout therefore succeeds whatever the order of its statements, while deleting a player who still has history, or an entry that still has match sides, fails. This makes D6 a database rule: a player with history disappears only with its league, because removing a player only sets `removed_at`. The application never issues a `DELETE` on `players` outside the league delete.
   - With an immediate check (`RESTRICT` or plain `NO ACTION`), deleting a league or a tournament fails, because the cascade reaches `players` and `entries` before the rows that reference them (verified on PostgreSQL). With `CASCADE` on these references, a stray `DELETE` of one player or entry would silently take match sides and side players with it.
   - The API treats a foreign-key violation raised at commit as a bug: it returns 500 with a stable code and logs the constraint name.
   - ORM relationships along these foreign keys use `passive_deletes='all'` or have no back-reference. By default SQLAlchemy sets a nullable foreign key to `NULL` when the parent is deleted, which would let a stray delete of an entry pass the deferred check on `match_sides.entry_id`.
   - Integration tests that run in a transaction and roll it back never reach a real commit. The test session's commit (a savepoint release in that pattern) therefore runs `SET CONSTRAINTS ALL IMMEDIATE` and then `SET CONSTRAINTS ALL DEFERRED`, so a violation shows up at the operation that caused it, as it would at a real commit. Running `SET CONSTRAINTS ALL IMMEDIATE` at the start of a transaction instead would make the cascading deletes fail like an immediate check.
+  - A field's current match (`fields.match_id`) is `ON DELETE SET NULL`: deleting a round, a knockout or every round when going back to setup frees the fields, and the application then fills them (§4.6).
   - References to `users` are `ON DELETE RESTRICT` unless noted. Until organizers can delete their own account (RM-31), the instance admin deletes an account by hand: first the organizer's leagues, then the user, then the `auth_attempts` rows whose `key` is the user's email, since they reference nothing. Refresh tokens go with the user, and `admin_actions` keeps its rows with the reference set to `NULL`.
 - **Concurrency:** no version columns. Every operation that changes data inside a league locks the league row first and then, if it touches a tournament, the tournament row (`SELECT … FOR UPDATE`, ADR-008). Rules spanning a season and its tournaments depend on this (BR-010, BR-011, BR-095, FR-038), and the fixed order rules out deadlocks; with one organizer per league there is almost no waiting. With only the tournament lock, clearing a result in a finished tournament and starting a new season can both commit and leave a tournament in progress inside a closed season (reproduced on PostgreSQL).
 - **Repeated requests:** the locks do not help when a client repeats a request whose response was lost after the first attempt had committed, or when a second device acts on a stale screen. Operations that are unsafe to repeat state what they expect; the application checks it under the lock and answers 409 on a mismatch (ADR-008):
@@ -43,11 +47,12 @@ The schema follows the proposed ADRs in `ADR.md`, in particular ADR-002 (Postgre
   - adding a round carries the expected `round_no`, and the unique `(phase_id, round_no)` also catches a duplicate (FR-040);
   - starting a season carries the current season's `number` (FR-021);
   - "shuffle again" and "new DYP draw" carry the expected `draw_counter`;
-  - creating a league or a tournament uses a client-supplied id (see Primary keys).
+  - creating a league or a tournament uses a client-supplied id (see Primary keys);
+  - adding a field carries the number the client expects it to get, the lowest free one (BR-132); the unique `(tournament_id, number)` also catches a duplicate.
 
   Changing the entries in setup carries no expected state: a retried add is refused, because the service finds the player already in the stage under the tournament lock, before the unique `(tournament_id, stage, player_id)` would fire (BR-003), and a retried remove gets 404.
 
-  Every other operation is safe to repeat: it sets a target state (`disabled: true`, never a toggle; the full seed order, never "move up"), deletes by id, or is refused under the lock by a uniqueness check or by the tournament state. A full seed order that does not list exactly the current entries of the stage gets 409. A repeated delete by id gets 404, which the frontend treats like a 409: it reloads the state instead of showing an error.
+  Every other operation is safe to repeat: it sets a target state (`disabled: true`, never a toggle; the full seed order, never "move up"; a whole result with every game or the walkover, never one game; "match M on field F" or "match M waiting", and a swap that names both matches with their new fields, so a repeated swap changes nothing; the number of fields in setup), deletes by id (a field by `fields.id`), or is refused under the lock by a uniqueness check or by the tournament state. A full seed order that does not list exactly the current entries of the stage gets 409. A repeated delete by id gets 404, which the frontend treats like a 409: it reloads the state instead of showing an error.
 - **Case-insensitive text:** email addresses and player names are compared with `lower()`. The database is created with PostgreSQL 17's built-in locale provider: `initdb --locale-provider=builtin --builtin-locale=C.UTF-8`, passed as `POSTGRES_INITDB_ARGS` to the image. `lower()` then uses Unicode case mapping, so `Č` folds to `č`, and the `lower()` unique indexes do not depend on the image's glibc version. The behaviour is stable within a PostgreSQL major version, so the release notes are checked before a major upgrade. Text sorts by code point; a query that must list names in Czech order uses `COLLATE "cs-x-icu"`. A test checks the folding: a database created with the plain `C` locale does not fold `Č` at all.
 - **What the database checks:** single-row and same-table invariants (CHECK, UNIQUE, foreign keys). Rules spanning several rows or tables — e.g. "no new season while a tournament is unfinished" (BR-010) or "a closed season cannot change" (BR-011) — are enforced by the application under the league and tournament locks and covered by tests, including invariant queries run after every integration test (§5).
 
@@ -69,6 +74,9 @@ erDiagram
     tournament_phases ||--o{ rounds : has
     rounds ||--o{ round_participation : records
     rounds ||--o{ matches : contains
+    tournaments ||--o{ fields : "has (1 or more)"
+    fields |o--o| matches : "is playing"
+    matches ||--o{ match_games : "1-5 games"
     matches ||--o{ match_sides : "2 sides"
     match_sides ||--o{ match_side_players : "1-2 players"
 ```
@@ -148,6 +156,9 @@ The sign-up code itself is never written to `admin_actions`.
 | `owner_user_id` | FK `users`. One organizer per league in the MVP; co-organizers (RM-01) will add a membership table. |
 | `name` | |
 | `draws_allowed` | `bool` (FR-011, BR-090). |
+| `default_field_count` | `int`, default `1`, CHECK `>= 1` (FR-011, FR-090). |
+| `default_match_format` | `bo1`, `bo3` or `bo5`, default `bo1` (FR-011, BR-120). Not `bo2`, which only group phases of leagues with draws can play (BR-121), so a default that a knockout cannot take is never copied. |
+| `default_goals_per_game` | `int`, default `10`, CHECK `> 0` (FR-011, BR-123). |
 | `share_token` | `text`, unique; at least 128 random bits, URL-safe (FR-071, ADR-008). |
 | `created_at`, `updated_at` | |
 
@@ -173,6 +184,8 @@ The sign-up code itself is never written to `admin_actions`.
 | `placement_points` | `int[]`, the season's placement points table, e.g. `{10,8,6,4,2}` (FR-011). CHECK via an immutable SQL helper function: one-dimensional, not empty, no `NULL` elements, no negative values, non-increasing. |
 | `started_at`, `closed_at` | |
 
+The league's defaults are copied, never referenced, like the placement points table below. Creating a tournament (FR-030) copies `default_goals_per_game` to `tournaments.goals_per_game`, creates `default_field_count` fields and gives each phase created in setup `default_match_format`; the create request may set its own values instead. A knockout created after a group phase (FR-045) takes its format from the start request, which the UI fills in from the league's current default. Changing a default never changes an existing tournament.
+
 The placement points table lives only on seasons. The league settings screen edits the active season's table, a new season starts with a copy of the previous season's table, and a closed season's table no longer changes (BR-012). This is the "season keeps its own copy" of ADR-009 without a second copy on `leagues`.
 
 ### 4.3 Tournaments and phases
@@ -189,15 +202,17 @@ The placement points table lives only on seasons. The league settings screen edi
 | `seeding_method` | `ranking` or `random` (FR-034); not used by Monster DYP. |
 | `rng_seed` | `bytea`, 16 bytes, immutable (ADR-010). |
 | `draw_counter` | `int`, incremented on each new draw: "shuffle again", "new DYP draw", or a draw forced by a change to the entries in setup (ADR-010). |
+| `goals_per_game` | `int`, CHECK `> 0`; copied from the league (FR-030). How many goals the score counter shows, for every phase and the final; a guide, not a rule, so a score above it is accepted and the organizer can change it at any time (BR-123). |
 | `created_at`, `updated_at` | |
 
-**`tournament_phases`** — at most one group phase and one knockout per tournament (FR-031).
+**`tournament_phases`** — the tournament's phases in order (D9); in the MVP at most one group phase and one knockout (FR-031).
 
 | Column | Notes |
 |---|---|
 | `id` | |
-| `tournament_id` | FK `tournaments`, `ON DELETE CASCADE`. Unique on `(tournament_id, kind)`. |
-| `kind` | `group` or `knockout`. |
+| `tournament_id` | FK `tournaments`, `ON DELETE CASCADE`. |
+| `position` | `1, 2, …`, the order of the phases (D9). Unique on `(tournament_id, position)`. In the MVP the group phase is 1 and the knockout 2, or 1 when there is no group phase. |
+| `kind` | `group` or `knockout`. A partial unique index on `(tournament_id, kind) WHERE kind IN ('group', 'knockout')` keeps at most one of each, so the rule still holds when later formats add kinds of their own. |
 | `format` | `round_robin`, `swiss`, `monster_dyp` (group) or `single_elimination` (knockout). |
 | `round_robin_legs` | `1` or `2`; round robin only. |
 | `sit_out_points` | `0` or `1`; group phases only (FR-039, BR-071). |
@@ -205,9 +220,11 @@ The placement points table lives only on seasons. The league settings screen edi
 | `qualifiers` | Number of qualifying entries (FR-045, BR-080). Set only on a knockout that follows a group phase. |
 | `third_place_match` | `bool`; knockout only. |
 | `monster_knockout_mode` | `seeded_pairs`, `singles`, `a_little_mercy`, `lord_have_mercy` (BR-081–BR-084). Set only on a knockout that follows a Monster DYP group phase. |
+| `match_format` | `bo1`, `bo2`, `bo3` or `bo5`, `NOT NULL` (BR-120). The format of every match of the phase except the final; the third-place match plays it too. Copied from the league in setup, or for a knockout after a group phase taken from the start request (§4.2). The organizer can change it until the phase's first result (FR-054). |
+| `final_match_format` | `bo1`, `bo3` or `bo5`, nullable; knockout only. `NULL` means the final plays `match_format` (BR-120). The final is the `standard` match of the bracket's last round (D4). The organizer can change it until the final has a result (FR-054). |
 | `created_at` | |
 
-CHECK constraints tie the columns to `kind` and `format`: e.g. a `group` phase has `sit_out_points` and no `third_place_match`; `round_robin_legs` is set only for `round_robin`; `tiebreakers` only for `swiss` and `monster_dyp`; `qualifiers` and `monster_knockout_mode` only on `knockout` rows. Rules that need another row or the tournament type are checked by the application: `qualifiers` is set exactly when the tournament also has a group phase, `monster_knockout_mode` exactly when that group phase is `monster_dyp`, and Monster DYP always has a `monster_dyp` group phase.
+CHECK constraints tie the columns to `kind` and `format`: e.g. a `group` phase has `sit_out_points` and no `third_place_match`; `round_robin_legs` is set only for `round_robin`; `tiebreakers` only for `swiss` and `monster_dyp`; `qualifiers`, `monster_knockout_mode` and `final_match_format` only on `knockout` rows; `match_format = 'bo2'` only on `group` rows (BR-121); a `group` phase has `position = 1` and a `knockout` phase `position` 1 or 2. Rules that need another row, the tournament type or the league are checked by the application: `qualifiers` is set exactly when the tournament also has a group phase, `monster_knockout_mode` exactly when that group phase is `monster_dyp`, Monster DYP always has a `monster_dyp` group phase, a knockout is at position 2 exactly when a group phase exists, `bo2` only in a league that allows draws (BR-121), and a format no longer changes once FR-054 locks it.
 
 A knockout without a group phase is created in setup. A knockout after a group phase is created when the organizer starts it (FR-045). Deleting it (FR-046, BR-087) removes the phase row, which cascades to its rounds and matches; its `knockout` entries hang off `tournaments`, so the application deletes them in the same transaction, in either order (§2).
 
@@ -290,13 +307,36 @@ The drawn pairs are stored as `pair` entries. The left-out player has no entry a
 | `round_id` | FK `rounds`, `ON DELETE CASCADE`. |
 | `position` | Order within the round; in a bracket, the slot used to derive progression (D4). Unique on `(round_id, kind, position)`. |
 | `kind` | `standard` or `third_place`. |
-| `outcome` | `side_1`, `side_2`, `draw`, or `NULL` while there is no result. |
+| `outcome` | `side_1`, `side_2`, `draw`, or `NULL` while there is no result. Written by the application from the games when a result is entered, or the walkover's winner (D11); never edited on its own. |
 | `is_walkover` | `bool` (FR-052). |
-| `score_1`, `score_2` | `int`, nullable, `>= 0` (FR-051). |
 | `result_entered_at` | `timestamptz`, nullable. |
+| `requeued_at` | `timestamptz`, nullable. Set when the field this match was on is removed; a requeued match waits ahead of the schedule order, earliest first (BR-132). Cleared when the match takes a field or gets a result. |
 | `created_at` | |
 
-CHECK constraints keep a result consistent within the row (BR-092, BR-093): no result → no scores and not a walkover; both scores or neither; a walkover has a winner and no scores; `side_1` wins → `score_1 > score_2` when scores are present, and the reverse for `side_2`; a draw is not a walkover and has equal scores if any. Whether draws are allowed (BR-090) and whether scores are required (BR-092) depend on the league and the phase, so the application checks them.
+CHECK constraints keep a result consistent within the row (BR-093, BR-124): no result → not a walkover; a walkover has a winner (`side_1` or `side_2`); a match with a result is not requeued. The scores are in `match_games`. Whether draws are allowed (BR-090) and whether the games fit the format (BR-121) depend on the league and the phase, so the application checks them.
+
+**`match_games`** — the games of a result (D11; FR-050, FR-051, BR-120–BR-124).
+
+| Column | Notes |
+|---|---|
+| `match_id` | FK `matches`, `ON DELETE CASCADE`. |
+| `game_no` | `1`–`5`. Primary key `(match_id, game_no)`. Numbers run from 1 without gaps (application). |
+| `winner` | `side_1`, `side_2` or `draw`. Picked by the organizer when there are no scores (FR-051). |
+| `score_1`, `score_2` | `int`, nullable, `>= 0`: the goals of each side (FR-051). |
+
+CHECK constraints keep a game consistent within the row (BR-092): both scores or neither; `side_1` wins → `score_1 > score_2` when scores are present, and the reverse for `side_2`; a drawn game has equal scores if any and is game 1, because only a BO1 game can be drawn (BR-090, BR-121).
+
+The API takes a whole result: every game played, or a walkover with its winner (§2). The application checks it against the match's format, the phase's `match_format` or, for the final, `final_match_format`, and then writes `outcome` and the games in one transaction. Clearing a result deletes its games.
+
+| Format | Games stored | Outcome (BR-121) |
+|---|---|---|
+| BO1 | exactly 1 | its winner; a draw only in a group phase of a league that allows draws (BR-090) |
+| BO2 | exactly 2, neither drawn | 2:0 a win, 1:1 a draw (group phases of leagues with draws only) |
+| BO3 | 2 or 3, none drawn, ending when a side has won 2 | the side that won 2 |
+| BO5 | 3 to 5, none drawn, ending when a side has won 3 | the side that won 3 |
+| Walkover, any format | none | the winner given (FR-052, BR-124) |
+
+Scores are optional per game, except that every game of a Swiss or Monster DYP round needs them, unless the match is a walkover (BR-092). Score difference (BR-073) sums the games with scores; group-phase points come from `outcome`, not from games (BR-122).
 
 **`match_sides`** — the two sides of a match, where they are stored.
 
@@ -320,6 +360,30 @@ Players are listed for every stored side, including sides that have an entry, so
 
 **Byes.** A round-1 match with a bye side is stored so that the bracket has its full shape, but it is not a match in the PRD's sense (BR-041). It keeps `outcome = NULL`; the engine treats the other side as having gone through. Checks such as "every knockout match has a result" (FR-037) and "every first-round match has a result" (BR-045) skip matches with a bye side. When a late entry replaces the bye (BR-045), only the side is rewritten and the match becomes an ordinary match without a result.
 
+### 4.6 Fields
+
+**`fields`** — the places where a tournament's matches are played (FR-090–FR-094, BR-130–BR-135).
+
+| Column | Notes |
+|---|---|
+| `id` | A field is removed by its id (§2). |
+| `tournament_id` | FK `tournaments`, `ON DELETE CASCADE`. |
+| `number` | `int`, `>= 1`; unique on `(tournament_id, number)`. Shown as "Field" and its number (FR-091). A new field takes the lowest free number; removing a field keeps the other numbers (BR-132). |
+| `match_id` | FK `matches`, nullable, unique, `ON DELETE SET NULL` (§2). The match being played on this field (D10); `NULL` while the field is free. The unique index keeps a match on at most one field. |
+| `created_at`, `updated_at` | |
+
+Creating a tournament creates its fields from the league's default (§4.2). In setup the organizer sends the number of fields, and the rows are rewritten as fields 1 to n; no match exists yet. While the tournament runs, the organizer adds and removes single fields (FR-090). Only the current placement is stored: no history, no flag for a placement made by hand, no stored waiting list.
+
+The application changes placements under the tournament lock, in the same transaction as the write that causes them:
+
+- **Filling.** After every write that frees a field or makes a match playable (a result entered, a field added or removed, a match moved or taken off by hand, a round or knockout generated, a knockout side becoming known), a pure engine function gets the free fields, the waiting matches in waiting order and the players on fields. It returns the placements of BR-130 and BR-131: each free field, lowest number first, takes the first waiting match whose sides are known and whose players are on no field. The application writes them.
+- **Waiting order** is computed on read (FR-092): requeued matches first, earliest `requeued_at` first, then the schedule order of BR-130. Waiting matches are those without a result, not on a field and without a bye side (BR-041); a later knockout match counts once the engine derives both its sides (D4).
+- **By hand** (FR-093, BR-133): placing, moving and swapping write `match_id` as the request states (§2). The filling never moves a match that is on a field, so a placement made by hand holds until the match has a result without being marked. A placement is refused with 422 if a side is unknown (BR-091) or a player is on another field (BR-131). Taking a match off its field makes it wait in schedule order; the field it left is filled in the same request without that match.
+- **Results** (FR-094, BR-134): entering a result frees the match's field and clears `requeued_at`, and a waiting match with a result never takes a field. Clearing a result does not place the match again.
+- **Removing a field** (BR-132): the last field cannot be removed (422). The removed field's match gets `requeued_at` and goes to the front of the waiting list.
+
+Fields change nothing the engine computes for standings, places, points or sit-outs (BR-135).
+
 ## 5. What the database enforces, and what the application does
 
 | Rule | Where |
@@ -331,14 +395,21 @@ Players are listed for every stored side, including sides that have an entry, so
 | Valid settings per phase kind and format (FR-031, FR-039, FR-043, FR-045) | CHECK on `tournament_phases` |
 | `qualifiers` only with a group phase, `monster_knockout_mode` only after Monster DYP (FR-045, BR-081–BR-084) | Application |
 | Placement points non-increasing, not negative (FR-011) | CHECK on `seasons` |
-| Result consistent with scores and walkover (BR-092, BR-093) | CHECK on `matches` |
+| Phases in order: a group phase first, at most one of each kind (D9, FR-031) | CHECK on `position`, unique `(tournament_id, position)` and partial unique on `kind`; a knockout at position 2 exactly when a group phase exists: application |
+| Match formats valid per phase kind; BO2 only in group phases (BR-120, BR-121) | CHECK on `tournament_phases`; BO2 only with draws allowed and the FR-054 lock: application |
+| Result consistent with walkover (BR-093, BR-124) | CHECK on `matches` |
+| A game's winner agrees with its scores; only game 1 can be drawn (BR-092) | CHECK on `match_games` |
+| Games fit the format and the outcome; scores in every Swiss and Monster DYP game (BR-090, BR-092, BR-121) | Application, checked by invariant queries |
+| A field holds at most one match and a match is on at most one field; field numbers unique per tournament (BR-132) | Unique indexes on `fields` |
+| At least one field per tournament; the last field cannot be removed (FR-090, BR-132) | Application, checked by an invariant query |
+| A match on a field has both sides, no result and no player on another field (BR-130, BR-131) | Application, under the tournament lock; checked by invariant queries for stored sides |
 | A bye side has no entry (BR-041) | CHECK on `match_sides` |
 | A CLI action has no admin; setting the sign-up code has no target | One-way CHECKs on `admin_actions` |
 | A player row is deleted only with its league (D6); an entry with matches is not deleted on its own | Deferred foreign keys (§2) |
 | No new season with an unfinished tournament (BR-010); closed seasons frozen (BR-011) | Application, under the league lock, which every write in a league takes before the tournament lock |
 | Draws allowed, scores required, result locking (BR-053, BR-065, BR-090, BR-092, BR-094) | Application, under the league and tournament locks |
-| Repeated and stale requests (FR-021, FR-040, FR-046, new draws, creating a league or a tournament) | Application: expected state checked under the lock, 409 on a mismatch; client-supplied ids for creates (§2) |
-| Entries in `round_participation` and `match_sides` belong to the same tournament and have the phase's stage; `source_entry_id` stays in the tournament; players in entries, DYP halves and sides belong to the tournament's league | Application: every id in a request is loaded through the league and tournament the operation locked |
+| Repeated and stale requests (FR-021, FR-040, FR-046, FR-093, BR-132, new draws, creating a league or a tournament) | Application: expected state checked under the lock, 409 on a mismatch; client-supplied ids for creates (§2) |
+| Entries in `round_participation` and `match_sides` belong to the same tournament and have the phase's stage; `source_entry_id` stays in the tournament; a field's match belongs to the field's tournament; players in entries, DYP halves and sides belong to the tournament's league | Application: every id in a request is loaded through the league and tournament the operation locked |
 | A side's players equal its entry's members (D2); a bye side has no players | Application, checked by invariant queries |
 | Entry sizes per kind (BR-030), DYP half sizes (BR-032), minimum entries (FR-032) | Application |
 | A player in an unfinished tournament cannot be removed (BR-002) | Application |
@@ -354,7 +425,10 @@ Loading every id through the locked league and tournament also stops an organize
 - players in `entry_members`, `dyp_halves` or `match_side_players` from another league;
 - side players that differ from the members of the side's entry;
 - bye sides with players;
-- group rounds without exactly one `round_participation` row per `main` entry.
+- group rounds without exactly one `round_participation` row per `main` entry;
+- games on a match without a result or on a walkover, a result that is not a walkover and has no games, game numbers with a gap, and games that do not fit the format or the outcome (§4.5);
+- a phase at a position that does not fit its kind and the tournament's other phase (D9);
+- a tournament without a field, a field whose match is in another tournament or has a result, a requeued match on a field, and two fields whose matches share a player, for matches with stored sides.
 
 The deferred foreign keys (§2) are checked at each simulated commit, so the invariant queries see a state that passed them.
 
