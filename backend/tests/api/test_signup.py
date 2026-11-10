@@ -311,6 +311,30 @@ def test_adr006_the_code_is_checked_before_the_email_so_a_stranger_learns_nothin
             "string_too_long",
             id="long-email",
         ),
+        pytest.param(
+            {"display_name": "\u200b"},
+            "display_name",
+            "invisible_characters",
+            id="zero-width-name",
+        ),
+        pytest.param(
+            {"display_name": "Ana\u200bB"},
+            "display_name",
+            "invisible_characters",
+            id="zero-width-inside-name",
+        ),
+        pytest.param(
+            {"display_name": "Ana\u202e"},
+            "display_name",
+            "invisible_characters",
+            id="bidi-override-name",
+        ),
+        pytest.param(
+            {"display_name": "A\x00na"},
+            "display_name",
+            "invisible_characters",
+            id="control-name",
+        ),
         pytest.param({"language": "de"}, "language", "enum", id="language"),
         pytest.param(
             {"signup_code": "x" * 257}, "signup_code", "too_long", id="long-code"

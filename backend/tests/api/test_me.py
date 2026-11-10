@@ -110,6 +110,17 @@ def test_fr001_patch_me_changes_the_display_name_and_strips_it(
     assert ana.language == Language.EN
 
 
+def test_fr001_patch_me_accepts_a_name_with_czech_letters_and_inner_spaces(
+    client: TestClient, ana: User, headers: dict[str, str]
+) -> None:
+    response = client.patch(
+        "/api/v1/me", json={"display_name": "Žofie Příhodová-Nováková"}, headers=headers
+    )
+
+    assert response.status_code == 200
+    assert ana.display_name == "Žofie Příhodová-Nováková"
+
+
 def test_fr081_patch_me_changes_both_at_once(
     client: TestClient, ana: User, headers: dict[str, str]
 ) -> None:
@@ -173,6 +184,24 @@ def test_fr081_patch_me_twice_with_the_same_body_is_harmless(
         ),
         pytest.param(
             {"display_name": 7}, "display_name", "string_type", id="number-name"
+        ),
+        pytest.param(
+            {"display_name": "\u200b"},
+            "display_name",
+            "invisible_characters",
+            id="zero-width-name",
+        ),
+        pytest.param(
+            {"display_name": "A\u200dna"},
+            "display_name",
+            "invisible_characters",
+            id="joiner-inside-name",
+        ),
+        pytest.param(
+            {"display_name": "Ana\x07"},
+            "display_name",
+            "invisible_characters",
+            id="control-name",
         ),
         pytest.param({"language": "de"}, "language", "enum", id="unknown-language"),
         pytest.param({"language": "EN"}, "language", "enum", id="upper-case-language"),

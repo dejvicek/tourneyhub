@@ -1,12 +1,15 @@
+import unicodedata
 from typing import Annotated
 
 from pydantic import (
+    AfterValidator,
     BaseModel,
     ConfigDict,
     JsonValue,
     SecretStr,
     StringConstraints,
 )
+from pydantic_core import PydanticCustomError
 
 from tourneyhub.engine.accounts import Language
 from tourneyhub.errors import ErrorCode
@@ -36,8 +39,25 @@ type NewPassword = Annotated[
     SecretStr,
     StringConstraints(min_length=MIN_PASSWORD_LENGTH, max_length=MAX_PASSWORD_LENGTH),
 ]
+
+
+def _reject_invisible_characters(name: str) -> str:
+    """Refuse control, zero-width and other format characters (Unicode Cc, Cf).
+
+    A name made of them looks empty, and one that contains them can look like
+    another person's.
+    """
+    if any(unicodedata.category(char) in {"Cc", "Cf"} for char in name):
+        raise PydanticCustomError(
+            "invisible_characters", "the name contains invisible characters"
+        )
+    return name
+
+
 type DisplayName = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=100),
+    AfterValidator(_reject_invisible_characters),
 ]
 # No email-validator dependency: one @, no spaces, a dot in the domain.
 type Email = Annotated[
