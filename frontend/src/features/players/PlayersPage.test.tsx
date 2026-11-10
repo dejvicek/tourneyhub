@@ -138,7 +138,7 @@ describe("PlayersPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("P5b, BR-001: a removed player's name is refused with an offer to restore them", async () => {
+  it("BR-001: a removed player's name is refused with an offer to restore them", async () => {
     const filip = db().players.find((p) => p.name === "Filip Šimek");
     if (filip === undefined) {
       throw new Error("The seed has Filip Šimek");
@@ -169,7 +169,7 @@ describe("PlayersPage", () => {
     expect(filip.removed_at).toBeNull();
   });
 
-  it("P5b: a league full at 500 players says so at the field", async () => {
+  it("a league full at 500 players says so at the field", async () => {
     const count = db().players.filter(
       (p) => p.league_id === DEMO_LEAGUE_ID,
     ).length;
@@ -195,7 +195,7 @@ describe("PlayersPage", () => {
     });
   });
 
-  it("P5b: a name with an invisible character is refused at the field", async () => {
+  it("a name with an invisible character is refused at the field", async () => {
     const user = userEvent.setup();
     renderAt(players);
 

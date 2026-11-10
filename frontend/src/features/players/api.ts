@@ -4,19 +4,16 @@ import {
   queryOptions,
 } from "@tanstack/react-query";
 
-import { dataOf } from "@/api/client";
-import { provisionalApi } from "@/api/provisional";
+import { api, dataOf } from "@/api/client";
 
-// Players mirror P5b (feat/players), still provisional until it merges
-// (src/demo/contract.ts, players).
 export const playerQueries = {
   list: (leagueId: string) =>
     queryOptions({
       queryKey: ["leagues", leagueId, "players"],
       queryFn: ({ signal }) =>
         dataOf(
-          provisionalApi.GET("/api/v1/leagues/{league_id}/players", {
-            // The screen lists removed players too, to restore them (P5b).
+          api.GET("/api/v1/leagues/{league_id}/players", {
+            // The screen lists removed players too, to restore them.
             params: {
               path: { league_id: leagueId },
               query: { include_removed: true },
@@ -35,7 +32,7 @@ export const playerMutations = {
     mutationOptions({
       mutationFn: (name: string) =>
         dataOf(
-          provisionalApi.POST("/api/v1/leagues/{league_id}/players", {
+          api.POST("/api/v1/leagues/{league_id}/players", {
             params: { path: { league_id: leagueId } },
             body: { name },
           }),
@@ -49,15 +46,12 @@ export const playerMutations = {
     mutationOptions({
       mutationFn: (input: { playerId: string; name: string }) =>
         dataOf(
-          provisionalApi.PUT(
-            "/api/v1/leagues/{league_id}/players/{player_id}/name",
-            {
-              params: {
-                path: { league_id: leagueId, player_id: input.playerId },
-              },
-              body: { name: input.name },
+          api.PUT("/api/v1/leagues/{league_id}/players/{player_id}/name", {
+            params: {
+              path: { league_id: leagueId, player_id: input.playerId },
             },
-          ),
+            body: { name: input.name },
+          }),
         ),
       onSettled: () =>
         queryClient.invalidateQueries({ queryKey: ["leagues", leagueId] }),
@@ -68,15 +62,12 @@ export const playerMutations = {
     mutationOptions({
       mutationFn: (input: { playerId: string; removed: boolean }) =>
         dataOf(
-          provisionalApi.PUT(
-            "/api/v1/leagues/{league_id}/players/{player_id}/removed",
-            {
-              params: {
-                path: { league_id: leagueId, player_id: input.playerId },
-              },
-              body: { removed: input.removed },
+          api.PUT("/api/v1/leagues/{league_id}/players/{player_id}/removed", {
+            params: {
+              path: { league_id: leagueId, player_id: input.playerId },
             },
-          ),
+            body: { removed: input.removed },
+          }),
         ),
       onSettled: () =>
         queryClient.invalidateQueries({ queryKey: ["leagues", leagueId] }),

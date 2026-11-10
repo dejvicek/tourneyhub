@@ -3,6 +3,7 @@ import { type SubmitEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ApiError } from "@/api/client";
+import type { components } from "@/api/schema";
 import { DocumentTitle } from "@/components/DocumentTitle";
 import { PageFallback } from "@/components/PageFallback";
 import {
@@ -18,7 +19,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { Player } from "@/demo/contract";
 import { errorCodeOf, ruleOf } from "@/features/auth/apiErrors";
 import { fieldErrors } from "@/features/auth/fieldErrors";
 import { FormField } from "@/features/auth/FormField";
@@ -26,6 +26,8 @@ import { EmptyState } from "@/features/leagues/EmptyState";
 import { useRouteParam } from "@/hooks/useRouteParam";
 
 import { playerMutations, playerQueries } from "./api";
+
+type PlayerRead = components["schemas"]["PlayerRead"];
 
 /**
  * The league's player list (FR-012): add, rename, remove and restore, with
@@ -125,7 +127,7 @@ function useNameTaken() {
       return undefined;
     }
     const name = typeof error.detail.name === "string" ? error.detail.name : "";
-    // P5b: the 409 of a race has no detail; the reload shows the holder.
+    // The API: the 409 of a race has no detail; the reload shows the holder.
     if (name === "") {
       return t("players.errors.takenUnknown");
     }
@@ -161,7 +163,7 @@ function AddPlayer({
     });
   }
 
-  // P5b refuses a removed player's name; the organizer restores them instead.
+  // The API refuses a removed player's name; the organizer restores them instead.
   const removedHolder =
     add.error instanceof ApiError &&
     errorCodeOf(add.error) === "player_name_taken" &&
@@ -239,7 +241,7 @@ function PlayerRow({
   onDone,
 }: {
   leagueId: string;
-  player: Player;
+  player: PlayerRead;
   onDone: (message: string) => void;
 }) {
   const { t } = useTranslation();
@@ -412,7 +414,7 @@ function RemovedRow({
   onDone,
 }: {
   leagueId: string;
-  player: Player;
+  player: PlayerRead;
   onDone: (message: string) => void;
 }) {
   const { t } = useTranslation();

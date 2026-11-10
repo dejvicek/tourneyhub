@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 
-import type { Player } from "@/demo/contract";
+import type { PlayerRead } from "@/demo/contract";
 
 import type { PublicMatch, PublicTournament } from "./api";
 
@@ -8,7 +8,7 @@ import type { PublicMatch, PublicTournament } from "./api";
  * Names for players, entries and match sides, from the league's player list:
  * a rename shows everywhere (FR-012). A pair reads "A & B".
  */
-export function useNames(players: Player[], tournament?: PublicTournament) {
+export function useNames(players: PlayerRead[], tournament?: PublicTournament) {
   const { t } = useTranslation();
   const byId = new Map(players.map((player) => [player.id, player.name]));
   const entries = new Map(

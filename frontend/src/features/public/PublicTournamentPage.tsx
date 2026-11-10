@@ -5,7 +5,7 @@ import { generatePath, Link } from "react-router";
 import { DocumentTitle } from "@/components/DocumentTitle";
 import { PageFallback } from "@/components/PageFallback";
 import { Badge } from "@/components/ui/badge";
-import type { Player } from "@/demo/contract";
+import type { PlayerRead } from "@/demo/contract";
 import { useRouteParam } from "@/hooks/useRouteParam";
 import { paths } from "@/lib/paths";
 
@@ -85,7 +85,7 @@ function TournamentView({
 }: {
   shareToken: string;
   leagueName: string;
-  players: Player[];
+  players: PlayerRead[];
   tournament: PublicTournament;
 }) {
   const { t, i18n } = useTranslation();
@@ -147,7 +147,7 @@ function Places({
   players,
 }: {
   tournament: PublicTournament;
-  players: Player[];
+  players: PlayerRead[];
 }) {
   const { t } = useTranslation();
   const names = useNames(players, tournament);
@@ -193,7 +193,7 @@ function Standings({
 }: {
   shareToken: string;
   tournament: PublicTournament;
-  players: Player[];
+  players: PlayerRead[];
 }) {
   const { t, i18n } = useTranslation();
   const names = useNames(players, tournament);
@@ -270,7 +270,7 @@ function Results({
   players,
 }: {
   tournament: PublicTournament;
-  players: Player[];
+  players: PlayerRead[];
 }) {
   const { t } = useTranslation();
   const names = useNames(players, tournament);

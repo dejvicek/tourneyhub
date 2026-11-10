@@ -6,7 +6,11 @@ import { DocumentTitle } from "@/components/DocumentTitle";
 import { PageFallback } from "@/components/PageFallback";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { Player, PublicLeague, TournamentSummary } from "@/demo/contract";
+import type {
+  PlayerRead,
+  PublicLeague,
+  TournamentSummary,
+} from "@/demo/contract";
 import { EmptyState } from "@/features/leagues/EmptyState";
 import { useSeasonName } from "@/features/leagues/useSeasonName";
 import { useRouteParam } from "@/hooks/useRouteParam";
@@ -191,7 +195,7 @@ function LiveTournament({
 }: {
   shareToken: string;
   summary: TournamentSummary;
-  players: Player[];
+  players: PlayerRead[];
 }) {
   const { t } = useTranslation();
   const date = useDate();

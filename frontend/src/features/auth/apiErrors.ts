@@ -2,9 +2,8 @@
 // does not list P2b's, P5a's and the players proposal's codes yet; they
 // arrive in the same shape, so the code is read as either.
 import { ApiError, type ErrorCode } from "@/api/client";
-import type { OutsideErrorCode } from "@/demo/contract";
 
-export type KnownErrorCode = ErrorCode | OutsideErrorCode;
+export type KnownErrorCode = ErrorCode;
 
 export function errorCodeOf(error: unknown): KnownErrorCode | undefined {
   if (!(error instanceof ApiError)) {
