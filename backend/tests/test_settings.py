@@ -12,6 +12,7 @@ def test_settings_are_read_from_prefixed_variables(
     monkeypatch.setenv("TOURNEYHUB_ENV", "production")
     monkeypatch.setenv("TOURNEYHUB_DATABASE_URL", "postgresql+psycopg://h/d")
     monkeypatch.setenv("TOURNEYHUB_JWT_SECRET", _SECRET)
+    monkeypatch.delenv("TOURNEYHUB_COOKIE_SECURE", raising=False)
 
     settings = Settings()
 

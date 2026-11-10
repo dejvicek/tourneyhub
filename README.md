@@ -50,7 +50,6 @@ docker compose exec api sh -c '
   db=${TOURNEYHUB_DATABASE_URL%/*}
   export TOURNEYHUB_TEST_DATABASE_URL=$db/tourneyhub_test
   export TOURNEYHUB_TEST_MIGRATIONS_DATABASE_URL=$db/tourneyhub_test_migrations
-  unset TOURNEYHUB_COOKIE_SECURE  # a settings test expects it unset, as in CI
   ruff format --check && ruff check && mypy && lint-imports &&
   coverage run -m pytest && coverage report &&
   coverage report --include="*/tourneyhub/engine/*" --fail-under=100 &&
