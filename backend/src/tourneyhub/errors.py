@@ -25,8 +25,10 @@ class ErrorCode(StrEnum):
     # Leagues
     LEAGUE_NOT_FOUND = "league_not_found"
     LEAGUE_ID_TAKEN = "league_id_taken"
-    LEAGUE_NAME_CHANGED = "league_name_changed"
-    LEAGUE_NOT_ACTIVE = "league_not_active"
+    # Seasons
+    SEASON_NOT_FOUND = "season_not_found"
+    SEASON_CLOSED = "season_closed"
+    SEASON_NUMBER_CHANGED = "season_number_changed"
 
 
 class AppError(Exception):

@@ -23,7 +23,7 @@ def _forbidden() -> None:
 
 
 def _refused() -> None:
-    raise RuleViolationError(ErrorCode.LEAGUE_NOT_ACTIVE, minimum=4, given=3)
+    raise RuleViolationError(ErrorCode.SEASON_CLOSED, minimum=4, given=3)
 
 
 def _unknown_constraint() -> None:
@@ -88,7 +88,7 @@ def test_the_subclass_decides_the_status(lenient_client: TestClient) -> None:
     assert forbidden.json()["code"] == "password_change_required"
     assert refused.status_code == 422
     assert refused.json() == {
-        "code": "league_not_active",
+        "code": "season_closed",
         "detail": {"minimum": 4, "given": 3},
     }
 

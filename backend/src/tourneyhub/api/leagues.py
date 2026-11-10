@@ -1,17 +1,22 @@
 from datetime import datetime
 from http import HTTPStatus
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter
-from pydantic import UUID7
+from pydantic import UUID7, Field
 
 from tourneyhub.api.deps import CurrentUserDep, NowDep, SessionDep
 from tourneyhub.api.schemas import (
+    INT_MAX,
     ErrorResponse,
     LeagueName,
+    PlacementPoints,
     RequestModel,
     ResponseModel,
+    SeasonName,
 )
+from tourneyhub.engine.leagues import DefaultMatchFormat, SeasonState
 from tourneyhub.services import leagues as league_service
 
 router = APIRouter(
@@ -28,13 +33,81 @@ class LeagueCreate(RequestModel):
     name: LeagueName
 
 
-class LeagueRead(ResponseModel):
-    """A league as the organizer sees it."""
+class LeagueUpdate(RequestModel):
+    """League settings to change (FR-011); a field left out or null stays as it is.
+
+    Each value is the target state, so repeating the request changes nothing
+    (ADR-008). The placement points table belongs to the season: see
+    `set_placement_points`.
+    """
+
+    name: LeagueName | None = None
+    draws_allowed: bool | None = None
+    default_field_count: Annotated[int, Field(ge=1, le=INT_MAX)] | None = None
+    default_match_format: DefaultMatchFormat | None = None
+    default_goals_per_game: Annotated[int, Field(ge=1, le=INT_MAX)] | None = None
+
+
+class SeasonStart(RequestModel):
+    """Start the next season; the active season's number as the client saw it."""
+
+    expected_current_number: Annotated[int, Field(ge=1, le=INT_MAX)]
+
+
+class SeasonRename(RequestModel):
+    """A season's new name; null restores the default "Season <number>" (FR-020)."""
+
+    name: SeasonName | None
+
+
+class PlacementPointsUpdate(RequestModel):
+    """The whole placement points table, first place first (FR-011)."""
+
+    placement_points: PlacementPoints
+
+
+class SeasonRead(ResponseModel):
+    """A season; `name` is null while it has the default name (FR-020)."""
+
+    id: UUID
+    number: int
+    name: str | None
+    state: SeasonState
+    placement_points: list[int]
+    started_at: datetime
+    closed_at: datetime | None
+
+
+class LeagueSummary(ResponseModel):
+    """A league in the organizer's list (FR-007)."""
 
     id: UUID
     name: str
+
+
+class LeagueRead(ResponseModel):
+    """A league as its organizer sees it, with every season, oldest first.
+
+    `share_token` is the secret of the league's share link (FR-070, FR-071).
+    """
+
+    id: UUID
+    name: str
+    draws_allowed: bool
+    default_field_count: int
+    default_match_format: DefaultMatchFormat
+    default_goals_per_game: int
+    share_token: str
     created_at: datetime
     updated_at: datetime | None
+    seasons: list[SeasonRead]
+
+
+@router.get("")
+def list_leagues(session: SessionDep, user: CurrentUserDep) -> list[LeagueSummary]:
+    """List the organizer's own leagues, oldest first (FR-007)."""
+    leagues = league_service.list_leagues(session, user_id=user.id)
+    return [LeagueSummary.model_validate(league) for league in leagues]
 
 
 @router.post(
@@ -45,7 +118,7 @@ class LeagueRead(ResponseModel):
 def create_league(
     body: LeagueCreate, session: SessionDep, user: CurrentUserDep, now: NowDep
 ) -> LeagueRead:
-    """Create a league, or return it again when the request is repeated.
+    """Create a league with its Season 1, or return it again on a repeat (FR-010).
 
     An id of another organizer's league, or a repeat racing its first attempt,
     is 409: reload.
@@ -56,13 +129,136 @@ def create_league(
     return LeagueRead.model_validate(league)
 
 
-@router.get(
-    "/{league_id}",
-    responses={HTTPStatus.NOT_FOUND: {"model": ErrorResponse}},
-)
+@router.get("/{league_id}", responses={HTTPStatus.NOT_FOUND: {"model": ErrorResponse}})
 def read_league(
     league_id: UUID, session: SessionDep, user: CurrentUserDep
 ) -> LeagueRead:
     """Return one of the organizer's leagues; another organizer's is 404."""
-    league = league_service.lock_league(session, league_id=league_id, user_id=user.id)
+    league = league_service.get_league(session, league_id=league_id, user_id=user.id)
     return LeagueRead.model_validate(league)
+
+
+@router.patch(
+    "/{league_id}", responses={HTTPStatus.NOT_FOUND: {"model": ErrorResponse}}
+)
+def update_league(
+    league_id: UUID,
+    body: LeagueUpdate,
+    session: SessionDep,
+    user: CurrentUserDep,
+    now: NowDep,
+) -> LeagueRead:
+    """Change the league's settings (FR-011); allowed in any season (BR-011)."""
+    league = league_service.update_league(
+        session,
+        league_id=league_id,
+        user_id=user.id,
+        name=body.name,
+        draws_allowed=body.draws_allowed,
+        default_field_count=body.default_field_count,
+        default_match_format=body.default_match_format,
+        default_goals_per_game=body.default_goals_per_game,
+        now=now,
+    )
+    return LeagueRead.model_validate(league)
+
+
+@router.delete(
+    "/{league_id}",
+    status_code=HTTPStatus.NO_CONTENT,
+    responses={HTTPStatus.NOT_FOUND: {"model": ErrorResponse}},
+)
+def delete_league(league_id: UUID, session: SessionDep, user: CurrentUserDep) -> None:
+    """Delete the league with all its seasons (FR-013).
+
+    The UI asks for confirmation first. A repeated delete gets 404, which means
+    the league is already gone.
+    """
+    league_service.delete_league(session, league_id=league_id, user_id=user.id)
+
+
+@router.post(
+    "/{league_id}/seasons",
+    status_code=HTTPStatus.CREATED,
+    responses={
+        HTTPStatus.NOT_FOUND: {"model": ErrorResponse},
+        HTTPStatus.CONFLICT: {"model": ErrorResponse},
+    },
+)
+def start_season(
+    league_id: UUID,
+    body: SeasonStart,
+    session: SessionDep,
+    user: CurrentUserDep,
+    now: NowDep,
+) -> SeasonRead:
+    """Close the active season and start the next one (FR-021).
+
+    409 `season_number_changed`, with the active season's `current_number`,
+    when `expected_current_number` is stale, for example on a repeat: reload.
+    """
+    season = league_service.start_season(
+        session,
+        league_id=league_id,
+        user_id=user.id,
+        expected_current_number=body.expected_current_number,
+        now=now,
+    )
+    return SeasonRead.model_validate(season)
+
+
+@router.put(
+    "/{league_id}/seasons/{season_id}/name",
+    responses={HTTPStatus.NOT_FOUND: {"model": ErrorResponse}},
+)
+def rename_season(
+    league_id: UUID,
+    season_id: UUID,
+    body: SeasonRename,
+    session: SessionDep,
+    user: CurrentUserDep,
+    now: NowDep,
+) -> SeasonRead:
+    """Rename a season, closed ones too (FR-020, BR-011)."""
+    season = league_service.rename_season(
+        session,
+        league_id=league_id,
+        season_id=season_id,
+        user_id=user.id,
+        name=body.name,
+        now=now,
+    )
+    return SeasonRead.model_validate(season)
+
+
+@router.put(
+    "/{league_id}/seasons/{season_id}/placement-points",
+    responses={
+        HTTPStatus.NOT_FOUND: {"model": ErrorResponse},
+        HTTPStatus.CONFLICT: {"model": ErrorResponse},
+    },
+)
+def set_placement_points(
+    league_id: UUID,
+    season_id: UUID,
+    body: PlacementPointsUpdate,
+    session: SessionDep,
+    user: CurrentUserDep,
+    now: NowDep,
+) -> SeasonRead:
+    """Replace the active season's placement points table (FR-011, BR-012).
+
+    A closed season keeps its table: 409 `season_closed`, reload (BR-011). A
+    table with a place worth more than the place above it is 422
+    `validation_failed` with the error type `placement_points_increase` and the
+    `place`.
+    """
+    season = league_service.set_placement_points(
+        session,
+        league_id=league_id,
+        season_id=season_id,
+        user_id=user.id,
+        placement_points=body.placement_points,
+        now=now,
+    )
+    return SeasonRead.model_validate(season)

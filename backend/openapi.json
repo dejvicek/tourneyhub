@@ -15,6 +15,16 @@
         "title": "AccessTokenRead",
         "type": "object"
       },
+      "DefaultMatchFormat": {
+        "description": "The match format a league's new tournaments start with (FR-011, BR-120).\n\nNot BO2: only group phases of leagues with draws can play it (BR-121), so a\ndefault that a knockout cannot take is never copied (DATA-MODEL \u00a74.2).",
+        "enum": [
+          "bo1",
+          "bo3",
+          "bo5"
+        ],
+        "title": "DefaultMatchFormat",
+        "type": "string"
+      },
       "DisplayName": {
         "maxLength": 100,
         "minLength": 1,
@@ -44,8 +54,9 @@
           "password_unchanged",
           "league_not_found",
           "league_id_taken",
-          "league_name_changed",
-          "league_not_active"
+          "season_not_found",
+          "season_closed",
+          "season_number_changed"
         ],
         "title": "ErrorCode",
         "type": "string"
@@ -107,12 +118,27 @@
         "type": "string"
       },
       "LeagueRead": {
-        "description": "A league as the organizer sees it.",
+        "description": "A league as its organizer sees it, with every season, oldest first.\n\n`share_token` is the secret of the league's share link (FR-070, FR-071).",
         "properties": {
           "created_at": {
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "default_field_count": {
+            "title": "Default Field Count",
+            "type": "integer"
+          },
+          "default_goals_per_game": {
+            "title": "Default Goals Per Game",
+            "type": "integer"
+          },
+          "default_match_format": {
+            "$ref": "#/components/schemas/DefaultMatchFormat"
+          },
+          "draws_allowed": {
+            "title": "Draws Allowed",
+            "type": "boolean"
           },
           "id": {
             "format": "uuid",
@@ -121,6 +147,17 @@
           },
           "name": {
             "title": "Name",
+            "type": "string"
+          },
+          "seasons": {
+            "items": {
+              "$ref": "#/components/schemas/SeasonRead"
+            },
+            "title": "Seasons",
+            "type": "array"
+          },
+          "share_token": {
+            "title": "Share Token",
             "type": "string"
           },
           "updated_at": {
@@ -139,10 +176,101 @@
         "required": [
           "id",
           "name",
+          "draws_allowed",
+          "default_field_count",
+          "default_match_format",
+          "default_goals_per_game",
+          "share_token",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "seasons"
         ],
         "title": "LeagueRead",
+        "type": "object"
+      },
+      "LeagueSummary": {
+        "description": "A league in the organizer's list (FR-007).",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "LeagueSummary",
+        "type": "object"
+      },
+      "LeagueUpdate": {
+        "additionalProperties": false,
+        "description": "League settings to change (FR-011); a field left out or null stays as it is.\n\nEach value is the target state, so repeating the request changes nothing\n(ADR-008). The placement points table belongs to the season: see\n`set_placement_points`.",
+        "properties": {
+          "default_field_count": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Field Count"
+          },
+          "default_goals_per_game": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Goals Per Game"
+          },
+          "default_match_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DefaultMatchFormat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "draws_allowed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Draws Allowed"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LeagueName"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "LeagueUpdate",
         "type": "object"
       },
       "LoginRequest": {
@@ -198,6 +326,30 @@
         "title": "PasswordChange",
         "type": "object"
       },
+      "PlacementPoints": {
+        "items": {
+          "maximum": 2147483647.0,
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "maxItems": 256,
+        "minItems": 1,
+        "type": "array"
+      },
+      "PlacementPointsUpdate": {
+        "additionalProperties": false,
+        "description": "The whole placement points table, first place first (FR-011).",
+        "properties": {
+          "placement_points": {
+            "$ref": "#/components/schemas/PlacementPoints"
+          }
+        },
+        "required": [
+          "placement_points"
+        ],
+        "title": "PlacementPointsUpdate",
+        "type": "object"
+      },
       "ProfileUpdate": {
         "additionalProperties": false,
         "description": "The fields to change; a field left out or null stays as it is.",
@@ -225,6 +377,121 @@
         },
         "title": "ProfileUpdate",
         "type": "object"
+      },
+      "SeasonName": {
+        "maxLength": 100,
+        "minLength": 1,
+        "type": "string"
+      },
+      "SeasonRead": {
+        "description": "A season; `name` is null while it has the default name (FR-020).",
+        "properties": {
+          "closed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "placement_points": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Placement Points",
+            "type": "array"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/SeasonState"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "name",
+          "state",
+          "placement_points",
+          "started_at",
+          "closed_at"
+        ],
+        "title": "SeasonRead",
+        "type": "object"
+      },
+      "SeasonRename": {
+        "additionalProperties": false,
+        "description": "A season's new name; null restores the default \"Season <number>\" (FR-020).",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SeasonName"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "SeasonRename",
+        "type": "object"
+      },
+      "SeasonStart": {
+        "additionalProperties": false,
+        "description": "Start the next season; the active season's number as the client saw it.",
+        "properties": {
+          "expected_current_number": {
+            "maximum": 2147483647.0,
+            "minimum": 1.0,
+            "title": "Expected Current Number",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_current_number"
+        ],
+        "title": "SeasonStart",
+        "type": "object"
+      },
+      "SeasonState": {
+        "description": "Whether a season is the league's active one (FR-021, DATA-MODEL \u00a74.2).",
+        "enum": [
+          "active",
+          "closed"
+        ],
+        "title": "SeasonState",
+        "type": "string"
       },
       "SignUpRequest": {
         "additionalProperties": false,
@@ -647,8 +914,57 @@
       }
     },
     "/api/v1/leagues": {
+      "get": {
+        "description": "List the organizer's own leagues, oldest first (FR-007).",
+        "operationId": "list_leagues",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LeagueSummary"
+                  },
+                  "title": "Response List Leagues",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Leagues",
+        "tags": [
+          "leagues"
+        ]
+      },
       "post": {
-        "description": "Create a league, or return it again when the request is repeated.\n\nAn id of another organizer's league, or a repeat racing its first attempt,\nis 409: reload.",
+        "description": "Create a league with its Season 1, or return it again on a repeat (FR-010).\n\nAn id of another organizer's league, or a repeat racing its first attempt,\nis 409: reload.",
         "operationId": "create_league",
         "requestBody": {
           "content": {
@@ -714,6 +1030,66 @@
       }
     },
     "/api/v1/leagues/{league_id}": {
+      "delete": {
+        "description": "Delete the league with all its seasons (FR-013).\n\nThe UI asks for confirmation first. A repeated delete gets 404, which means\nthe league is already gone.",
+        "operationId": "delete_league",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete League",
+        "tags": [
+          "leagues"
+        ]
+      },
       "get": {
         "description": "Return one of the organizer's leagues; another organizer's is 404.",
         "operationId": "read_league",
@@ -777,6 +1153,360 @@
           }
         ],
         "summary": "Read League",
+        "tags": [
+          "leagues"
+        ]
+      },
+      "patch": {
+        "description": "Change the league's settings (FR-011); allowed in any season (BR-011).",
+        "operationId": "update_league",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeagueUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeagueRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update League",
+        "tags": [
+          "leagues"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/seasons": {
+      "post": {
+        "description": "Close the active season and start the next one (FR-021).\n\n409 `season_number_changed`, with the active season's `current_number`,\nwhen `expected_current_number` is stale, for example on a repeat: reload.",
+        "operationId": "start_season",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeasonStart"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Start Season",
+        "tags": [
+          "leagues"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/seasons/{season_id}/name": {
+      "put": {
+        "description": "Rename a season, closed ones too (FR-020, BR-011).",
+        "operationId": "rename_season",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "season_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Season Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeasonRename"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Rename Season",
+        "tags": [
+          "leagues"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/seasons/{season_id}/placement-points": {
+      "put": {
+        "description": "Replace the active season's placement points table (FR-011, BR-012).\n\nA closed season keeps its table: 409 `season_closed`, reload (BR-011). A\ntable with a place worth more than the place above it is 422\n`validation_failed` with the error type `placement_points_increase` and the\n`place`.",
+        "operationId": "set_placement_points",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "season_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Season Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlacementPointsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Placement Points",
         "tags": [
           "leagues"
         ]

@@ -24,11 +24,10 @@ def test_created_at_and_updated_at_come_from_one_clock(
         headers=auth_header(owner.id),
     )
 
-    league = league_service.rename_league(
+    league = league_service.update_league(
         session,
         league_id=league_id,
         user_id=owner.id,
-        expected_name="Old",
         name="New",
         now=now + timedelta(minutes=1),
     )
