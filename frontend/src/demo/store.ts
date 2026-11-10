@@ -17,6 +17,7 @@ import {
   waitingMatches,
   withPoints,
 } from "./engine";
+import { placesOf, syncBracket } from "./finalsEngine";
 import { rules } from "./rules";
 import {
   createSeed,
@@ -104,6 +105,7 @@ function currentPhase(
 }
 
 export function tournamentSummary(t: StoredTournament): TournamentSummary {
+  syncBracket(t); // finals: the last knockout result finishes the tournament (FR-037)
   return {
     id: t.id,
     season_id: t.season_id,
@@ -145,6 +147,11 @@ function places(t: StoredTournament): PlaceRow[] | null {
   const table =
     state.seasons.find((season) => season.id === t.season_id)
       ?.placement_points ?? [];
+  // finals: knockouts of any size, Swiss and Monster DYP (finalsEngine.ts)
+  const detailed = placesOf(t, table);
+  if (detailed) {
+    return detailed.rows;
+  }
   const groupOrder = tournamentStandings(t);
   const knockout = t.phases.find((phase) => phase.kind === "knockout");
   if (!knockout) {
@@ -171,6 +178,7 @@ function places(t: StoredTournament): PlaceRow[] | null {
 }
 
 export function tournamentRead(t: StoredTournament): TournamentRead {
+  syncBracket(t); // finals: the winners move on, the tournament finishes (FR-037)
   return {
     ...withoutLeague(t),
     ...currentPhase(t),

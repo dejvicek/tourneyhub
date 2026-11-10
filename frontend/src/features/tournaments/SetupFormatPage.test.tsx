@@ -115,6 +115,7 @@ describe("setup: format (screen 2)", () => {
 
   it("asks for a name before it creates anything", async () => {
     const user = userEvent.setup();
+    const before = (await tournamentsOfSeason()).length;
     renderAt(newTournament);
 
     const name = await screen.findByRole("textbox", { name: "Name" });
@@ -127,12 +128,13 @@ describe("setup: format (screen 2)", () => {
     expect(name).toHaveAttribute("aria-invalid", "true");
     expect(name).toHaveFocus();
     expect(name).toHaveAccessibleDescription(/Give the tournament a name\./);
-    expect(await tournamentsOfSeason()).toHaveLength(4);
+    expect(await tournamentsOfSeason()).toHaveLength(before);
   });
 
   it("changes the tournament it was opened for instead of creating another", async () => {
     const user = userEvent.setup();
     const id = await createDraft({ name: "Friday DYP" });
+    const before = (await tournamentsOfSeason()).length;
     const view = renderAt(`${newTournament}?tournament=${id}`);
 
     const name = await screen.findByRole("textbox", { name: "Name" });
@@ -147,7 +149,7 @@ describe("setup: format (screen 2)", () => {
       expect(view.state.location.pathname).toMatch(/\/setup\/players$/);
     });
     const all = await tournamentsOfSeason();
-    expect(all).toHaveLength(5);
+    expect(all).toHaveLength(before);
     expect(all.find((t) => t.id === id)?.name).toBe("Friday finals");
   });
 

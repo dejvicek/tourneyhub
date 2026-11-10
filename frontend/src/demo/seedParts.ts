@@ -7,6 +7,7 @@
 //   finals   seedFinals.ts   3000–3999
 //   outside  seedOutside.ts  4000–4999
 import type { SeedPart } from "./seed";
+import { seedFinals } from "./seedFinals";
 import { seedSetup } from "./seedSetup";
 
-export const seedParts: SeedPart[] = [seedSetup];
+export const seedParts: SeedPart[] = [seedSetup, seedFinals];

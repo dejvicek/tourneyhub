@@ -5,6 +5,7 @@
 import { auth } from "./en/auth";
 import { common } from "./en/common";
 import { fields } from "./en/fields";
+import { finals } from "./en/finals";
 import { leagues } from "./en/leagues";
 import { players } from "./en/players";
 import { publicView } from "./en/publicView";
@@ -27,6 +28,7 @@ export const en = {
   publicView,
   // play
   roundRobin,
+  finals,
 };
 
 export type Messages = typeof en;

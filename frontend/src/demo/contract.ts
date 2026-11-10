@@ -470,6 +470,186 @@ export interface FinishWrite {
   expected_state: "in_progress";
 }
 
+// ================================================================ finals
+// Screens 9–13 and the season standings tab: knockout bracket, places,
+// Swiss and Monster DYP rounds, late and disabled players, and starting the
+// knockout. Served by handlers/finals.ts and handlers/standings.ts.
+
+export type KnockoutMatchState =
+  /** A first-round match against an empty spot; the entry goes through (BR-041). */
+  | "bye"
+  | "played"
+  | "on_field"
+  /** Both sides are known and no field is assigned. */
+  | "ready"
+  /** At least one side depends on an earlier match. */
+  | "waiting";
+
+/** The last round holds the final and, if played, the third-place match. */
+export type BracketRoundName =
+  "round_of_16" | "quarterfinal" | "semifinal" | "final";
+
+export interface BracketSide {
+  entry_id: Uuid | null;
+  seed: number | null;
+  is_bye: boolean;
+}
+
+export interface BracketMatch {
+  match_id: Uuid;
+  /** The match number in the tournament, continuing after the group phase; null for a bye. */
+  number: number | null;
+  round_no: number;
+  position: number;
+  kind: MatchRead["kind"];
+  state: KnockoutMatchState;
+  sides: [BracketSide, BracketSide];
+  outcome: Outcome | null;
+  is_walkover: boolean;
+  /** Goals of a BO1 game, otherwise the games won; null before a result. */
+  score: [number, number] | null;
+  match_format: MatchFormat;
+  field_number: number | null;
+  /** The number of the match the winner plays in. */
+  next_number: number | null;
+}
+
+export interface BracketRound {
+  round_no: number;
+  name: BracketRoundName;
+  matches: BracketMatch[];
+}
+
+export interface BracketRead {
+  phase_id: Uuid;
+  /** 4, 8 or 16, the smallest power of two that fits the entries (BR-040). */
+  size: number;
+  third_place_match: boolean;
+  has_group_phase: boolean;
+  rounds: BracketRound[];
+}
+
+export interface PlaceReason {
+  kind:
+    | "won_final"
+    | "lost_final"
+    | "won_third_place"
+    | "lost_third_place"
+    | "lost_in_round"
+    | "group_place";
+  round: BracketRoundName | null;
+  /** The entry's score first. */
+  score: [number, number] | null;
+  opponent_entry_id: Uuid | null;
+  group_place: number | null;
+  group_format: PhaseRead["format"] | null;
+}
+
+export interface PlaceDetail extends PlaceRow {
+  reason: PlaceReason;
+}
+
+export interface PlacesRead {
+  /** True once the tournament is finished; before, only decided places. */
+  complete: boolean;
+  rows: PlaceDetail[];
+}
+
+/** One player's change in the season standings after a tournament (screen 10). */
+export interface SeasonEffectRow {
+  player_id: Uuid;
+  place: number;
+  points: number;
+  /** Placement points earned in this tournament. */
+  earned: number;
+  /** The place before this tournament; null if the player had none. */
+  previous_place: number | null;
+}
+
+export interface SwissRankingRow {
+  place: number;
+  entry_id: Uuid;
+  played: number;
+  sat_out: number;
+  points: number;
+  bh1: number;
+  bh2: number;
+  score_difference: number;
+  is_disabled: boolean;
+}
+
+/** Swiss and Monster DYP standings with the tie-breakers (FR-043, BR-072, BR-073). */
+export interface RankingRead {
+  /** The enabled tie-breakers, in order. */
+  tiebreakers: SwissTiebreaker[];
+  /** How many go through to the knockout, if the setup said. */
+  qualifiers: number | null;
+  rows: SwissRankingRow[];
+}
+
+export interface ParticipantRead {
+  entry_id: Uuid;
+  state: "playing" | "sat_out" | "disabled";
+  /** The round a late player joined in; null for everyone from round 1. */
+  joined_round: number | null;
+  /** The round a disabled player was disabled in. */
+  disabled_since_round: number | null;
+  /** The newest round the entry sat out, if it sat out the latest round. */
+  sat_out_round: number | null;
+}
+
+export interface RoundAddWrite {
+  /** The number the organizer expects the new round to get (ADR-008). */
+  expected_round_no: number;
+}
+
+export interface DisabledWrite {
+  disabled: boolean;
+}
+
+export interface LateEntryWrite {
+  player_id: Uuid;
+  /** The round the player is expected to start in. */
+  from_round_no: number;
+}
+
+export interface TiebreakersWrite {
+  tiebreakers: SwissTiebreaker[];
+}
+
+export interface FinishStateWrite {
+  state: "finished";
+}
+
+export interface KnockoutWrite {
+  qualifiers: number;
+  third_place_match: boolean;
+  /** Null after a round robin or Swiss: the entries play as they are (BR-085). */
+  mode: MonsterKnockoutMode | null;
+  /** The draw counter: another number draws another lot (ADR-008). */
+  draw: number;
+}
+
+export interface KnockoutPreviewEntry {
+  seed: number;
+  /** The standings entries (players) that form it, with their standings places. */
+  members: { entry_id: Uuid; place: number }[];
+}
+
+export interface KnockoutPreview {
+  /** Entries that can go through: the active ones. */
+  max_qualifiers: number;
+  qualifiers: number;
+  entries: KnockoutPreviewEntry[];
+  /** The first round by seeds; null is a bye. */
+  first_round: [number, number | null][];
+  bracket_size: number;
+  /** The newest group-phase round, which the draw locks (BR-065). */
+  locks_round_no: number;
+  /** Standings places of disabled entries who would otherwise have qualified. */
+  skipped_entry_ids: Uuid[];
+}
+
 interface Delete<P> {
   parameters: P;
   requestBody?: never;
@@ -565,5 +745,84 @@ export interface ProvisionalPaths {
   };
   "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/finish": {
     post: Action<Tournament, FinishWrite, TournamentRead>;
+  };
+}
+
+type TournamentEntry = Params<{
+  league_id: Uuid;
+  tournament_id: Uuid;
+  entry_id: Uuid;
+}>;
+type TournamentRound = Params<{
+  league_id: Uuid;
+  tournament_id: Uuid;
+  round_id: Uuid;
+}>;
+type TournamentPhase = Params<{
+  league_id: Uuid;
+  tournament_id: Uuid;
+  phase_id: Uuid;
+}>;
+
+export interface KnockoutPreviewParams {
+  path: { league_id: Uuid; tournament_id: Uuid };
+  query: {
+    qualifiers: number;
+    third_place_match: boolean;
+    mode?: MonsterKnockoutMode;
+    draw: number;
+  };
+}
+
+// Reopening the interface adds the finals routes to the provisional paths.
+export interface ProvisionalPaths {
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/bracket": {
+    get: Get<Tournament, BracketRead>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/places": {
+    get: Get<Tournament, PlacesRead>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/season-effect": {
+    get: Get<Tournament, SeasonEffectRow[]>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/ranking": {
+    get: Get<Tournament, RankingRead>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/participants": {
+    get: Get<Tournament, ParticipantRead[]>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/rounds": {
+    post: Post<Tournament, RoundAddWrite, RoundRead>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/rounds/{round_id}": {
+    delete: Delete<TournamentRound>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/entries": {
+    post: Post<Tournament, LateEntryWrite, ParticipantRead>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/entries/{entry_id}/disabled": {
+    put: Put<TournamentEntry, DisabledWrite, ParticipantRead>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/tiebreakers": {
+    put: Put<Tournament, TiebreakersWrite, RankingRead>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/state": {
+    put: Put<Tournament, FinishStateWrite, TournamentRead>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout/preview": {
+    get: {
+      parameters: KnockoutPreviewParams & {
+        header?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: { 200: Json<KnockoutPreview> } & Errors;
+    };
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout": {
+    put: Put<Tournament, KnockoutWrite, BracketRead>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/phases/{phase_id}": {
+    delete: Delete<TournamentPhase>;
   };
 }

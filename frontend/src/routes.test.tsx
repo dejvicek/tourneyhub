@@ -66,7 +66,7 @@ const SCREENS: Screen[] = [
   ["fieldsResult", "Round 5", "5. kolo", { overlay: true }],
   ["tournamentStandings", "Tournament standings", "Pořadí turnaje"],
   ["groupPhaseDone", "Round robin done", "Každý s každým skončil"],
-  ["knockout", "Knockout in progress", "Probíhá vyřazovací fáze"],
+  ["knockout", "Knockout", "Vyřazovací část"],
   // The final of Autumn Open DYP is best of three (7b).
   [
     "knockoutResult",
@@ -77,27 +77,11 @@ const SCREENS: Screen[] = [
       params: { tournamentId: autumn.id, matchId: autumnFinal },
     },
   ],
-  [
-    "startKnockout",
-    "Monster DYP: start the knockout",
-    "Monster DYP: start vyřazovací fáze",
-  ],
-  [
-    "finished",
-    "Finished: places and season points",
-    "Konec: pořadí a body do sezóny",
-  ],
-  [
-    "betweenRounds",
-    "Swiss and Monster DYP: between rounds",
-    "Švýcarský systém a Monster DYP: mezi koly",
-  ],
-  ["roundsResult", "Round 5", "5. kolo", { overlay: true }],
-  [
-    "lateAndDisabled",
-    "Swiss and Monster DYP: late and disabled players",
-    "Švýcarský systém a Monster DYP: pozdní a pozastavení hráči",
-  ],
+  ["startKnockout", "Start the knockout", "Začít vyřazovací část"],
+  ["finished", "Finished", "Dohráno"],
+  ["betweenRounds", "Rounds", "Kola"],
+  ["roundsResult", "Enter a result", "Zadat výsledek", { overlay: true }],
+  ["lateAndDisabled", "Players", "Hráči"],
   ["seasonStandings", "Season standings", "Pořadí sezóny"],
   ["players", "Players", "Hráči"],
   ["leagueSettings", "League settings", "Nastavení ligy"],
@@ -150,9 +134,7 @@ describe("the route table", () => {
       generatePath(paths.tournament, { ...params, tournamentId: autumn.id }),
     );
 
-    expect(
-      await findTitle("Finished: places and season points"),
-    ).toBeInTheDocument();
+    expect(await findTitle("Finished")).toBeInTheDocument();
     expect(view.state.location.pathname).toBe(
       generatePath(paths.finished, { ...params, tournamentId: autumn.id }),
     );

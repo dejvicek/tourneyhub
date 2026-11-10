@@ -43,15 +43,17 @@ describe("the tournament list (screen 1)", () => {
     ).toBeInTheDocument();
     const running = await screen.findByRole("region", { name: "Running now" });
     const finished = screen.getByRole("region", { name: "Finished" });
-    expect(
-      within(running)
-        .getAllByRole("link")
-        .map((link) => link.textContent),
-    ).toEqual([
-      expect.stringContaining("Thursday DYP"),
-      expect.stringContaining("Next Thursday DYP"),
-      expect.stringContaining("Friday DYP"),
-    ]);
+    // The seed parts of other screen areas add running tournaments too.
+    const runningLinks = within(running)
+      .getAllByRole("link")
+      .map((link) => link.textContent);
+    expect(runningLinks[0]).toContain("Thursday DYP");
+    expect(runningLinks).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("Next Thursday DYP"),
+        expect.stringContaining("Friday DYP"),
+      ]),
+    );
     expect(within(finished).getAllByRole("link")).toHaveLength(2);
     // The running one shows its round and how many matches were played.
     expect(
