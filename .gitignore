@@ -1,0 +1,5 @@
+# Local configuration with secrets; .env.example is the committed template (ADR-004)
+.env
+!.env.example
+node_modules/
+.idea/
