@@ -8,7 +8,7 @@ from uuid import uuid7
 from fastapi import FastAPI
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from tourneyhub.api import auth, leagues
+from tourneyhub.api import auth, leagues, me
 from tourneyhub.api.errors import install_error_handlers
 from tourneyhub.api.schemas import ErrorResponse
 from tourneyhub.db.session import create_db_engine, create_session_factory
@@ -52,5 +52,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     install_error_handlers(app)
     app.include_router(auth.router, prefix="/api/v1")
     app.include_router(leagues.router, prefix="/api/v1")
+    app.include_router(me.router, prefix="/api/v1")
     logger.info("application created", extra={"env": settings.env})
     return app

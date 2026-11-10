@@ -47,10 +47,69 @@ views "III. Flows" {
     tourneyhub.spa.authClient <- tourneyhub.api.authApi "204, cookie removed; other devices stay logged in"
   }
 
+  dynamic view signUp {
+    variant sequence
+    title "9b. Sign-up"
+    order 10
+    description "FR-001, ADR-006 and ADR-007: an account needs the instance's sign-up code. Wrong code and closed sign-up look the same. Success logs in as a login does."
+    organizer -> tourneyhub.spa.organizerUi "enters email, name, password and the code from the admin"
+    tourneyhub.spa.organizerUi -> tourneyhub.spa.authClient "sign-up"
+    tourneyhub.spa.authClient -> tourneyhub.api.authApi "POST /api/v1/auth/signup"
+    tourneyhub.api.authApi -> tourneyhub.db.accounts "counts the attempt per IP (IPv6 per /64) before the code check, in a transaction of its own"
+    alt {
+      when "inside the waiting period after repeated failures" {
+        tourneyhub.spa.authClient <- tourneyhub.api.authApi "429 too_many_attempts with Retry-After; code not checked"
+      }
+      when "otherwise" {
+        tourneyhub.api.authApi -> tourneyhub.db.accounts "compares the code from instance_settings in constant time; NULL means closed"
+        alt {
+          when "wrong code, or sign-up closed" {
+            tourneyhub.spa.authClient <- tourneyhub.api.authApi "422 invalid_signup_code"
+          }
+          when "email already has an account (any letter case)" {
+            tourneyhub.spa.authClient <- tourneyhub.api.authApi "422 email_taken"
+          }
+          when "otherwise" {
+            tourneyhub.api.authApi -> tourneyhub.db.accounts "stores the user, marks the attempt succeeded, stores the hash of a new refresh token"
+            tourneyhub.spa.authClient <- tourneyhub.api.authApi "201: access JWT in the body + HttpOnly cookie"
+          }
+        }
+      }
+    }
+  }
+
+  dynamic view passwordChange {
+    variant sequence
+    title "9c. Password change"
+    order 11
+    description "FR-004 and ADR-006: needs the current password. It also ends a required change after an admin reset. This device stays logged in; the others are logged out."
+    organizer -> tourneyhub.spa.organizerUi "enters the current and a new password"
+    tourneyhub.spa.organizerUi -> tourneyhub.spa.authClient "change password"
+    tourneyhub.spa.authClient -> tourneyhub.api.authApi "POST /api/v1/auth/password (Bearer JWT)"
+    tourneyhub.api.authApi -> tourneyhub.db.accounts "counts the attempt on the login's budget (email, IP), in a transaction of its own"
+    alt {
+      when "inside the waiting period after repeated failures" {
+        tourneyhub.spa.authClient <- tourneyhub.api.authApi "429 too_many_attempts with Retry-After; password not checked"
+      }
+      when "otherwise" {
+        tourneyhub.api.authApi -> tourneyhub.db.accounts "locks the user row and verifies the current password"
+        alt {
+          when "current password wrong, or new one equal to it" {
+            tourneyhub.spa.authClient <- tourneyhub.api.authApi "422 wrong_password or password_unchanged; nothing changes"
+          }
+          when "otherwise" {
+            tourneyhub.api.authApi -> tourneyhub.db.accounts "new hash, clears must_change_password, revokes the other families, marks the attempt succeeded"
+            tourneyhub.spa.authClient <- tourneyhub.api.authApi "204; other devices are logged out"
+          }
+        }
+      }
+    }
+  }
+
   dynamic view resultEntry {
     variant sequence
     title "10. Result entry"
-    order 10
+    order 12
     description "FR-050 to FR-053, FR-082: at most three taps plus the score. The write locks the league, then the tournament. Standings are not computed on write; they are computed on every read (ADR-009)."
     organizer -> tourneyhub.spa.organizerUi "opens the match, chooses the result, saves"
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "saves the result (Bearer JWT)"
@@ -68,7 +127,7 @@ views "III. Flows" {
   dynamic view addRound {
     variant sequence
     title "11. Next round in a Swiss"
-    order 11
+    order 13
     description "ADR-011: BR-056 top-down; when it gets stuck, blossom matching on pairs that have not met. A round can be added once every match in the round has a result (FR-040)."
     organizer -> tourneyhub.spa.organizerUi "add a round"
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "POST round with the expected round_no"
@@ -83,7 +142,7 @@ views "III. Flows" {
   dynamic view shareLink {
     variant sequence
     title "12. Viewer through the share link"
-    order 12
+    order 14
     description "FR-070 to FR-072: no account, read-only. Standings are computed on every read (ADR-009)."
     viewer -> tourneyhub.spa.publicUi "opens the link from the organizer"
     tourneyhub.spa.publicUi -> tourneyhub.api.publicApi "GET /api/v1/public/{share_token}/…"
@@ -97,7 +156,7 @@ views "III. Flows" {
   dynamic view adminReset {
     variant sequence
     title "13a. Forgotten password: admin reset"
-    order 13
+    order 15
     description "FR-006, ADR-006 and ADR-007: the admin sets a new password for the organizer. The reset sets must_change_password and revokes all of the organizer's logins, so old refresh tokens get 401. Continues in view 13b."
     admin -> tourneyhub.spa.adminUi "sets a new password for the organizer"
     tourneyhub.spa.adminUi -> tourneyhub.api.adminApi "POST reset (Bearer JWT, is_admin from the database)"
@@ -115,7 +174,7 @@ views "III. Flows" {
   dynamic view adminResetLogin {
     variant sequence
     title "13b. Forgotten password: first login"
-    order 14
+    order 16
     description "ADR-006: login with the password from the admin succeeds, but everything except /api/v1/auth/* and GET /api/v1/me returns 403 password_change_required until the organizer changes the password. The admin therefore knows the password only until then. Follows view 13a."
     organizer -> tourneyhub.spa.organizerUi "logs in with the password from the admin"
     tourneyhub.spa.organizerUi -> tourneyhub.spa.authClient "login"
@@ -130,14 +189,16 @@ views "III. Flows" {
     }
     tourneyhub.spa.organizerUi -> tourneyhub.spa.authClient "opens the new-password screen"
     organizer -> tourneyhub.spa.organizerUi "enters a new password"
-    tourneyhub.spa.authClient -> tourneyhub.api.authApi "password change (under /api/v1/auth, FR-004)"
+    tourneyhub.spa.authClient -> tourneyhub.api.authApi "POST /api/v1/auth/password (FR-004)" {
+      navigateTo passwordChange
+    }
     tourneyhub.api.authApi -> tourneyhub.db.accounts "new hash, clears must_change_password, revokes the other families"
     tourneyhub.spa.authClient <- tourneyhub.api.authApi "done; other devices are logged out"
   }
 
   dynamic view release {
     title "14. From PR to VPS"
-    order 15
+    order 17
     description "ADR-012 and ADR-014: the VPS runs exactly the images that passed the tests. CI holds no SSH key to the VPS; the admin triggers the update."
     developer -> github.repo "merges the PR after review with passing checks"
     github.repo -> github.actions "push to main"
@@ -150,11 +211,13 @@ views "III. Flows" {
   dynamic view dypEvening {
     variant sequence
     title "15a. DYP evening: setup (PRD §5.1)"
-    order 16
+    order 18
     description "PRD §5.1, steps 1 to 5: sign-up with the code from the admin, the league Thursday Foosball and its players, a DYP tournament for 12 players with a round robin, and the generated schedule. Continues in view 15b."
     organizer -> tourneyhub.spa.organizerUi "signs up with the code from the admin"
     tourneyhub.spa.organizerUi -> tourneyhub.spa.authClient "sign-up"
-    tourneyhub.spa.authClient -> tourneyhub.api.authApi "POST sign-up with the sign-up code (FR-001)"
+    tourneyhub.spa.authClient -> tourneyhub.api.authApi "POST sign-up with the sign-up code (FR-001)" {
+      navigateTo signUp
+    }
     organizer -> tourneyhub.spa.organizerUi "creates the league Thursday Foosball and adds players"
     tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "league (Season 1 starts automatically), players"
     organizer -> tourneyhub.spa.organizerUi "on Thursday: DYP tournament with a round robin, 12 players"
@@ -170,7 +233,7 @@ views "III. Flows" {
   dynamic view dypEveningPlay {
     variant sequence
     title "15b. DYP evening: play and viewers (PRD §5.1)"
-    order 17
+    order 19
     description "PRD §5.1, steps 6 to 8: results during the evening, a knockout for the top 4 pairs without a third-place match, the final and season points, a viewer through the share link. Follows view 15a."
     loop "15 round-robin matches, as they finish" {
       organizer -> tourneyhub.spa.organizerUi "enters the result on the phone"

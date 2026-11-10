@@ -6,7 +6,7 @@ from fastapi import Depends, Header, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session, sessionmaker
 
-from tourneyhub.api.schemas import LoginRequest
+from tourneyhub.api.schemas import LoginRequest, SignUpRequest
 from tourneyhub.db.models.accounts import User
 from tourneyhub.errors import ErrorCode, ForbiddenError, NotAuthenticatedError
 from tourneyhub.services import accounts as account_service
@@ -53,16 +53,37 @@ _bearer = HTTPBearer(auto_error=False)
 BearerDep = Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)]
 
 
-def get_current_user(
-    credentials: BearerDep, session: SessionDep, settings: SettingsDep, now: NowDep
-) -> User:
-    """Load the caller's row from the user id in the access token (ADR-006)."""
+def get_access_claims(
+    credentials: BearerDep, settings: SettingsDep, now: NowDep
+) -> auth_service.AccessClaims:
+    """Check the access token: signature and expiry, no query (ADR-006)."""
     if credentials is None:
         raise NotAuthenticatedError(ErrorCode.NOT_AUTHENTICATED)
-    claims = auth_service.read_access_token(
+    return auth_service.read_access_token(
         credentials.credentials, key=settings.jwt_secret, now=now
     )
-    return account_service.load_current_user(session, user_id=claims.user_id)
+
+
+AccessClaimsDep = Annotated[auth_service.AccessClaims, Depends(get_access_claims)]
+
+
+def get_account(claims: AccessClaimsDep, session: SessionDep) -> User:
+    """Load the caller's row from the user id in the access token (ADR-006).
+
+    For the routes that work while `must_change_password` is set: the password
+    change and `GET /me`. The other routes use `CurrentUserDep`.
+    """
+    return account_service.load_user(session, user_id=claims.user_id)
+
+
+AccountDep = Annotated[User, Depends(get_account)]
+
+
+def get_current_user(user: AccountDep) -> User:
+    """The caller's row, unless an admin reset still requires a new password."""
+    if user.must_change_password:
+        raise ForbiddenError(ErrorCode.PASSWORD_CHANGE_REQUIRED)
+    return user
 
 
 CurrentUserDep = Annotated[User, Depends(get_current_user)]
@@ -91,7 +112,7 @@ def throttle_login(
     body: LoginRequest,
     client_ip: ClientIpDep,
     now: NowDep,
-) -> auth_service.LoginAttempt:
+) -> auth_service.Attempt:
     """Count a login before its password is checked, or refuse it (ADR-006).
 
     A short transaction of its own commits the attempt at once: parallel
@@ -105,7 +126,48 @@ def throttle_login(
         )
 
 
-LoginThrottleDep = Annotated[auth_service.LoginAttempt, Depends(throttle_login)]
+LoginThrottleDep = Annotated[auth_service.Attempt, Depends(throttle_login)]
+
+
+def throttle_signup(
+    session_factory: SessionFactoryDep,
+    # Unused: a body that fails validation is refused before it is counted.
+    body: SignUpRequest,  # noqa: ARG001
+    client_ip: ClientIpDep,
+    now: NowDep,
+) -> auth_service.Attempt:
+    """Count a sign-up before its code is checked, or refuse it (ADR-006).
+
+    As `throttle_login`: a short transaction of its own, 429 inside the waiting
+    period, nothing sleeps.
+    """
+    with session_factory.begin() as session:
+        return auth_service.start_signup_attempt(session, ip=client_ip, now=now)
+
+
+SignUpThrottleDep = Annotated[auth_service.Attempt, Depends(throttle_signup)]
+
+
+def throttle_password_change(
+    session_factory: SessionFactoryDep,
+    claims: AccessClaimsDep,
+    client_ip: ClientIpDep,
+    now: NowDep,
+) -> auth_service.Attempt:
+    """Count a password change before its current password is checked (ADR-006).
+
+    On the login's budget, per email and per client IP, as `throttle_login`: a
+    short transaction of its own, 429 inside the waiting period, nothing sleeps.
+    """
+    with session_factory.begin() as session:
+        return account_service.start_password_change_attempt(
+            session, user_id=claims.user_id, ip=client_ip, now=now
+        )
+
+
+PasswordChangeThrottleDep = Annotated[
+    auth_service.Attempt, Depends(throttle_password_change)
+]
 
 
 def require_custom_header(

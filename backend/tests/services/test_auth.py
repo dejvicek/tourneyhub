@@ -1,3 +1,4 @@
+import hashlib
 import threading
 import time
 from collections.abc import Callable, Sequence
@@ -190,7 +191,7 @@ def test_fr002_log_in_folds_the_email_as_the_unique_index_does(
 
     tokens = auth_service.log_in(
         session,
-        attempt=auth_service.LoginAttempt(attempt_ids=()),
+        attempt=auth_service.Attempt(attempt_ids=()),
         email="ΟΔΟΣ@example.test",
         password="a passphrase of 15+",
         key=KEY,
@@ -220,7 +221,7 @@ def test_adr006_an_unknown_email_is_verified_against_a_dummy_hash(
     with pytest.raises(NotAuthenticatedError) as raised:
         auth_service.log_in(
             session,
-            attempt=auth_service.LoginAttempt(attempt_ids=()),
+            attempt=auth_service.Attempt(attempt_ids=()),
             email="nobody@example.test",
             password="x" * 15,
             key=KEY,
@@ -359,7 +360,7 @@ def test_adr006_a_rehash_does_not_overwrite_a_hash_changed_meanwhile(
 
     auth_service.log_in(
         session,
-        attempt=auth_service.LoginAttempt(attempt_ids=()),
+        attempt=auth_service.Attempt(attempt_ids=()),
         email=user.email,
         password="a passphrase of 15+",
         key=KEY,
@@ -379,7 +380,7 @@ def test_adr006_a_token_deleted_between_the_read_and_the_lock_is_refused(
     user = make_user(password="a passphrase of 15+")
     tokens = auth_service.log_in(
         session,
-        attempt=auth_service.LoginAttempt(attempt_ids=()),
+        attempt=auth_service.Attempt(attempt_ids=()),
         email=user.email,
         password="a passphrase of 15+",
         key=KEY,
@@ -401,3 +402,116 @@ def test_adr006_a_token_deleted_between_the_read_and_the_lock_is_refused(
         )
 
     assert raised.value.code is ErrorCode.NOT_AUTHENTICATED
+
+
+def _token_row(session: Session, token: str) -> RefreshToken:
+    return session.scalars(
+        select(RefreshToken).where(
+            RefreshToken.token_hash == hashlib.sha256(token.encode()).digest()
+        )
+    ).one()
+
+
+def _fail_signups(session: Session, times: int, *, ip: str, at: datetime) -> None:
+    session.add_all(
+        AuthAttempt(
+            kind=AuthAttemptKind.SIGNUP_IP, key=ip, succeeded=False, created_at=at
+        )
+        for _ in range(times)
+    )
+    session.flush()
+
+
+def _signup_retry_after(session: Session, *, ip: str, now: datetime) -> int:
+    with session.begin_nested():
+        try:
+            auth_service.start_signup_attempt(session, ip=ip, now=now)
+        except TooManyAttemptsError as refused:
+            return refused.retry_after
+        return 0
+
+
+@pytest.mark.parametrize(
+    ("failures", "seconds"),
+    [
+        pytest.param(4, 0, id="free-failures"),
+        pytest.param(5, 1, id="first-delay"),
+        pytest.param(8, 8, id="doubling"),
+        pytest.param(14, 512, id="doubling-on"),
+        pytest.param(15, 900, id="capped-at-15-minutes"),
+        pytest.param(200, 900, id="capped-without-overflow"),
+    ],
+)
+def test_adr006_the_sign_up_waiting_period_grows_with_failures_per_ip(
+    session: Session, now: datetime, failures: int, seconds: int
+) -> None:
+    _fail_signups(session, failures, ip="192.0.2.1", at=now)
+
+    assert _signup_retry_after(session, ip="192.0.2.1", now=now) == seconds
+
+
+def test_adr006_sign_up_failures_are_forgotten_after_an_hour(
+    session: Session, now: datetime
+) -> None:
+    _fail_signups(session, 20, ip="192.0.2.1", at=now)
+
+    assert (
+        _signup_retry_after(session, ip="192.0.2.1", now=now + timedelta(hours=1)) == 0
+    )
+    assert (
+        _signup_retry_after(session, ip="192.0.2.1", now=now + timedelta(minutes=59))
+        > 0
+    )
+
+
+def test_adr006_sign_up_failures_of_another_ip_and_of_logins_do_not_count(
+    session: Session, now: datetime
+) -> None:
+    _fail_signups(session, 20, ip="192.0.2.99", at=now)
+    _fail(session, 20, email="ana@example.test", ip="192.0.2.1", at=now)
+
+    assert _signup_retry_after(session, ip="192.0.2.1", now=now) == 0
+
+
+def test_adr006_sign_up_counts_an_ipv6_client_per_64(
+    session: Session, now: datetime
+) -> None:
+    _fail_signups(session, 5, ip="2001:db8:1:2::/64", at=now)
+
+    assert _signup_retry_after(session, ip="2001:db8:1:2:aaaa::7", now=now) == 1
+    assert _signup_retry_after(session, ip="2001:db8:1:3::7", now=now) == 0
+
+
+def test_adr006_a_password_change_revokes_every_family_but_the_kept_one(
+    session: Session, make_user: Callable[..., User], now: datetime
+) -> None:
+    user = make_user()
+    other = make_user()
+    later = now + timedelta(minutes=1)
+    families = [
+        auth_service.start_session(session, user_id=user.id, key=KEY, now=now)
+        for _ in range(3)
+    ]
+    foreign = auth_service.start_session(session, user_id=other.id, key=KEY, now=now)
+    rows = {
+        token.refresh_token: _token_row(session, token.refresh_token)
+        for token in [*families, foreign]
+    }
+    already = rows[families[2].refresh_token]
+    already.revoked_at = now
+    session.flush()
+
+    auth_service.revoke_other_families(
+        session,
+        user_id=user.id,
+        keep_family_id=rows[families[0].refresh_token].family_id,
+        now=later,
+    )
+
+    session.expire_all()
+    assert [rows[token.refresh_token].revoked_at for token in [*families, foreign]] == [
+        None,
+        later,
+        now,
+        None,
+    ]

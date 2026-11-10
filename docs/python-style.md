@@ -220,7 +220,7 @@ LOGGING_CONFIG: dict[str, object] = {
 - Use `lifespan`, never `on_event`. The lifespan disposes of the database engine.
 - One `APIRouter` per area, with a `prefix` and `tags`.
 - Every endpoint and dependency is `def`; FastAPI runs them in its thread pool. Exception handlers and middleware are `async def` and never block.
-- Dependencies are `Annotated` aliases defined once in `api/deps.py`: `SessionDep`, `SettingsDep`, `NowDep` (`get_now`, which returns `datetime.now(UTC)`), `CurrentUserDep`, `AdminDep`, `LoginThrottleDep`, `CustomHeaderDep`. Endpoints use the aliases, never an inline `Depends(...)`.
+- Dependencies are `Annotated` aliases defined once in `api/deps.py`: `SessionDep`, `SettingsDep`, `NowDep` (`get_now`, which returns `datetime.now(UTC)`), `CurrentUserDep`, `AccountDep`, `AccessClaimsDep`, `AdminDep`, `LoginThrottleDep`, `SignUpThrottleDep`, `PasswordChangeThrottleDep`, `CustomHeaderDep`. Endpoints use the aliases, never an inline `Depends(...)`.
 - **The request owns the transaction:**
 
 ```python
@@ -239,7 +239,7 @@ SessionDep = Annotated[Session, Depends(get_session, scope="function")]
   - The CLI and the auth dependencies (below) open their own transaction with `with session_factory.begin() as session:` around one service call. The dependencies take the factory from `SessionFactoryDep`.
   - A write that must survive an error response cannot be followed by a raised error, because `SessionDep` rolls back. Either it commits in a short transaction of its own before the request's work starts, as `throttle_login` counts a login attempt, or the endpoint returns the error response instead of raising, built with `error_response()` from `api/errors.py`. Only the refresh endpoint does the latter: it revokes a reused token's family under the locks it already holds and returns 401 (ADR-001, ADR-006).
   - Integration tests pin this: a commit that fails returns 500 `internal_error`, and one that fails on a known unique constraint returns its 409 code.
-- `CurrentUserDep` loads the user row on every request, gives it to the endpoint as a `User`, and raises `ForbiddenError(ErrorCode.PASSWORD_CHANGE_REQUIRED)` while `must_change_password` is set. The `auth` router and `GET /api/v1/me` use a variant without that check (ADR-006). `AdminDep` reads `is_admin` from the same row (ADR-007). Missing tokens are handled with `HTTPBearer(auto_error=False)` and our own `NotAuthenticatedError`, so they get an ADR-008 code instead of FastAPI's English `detail`.
+- `CurrentUserDep` loads the user row on every request, gives it to the endpoint as a `User`, and raises `ForbiddenError(ErrorCode.PASSWORD_CHANGE_REQUIRED)` while `must_change_password` is set. The password change and `GET /api/v1/me` use `AccountDep`, the same row without that check (ADR-006); `AccessClaimsDep` gives the password change the token's family, which stays logged in. `AdminDep` reads `is_admin` from the same row (ADR-007). Missing tokens are handled with `HTTPBearer(auto_error=False)` and our own `NotAuthenticatedError`, so they get an ADR-008 code instead of FastAPI's English `detail`.
 - The login throttle (ADR-006) never sleeps: an attempt inside the waiting period gets 429 `too_many_attempts` with `Retry-After`, and a burst of logins holds neither threads nor connections. `throttle_login` counts the attempt before the password is checked, in a short transaction of its own: per email and per client IP, under transaction-level advisory locks, it counts the failures and inserts the attempt as a failure, so parallel attempts count each other, and the row stays when the login rolls back with its 401. A successful `log_in` marks the attempt as succeeded in its own transaction. `log_in` lists it first: `def log_in(attempt: LoginThrottleDep, body: LoginRequest, session: SessionDep, …)`.
 
 ```python
@@ -248,18 +248,21 @@ def throttle_login(
     body: LoginRequest,
     client_ip: ClientIpDep,
     now: NowDep,
-) -> auth_service.LoginAttempt:
+) -> auth_service.Attempt:
     with session_factory.begin() as session:  # commits the attempt at once
         return auth_service.start_login_attempt(
             session, email=body.email, ip=client_ip, now=now
         )
 
 
-LoginThrottleDep = Annotated[auth_service.LoginAttempt, Depends(throttle_login)]
+LoginThrottleDep = Annotated[auth_service.Attempt, Depends(throttle_login)]
 ```
 
   - FastAPI resolves dependencies in the order of the signature. `SessionDep`'s session takes a connection only at its first query, so the throttle comes before any dependency that queries through `SessionDep`.
   - The email key is folded with PostgreSQL's `lower()`, as the login's lookup folds it. An IPv6 client is counted per /64; an IPv4-mapped address counts as its IPv4 address.
+- `SignUpThrottleDep` is the same for sign-up (`start_signup_attempt`, kind `signup_ip`, per client IP). It takes the request body as a parameter, so that a body that fails validation is refused before it is counted. Sign-up has its own limits, as the guessing of a code is not slowed by Argon2: 5 free failures in an hour, then a doubling waiting period up to 15 minutes. `tourneyhub cleanup` deletes attempts older than the longest window.
+  - `PasswordChangeThrottleDep` counts a password change on the login's budget (`login_email` of the token's user, `login_ip`), since checking the current password is a password guess. `log_in` re-reads the user's hash `FOR NO KEY UPDATE` after verifying, so that a login racing a password change cannot keep the old password.
+  - Both throttles read the body, and so does the route, so a validation error is reported by each. The validation handler lists an error once.
 - Every id in a path or body is loaded through the current organizer's league, under its lock when writing (ADR-008). Another organizer's id is then simply not found (OWASP API1).
 - The return annotation is the response model. Routers return Pydantic models built from service results (`LeagueRead.model_validate(league)`), never dicts or ORM objects.
 - Status codes go on the decorator, as `http.HTTPStatus` members: `@router.post("", status_code=HTTPStatus.CREATED)`.
@@ -282,7 +285,7 @@ LoginThrottleDep = Annotated[auth_service.LoginAttempt, Depends(throttle_login)]
   - `loc` starts with where the value was: `body`, `path`, `query`, `header` or `cookie`. Malformed JSON gives `{"loc": ["body", 7], "type": "json_invalid"}`, where 7 is the character position.
   - `type` is a Pydantic error type or a `PydanticCustomError` type (§6); the frontend translates it.
 - `python -m tourneyhub.openapi` prints the schema: it builds the app with placeholder settings (the schema does not depend on them, and creating the database engine does not connect) and prints `json.dumps(app.openapi(), indent=2, sort_keys=True)`. CI runs it with `-W error`, which turns a duplicate operation id into a failure, and compares the result with the committed `openapi.json` (§2). Only the schema goes to stdout; a record logged while the app is built goes to stderr (§4.6).
-- `cli.py` uses `argparse` and reads passwords with `getpass`, never from an argument or an environment variable. It builds its session factory with the same `db` helpers as `create_app()`. Admin services take `source` (`web` or `cli`) and `admin_user_id: UUID | None` and write `admin_actions` themselves, so actions from the web and the CLI are recorded in one place (ADR-007).
+- `cli.py` uses `argparse` and reads passwords and the sign-up code with `getpass`, never from an argument or an environment variable, and never prints them back. `tourneyhub set-signup-code [--clear]` sets or clears the code, `tourneyhub cleanup` deletes expired and revoked refresh tokens and old `auth_attempts`; a schedule for it is P15. It builds its session factory with the same `db` helpers as `create_app()`. Admin services take `source` (`web` or `cli`) and `admin_user_id: UUID | None` and write `admin_actions` themselves, so actions from the web and the CLI are recorded in one place (ADR-007).
 
 ## 6. Pydantic and settings
 

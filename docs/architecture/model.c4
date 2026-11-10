@@ -93,10 +93,10 @@ model {
 
       authApi = component "API: auth" {
         technology "JWT HS256, Argon2id"
-        summary "/api/v1/auth: sign-up, login, refresh with rotation and a 60-second window, logout, password change."
+        summary "/api/v1/auth: sign-up, login, refresh with rotation and a 60-second window, logout, password change; /api/v1/me."
         description "
-          /api/v1/auth: sign-up with the sign-up code, login, refresh with rotation and a 60-second window, logout, password change.
-          Abuse limits slow responses down with growing delays instead of locking the account; counters live in PostgreSQL (auth_attempts). The IP from X-Forwarded-For is trusted only from Caddy.
+          /api/v1/auth: sign-up with the sign-up code, login, refresh with rotation and a 60-second window, logout, password change. /api/v1/me: the caller's display name and language.
+          Abuse limits answer 429 with Retry-After after repeated failures instead of locking the account or sleeping; counters live in PostgreSQL (auth_attempts). The IP from X-Forwarded-For is trusted only from Caddy.
           is_admin and must_change_password are read from the users row on every request, not from the token.
         "
         link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-006--authentication-jwt-access-token-and-rotating-refresh-token "ADR-006"
@@ -144,8 +144,8 @@ model {
     cli = tool "tourneyhub CLI" {
       technology "Python, runs in the api container"
       icon tech:python
-      summary "migrate, run as the api container starts; create-admin, grant-admin, revoke-admin. No web route can create an admin."
-      description "migrate, which the api container runs on start; create-admin, grant-admin, revoke-admin. No web route can create an admin, so a stranger cannot claim the instance on first start."
+      summary "migrate, run as the api container starts; set-signup-code, cleanup; create-admin, grant-admin, revoke-admin. No web route can create an admin."
+      description "migrate, which the api container runs on start; set-signup-code (a prompt, or --clear to close sign-up); cleanup (deletes expired and revoked refresh tokens and old auth_attempts); create-admin, grant-admin, revoke-admin. No web route can create an admin, so a stranger cannot claim the instance on first start."
       link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-004--repository-layout-and-local-development-in-docker "ADR-004"
       link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-007--instance-admin-admin-flag-admin-screens-cli-bootstrap "ADR-007"
     }
@@ -238,7 +238,7 @@ model {
   organizer -> tourneyhub.spa.organizerUi "manages leagues, runs the evening, enters results"
   viewer -> tourneyhub.spa.publicUi "opens the share link"
   admin -> tourneyhub.spa.adminUi "sets the sign-up code, resets a password"
-  admin -> tourneyhub.cli "creates the first admin (create-admin)"
+  admin -> tourneyhub.cli "creates the first admin, sets the sign-up code"
   admin -> github.ghcr "pulls new images on the VPS"
   developer -> github.repo "PRs and reviews"
 
@@ -264,5 +264,5 @@ model {
   tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "draws, pairs, computes standings"
   tourneyhub.api.leaguesApi -> tourneyhub.api.engine "season standings, league ranking"
   tourneyhub.api.publicApi -> tourneyhub.api.engine "computes standings on read"
-  tourneyhub.cli -> tourneyhub.db.accounts "writes the admin and the action record"
+  tourneyhub.cli -> tourneyhub.db.accounts "writes the admin, the action record and the sign-up code; cleans up"
 }

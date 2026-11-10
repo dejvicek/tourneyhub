@@ -20,9 +20,13 @@ def test_main_prints_a_schema_with_function_names_as_operation_ids(
         for operation in path.values()
     }
     assert operation_ids == {
+        "change_password",
         "create_league",
         "log_in",
         "log_out",
         "read_league",
+        "read_me",
         "refresh",
+        "sign_up",
+        "update_me",
     }
