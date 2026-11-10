@@ -1,49 +1,121 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { generatePath, Link } from "react-router";
 
-import { PlaceholderPage } from "@/components/PlaceholderPage";
+import { DocumentTitle } from "@/components/DocumentTitle";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { TournamentSummary } from "@/demo/contract";
 import { leagueQueries } from "@/features/leagues/api";
-import { tournamentQueries } from "@/features/tournaments/api";
+import { setupQueries, tournamentQueries } from "@/features/tournaments/api";
 import { useRouteParam } from "@/hooks/useRouteParam";
 import { paths } from "@/lib/paths";
 
-// Placeholder (FR-022, FR-030), with links into each tournament so the demo
-// is clickable.
+import { TournamentItem } from "./setup/TournamentItem";
+
+const byNewest = (a: TournamentSummary, b: TournamentSummary) =>
+  b.date.localeCompare(a.date);
+
+/** Screen 1: the season's tournaments, running ones first, and "New tournament" (FR-030, FR-038). */
 export function TournamentsPage() {
   const { t } = useTranslation();
   const leagueId = useRouteParam("leagueId");
   const seasons = useQuery(leagueQueries.seasons(leagueId));
   const seasonId = seasons.data?.find((s) => s.state === "active")?.id;
   const tournaments = useQuery(tournamentQueries.ofSeason(leagueId, seasonId));
+  const players = useQuery(setupQueries.players(leagueId));
+  const summaries = tournaments.data ?? [];
+  const details = useQueries({
+    queries: summaries.map((summary) =>
+      tournamentQueries.detail(leagueId, summary.id),
+    ),
+  });
+
+  const names = new Map(players.data?.map((p) => [p.id, p.name]));
+  const nameOf = (playerId: string) => names.get(playerId) ?? "";
+  const detailOf = (id: string) =>
+    details[summaries.findIndex((summary) => summary.id === id)]?.data;
+
+  const running = summaries
+    .filter((summary) => summary.state !== "finished")
+    .sort(
+      (a, b) =>
+        Number(a.state === "setup") - Number(b.state === "setup") ||
+        byNewest(a, b),
+    );
+  const finished = summaries
+    .filter((summary) => summary.state === "finished")
+    .sort(byNewest);
+
+  const group = (
+    id: string,
+    heading: string,
+    items: TournamentSummary[],
+    wide: boolean,
+  ) =>
+    items.length === 0 ? null : (
+      <section aria-labelledby={id} className="grid gap-3">
+        <h2 id={id} className="text-body-sm font-bold text-muted-foreground">
+          {heading}
+        </h2>
+        <ul
+          className={
+            wide
+              ? "grid gap-3 md:grid-cols-2 xl:grid-cols-3"
+              : "grid gap-3 md:grid-cols-2"
+          }
+        >
+          {items.map((summary) => (
+            <TournamentItem
+              key={summary.id}
+              leagueId={leagueId}
+              summary={summary}
+              detail={detailOf(summary.id)}
+              nameOf={nameOf}
+            />
+          ))}
+        </ul>
+      </section>
+    );
 
   return (
-    <PlaceholderPage screen="1" title={t("tournaments.list.title")}>
-      <Link
-        to={generatePath(paths.newTournament, { leagueId })}
-        className="inline-flex min-h-11 items-center rounded-md bg-primary px-4 text-button-sm text-primary-foreground"
-      >
-        {t("tournaments.list.newTournament")}
-      </Link>
-      {tournaments.data?.length === 0 && <p>{t("tournaments.list.empty")}</p>}
-      <ul className="space-y-2">
-        {tournaments.data?.map((tournament) => (
-          <li key={tournament.id}>
-            <Link
-              to={generatePath(paths.tournament, {
-                leagueId,
-                tournamentId: tournament.id,
-              })}
-              className="flex min-h-11 flex-col justify-center rounded-lg border bg-card px-4 py-2 text-card-foreground"
-            >
-              <span className="text-body-md font-bold">{tournament.name}</span>
-              <span className="text-caption text-muted-foreground">
-                {t(`tournaments.state.${tournament.state}`)}
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </PlaceholderPage>
+    <div className="grid gap-6">
+      <DocumentTitle screen={t("tournaments.list.title")} />
+      <div className="grid gap-4 md:flex md:items-end md:justify-between">
+        <h1 className="font-display text-display-title">
+          {t("tournaments.list.title")}
+        </h1>
+        <Button asChild size="lg" className="md:min-w-60">
+          <Link to={generatePath(paths.newTournament, { leagueId })}>
+            {t("tournaments.list.newTournament")}
+          </Link>
+        </Button>
+      </div>
+
+      {tournaments.isError && (
+        <p role="alert" className="text-body-md text-destructive">
+          {t("tournaments.list.error")}
+        </p>
+      )}
+      {tournaments.isPending && (
+        <div role="status" className="grid gap-3">
+          <span className="sr-only">{t("loading")}</span>
+          <Skeleton className="h-28" />
+          <Skeleton className="h-28" />
+        </div>
+      )}
+      {tournaments.data?.length === 0 && (
+        <p className="text-body-md text-muted-foreground">
+          {t("tournaments.list.empty")}
+        </p>
+      )}
+      {group("running-heading", t("tournaments.list.running"), running, false)}
+      {group(
+        "finished-heading",
+        t("tournaments.list.finished"),
+        finished,
+        true,
+      )}
+    </div>
   );
 }
