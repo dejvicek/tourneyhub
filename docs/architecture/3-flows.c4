@@ -8,23 +8,43 @@ views "III. Flows" {
     variant sequence
     title "9. Login and token refresh"
     order 9
-    description "ADR-006: access JWT valid 15 minutes, kept in memory; refresh token in an HttpOnly cookie with rotation and a 60-second window."
+    description "ADR-006: access JWT (HS256) valid 15 minutes, kept in memory; refresh token in an HttpOnly, SameSite=Strict cookie on /api/v1/auth, with rotation and a 60-second window."
     organizer -> tourneyhub.spa.organizerUi "logs in with email and password"
     tourneyhub.spa.organizerUi -> tourneyhub.spa.authClient "login"
     tourneyhub.spa.authClient -> tourneyhub.api.authApi "POST /api/v1/auth/login"
-    tourneyhub.api.authApi -> tourneyhub.db.accounts "verifies Argon2id, stores the hash of the new refresh token"
-    tourneyhub.spa.authClient <- tourneyhub.api.authApi "access JWT + HttpOnly cookie"
-    tourneyhub.spa.authClient -> tourneyhub.api.authApi "on page load or after 401: POST /api/v1/auth/refresh with the CSRF header"
-    tourneyhub.api.authApi -> tourneyhub.db.accounts "locks the token family (FOR UPDATE)"
+    tourneyhub.api.authApi -> tourneyhub.db.accounts "counts the attempt per email and per IP (IPv6 per /64) before the password check, in a transaction of its own"
     alt {
-      when "token valid, or rotated less than 60 s ago" {
+      when "inside the waiting period after repeated failures" {
+        tourneyhub.spa.authClient <- tourneyhub.api.authApi "429 too_many_attempts with Retry-After; password not checked" {
+          notes "Nothing sleeps on the server and the account is never locked (ADR-006)."
+        }
+      }
+      when "otherwise" {
+        tourneyhub.api.authApi -> tourneyhub.db.accounts "verifies Argon2id (a dummy hash for an unknown email); on success marks the attempt succeeded and stores the hash of the new refresh token"
+        tourneyhub.spa.authClient <- tourneyhub.api.authApi "access JWT in the body + HttpOnly cookie, or 401"
+      }
+    }
+    tourneyhub.spa.authClient -> tourneyhub.api.authApi "on page load or after 401: POST /api/v1/auth/refresh with X-Requested-With"
+    tourneyhub.api.authApi -> tourneyhub.db.accounts "locks the token family (FOR UPDATE), then reads it"
+    alt {
+      when "token not yet rotated, or rotated less than 60 s ago" {
         tourneyhub.spa.authClient <- tourneyhub.api.authApi "new access JWT and cookie"
       }
-      when "token revoked, expired, or reused" {
-        tourneyhub.api.authApi -> tourneyhub.db.accounts "reused token: revokes the whole family"
+      when "token revoked or expired" {
+        tourneyhub.spa.authClient <- tourneyhub.api.authApi "401: log in again; nothing changes"
+      }
+      when "token rotated 60 s ago or earlier (reuse)" {
+        tourneyhub.api.authApi -> tourneyhub.db.accounts "revokes the whole family under the same locks" {
+          notes "The endpoint returns the 401 instead of raising, so the revocation commits (ADR-001)."
+        }
         tourneyhub.spa.authClient <- tourneyhub.api.authApi "401: log in again"
       }
     }
+    organizer -> tourneyhub.spa.organizerUi "logs out"
+    tourneyhub.spa.organizerUi -> tourneyhub.spa.authClient "logout"
+    tourneyhub.spa.authClient -> tourneyhub.api.authApi "POST /api/v1/auth/logout with X-Requested-With"
+    tourneyhub.api.authApi -> tourneyhub.db.accounts "revokes the cookie's family"
+    tourneyhub.spa.authClient <- tourneyhub.api.authApi "204, cookie removed; other devices stay logged in"
   }
 
   dynamic view resultEntry {
