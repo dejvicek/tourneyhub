@@ -302,9 +302,20 @@ views "III. Flows" {
     tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "PUT removed: false"
     tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "locks the league, clears removed_at"
     tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "200: the same player, history intact"
+    organizer -> tourneyhub.spa.organizerUi "renames a player, removed or not"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "PUT name"
+    tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "locks the league, looks up lower(name) among the other players"
+    alt {
+      when "the name is free" {
+        tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "200: the player with the new name"
+      }
+      when "another player has it" {
+        tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "422 player_name_taken: the holder (409 if a write without the lock won the race)"
+      }
+    }
     organizer -> tourneyhub.spa.organizerUi "removes a player"
     tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "PUT removed: true"
-    tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "sets removed_at; the row and the name stay"
+    tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "locks the league, sets removed_at; the row and the name stay"
     tourneyhub.api.leaguesApi -> tourneyhub.db.tournaments "not in an unfinished tournament (BR-002, P7)"
   }
 }
