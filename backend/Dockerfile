@@ -56,7 +56,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked
 USER tourneyhub
 EXPOSE 8000
-CMD ["sh", "-c", "tourneyhub migrate && exec uvicorn --factory tourneyhub.app:create_app --host 0.0.0.0 --port 8000 --forwarded-allow-ips 172.30.0.0/24 --reload --reload-dir /src/src"]
+# No Caddy in development, so no proxy is trusted for X-Forwarded-For (ADR-006).
+CMD ["sh", "-c", "tourneyhub migrate && exec uvicorn --factory tourneyhub.app:create_app --host 0.0.0.0 --port 8000 --reload --reload-dir /src/src"]
 
 
 FROM base AS runtime
