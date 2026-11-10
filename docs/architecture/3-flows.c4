@@ -221,7 +221,9 @@ views "III. Flows" {
     organizer -> tourneyhub.spa.organizerUi "creates the league Thursday Foosball and adds players"
     tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "league (Season 1 starts automatically), players"
     organizer -> tourneyhub.spa.organizerUi "on Thursday: DYP tournament with a round robin, 12 players"
-    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "setup: halves by league ranking, partner draw"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "setup: halves by league ranking, partner draw" {
+      navigateTo tournamentSetup
+    }
     tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "league ranking and partner draw from the tournament's seed"
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "generate the schedule"
     tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "round robin: 6 pairs, 5 rounds, 15 matches"
@@ -269,7 +271,7 @@ views "III. Flows" {
     organizer -> tourneyhub.spa.organizerUi "starts a new season"
     tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "POST season with the current number"
     tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "locks the league, compares the number"
-    tourneyhub.api.leaguesApi -> tourneyhub.db.tournaments "no unfinished tournament (BR-010, P7)"
+    tourneyhub.api.leaguesApi -> tourneyhub.db.tournaments "no unfinished tournament (BR-010): 422 with their ids"
     alt {
       when "the number is current" {
         tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "closes it, starts the next with a copy of the table"
@@ -316,6 +318,39 @@ views "III. Flows" {
     organizer -> tourneyhub.spa.organizerUi "removes a player"
     tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "PUT removed: true"
     tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "locks the league, sets removed_at; the row and the name stay"
-    tourneyhub.api.leaguesApi -> tourneyhub.db.tournaments "not in an unfinished tournament (BR-002, P7)"
+    tourneyhub.api.leaguesApi -> tourneyhub.db.tournaments "not picked for an unfinished tournament (BR-002): 422 with their ids"
+  }
+
+  dynamic view tournamentSetup {
+    variant sequence
+    title "18. Tournament setup"
+    order 22
+    description "FR-030 to FR-034, FR-038, ADR-008 and ADR-010: a tournament is created with a client id in the active season, takes the league's defaults, and is set up by target states. Every write locks the league, then the tournament. A change to the picks draws again with the engine and increments the draw counter; draw again carries the counter the screen showed."
+    organizer -> tourneyhub.spa.organizerUi "new tournament: DYP, round robin"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "POST tournament with a client id"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.leagues "locks the league, finds the active season"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "a known id: the same one back or 409; else a new one with the league's defaults, its phase, fields and seed"
+    organizer -> tourneyhub.spa.organizerUi "picks 13 players"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "PUT the picked players"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the league, then the tournament; a removed player: 422"
+    tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "league ranking, halves (one left out by lot), partners, seeds"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "picks, halves, pairs and seeds; draw counter + 1"
+    tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "the setup with the draw counter"
+    organizer -> tourneyhub.spa.organizerUi "draw again"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "POST draw with the expected counter"
+    alt {
+      when "the counter is current" {
+        tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "partners from the next counter's lot"
+        tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: the new pairs"
+      }
+      when "stale or repeated" {
+        tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "409 draw_counter_changed: reload"
+      }
+    }
+    organizer -> tourneyhub.spa.organizerUi "moves a pair up"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "PUT the full seed order; not the current entries: 409"
+    organizer -> tourneyhub.spa.organizerUi "deletes a tournament after confirming"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "DELETE; a closed season: 409, a repeat: 404"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "everything under it by cascade; the players stay"
   }
 }

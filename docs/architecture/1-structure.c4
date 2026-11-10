@@ -81,6 +81,7 @@ views "I. Structure" {
     include *
     include tourneyhub.db.accounts with { navigateTo loginRefresh }
     include tourneyhub.db.leagues with { navigateTo leagueSeasons }
+    include tourneyhub.db.tournaments with { navigateTo tournamentSetup }
     include tourneyhub.db.play with { navigateTo resultEntry }
     include tourneyhub.api -> tourneyhub.db.accounts with {
       title "auth and instance admin"
