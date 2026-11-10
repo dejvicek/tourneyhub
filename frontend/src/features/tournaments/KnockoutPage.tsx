@@ -138,7 +138,7 @@ function KnockoutContent() {
           </Link>
         </Notice>
       )}
-      {layout === "desktop" ? (
+      {layout === "desktop" && shape.size <= 4 ? (
         <div className="grid grid-cols-[minmax(0,1fr)_18rem] gap-8">
           {body}
           <aside>{decided}</aside>

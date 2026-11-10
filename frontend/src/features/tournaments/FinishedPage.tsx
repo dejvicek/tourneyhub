@@ -90,22 +90,24 @@ function FinishedContent() {
   const shown = standings.slice(0, 6);
   const playerNames = roster.player;
 
-  const winnerText = (() => {
-    if (first === undefined) {
-      return null;
-    }
-    const earn = isPair(first.entry_id)
-      ? t("finals.finished.earnsEach", { count: first.points_per_player })
-      : t("finals.finished.earnsOwn", { count: first.points_per_player });
-    if (first.reason.kind !== "won_final") {
-      return `${t("finals.finished.wonStandings")} ${earn}`;
-    }
-    const score = first.reason.score;
-    return `${t("finals.finished.wonFinal", {
-      score: score === null ? "" : `${String(score[0])}:${String(score[1])}`,
-      opponent: roster.entry(first.reason.opponent_entry_id),
-    })} ${earn}`;
-  })();
+  const earn =
+    first === undefined
+      ? null
+      : isPair(first.entry_id)
+        ? t("finals.finished.earnsEach", { count: first.points_per_player })
+        : t("finals.finished.earnsOwn", { count: first.points_per_player });
+  const how =
+    first === undefined
+      ? null
+      : first.reason.kind === "won_final"
+        ? t("finals.finished.wonFinal", {
+            score:
+              first.reason.score === null
+                ? ""
+                : `${String(first.reason.score[0])}:${String(first.reason.score[1])}`,
+            opponent: roster.entry(first.reason.opponent_entry_id),
+          })
+        : t("finals.finished.wonStandings");
 
   const placesSection = (
     <section aria-labelledby="final-places" className="space-y-3">
@@ -217,7 +219,8 @@ function FinishedContent() {
             {roster.entry(row.entry_id)}
           </p>
         ))}
-        <p className="text-body-md">{winnerText}</p>
+        <p className="text-body-md">{how}</p>
+        <p className="text-body-md">{earn}</p>
       </section>
       {layout === "desktop" ? (
         <div className="grid grid-cols-2 gap-8">
