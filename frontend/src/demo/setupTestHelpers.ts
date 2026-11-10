@@ -3,10 +3,10 @@ import axe from "axe-core";
 
 import { dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
-import type { TournamentFormatWrite } from "@/demo/contract";
-import { DEMO_LEAGUE_ID } from "@/demo/seed";
 
-import { newTournamentId } from "./uuid";
+import type { TournamentFormatWrite } from "./contract";
+import { DEMO_LEAGUE_ID, DEMO_SEASON_ID } from "./seed";
+import { newId } from "./setupEngine";
 
 /** The formats of a DYP evening as screen 2 would send them. */
 export const dypFormat: TournamentFormatWrite = {
@@ -33,7 +33,7 @@ const at = (tournamentId: string) => ({
 export async function createDraft(
   format: Partial<TournamentFormatWrite> = {},
 ): Promise<string> {
-  const id = newTournamentId();
+  const id = newId();
   await dataOf(
     provisionalApi.POST("/api/v1/leagues/{league_id}/tournaments", {
       params: { path: league },
@@ -104,5 +104,74 @@ export async function axeViolations(): Promise<string[]> {
       `${violation.id}: ${violation.help} (${violation.nodes
         .map((node) => node.target.join(" "))
         .join("; ")})`,
+  );
+}
+
+/** The item at `index`; fails the test when there is none. */
+export function nth<T>(items: readonly T[], index: number): T {
+  const item = items[index];
+  if (item === undefined) {
+    throw new Error(`No item at ${String(index)}`);
+  }
+  return item;
+}
+
+/** Another device draws with the counter it knows (a change this screen has not seen). */
+export async function drawElsewhere(
+  tournamentId: string,
+  target: "pairs" | "seeds",
+) {
+  await dataOf(
+    provisionalApi.POST(
+      "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/draw",
+      {
+        ...at(tournamentId),
+        body: {
+          expected_draw_counter: (await setupOf(tournamentId)).draw_counter,
+          target,
+        },
+      },
+    ),
+  );
+}
+
+/** Generates and starts a tournament with its current draw counter. */
+export async function startTournament(tournamentId: string) {
+  await dataOf(
+    provisionalApi.POST(
+      "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/start",
+      {
+        ...at(tournamentId),
+        body: {
+          expected_draw_counter: (await setupOf(tournamentId)).draw_counter,
+        },
+      },
+    ),
+  );
+}
+
+export function tournamentsOfSeason() {
+  return dataOf(
+    provisionalApi.GET(
+      "/api/v1/leagues/{league_id}/seasons/{season_id}/tournaments",
+      { params: { path: { ...league, season_id: DEMO_SEASON_ID } } },
+    ),
+  );
+}
+
+/** The league allows draws (BR-121), so BO2 is offered. */
+export async function allowDraws() {
+  await dataOf(
+    provisionalApi.PUT("/api/v1/leagues/{league_id}/settings", {
+      params: { path: league },
+      body: {
+        name: "Thursday Foosball",
+        draws_allowed: true,
+        default_field_count: 2,
+        default_match_format: "bo1",
+        default_goals_per_game: 10,
+        placement_points: [10, 8, 6, 4, 2],
+      },
+    }),
   );
 }

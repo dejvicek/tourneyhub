@@ -1,11 +1,9 @@
 import type { CsMessages, Messages } from "../en";
+import { tournamentsSetup } from "./tournamentsSetup";
 
 export const tournaments: CsMessages<Messages["tournaments"]> = {
-  list: {
-    title: "Turnaje sezóny",
-    newTournament: "Nový turnaj",
-    empty: "V této sezóně zatím není žádný turnaj.",
-  },
+  // Screens 1-5: the list and the setup steps (src/features/tournaments/setup).
+  ...tournamentsSetup,
   header: {
     back: "Zpět na turnaje",
     tabs: "Pohledy na turnaj",
