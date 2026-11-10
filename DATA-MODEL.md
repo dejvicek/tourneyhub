@@ -168,8 +168,8 @@ The sign-up code itself is never written to `admin_actions`.
 |---|---|
 | `id` | |
 | `league_id` | FK `leagues`, `ON DELETE CASCADE`. |
-| `name` | Unique on `(league_id, lower(name))`, **including removed players** (ADR-002). Re-adding a removed player's name restores that player. |
-| `removed_at` | `NULL` while the player is on the list. |
+| `name` | Unique on `(league_id, lower(name))`, **including removed players** (ADR-002). Adding a name that a removed player holds is refused (422 `player_name_taken`, with `removed: true`), and the organizer restores that player explicitly (ADR-002). A removed player cannot be renamed, so a restored player's name is always still theirs. |
+| `removed_at` | `NULL` while the player is on the list. Set when the player is removed (BR-002), cleared when they are restored; a repeated removal keeps the first time. |
 | `created_at`, `updated_at` | |
 
 **`seasons`** (FR-020–FR-022, BR-010–BR-012).
