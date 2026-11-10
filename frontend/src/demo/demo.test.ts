@@ -92,7 +92,8 @@ describe("the demo's fake API", () => {
   });
 
   it("has two finished tournaments with places and a DYP running its round robin", async () => {
-    const summaries = await tournamentsOfSeason();
+    // The foundation's three; the screen areas' seed parts follow them.
+    const summaries = (await tournamentsOfSeason()).slice(0, 3);
     expect(summaries.map((t) => [t.name, t.type, t.state])).toEqual([
       ["October Singles", "singles", "finished"],
       ["Autumn Open DYP", "dyp", "finished"],

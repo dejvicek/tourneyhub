@@ -1,10 +1,9 @@
 // Titles follow the screens of the Figma file's "Tournament lifecycle" page.
+import { tournamentsSetup } from "./tournamentsSetup";
+
 export const tournaments = {
-  list: {
-    title: "Tournaments in the season",
-    newTournament: "New tournament",
-    empty: "No tournaments in this season yet.",
-  },
+  // Screens 1-5: the list and the setup steps (src/features/tournaments/setup).
+  ...tournamentsSetup,
   header: {
     back: "Back to tournaments",
     tabs: "Views of this tournament",

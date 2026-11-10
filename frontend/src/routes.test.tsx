@@ -45,11 +45,11 @@ const SCREENS: Screen[] = [
   ["changePassword", "Change your password", "Změna hesla"],
   ["admin", "Admin", "Správa"],
   ["myLeagues", "My leagues", "Moje ligy"],
-  ["tournaments", "Tournaments in the season", "Turnaje sezóny"],
-  ["newTournament", "Setup: format", "Příprava: formát"],
-  ["setupPlayers", "Setup: who is playing tonight", "Příprava: kdo dnes hraje"],
-  ["setupDraw", "Setup: draw the DYP pairs", "Příprava: losování dvojic DYP"],
-  ["setupReview", "Setup: review and start", "Příprava: kontrola a start"],
+  ["tournaments", "Tournaments", "Turnaje"],
+  ["newTournament", "Choose the format", "Zvolte formát"],
+  ["setupPlayers", "Who is playing tonight?", "Kdo dnes hraje?"],
+  ["setupDraw", "Draw the pairs", "Losování dvojic"],
+  ["setupReview", "Ready to start?", "Můžeme začít?"],
   // The running round robin opens on its schedule.
   ["tournament", "Round robin in progress", "Probíhá každý s každým"],
   ["schedule", "Round robin in progress", "Probíhá každý s každým"],
@@ -170,7 +170,7 @@ describe("the route table", () => {
     expect(
       await screen.findByRole("heading", {
         level: 1,
-        name: "Tournaments in the season",
+        name: "Tournaments",
       }),
     ).toBeInTheDocument();
     expect(view.state.location.pathname).toBe(

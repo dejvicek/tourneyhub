@@ -128,7 +128,7 @@ describe("LeagueShell", () => {
     });
     expect(within(nav).getByRole("link", { name: "Turnaje" })).toBeVisible();
     expect(
-      await screen.findByRole("heading", { level: 1, name: "Turnaje sezóny" }),
+      await screen.findByRole("heading", { level: 1, name: "Turnaje" }),
     ).toBeInTheDocument();
   });
 

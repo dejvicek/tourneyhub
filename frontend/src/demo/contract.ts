@@ -326,4 +326,178 @@ type Duplicates = {
 type NoDuplicates<T extends never> = T;
 export type ContractDuplicates = NoDuplicates<Duplicates>;
 
-export type DemoPaths = MergePaths<GeneratedPaths, ProvisionalPaths>;
+export type DemoPaths = MergePaths<
+  GeneratedPaths,
+  ProvisionalPaths & SetupPaths
+>;
+
+// ================================================================ setup
+// Tournament list and setup, screens 1-5 (FR-030-FR-039). Modelled on
+// DATA-MODEL §4.3-4.4 (tournaments, phases, entries, dyp_halves) and ADR-008:
+// a tournament is created with a client id, every write sends the target
+// state, and "shuffle again", "new DYP draw" and "generate" carry the
+// expected draw counter (409 when it is stale).
+
+export type GroupPhaseChoice = "round_robin" | "swiss" | "monster_dyp" | "none";
+export type KnockoutMatchFormat = Exclude<MatchFormat, "bo2">;
+export type SeedingMethod = "ranking" | "random";
+export type HalvesMethod = "ranking" | "by_hand";
+export type Half = "top" | "bottom" | "left_out";
+
+/** Stable 409 codes of setup; a 409 makes the screen reload (ADR-008). */
+export type SetupConflictCode =
+  | "draw_counter_changed"
+  | "seed_order_changed"
+  | "tournament_not_in_setup"
+  | "tournament_id_taken";
+
+/** Everything screen 2 sets, as a whole (ADR-008: the target state). */
+export interface TournamentFormatWrite {
+  name: string;
+  date: IsoDate;
+  type: TournamentType;
+  /** Monster DYP always plays "monster_dyp"; the others never do. */
+  group_phase: GroupPhaseChoice;
+  /** Round robin only. */
+  round_robin_legs: 1 | 2;
+  /** FR-039, BR-071; unused without a group phase. */
+  sit_out_points: 0 | 1;
+  /** The group phase's format; "bo2" only in a league that allows draws (BR-121). */
+  group_match_format: MatchFormat;
+  /** The knockout's format. After a group phase it is applied when the knockout starts. */
+  knockout_match_format: KnockoutMatchFormat;
+  /** Null: the final plays the knockout's format (BR-120). */
+  final_match_format: KnockoutMatchFormat | null;
+  /** Only for a knockout without a group phase (FR-031). */
+  third_place_match: boolean;
+  goals_per_game: number;
+  field_count: number;
+}
+
+export interface TournamentCreate extends TournamentFormatWrite {
+  /** UUIDv7 made by the client; a repeated create returns the same tournament. */
+  id: Uuid;
+}
+
+export interface DypHalfWrite {
+  player_id: Uuid;
+  half: Half;
+}
+
+/** What setup knows beyond TournamentRead (DATA-MODEL §4.3, §4.4). */
+export interface TournamentSetupRead {
+  tournament_id: Uuid;
+  format: TournamentFormatWrite;
+  seeding_method: SeedingMethod;
+  /** Incremented by each draw: players changed, "new DYP draw", "shuffle again". */
+  draw_counter: number;
+  /** The players picked for the tournament, in the league ranking's order. */
+  player_ids: Uuid[];
+  halves_method: HalvesMethod;
+  /** DYP only; a picked player without a row has no half yet. */
+  halves: DypHalfWrite[];
+  /** Monster DYP: the players the organizer marked as top players (FR-041). */
+  top_player_ids: Uuid[];
+}
+
+export interface RankingRow {
+  rank: number;
+  player_id: Uuid;
+  /** The current season's points (BR-020). */
+  points: number;
+}
+
+export interface PreviewMatch {
+  /** The players of each side. */
+  sides: [Uuid[], Uuid[]];
+}
+
+export interface PreviewRound {
+  round_no: number;
+  matches: PreviewMatch[];
+  /** The players of each entry that sits the round out. */
+  sitting_out: Uuid[][];
+}
+
+/** What "Generate and start" would create (FR-035). */
+export interface SchedulePreview {
+  /** Round robin: all rounds. Swiss, Monster DYP and a knockout: the first round. */
+  rounds: PreviewRound[];
+  /** Null when rounds are added one by one. */
+  match_count: number | null;
+  round_count: number | null;
+  /** A knockout's bracket size (BR-040). */
+  bracket_size: number | null;
+}
+
+interface Delete<P> {
+  parameters: P;
+  requestBody?: never;
+  responses: {
+    204: { headers: Record<string, unknown>; content?: never };
+  } & Errors;
+}
+interface Action<P, B, R> {
+  parameters: P;
+  requestBody: { content: { "application/json": B } };
+  responses: { 200: Json<R> } & Errors;
+}
+
+/** The routes of tournament list and setup; merged into DemoPaths. */
+export interface SetupPaths {
+  "/api/v1/leagues/{league_id}/ranking": { get: Get<League, RankingRow[]> };
+  "/api/v1/leagues/{league_id}/tournaments": {
+    post: Post<League, TournamentCreate, TournamentRead>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}": {
+    delete: Delete<Tournament>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/format": {
+    put: Put<Tournament, TournamentFormatWrite, TournamentRead>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup": {
+    get: Get<Tournament, TournamentSetupRead>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/players": {
+    put: Put<Tournament, { player_ids: Uuid[] }, TournamentSetupRead>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/halves": {
+    put: Put<
+      Tournament,
+      { method: HalvesMethod; halves: DypHalfWrite[] },
+      TournamentSetupRead
+    >;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/pairs": {
+    put: Put<Tournament, { pairs: [Uuid, Uuid][] }, TournamentSetupRead>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/top-players": {
+    put: Put<Tournament, { player_ids: Uuid[] }, TournamentSetupRead>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/seeding": {
+    put: Put<Tournament, { method: SeedingMethod }, TournamentSetupRead>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/seed-order": {
+    put: Put<Tournament, { entry_ids: Uuid[] }, TournamentSetupRead>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/draw": {
+    post: Action<
+      Tournament,
+      { expected_draw_counter: number; target: "pairs" | "seeds" },
+      TournamentSetupRead
+    >;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/preview": {
+    get: Get<Tournament, SchedulePreview>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/start": {
+    post: Action<Tournament, { expected_draw_counter: number }, TournamentRead>;
+  };
+  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/back-to-setup": {
+    post: Action<
+      Tournament,
+      { expected_state: TournamentState },
+      TournamentRead
+    >;
+  };
+}
