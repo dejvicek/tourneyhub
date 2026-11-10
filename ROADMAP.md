@@ -32,7 +32,7 @@ The bigger version is a hosted platform where any club can run leagues and tourn
 | RM-08 | More tie-breakers | Further tie-breakers, and configurable ones in round robins. |
 | RM-09 | Player pages | Each player's history, win rate and head-to-head records. |
 | RM-10 | CSV export | A league's players, results and standings as a spreadsheet file. |
-| RM-11 | Dark mode and accessibility | A dark theme, and every screen checked for accessibility. |
+| RM-11 | Accessibility | Every screen checked for accessibility (WCAG 2.2 Level AA). |
 
 ## 3. Stage 2 — Players join in
 

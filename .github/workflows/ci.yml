@@ -152,6 +152,8 @@ jobs:
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      # Known vulnerabilities in what ships to the browser; build tools are left out (ADR-012)
+      - run: pnpm audit --prod
       # The API types from the committed backend/openapi.json (ADR-008)
       - run: pnpm generate:api
       - run: pnpm lint

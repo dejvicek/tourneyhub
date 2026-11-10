@@ -2,6 +2,8 @@ node_modules/
 dist/
 coverage/
 *.tsbuildinfo
+# Vitest's json and junit reports
+.vitest/
 # Playwright's output (traces, screenshots, videos, reports)
 e2e/test-results/
 e2e/playwright-report/

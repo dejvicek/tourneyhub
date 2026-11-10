@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Status | Proposed — awaiting review by another developer |
-| Date | 2026-10-16, revised 2026-10-21 after review, 2026-11-03 (ADR-001: Python 3.15, SQLAlchemy 2.1), 2026-11-05 (ADR-001, ADR-006, ADR-008, ADR-010, ADR-012: decisions of the style-guide review), 2026-11-10 (ADR-003: mobile-first layout, light and dark themes in the MVP) and 2026-11-10 (ADR-005, ADR-006, ADR-014: acting decisions on PR #14 while the lead reviewer is away) |
+| Date | 2026-10-16, revised 2026-10-21 after review, 2026-11-03 (ADR-001: Python 3.15, SQLAlchemy 2.1), 2026-11-05 (ADR-001, ADR-006, ADR-008, ADR-010, ADR-012: decisions of the style-guide review), 2026-11-10 (ADR-003: mobile-first layout, light and dark themes in the MVP), 2026-11-10 (ADR-005, ADR-006, ADR-014: acting decisions on PR #14 while the lead reviewer is away) and 2026-11-10 (ADR-003, ADR-008, ADR-012, ADR-013: acting decisions on the frontend style guide while the lead reviewer is away) |
 | Scope | Technical decisions for the MVP in `PRD.md`. Once accepted, a changed decision gets a new ADR that supersedes the old one; accepted ADRs are not rewritten. |
 
 Each ADR states its status, the context, the decision, its consequences and the alternatives considered. Requirement IDs (FR-, BR-, RM-) refer to `PRD.md` and `ROADMAP.md`.
@@ -93,7 +93,7 @@ Each ADR states its status, the context, the decision, its consequences and the 
 | Translations | react-i18next; no hard-coded user-facing strings; dates formatted with `Intl` in the chosen language |
 | Remembered language (FR-081) | Organizers: a field on their account (`users.language`). Viewers: the browser's language if it is English or Czech, otherwise English; a viewer's own choice is kept in `localStorage` |
 | Themes | A light and a dark theme for every screen, as the design in Figma has them; the theme follows the device's setting (`prefers-color-scheme`). Colours come from theme tokens (Tailwind and shadcn/ui CSS variables), never from hard-coded values |
-| API types | Generated at build time from the committed OpenAPI schema with `openapi-typescript` (ADR-008) |
+| API types | Generated at build time from the committed OpenAPI schema with `openapi-typescript`; `openapi-fetch` is the runtime client they type (ADR-008) |
 | Node.js | The current Active LTS (26 from 2026-10-28), pinned in `.nvmrc` and `engines` |
 | Package manager | pnpm, its version pinned in the `packageManager` field; `pnpm-lock.yaml` committed |
 
@@ -101,7 +101,7 @@ Each ADR states its status, the context, the decision, its consequences and the 
 - The knockout options keep their English names in both languages (FR-080).
 - Both themes ship in the MVP, as the design has them. Every screen and component is built and checked in both, which costs more than one theme; tokens keep that cost to the colours, not the layout. A manual theme switch is not in the MVP.
 - pnpm keeps `node_modules` strict: code can import only what its own `package.json` declares.
-- pnpm does not run dependency install scripts unless the package is on an allow-list (`allowBuilds` in `pnpm-workspace.yaml`; `onlyBuiltDependencies` in pnpm 10). An unlisted install script fails `pnpm install`, so the list (typically esbuild for Vite) is reviewed like code.
+- pnpm does not run dependency install scripts unless the package is on an allow-list (`allowBuilds` in `pnpm-workspace.yaml`). An unlisted install script fails `pnpm install`, so the list is reviewed like code. Today it lets no package run one, and it denies `@swc/core`'s explicitly.
 - Node 25 and later no longer ship Corepack, so pnpm is installed explicitly: in CI with `pnpm/action-setup`, which reads the pinned version, before `actions/setup-node` with `cache: pnpm`, then `pnpm install --frozen-lockfile`; in the Dockerfile with the same pinned version. Playwright browsers are installed with `pnpm exec playwright install --with-deps`.
 
 **Alternatives considered.** Mantine (faster start, less control over the look). Plain Tailwind (most work, accessibility of dialogs and menus on us). npm (nothing extra to set up, but `node_modules` is not strict and dependency install scripts run by default).
@@ -203,7 +203,7 @@ Caddy adds three headers to every response: a Content-Security-Policy that allow
 - Every error returns an HTTP status and a body `{"code": "<stable_code>", "detail": {…}}`, including the framework's own errors: custom handlers for `RequestValidationError` and `starlette.exceptions.HTTPException` (which also covers the router's 404 and 405) replace FastAPI's defaults, which return `detail` as an English string or a list. Their codes are `validation_failed` (422), `not_found` and `method_not_allowed` (the router's 404 and 405), `bad_request` (any other HTTP error) and `internal_error` (500, any unexpected error). The error schema is declared in OpenAPI with `code` as an enum, so the generated types know it. `detail` carries structured parameters, for example `{"min": 4, "given": 3}`, from which the frontend builds English or Czech messages; the backend never returns user-facing text.
 - Status codes the frontend acts on: 401 (`not_authenticated`, `token_expired`) makes it refresh once and retry once (ADR-006); 403 (`forbidden`, `password_change_required`) never does; 409 makes it reload the state; 422 makes it show a message built from the code and `detail`; 404 on a repeated delete means the delete already happened.
 - 409 is used only when the request carried an expectation that is stale and a reload repairs it: an expected value, a target state, the client id of another row. The reloaded screen shows what changed. 422 with a stable code (`RuleViolationError` in the backend) means that the current state refuses the request and the organizer needs a message, for example a player name the league already has (BR-001) or too few entries; a reload would change nothing. Services check these rules under the lock (`docs/python-style.md` §4.4).
-- The OpenAPI schema is generated by FastAPI, exported to `backend/openapi.json` and committed. CI fails if the committed schema differs from the code. The frontend generates its TypeScript types from that file at build time and does not commit them, so this one drift check covers both sides; hand-written copies of API types are not allowed.
+- The OpenAPI schema is generated by FastAPI, exported to `backend/openapi.json` and committed. CI fails if the committed schema differs from the code. The frontend generates its TypeScript types from that file at build time and does not commit them, so this one drift check covers both sides; hand-written copies of API types are not allowed. The frontend calls the API only through `openapi-fetch`, typed by these generated types, behind one client module that turns every non-2xx response into an error carrying the status, `code` and `detail`.
 - Share tokens are at least 128 bits of randomness, URL-safe (FR-071).
 - Every mutating operation inside a league locks the league row first and then, if it touches a tournament, the tournament row (`SELECT … FOR UPDATE`). Two devices of the same organizer cannot interleave changes such as generating a round while entering a result, and the fixed order rules out deadlocks. Rules spanning a league, a season and its tournaments hold: clearing a result in a finished tournament cannot race starting a new season (BR-010, BR-011, BR-095), creating a tournament cannot race closing the season, and removing a player cannot race adding them as a late entry (BR-002).
 - Every id in a request (entry, round, match, player) is loaded through the league and tournament the operation locked, so an id from another tournament or another organizer's league is not found.
@@ -212,7 +212,7 @@ Caddy adds three headers to every response: a Content-Security-Policy that allow
 
 **Consequences.** All writes in a league are serialized; with one organizer per league there is no noticeable waiting. A retried or stale request either changes nothing or gets 409 and reloads. Share tokens appear in every public path, so the access logs of Caddy and uvicorn contain them; redaction or retention is decided with the logging in ADR-014.
 
-**Alternatives considered.** Hand-written OpenAPI first (doubles the work with FastAPI). GraphQL (no need for the MVP's fixed set of views). Idempotency keys for every mutation (a stored table of keys and responses; expected-state checks cover the same retries and stale screens without it).
+**Alternatives considered.** Hand-written OpenAPI first (doubles the work with FastAPI). A hand-written fetch wrapper (would restate the paths and parameters the schema already types). GraphQL (no need for the MVP's fixed set of views). Idempotency keys for every mutation (a stored table of keys and responses; expected-state checks cover the same retries and stale screens without it).
 
 ---
 
@@ -301,7 +301,7 @@ Caddy adds three headers to every response: a Content-Security-Policy that allow
 | Area | Checks |
 |---|---|
 | Backend | `ruff` (lint and format), `mypy --strict`, import-linter, `pytest` under `coverage` (100 % in the engine; 90 % overall from the first feature), `hypothesis` property tests for the engine, integration tests against a real PostgreSQL service container, pytest-alembic's migration tests, `alembic upgrade head` and `alembic check`, OpenAPI drift check (ADR-008), `uv audit` |
-| Frontend | ESLint, Prettier, `tsc --noEmit` against the types generated from the committed OpenAPI schema, Vitest with Testing Library |
+| Frontend | ESLint, Prettier, `tsc --build` over the app, `vite.config.ts` and the Playwright tests (`pnpm typecheck`), against the types generated from the committed OpenAPI schema, Vitest with Testing Library, `i18next-cli lint` (no user-facing text outside `t()` and `<Trans>`), `pnpm audit --prod` (known vulnerabilities in the production dependencies) |
 | End to end | Playwright (ADR-013) |
 
 - Jobs are filtered by the changed paths inside the workflow: each job is skipped when its area did not change, and one aggregate job (`ci-ok`) fails if any job it depends on failed. Documentation-only pull requests then skip the heavy jobs, and the checks keep reporting once they become required. A workflow-level `paths` filter would leave a required check waiting forever.
@@ -331,7 +331,8 @@ Caddy adds three headers to every response: a Content-Security-Policy that allow
   - A viewer opening the share link without an account sees the league and cannot change anything; tournaments in setup are hidden (FR-070, FR-072).
   - Switching between English and Czech, and the default language taken from the browser (FR-081).
   - Entering a result in at most three taps from the bracket, schedule or round, plus typing scores (FR-082).
-- Accessibility checks with `@axe-core/playwright` run on the main screens and produce a report that does not fail the build; they become a gate with RM-11 (Stage 1).
+- Accessibility checks with `@axe-core/playwright` run on the main screens, in the light and the dark colour scheme, and produce a report that does not fail the build. They run axe's WCAG 2.0, 2.1 and 2.2 Level A and AA rules (tags `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`), with `target-size` enabled by name because axe leaves the WCAG 2.2 rules off by default, and its `best-practice` rules. WCAG 2.2 Level AA is the level the report measures and the level the gate requires from RM-11 (Stage 1); the `best-practice` rules stay a report.
+- `target-size` checks AA's minimum of 24 × 24 CSS px (SC 2.5.8). The 44 × 44 px of the result-entry controls (FR-082) is the AAA size of SC 2.5.5, chosen because those taps are made on a phone at the table; axe does not check it, so the FR-082 scenario asserts it.
 - On failure, CI keeps the trace and screenshots, and the video (`retain-on-failure`), as build artifacts for 7 days (ADR-012).
 
 **Consequences.** Each pull request pays for one browser. Problems specific to WebKit, including how Safari handles the refresh cookie, may surface only when WebKit is added before the pilot.
