@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Status | Proposed — awaiting review by another developer |
-| Date | 2026-10-16, revised 2026-10-21 after review, 2026-11-03 (ADR-001: Python 3.15, SQLAlchemy 2.1), 2026-11-05 (ADR-001, ADR-006, ADR-008, ADR-010, ADR-012: decisions of the style-guide review) and 2026-11-10 (ADR-003: mobile-first layout, light and dark themes in the MVP) |
+| Date | 2026-10-16, revised 2026-10-21 after review, 2026-11-03 (ADR-001: Python 3.15, SQLAlchemy 2.1), 2026-11-05 (ADR-001, ADR-006, ADR-008, ADR-010, ADR-012: decisions of the style-guide review), 2026-11-10 (ADR-003: mobile-first layout, light and dark themes in the MVP) and 2026-11-10 (ADR-005, ADR-006, ADR-014: acting decisions on PR #14 while the lead reviewer is away) |
 | Scope | Technical decisions for the MVP in `PRD.md`. Once accepted, a changed decision gets a new ADR that supersedes the old one; accepted ADRs are not rewritten. |
 
 Each ADR states its status, the context, the decision, its consequences and the alternatives considered. Requirement IDs (FR-, BR-, RM-) refer to `PRD.md` and `ROADMAP.md`.
