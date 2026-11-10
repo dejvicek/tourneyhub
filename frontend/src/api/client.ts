@@ -25,8 +25,26 @@ export class ApiError extends Error {
   }
 }
 
+// Query and mutation errors are ApiErrors: every call goes through dataOf.
+// A network failure still arrives as a TypeError, so code that tells the
+// two apart checks `instanceof ApiError` (docs/frontend-style.md §8.1).
+declare module "@tanstack/react-query" {
+  interface Register {
+    defaultError: ApiError;
+  }
+}
+
+/**
+ * Looks up the global fetch on every call; openapi-fetch would keep the one
+ * it found when the client was created, which MSW in the tests replaces
+ * later.
+ */
+export function globalFetch(request: Request): Promise<Response> {
+  return fetch(request);
+}
+
 export function createApi(options?: ClientOptions) {
-  return createClient<paths>(options);
+  return createClient<paths>({ fetch: globalFetch, ...options });
 }
 
 /** The API on the page's own origin: Vite's proxy in development, Caddy in production (ADR-005). */

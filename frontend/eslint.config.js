@@ -53,6 +53,14 @@ const apiClient = {
   importNames: ["api", "createApi", "dataOf"],
   message: "Only src/api/ and a feature's api.ts call the API.",
 };
+// The demo (src/demo) loads only in demo mode, through main.tsx's dynamic
+// import; app code may read its rules and provisional contract, nothing
+// else, so no MSW code reaches a production bundle.
+const demoInternals = {
+  regex: "^(@/|(\\.\\./)+)demo/(?!(rules|contract)$)",
+  message:
+    "Only main.tsx starts the demo; app code imports @/demo/rules and @/demo/contract.",
+};
 // Imports flow one way: shared code → features → the app (guide §11).
 const appFromShared = {
   regex: "^(@/|(\\.\\./)+)(App|main|routes|pages|features)(/|$)",
@@ -209,31 +217,51 @@ export default defineConfig([
           }),
         ),
       ],
-      "no-restricted-imports": restrictImports(apiClient),
+      "no-restricted-imports": restrictImports(apiClient, demoInternals),
     },
   },
   {
     files: ["src/{components,hooks,i18n,lib}/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": restrictImports(apiClient, appFromShared),
+      "no-restricted-imports": restrictImports(
+        apiClient,
+        appFromShared,
+        demoInternals,
+      ),
     },
   },
   {
     files: ["src/features/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": restrictImports(apiClient, appFromFeature),
+      "no-restricted-imports": restrictImports(
+        apiClient,
+        appFromFeature,
+        demoInternals,
+      ),
     },
   },
   {
     files: ["src/api/**/*.ts"],
     rules: {
       "no-restricted-globals": "off",
-      "no-restricted-imports": restrictImports(appFromShared),
+      "no-restricted-imports": restrictImports(appFromShared, demoInternals),
     },
   },
   {
     files: ["src/features/*/api.ts"],
-    rules: { "no-restricted-imports": restrictImports(appFromFeature) },
+    rules: {
+      "no-restricted-imports": restrictImports(appFromFeature, demoInternals),
+    },
+  },
+  {
+    // Tests run against the demo's fake API (src/test/server.ts).
+    files: ["src/test/**/*.{ts,tsx}", "src/**/*.test.{ts,tsx}"],
+    rules: { "no-restricted-imports": restrictImports(apiClient) },
+  },
+  {
+    // The demo itself; its tests call it through the API clients.
+    files: ["src/demo/**/*.ts"],
+    rules: { "no-restricted-imports": restrictImports() },
   },
   {
     files: ["src/**/*.tsx"],
