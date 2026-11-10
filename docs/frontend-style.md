@@ -267,7 +267,6 @@ From the first feature onward (the skeleton has none of these yet):
 
 | Document | Today | Proposal | Why | Status |
 |---|---|---|---|---|
-| ADR-012, frontend row | `tsc --noEmit` | `tsc --build`, as `pnpm typecheck` runs it | The root `tsconfig.json` only references the projects; `tsc --noEmit` there checks no file and exits 0 | Proposed |
 | ADR-012, frontend row | No check for hard-coded text | Add `i18next-cli lint` as a check, with its configuration and devDependency | It is the only tool that finds text outside `t()` and `<Trans>` [I1]; until then §7's first rule is left to review | Proposed |
 | ADR-012, frontend row | No dependency audit | Add `pnpm audit`, the counterpart of the backend's `uv audit`, first as a report | It checks the installed packages for known security issues [E18] | Proposed |
 | ADR-003, Consequences | "`allowBuilds` in `pnpm-workspace.yaml`; `onlyBuiltDependencies` in pnpm 10" and "typically esbuild for Vite" | Drop the pnpm 10 key and the esbuild example | pnpm 12 fails on settings it does not know [E19]; Vite 8 bundles with Rolldown, so the list is empty | Proposed |
