@@ -271,7 +271,6 @@ From the first feature onward (the skeleton has none of these yet):
 | Document | Today | Proposal | Why | Status |
 |---|---|---|---|---|
 | ADR-012, frontend row | No check for hard-coded text | Add `i18next-cli lint` as a check, with its configuration and devDependency | It is the only tool that finds text outside `t()` and `<Trans>` [I1]; until then §7's first rule is left to review. It finds nothing in `src/` today. Held back: its dependency `@swc/core` has an install script, which fails `pnpm install` while `allowBuilds` is empty; `"@swc/core": false` there lets the install pass, and the lint works without the script, which only checks the native binary. Adding that entry is a reviewed decision | Proposed |
-| ROADMAP RM-11 | "Dark mode and accessibility": "A dark theme, and every screen checked for accessibility" | Accessibility only | ADR-003 puts both themes in the MVP | Proposed |
 | PRD §6.9 | No requirement for the themes | Add FR-083: every screen has a light and a dark theme and follows the device's setting; and decide whether a manual switch becomes a roadmap item | ADR-003 builds both themes in the MVP, and ROADMAP §1 moves a picked-up item into the PRD | Proposed to the PRD team |
 
 ## 13. Sources
