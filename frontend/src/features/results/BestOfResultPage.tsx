@@ -1,10 +1,10 @@
-import { useTranslation } from "react-i18next";
+import { EnterResultPage } from "./EnterResultPage";
 
-import { PlaceholderSheet } from "@/components/PlaceholderSheet";
-
-// Placeholder (FR-050, BR-120–BR-124). Not a route: EnterResultPage shows it
-// for a match of more than one game.
+/**
+ * Screen 7b: the result overlay shows the best-of form by the match's
+ * format (BR-120, BR-121), so this route renders the same screen.
+ */
+// TODO(foundation-routes): the bestOfResult route goes with the rebase.
 export function BestOfResultPage() {
-  const { t } = useTranslation();
-  return <PlaceholderSheet screen="7b" title={t("results.bestOf.title")} />;
+  return <EnterResultPage />;
 }
