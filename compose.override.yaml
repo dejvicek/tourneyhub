@@ -21,4 +21,27 @@ services:
       db:
         condition: service_healthy
 
-  # frontend: the Vite dev server comes here (ADR-004).
+  # The Vite dev server with hot reload (ADR-004).
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    environment:
+      # Vite proxies /api here, so the browser sees one origin (ADR-005).
+      API_PROXY_TARGET: http://api:8000
+    # node_modules is a named volume: the macOS host and the Linux container
+    # need different native binaries. `pnpm generate:api` reads the schema
+    # from ../backend (ADR-008).
+    volumes:
+      - ./frontend:/src/frontend
+      - frontend-node-modules:/src/frontend/node_modules
+      - ./backend/openapi.json:/src/backend/openapi.json:ro
+    ports:
+      - "127.0.0.1:5173:5173"
+    # tini as PID 1 passes `docker stop` on to pnpm and Vite.
+    init: true
+    depends_on:
+      - api
+
+volumes:
+  frontend-node-modules:
