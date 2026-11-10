@@ -27,42 +27,44 @@ export function BracketView({ bracket, ctx }: ViewProps) {
       tabIndex={0}
       className="overflow-x-auto rounded-lg outline-hidden focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
-      <div className="flex min-w-max gap-10 py-1">
+      <div className="flex min-w-max gap-8 py-1">
         {bracket.rounds.map((round) => (
           <div
             key={round.round_no}
             role="group"
             aria-label={t(`finals.roundName.${round.name}`)}
-            className="flex w-56 flex-col justify-around gap-3"
+            className="flex w-52 flex-col gap-3"
           >
             <h2 className="text-caption font-bold text-muted-foreground">
               {t(`finals.roundName.${round.name}`)}
             </h2>
-            {round.matches.map((match) =>
-              match.kind === "standard" && round.name === "final" ? (
-                <FinalCard
-                  key={match.match_id}
-                  ctx={ctx}
-                  round={round}
-                  match={match}
-                />
-              ) : (
-                <MatchBox
-                  key={match.match_id}
-                  ctx={ctx}
-                  round={round}
-                  match={match}
-                  titled={
-                    round.name !== "round_of_16" || match.kind !== "standard"
-                  }
-                  className={cn(
-                    match.kind === "standard" &&
-                      round.name !== "final" &&
-                      "after:absolute after:top-1/2 after:left-full after:h-px after:w-10 after:bg-border",
-                  )}
-                />
-              ),
-            )}
+            <div className="flex flex-1 flex-col justify-around gap-3">
+              {round.matches.map((match) =>
+                match.kind === "standard" && round.name === "final" ? (
+                  <FinalCard
+                    key={match.match_id}
+                    ctx={ctx}
+                    round={round}
+                    match={match}
+                  />
+                ) : (
+                  <MatchBox
+                    key={match.match_id}
+                    ctx={ctx}
+                    round={round}
+                    match={match}
+                    titled={
+                      round.name !== "round_of_16" || match.kind !== "standard"
+                    }
+                    className={cn(
+                      match.kind === "standard" &&
+                        round.name !== "final" &&
+                        "after:absolute after:top-1/2 after:left-full after:h-px after:w-8 after:bg-border",
+                    )}
+                  />
+                ),
+              )}
+            </div>
           </div>
         ))}
       </div>
