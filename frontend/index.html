@@ -2,9 +2,26 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- viewport-fit=cover makes env(safe-area-inset-*) report the home
+         indicator's height to the bottom bar. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
     <meta name="color-scheme" content="light dark" />
-    <title>TourneyHub</title>
+    <!-- The --nav token of each theme (src/index.css): the browser's bar
+         meets the app's header, which uses it, under the status bar. -->
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: light)"
+      content="#ffffff"
+    />
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: dark)"
+      content="#151e28"
+    />
+    <!-- Each screen renders its own <title> (docs/frontend-style.md §6). -->
   </head>
   <body>
     <div id="root"></div>

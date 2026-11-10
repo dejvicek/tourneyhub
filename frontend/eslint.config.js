@@ -53,6 +53,14 @@ const apiClient = {
   importNames: ["api", "createApi", "dataOf"],
   message: "Only src/api/ and a feature's api.ts call the API.",
 };
+// The demo (src/demo) loads only in demo mode, through main.tsx's dynamic
+// import; app code may read its rules and provisional contract, nothing
+// else, so no MSW code reaches a production bundle.
+const demoInternals = {
+  regex: "^(@/|(\\.\\./)+)demo/(?!(rules|contract)$)",
+  message:
+    "Only main.tsx starts the demo; app code imports @/demo/rules and @/demo/contract.",
+};
 // Imports flow one way: shared code → features → the app (guide §11).
 const appFromShared = {
   regex: "^(@/|(\\.\\./)+)(App|main|routes|pages|features)(/|$)",
@@ -77,11 +85,21 @@ const forwardRefSyntax = [
   },
 ];
 
+// One cn for the whole app, configured with the theme's text styles; the
+// package alone takes text-caption for a colour (guide §5.3).
+const cnPackage = {
+  group: ["cn", "cn/*"],
+  message: "Import cn from @/lib/utils, which knows the theme's text styles.",
+};
+
 /** @param {object[]} patterns */
 function restrictImports(...patterns) {
   return /** @type {const} */ ([
     "error",
-    { paths: restrictedPaths, patterns: [unstableRouterApis, ...patterns] },
+    {
+      paths: restrictedPaths,
+      patterns: [unstableRouterApis, cnPackage, ...patterns],
+    },
   ]);
 }
 
@@ -209,38 +227,83 @@ export default defineConfig([
           }),
         ),
       ],
-      "no-restricted-imports": restrictImports(apiClient),
+      "no-restricted-imports": restrictImports(apiClient, demoInternals),
     },
   },
   {
     files: ["src/{components,hooks,i18n,lib}/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": restrictImports(apiClient, appFromShared),
+      "no-restricted-imports": restrictImports(
+        apiClient,
+        appFromShared,
+        demoInternals,
+      ),
+    },
+  },
+  {
+    // The one file that configures the cn package.
+    files: ["src/lib/utils.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: restrictedPaths,
+          patterns: [
+            unstableRouterApis,
+            apiClient,
+            appFromShared,
+            demoInternals,
+          ],
+        },
+      ],
     },
   },
   {
     files: ["src/features/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": restrictImports(apiClient, appFromFeature),
+      "no-restricted-imports": restrictImports(
+        apiClient,
+        appFromFeature,
+        demoInternals,
+      ),
     },
   },
   {
     files: ["src/api/**/*.ts"],
     rules: {
       "no-restricted-globals": "off",
-      "no-restricted-imports": restrictImports(appFromShared),
+      "no-restricted-imports": restrictImports(appFromShared, demoInternals),
     },
   },
   {
     files: ["src/features/*/api.ts"],
-    rules: { "no-restricted-imports": restrictImports(appFromFeature) },
+    rules: {
+      "no-restricted-imports": restrictImports(appFromFeature, demoInternals),
+    },
+  },
+  {
+    // Tests run against the demo's fake API (src/test/server.ts).
+    files: ["src/test/**/*.{ts,tsx}", "src/**/*.test.{ts,tsx}"],
+    rules: { "no-restricted-imports": restrictImports(apiClient) },
+  },
+  {
+    // The demo itself; its tests call it through the API clients.
+    files: ["src/demo/**/*.ts"],
+    rules: { "no-restricted-imports": restrictImports() },
   },
   {
     files: ["src/**/*.tsx"],
     extends: [jsxA11yX.configs.strict],
     settings: {
       // Each copied component that renders a native control is listed here.
-      "jsx-a11y-x": { components: { Button: "button" } },
+      "jsx-a11y-x": {
+        components: {
+          Button: "button",
+          Input: "input",
+          Textarea: "textarea",
+          Label: "label",
+        },
+      },
     },
     rules: {
       // Off in both of the plugin's configs; every control needs a name.

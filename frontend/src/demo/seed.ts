@@ -1,0 +1,453 @@
+// The demo's data: one league with 16 players and its current season, two
+// finished tournaments with results, and a DYP tournament running its round
+// robin tonight (PRD §5.1). The same seed gives the same data every time.
+// The screen areas add their own data through seedParts.ts, each in its own
+// id range (ids.ts).
+import type {
+  EntryRead,
+  GameRead,
+  LeagueRead,
+  MatchRead,
+  PhaseRead,
+  Player,
+  RoundRead,
+  SeasonRead,
+  TournamentRead,
+  UserRead,
+} from "./contract";
+import {
+  createRng,
+  drawDypPairs,
+  fillFields,
+  knockoutFirstRound,
+  randomGame,
+  roundRobinRounds,
+  roundRobinStandings,
+  waitingMatches,
+} from "./engine";
+import {
+  DEMO_EMAIL,
+  DEMO_LEAGUE_ID,
+  DEMO_SEASON_ID,
+  DEMO_SHARE_TOKEN,
+  DEMO_USER_ID,
+  demoId,
+  SEED_AREAS,
+  type SeedArea,
+} from "./ids";
+import { DEFAULT_PLACEMENT_POINTS } from "./rules";
+import { seedParts } from "./seedParts";
+
+/** A league as stored; its seasons are rows of their own. */
+export interface StoredLeague extends Omit<LeagueRead, "seasons"> {
+  owner_id: string;
+}
+export interface StoredPlayer extends Player {
+  league_id: string;
+}
+export interface StoredSeason extends SeasonRead {
+  league_id: string;
+}
+export interface StoredTournament extends Omit<
+  TournamentRead,
+  "waiting" | "places" | "current_phase_id" | "current_phase_done"
+> {
+  league_id: string;
+}
+
+export interface DemoState {
+  me: UserRead;
+  leagues: StoredLeague[];
+  players: StoredPlayer[];
+  seasons: StoredSeason[];
+  tournaments: StoredTournament[];
+}
+
+const PLAYER_NAMES = [
+  "Anna Nováková",
+  "Petr Svoboda",
+  "Jana Dvořáková",
+  "Tomáš Černý",
+  "Eva Procházková",
+  "Lukáš Kučera",
+  "Kateřina Veselá",
+  "Jakub Horák",
+  "Lucie Němcová",
+  "Ondřej Marek",
+  "Tereza Pokorná",
+  "Martin Král",
+  "Barbora Růžičková",
+  "David Beneš",
+  "Veronika Fialová",
+  "Filip Šimek",
+];
+
+function isoDate(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${String(date.getFullYear())}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function at(date: string, time: string): string {
+  return `${date}T${time}:00Z`;
+}
+
+/** Builds a tournament's rows; ids come from one counter per tournament. */
+export class TournamentBuilder {
+  private next: number;
+  private readonly area: SeedArea;
+  readonly tournament: StoredTournament;
+
+  constructor(
+    area: SeedArea,
+    base: number,
+    summary: Pick<StoredTournament, "name" | "date" | "type" | "state">,
+  ) {
+    this.area = area;
+    this.next = base;
+    this.tournament = {
+      id: demoId(base, area),
+      league_id: DEMO_LEAGUE_ID,
+      season_id: DEMO_SEASON_ID,
+      goals_per_game: 10,
+      phases: [],
+      entries: [],
+      rounds: [],
+      fields: [],
+      ...summary,
+    };
+  }
+
+  id(): string {
+    this.next += 1;
+    return demoId(this.next, this.area);
+  }
+
+  phase(fields: Omit<PhaseRead, "id" | "position">): PhaseRead {
+    const phase: PhaseRead = {
+      id: this.id(),
+      position: this.tournament.phases.length + 1,
+      ...fields,
+    };
+    this.tournament.phases.push(phase);
+    return phase;
+  }
+
+  entry(playerIds: string[], seed: number): EntryRead {
+    const entry: EntryRead = {
+      id: this.id(),
+      stage: "main",
+      kind: playerIds.length === 1 ? "player" : "pair",
+      seed,
+      player_ids: playerIds,
+      is_disabled: false,
+      is_top_player: false,
+    };
+    this.tournament.entries.push(entry);
+    return entry;
+  }
+
+  round(
+    phase: PhaseRead,
+    pairs: [EntryRead, EntryRead][],
+    sittingOut: EntryRead[] = [],
+  ): RoundRead {
+    const round: RoundRead = {
+      id: this.id(),
+      phase_id: phase.id,
+      round_no:
+        this.tournament.rounds.filter((r) => r.phase_id === phase.id).length +
+        1,
+      matches: [],
+      sitting_out: sittingOut.map((entry) => entry.id),
+    };
+    round.matches = pairs.map(([a, b], index) => ({
+      id: this.id(),
+      round_id: round.id,
+      position: index + 1,
+      kind: "standard",
+      sides: [
+        { entry_id: a.id, player_ids: a.player_ids, is_bye: false },
+        { entry_id: b.id, player_ids: b.player_ids, is_bye: false },
+      ],
+      outcome: null,
+      is_walkover: false,
+      games: [],
+      result_entered_at: null,
+    }));
+    this.tournament.rounds.push(round);
+    return round;
+  }
+
+  fields(count: number): void {
+    for (let number = 1; number <= count; number++) {
+      this.tournament.fields.push({ id: this.id(), number, match_id: null });
+    }
+  }
+}
+
+/** The value, which the seed's own construction guarantees. */
+function required<T>(value: T | undefined): T {
+  if (value === undefined) {
+    throw new Error("The demo seed is inconsistent");
+  }
+  return value;
+}
+
+function play(
+  match: MatchRead,
+  rng: () => number,
+  goalsPerGame: number,
+  gamesToWin: number,
+  enteredAt: string,
+): void {
+  const games: GameRead[] = [];
+  const wins = { side_1: 0, side_2: 0 };
+  while (wins.side_1 < gamesToWin && wins.side_2 < gamesToWin) {
+    const game = randomGame(rng, goalsPerGame);
+    if (game.winner !== "draw") {
+      wins[game.winner] += 1;
+    }
+    games.push({ game_no: games.length + 1, ...game });
+  }
+  match.games = games;
+  match.outcome = wins.side_1 > wins.side_2 ? "side_1" : "side_2";
+  match.result_entered_at = enteredAt;
+}
+
+const ROUND_ROBIN: Omit<PhaseRead, "id" | "position"> = {
+  kind: "group",
+  format: "round_robin",
+  round_robin_legs: 1,
+  sit_out_points: 0,
+  tiebreakers: null,
+  qualifiers: null,
+  third_place_match: null,
+  monster_knockout_mode: null,
+  match_format: "bo1",
+  final_match_format: null,
+};
+
+function octoberSingles(
+  players: StoredPlayer[],
+  rng: () => number,
+): StoredTournament {
+  const date = "2026-10-15";
+  const t = new TournamentBuilder("foundation", 200, {
+    name: "October Singles",
+    date,
+    type: "singles",
+    state: "finished",
+  });
+  const group = t.phase(ROUND_ROBIN);
+  const entries = players
+    .slice(0, 6)
+    .map((player, i) => t.entry([player.id], i + 1));
+  for (const pairing of roundRobinRounds(entries)) {
+    const round = t.round(group, pairing.matches, pairing.sittingOut);
+    for (const match of round.matches) {
+      play(match, rng, t.tournament.goals_per_game, 1, at(date, "19:30"));
+    }
+  }
+  t.fields(1);
+  return t.tournament;
+}
+
+function autumnOpenDyp(
+  players: StoredPlayer[],
+  rng: () => number,
+): StoredTournament {
+  const date = "2026-10-29";
+  const t = new TournamentBuilder("foundation", 300, {
+    name: "Autumn Open DYP",
+    date,
+    type: "dyp",
+    state: "finished",
+  });
+  const group = t.phase(ROUND_ROBIN);
+  const knockout = t.phase({
+    ...ROUND_ROBIN,
+    kind: "knockout",
+    format: "single_elimination",
+    round_robin_legs: null,
+    sit_out_points: null,
+    qualifiers: 4,
+    third_place_match: false,
+    final_match_format: "bo3",
+  });
+  const { pairs } = drawDypPairs(
+    players.slice(4, 12).map((player) => player.id),
+    rng,
+  );
+  const entries = pairs.map((pair, i) => t.entry(pair, i + 1));
+  for (const pairing of roundRobinRounds(entries)) {
+    const round = t.round(group, pairing.matches, pairing.sittingOut);
+    for (const match of round.matches) {
+      play(match, rng, t.tournament.goals_per_game, 1, at(date, "19:45"));
+    }
+  }
+  const order = roundRobinStandings(
+    entries.map((entry) => entry.id),
+    t.tournament.rounds,
+    0,
+  ).map((row) => required(entries.find((entry) => entry.id === row.entry_id)));
+  const semifinals = t.round(knockout, knockoutFirstRound(order.slice(0, 4)));
+  for (const match of semifinals.matches) {
+    play(match, rng, t.tournament.goals_per_game, 1, at(date, "21:00"));
+  }
+  const [first, second] = semifinals.matches.map((match) =>
+    required(
+      entries.find(
+        (entry) =>
+          entry.id === match.sides[match.outcome === "side_2" ? 1 : 0].entry_id,
+      ),
+    ),
+  );
+  const final = t.round(knockout, [[required(first), required(second)]]);
+  for (const match of final.matches) {
+    play(match, rng, t.tournament.goals_per_game, 2, at(date, "21:30"));
+  }
+  t.fields(2);
+  return t.tournament;
+}
+
+function thursdayDyp(
+  players: StoredPlayer[],
+  rng: () => number,
+  date: string,
+): StoredTournament {
+  const t = new TournamentBuilder("foundation", 400, {
+    name: "Thursday DYP",
+    date,
+    type: "dyp",
+    state: "in_progress",
+  });
+  const group = t.phase(ROUND_ROBIN);
+  const { pairs } = drawDypPairs(
+    players.slice(0, 12).map((player) => player.id),
+    rng,
+  );
+  const entries = pairs.map((pair, i) => t.entry(pair, i + 1));
+  const rounds = roundRobinRounds(entries).map((pairing) =>
+    t.round(group, pairing.matches, pairing.sittingOut),
+  );
+  // Rounds 1 and 2 are played, and the first match of round 3.
+  const played = [
+    ...(rounds[0]?.matches ?? []),
+    ...(rounds[1]?.matches ?? []),
+    ...(rounds[2]?.matches.slice(0, 1) ?? []),
+  ];
+  for (const match of played) {
+    play(match, rng, t.tournament.goals_per_game, 1, at(date, "19:15"));
+  }
+  t.fields(2);
+  const matchesById = new Map(
+    t.tournament.rounds
+      .flatMap((round) => round.matches)
+      .map((match) => [match.id, match]),
+  );
+  t.tournament.fields = fillFields(
+    t.tournament.fields,
+    waitingMatches(t.tournament.rounds, t.tournament.fields),
+    matchesById,
+  );
+  return t.tournament;
+}
+
+/** A fresh copy of the demo data; `today` dates the running tournament. */
+export function createSeed(today: Date = new Date()): DemoState {
+  const rng = createRng(20261110);
+  const players: StoredPlayer[] = PLAYER_NAMES.map((name, i) => ({
+    id: demoId(100 + i, "foundation"),
+    league_id: DEMO_LEAGUE_ID,
+    name,
+    removed_at: null,
+  }));
+  const tournaments = [
+    octoberSingles(players, rng),
+    autumnOpenDyp(players, rng),
+    thursdayDyp(players, rng, isoDate(today)),
+  ];
+  const state: DemoState = {
+    me: {
+      id: DEMO_USER_ID,
+      email: DEMO_EMAIL,
+      display_name: "Alex Organizer",
+      language: "en",
+      is_admin: false,
+      must_change_password: false,
+    },
+    leagues: [
+      {
+        id: DEMO_LEAGUE_ID,
+        name: "Thursday Foosball",
+        draws_allowed: false,
+        default_field_count: 2,
+        default_match_format: "bo1",
+        default_goals_per_game: 10,
+        share_token: DEMO_SHARE_TOKEN,
+        created_at: "2026-09-01T18:00:00Z",
+        updated_at: null,
+        owner_id: DEMO_USER_ID,
+      },
+    ],
+    players,
+    seasons: [
+      {
+        id: DEMO_SEASON_ID,
+        league_id: DEMO_LEAGUE_ID,
+        number: 1,
+        name: null,
+        state: "active",
+        placement_points: [...DEFAULT_PLACEMENT_POINTS],
+        started_at: "2026-09-01T18:00:00Z",
+        closed_at: null,
+      },
+    ],
+    tournaments,
+  };
+  for (const part of seedParts) {
+    part.add(state, seedKit(part.area, isoDate(today)));
+  }
+  return state;
+}
+
+/** What a seed part gets to build its rows with. */
+export interface SeedKit {
+  /** An id in the part's own range (ids.ts). */
+  id: (n: number) => string;
+  /** A tournament of the demo league's active season; its ids count up from `base`. */
+  tournament: (
+    base: number,
+    summary: Pick<StoredTournament, "name" | "date" | "type" | "state">,
+  ) => TournamentBuilder;
+  /** The part's own random numbers, the same on every seed. */
+  rng: () => number;
+  /** Today, YYYY-MM-DD, the date of a tournament played tonight. */
+  today: string;
+  /** Gives a match random games until a side has won `gamesToWin` of them. */
+  play: typeof play;
+  /** A group phase: one round robin leg, BO1, no sit-out points. */
+  roundRobinPhase: Omit<PhaseRead, "id" | "position">;
+}
+
+/**
+ * One screen area's addition to the seed, registered in seedParts.ts. It
+ * changes `state` in place, with ids from its own range. A seed part
+ * imports only types from this file; what it needs at run time comes in
+ * the kit, so that seed.ts → seedParts.ts → the part is not a cycle.
+ */
+export interface SeedPart {
+  area: Exclude<SeedArea, "foundation">;
+  add: (state: DemoState, kit: SeedKit) => void;
+}
+
+function seedKit(area: SeedArea, today: string): SeedKit {
+  return {
+    id: (n) => demoId(n, area),
+    tournament: (base, summary) => new TournamentBuilder(area, base, summary),
+    rng: createRng(20261110 + SEED_AREAS[area][0]),
+    today,
+    play,
+    roundRobinPhase: ROUND_ROBIN,
+  };
+}

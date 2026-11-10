@@ -19,7 +19,6 @@ export function LanguageSwitch() {
         <Button
           key={language}
           type="button"
-          size="sm"
           variant={language === current ? "default" : "outline"}
           aria-pressed={language === current}
           aria-label={t(`language.${language}.name`)}

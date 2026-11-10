@@ -112,8 +112,35 @@ Checked by tools: ESLint better-tailwindcss `no-unknown-classes`, `no-conflictin
 
 - The theme follows `prefers-color-scheme` (ADR-003). `:root` holds the light tokens, `@media (prefers-color-scheme: dark)` the dark ones, and Tailwind's default `dark:` variant uses the same query. The MVP has no manual switch [W21].
 - `@theme inline` maps each token once for both themes. `index.html` declares `<meta name="color-scheme" content="light dark">` and `:root` sets `color-scheme`, so native controls and scrollbars follow the theme [W4].
-- A new token is a pair, `x` and `x-foreground`, defined in both theme blocks and mapped in `@theme inline` [W14]. Its values come from the Figma design; until the design's tokens are available, no colour is added.
-- `index.html` gets one `<meta name="theme-color">` per scheme, with `media="(prefers-color-scheme: …)"` and the background token's colour, when the Figma tokens arrive [A22]. Contrast and focus are checked in both themes (§6).
+- A new token is a pair, `x` and `x-foreground`, defined in both theme blocks and mapped in `@theme inline` [W14]. Its values come from the Figma design's variables; a colour the design lacks is added only with its contrast ratios recorded below.
+- `index.css` maps the design's variables to the shadcn tokens and adds its extras: `team-a`, `team-b`, `notice-info`, `notice-warning`, `nav`, `nav-active`, `field` (the playfield), `feature` (the Feature button on it), `border-surface`, `input-background`, `bead-empty` and `bead-rod` (the last two are a fill and a stroke, not a pair).
+- Fonts are self-hosted from `@fontsource`, because the CSP is `default-src 'self'`: Atkinson Hyperlegible Next 400 and 700 (`font-sans`, body and UI) and Big Shoulders 800 (`font-display`, titles and scores), Latin and Latin Extended only. The Figma text styles are `text-display-*`, `text-score-*`, `text-body-*`, `text-button-*`, `text-caption` and `text-micro`, each with its line height and weight.
+- `index.html` has one `<meta name="theme-color">` per scheme, with `media="(prefers-color-scheme: …)"` and the `--nav` colour, `#ffffff` and `#151e28`, the colour of the header under the status bar [A22]. Contrast and focus are checked in both themes (§6).
+- The design has no destructive, focus or chart colours. These were added (ratios against page, card and, for the ring, the nav's active fill; light / dark):
+
+  | Token | Light | Dark | Ratios |
+  |---|---|---|---|
+  | `destructive` / `-foreground` | `#b42318` / `#ffffff` | `#ff9c8f` / `#1a2430` | text on page 5.94 / 7.77, on card 6.57 / 6.56; foreground on fill 6.57 / 7.77 |
+  | `ring` | `#1e7a4c` (primary) | `#edf2f6` (primary) | page 4.81 / 13.92, card 5.33 / 11.76, nav active 4.44 / 10.30 |
+  | `chart-1`…`5` | `#1e7a4c` `#e36414` `#2251c9` `#4e6157` `#7a3409` | `#5cc98a` `#f4b740` `#74b9f0` `#a9b8c6` `#f6d9a6` | on card, at least 3.44 / 6.27 |
+  | `team-a-foreground`, `team-b-foreground` | `#1a2430`, `#ffffff` | `#1a2430`, `#1a2430` | on the team colour 4.56 / 8.73, 6.80 / 7.42 |
+  | `field` / `-foreground` | `#1e7a4c` / `#ffffff` | `#1d5a3c` / `#edf2f6`, **provisional** | foreground on field 5.33 / 7.22; field against page 4.81 / 1.93 |
+  | `feature` / `-foreground` | `#ffffff` / `#1e3327` | `#edf2f6` / `#1a2430`, **provisional** | foreground on fill 13.48 / 13.92; the button against the field 5.33 / 7.22 |
+
+  Light `field` and `feature` are the design's `field/bg` and `feature/button`; `feature-foreground` is `text/default`, the design's bold label. The design has no dark `field/bg` or `feature/button` (the dark playfield looked transparent), so both dark pairs are provisional until it does: a darker green of the same hue, and the dark primary pair. In the dark theme the field is only 1.93 against the page, so the playfield's edge is not what tells a control apart; the Feature button on it is 7.22. A focus ring on the field relies on its background-coloured offset: the light ring is the field's own green.
+
+- The ring is solid, never `ring/50`, with a 2 px offset in the background colour (technique C40), so it keeps 3:1 next to a primary button of the same colour; `src/components/ui/button.tsx` and the base layer were changed for it. The destructive Button uses its token pair instead of `text-white` and `dark:bg-destructive/60`.
+- Deviations from Figma. The design falls below WCAG 2.2 AA in four places. Three tokens moved, each keeping its hue (HSL hue and saturation) and changing only lightness; ratios measured with a script (WCAG relative luminance), light / dark:
+
+  | Token | Figma | Now | Ratios |
+  |---|---|---|---|
+  | `input` (border) | `#8fa197` / `#5b6f84` | `#7b9085` / `#657c93` | on `input-background` 3.40 / 3.07, on page 3.08 / 3.63 (was 2.72 / 2.56 on the field, 2.46 on the light page) |
+  | `bead-rod` | `#8fa197` light (dark `#5b6f84` unchanged, 3.03 on `bead-empty`) | `#85988d` light | on `bead-empty` 3.06 (was 2.72) |
+  | `nav-active-foreground` | `#1e7a4c` light (dark unchanged) | `#1e784b` light | on `nav-active` 4.56 (was 4.44, for 13 px text) |
+
+  The design maps `secondary-foreground`, `accent-foreground` and `sidebar-accent-foreground` to the same light green as `nav-active-foreground` (`#1e7a4c` on `#e3ede6`, 4.44), so they move with it to `#1e784b` (4.56 on `secondary`, `accent` and `sidebar-accent`); dark values are unchanged.
+
+  `team-a` keeps `#e36414` / `#f4b740`: light `team-a` is 3.44 on a white card and 3.11 on the page, so as text it is for large text only (3:1), that is scores (`text-score-*`, `text-display-*`). The dark `team-a` is 7.38 on a card and `team-b` passes everywhere (6.80 / 6.27 on a card), but the rule is the same for both so the sides can be swapped. Smaller text (names, labels, captions) uses `team-a-foreground` or `team-b-foreground`, or the ordinary text tokens, never the team colour; the colour is carried by a dot or border next to it.
 
 ### 5.3 shadcn/ui
 
@@ -123,7 +150,7 @@ Checked by tools: ESLint better-tailwindcss `no-unknown-classes`, `no-conflictin
 - `src/components/ui/` is our code [W17]. Edit it in place only for project-wide decisions (touch sizes, focus ring, `outline-hidden`); a variant one feature needs is a wrapper component outside `ui/`.
 - To update a component, review upstream with `pnpm exec shadcn add <name> --diff` and port the changes by hand; never `--overwrite` an edited file [W18].
 - Never run `shadcn apply` or `shadcn migrate base-color`; both rewrite the theme [W19].
-- Classes are merged with `cn`, imported everywhere from `"cn"`, the package the CLI writes into the copied components [W15]. `src/lib/utils.ts` re-exports it only because `components.json` names that path as its `utils` alias; no file imports from it. If the package disappoints, a three-line helper on `clsx` and `tailwind-merge` takes its place there, and the imports change with it.
+- Classes are merged with `cn`, with one import path, `@/lib/utils` [W15]. `src/lib/utils.ts`, the path `components.json` names as its `utils` alias, builds it with `createCn` from the `cn` package and registers the theme's text styles (`text-display-*`, `text-score-*`, `text-body-*`, `text-button-*`, `text-caption`, `text-micro`) as font sizes; unconfigured, `cn` takes `text-caption` for a colour and drops `text-muted-foreground` beside it. ESLint `no-restricted-imports` allows the `cn` package only in that file, so after `shadcn add` the generated `import { cn } from "cn"` becomes `@/lib/utils`. A new text style in `index.css` is added to its list.
 - Icons come only from `lucide-react`, the `iconLibrary` of `components.json`. The package is not installed until an icon uses it; the pull request that renders the first icon adds it.
 
 ## 6. Accessibility
@@ -131,11 +158,11 @@ Checked by tools: ESLint better-tailwindcss `no-unknown-classes`, `no-conflictin
 Checked by tools: ESLint jsx-a11y-x `strict` and `jsx-a11y-x/control-has-associated-label` [E9]; better-tailwindcss `no-restricted-classes` (`outline-none`).
 
 - The target is WCAG 2.2 Level AA on every screen, in both themes [A1]; ADR-013 names it as what the axe report measures and what the gate requires from RM-11.
-- Every pointer target is at least 24 × 24 CSS px (WCAG 2.5.8, Level AA) [A19]. Result entry (open the match, choose the result, save, FR-082) and the primary actions on a phone are at least 44 × 44, beyond AA on purpose: 2.5.5 is Level AAA [A2]. The copied Button is 24 to 40 px tall, so the result-entry screen adds a 44 px size (`h-11`, `size-11`) to it.
-- Text contrast is at least 4.5:1 (3:1 for large text), and component boundaries and focus indicators at least 3:1, in each theme [A3]. The Figma `--ring` token is checked for 3:1 against its neighbours when it arrives [A4].
+- Every pointer target is at least 24 × 24 CSS px (WCAG 2.5.8, Level AA) [A19]. Result entry (open the match, choose the result, save, FR-082) and the primary actions on a phone are at least 44 × 44, beyond AA on purpose: 2.5.5 is Level AAA [A2]. `Button` follows the Figma Button (`components.md`) and has no size below 44 px: `default` is the Compact button (44 px, radius 8), `lg` the Primary one (56 px, radius 10, Button/Large), `icon` 44 × 44, the `feature` variant the white 52 px button on the playfield and `text` the plain text button.
+- Text contrast is at least 4.5:1 (3:1 for large text), and component boundaries and focus indicators at least 3:1, in each theme [A3]. The `--ring` token keeps 3:1 against its neighbours (§5.2) [A4].
 - A sticky header or bottom bar never hides the focused element: give the page `scroll-padding` equal to the bar's height [A5]. A fixed bottom bar adds `env(safe-area-inset-bottom)` to its bottom padding, so the home indicator does not cover its buttons [A20].
 - Our animations use `motion-safe:`. The reduced-motion rule in `index.css` cuts those that shadcn/ui and tw-animate-css ship [A6].
-- Every screen renders its own `<title>`, one at a time [A7]. The skeleton's pages share the app name that `index.html` and `src/i18n/index.ts` set; per-screen titles replace both with the first feature screen.
+- Every screen renders its own `<title>`, one at a time [A7]. `DocumentTitle` renders it as "Screen · TourneyHub"; `index.html` has none.
 - Forms use shadcn's `Field`. After validation fails, the control gets `aria-invalid="true"` and `aria-describedby` pointing at the message, which is text in `FieldError`, never colour alone; before validation there is no `aria-invalid` [A8]. Messages are the translated ADR-008 codes, and each form has a Vitest test of this.
 - "Result saved", the reload after a 409 and error summaries are announced with `role="status"` or `role="alert"` [A9].
 - Landmarks are HTML elements: one `<main>`, plus `<header>`, `<nav>` and `<footer>`, with all content inside one, as in `AppShell` [A10].
@@ -149,13 +176,13 @@ Checked by tools: ESLint jsx-a11y-x `strict` and `jsx-a11y-x/control-has-associa
 
 ## 7. Translations
 
-Checked by tools: `tsc` (keys of `t()` through `CustomTypeOptions` in `src/i18n/i18next.d.ts`; `cs` has every key of `en` through its `Messages` type); ESLint `no-restricted-properties` (`toLocaleString`, `toLocaleDateString`, `toLocaleTimeString`); `i18next-cli lint`, part of `pnpm lint`, for user-facing text in JSX elements and attributes outside `t()` and `<Trans>` [I1].
+Checked by tools: `tsc` (keys of `t()` through `CustomTypeOptions` in `src/i18n/i18next.d.ts`; `cs` has every key of `en`, and no other, through its `CsMessages` type); ESLint `no-restricted-properties` (`toLocaleString`, `toLocaleDateString`, `toLocaleTimeString`); `i18next-cli lint`, part of `pnpm lint`, for user-facing text in JSX elements and attributes outside `t()` and `<Trans>` [I1].
 
 - No hard-coded user-facing text (ADR-003), `aria-label` and `alt` included. A line that is not user-facing, such as a product name, is excused with `i18next-instrument-ignore-next-line` and a reason after ` -- `, as with `eslint-disable`. If the linter gives a false positive that neither `i18next.config.ts` nor that comment can silence, the pull request that hits it downgrades the check to a report and says so here.
-- Texts live in `src/i18n/locales/en.ts`, the reference from which the key types come [I2], and `cs.ts`, in one namespace until it grows unwieldy. Keys are semantic and nested by area (`notFound.home`), never English sentences.
+- Texts live in `src/i18n/locales/en.ts`, the reference from which the key types come [I2], and `cs.ts`, in one namespace. Each area keeps its texts in its own module, `en/<area>.ts` and `cs/<area>.ts`, which `en.ts` and `cs.ts` merge; a `cs` module is typed `CsMessages<Messages["<area>"]>`. Keys are semantic and nested by area (`notFound.home`), never English sentences.
 - A sentence is one key with `{{placeholders}}`, never pieces joined in code. `escapeValue: false` is safe because React escapes what it renders; `t()` output never goes into `dangerouslySetInnerHTML` [I3].
 - Markup inside a sentence, such as a link, uses `<Trans>` with named components [I4].
-- Plurals pass `count` [I5]. English keys take `_one` and `_other`; Czech takes `_one`, `_few` (2–4), `_many` (decimals) and `_other` [I6]. `cs: Messages` cannot hold `_few` and `_many` keys that `en` lacks, so the first plural changes the type of `cs` to allow them.
+- Plurals pass `count` [I5]. English keys take `_one` and `_other`; Czech takes `_one`, `_few` (2–4), `_many` (decimals) and `_other` [I6]. `CsMessages` (in `en.ts`) allows `_few` and `_many` for every key whose English reference has `_one` or `_other`, and no other extra key.
 - Places in a standing are numbers, written "1." in Czech; no `ordinal` plurals [I6].
 - Dates and numbers go through `Intl` with `i18n.resolvedLanguage`, or through i18next's `{{val, datetime}}` and `{{val, number}}` inside a sentence (FR-081) [I7].
 - A viewer's language comes from `pickLanguage` in `src/i18n/language.ts`: their stored choice, else `navigator.language` if it is English or Czech, else English. An organizer's comes from `users.language`, and changing it saves through the API before `i18n.changeLanguage` (ADR-003). No language-detector plugin; `supportedLngs` and `fallbackLng: "en"` stay set [I8].
@@ -188,10 +215,10 @@ Checked by tools: `tsc` (paths, parameters and bodies against `schema.d.ts`; `no
 
 - The runtime client is openapi-fetch, typed by openapi-typescript (ADR-008). No axios, no other generator and no openapi-react-query, whose keys `[method, path, init]` cannot be invalidated by a league's prefix [Q15].
 - `src/api/schema.d.ts` is generated by `pnpm generate:api`, git-ignored and never edited (ADR-008).
-- There is one client, `api` in `src/api/client.ts`, on the page's own origin (ADR-005). The paths in `openapi.json` already start with `/api/v1`, so it has no `baseUrl`.
+- There is one client for the generated routes, `api` in `src/api/client.ts`, on the page's own origin (ADR-005). The paths in `openapi.json` already start with `/api/v1`, so it has no `baseUrl`. Routes the backend does not have yet go through `provisionalApi` (`src/api/provisional.ts`), typed by the demo's contract (ADR-008); both are made by `createApi`.
 - `dataOf()` turns openapi-fetch's `{ error }` into a thrown `ApiError` with `status`, `code` and `detail` [Q16]. `code` is `undefined` when the body is not the API's error shape, such as a proxy's error page, so a `switch` on it handles `undefined` as well.
-- Refresh on 401 lives in one custom `fetch` passed to `createApi` (ADR-006, ADR-008). It clones the request, awaits the one refresh in flight for the tab and sends the clone once; 403 never refreshes, and a failed refresh goes to the login [Q17].
-- The access token is a module variable in `src/api/`, never in `localStorage`, React state or the query cache (ADR-006) [Q18].
+- Authentication lives in one openapi-fetch middleware that `createApi` adds to every client, `api` and `provisionalApi` alike (ADR-006, ADR-008). It sends the token as `Authorization: Bearer`; after a 401 from any route but `/auth/login`, `/auth/refresh` and `/auth/logout` it awaits the one `POST /api/v1/auth/refresh` in flight for the tab and sends a clone of the request once more. 403 never refreshes. A refused refresh clears the token and calls the `onSessionEnded` listeners, which go to the login; a network failure during the refresh rejects like any request and keeps the session [Q17].
+- The access token lives in `src/api/token.ts` (`getAccessToken`, `setAccessToken`, `onSessionEnded`), a module variable, never in `localStorage`, React state or the query cache (ADR-006) [Q18].
 - Request and response types come only from the generated `paths` and `components`: no `as` on API data and no copied interfaces (ADR-008) [Q19].
 
 ## 9. Routing
@@ -206,6 +233,8 @@ Checked by tools: ESLint `no-restricted-imports` (`Form`, `useActionData`, `useF
 - The last child route, `path: "*"`, renders `NotFoundPage`, because Caddy answers every unknown path with `index.html` [N7].
 - Organizer and admin routes are guarded by one client `middleware` on their parent route, which redirects to the login without a session; a test covers a logged-out deep link [N8].
 - Paths are constants, and links are built with `generatePath`, never by joining strings [N9].
+- An overlay, a sheet or dialog over a screen (Figma 6c, 6d, 7, 7b), is a nested route of that screen: the parent renders `<Outlet />`, and the overlay's page renders `ResponsiveSheet` (`src/components/ResponsiveSheet.tsx`), a bottom sheet on a phone, a centred dialog from `md` and a non-modal side panel from `lg`, which goes to the parent route when it closes. A link or a reload opens the overlay over its screen.
+- Inside a tournament and its setup, `TournamentLayout` shows the tournament's header with its tabs, and on a phone the league's header and bottom bar step aside; the layout route says so through its `handle` (`src/lib/routeHandle.ts`). The tournament's own path redirects to the screen for its state, phase and format (`tournamentHome` in `src/features/tournaments/tournamentViews.ts`).
 - `useParams()` types every parameter `string | undefined`; each area narrows them once, in a helper [N10].
 
 ## 10. Tests
@@ -217,8 +246,8 @@ Checked by tools: ESLint Testing Library `flat/react` (among them `prefer-screen
 - Unit and component tests run in Vitest with jsdom (ADR-012); real browsers are Playwright's [V1]. A test sits next to its code as `*.test.ts` or `*.test.tsx`; `vite.config.ts` keeps `e2e/` out.
 - `globals` stays off: tests import `describe`, `it` and `expect` from `vitest`, and `src/test/setup.ts` runs `cleanup()` and clears `localStorage` after each test [V2]. `restoreMocks` and `unstubGlobals` are on [V3].
 - Elements are found by role first, then by label, then by text; `getByTestId` only when nothing else works. Finding an element by role also proves that it has a role and a name [V12].
-- A test that needs the app renders `App` with `createMemoryRouter(routes)` and a fresh `QueryClient` with `retry: false`, as `renderAt` in `src/App.test.tsx` does; the helper moves to `src/test/` when a second test file needs it [V5].
-- The API is mocked at the network with MSW's `setupServer` from `msw/node` and `onUnhandledFrame: "error"`, never by mocking the client module [V6] [V7]. MSW arrives with the first test of a screen that loads data; until then a test passes its own `fetch` to `createApi`, as `src/api/client.test.ts` does. Shared handlers live in `src/test/`, a test overrides them with `server.use()`, and response bodies are typed with `satisfies components["schemas"][…]`.
+- A test that needs the app renders `App` with `createMemoryRouter(routes)` and a fresh `QueryClient` with `retry: false`, as `renderAt` in `src/test/renderApp.tsx` does [V5].
+- The API is mocked at the network with MSW's `setupServer` from `msw/node` and `onUnhandledFrame: "error"`, never by mocking the client module [V6] [V7]. `src/test/server.ts` serves the demo's handlers (`src/demo/handlers/`), so tests and the demo share one fake API; a test overrides them with `server.use()`. The handlers are typed through `route()` in `src/demo/route.ts`. A test that checks the client itself passes its own `fetch` to `createApi`, as `src/api/client.test.ts` does.
 
 ### 10.2 Playwright
 
@@ -247,8 +276,9 @@ frontend/
 │   ├── hooks/            # shared hooks, and those the shadcn CLI writes
 │   ├── lib/              # utils.ts (cn)
 │   ├── pages/            # screens outside any feature: home, not found
-│   ├── features/<area>/  # from the first feature on: api.ts, its components and screens
-│   └── test/             # setup.ts and test helpers
+│   ├── features/<area>/  # api.ts, its components and screens
+│   ├── demo/             # demo mode: the fake API, its contract and rules.ts (src/demo/README.md)
+│   └── test/             # setup.ts, the MSW server and test helpers
 └── e2e/                  # Playwright: configuration, specs, own tsconfig.json
 ```
 
@@ -259,13 +289,12 @@ Checked by tools: ESLint `no-restricted-imports` (imports flow one way: `api`, `
 - No barrel files (an `index.ts` that only re-exports): import each module directly [S2].
 - Only `VITE_` environment variables reach the browser, and none holds a secret. The first one adds `src/vite-env.d.ts` with a typed `ImportMetaEnv` [S3].
 
-From the first feature onward (the skeleton has none of these yet):
-- `src/features/<area>/` with its `api.ts` (§11), and the `QueryClient` defaults and `Register { defaultError: ApiError }` (§8.1).
-- MSW with `onUnhandledFrame: "error"` (§10.1).
-- A `<title>` per screen, and the 44 px Button size on the result-entry screen (§6).
-- `HydrateFallback` and `ErrorBoundary` on the root route (§9).
+Still to come with the first screens that need them:
+- The 44 px Button size on the result-entry screen (§6).
 - The Czech plural type for `cs` (§7).
-- `src/vite-env.d.ts`, with the first `VITE_` variable (above).
+- The `middleware` that guards organizer routes, with the login (§9).
+
+Demo mode (`pnpm dev:demo`, `src/demo/README.md`) runs every screen against an MSW worker. MSW is a dev dependency; `main.tsx` loads the demo behind a `MODE !== "production"` check that the bundler removes, ESLint lets app code import only `@/demo/rules` and `@/demo/contract`, and Vite's MSW plugin, which serves the worker script, is on only in demo mode. CI fails the frontend job if any text file in `dist` matches `msw|setupWorker|mockServiceWorker`. Provisional API types live in `src/demo/contract.ts` until the backend's routes are generated into `schema.d.ts`; screens call those routes through `provisionalApi` (`src/api/provisional.ts`). Texts are split per area into `src/i18n/locales/{en,cs}/<area>.ts`, merged into the one namespace. The build puts each `src/features/<area>/` into one chunk.
 
 ## 12. Proposed changes to other documents
 

@@ -1,21 +1,24 @@
-import type { Messages } from "./en";
+import { auth } from "./cs/auth";
+import { common } from "./cs/common";
+import { fields } from "./cs/fields";
+import { leagues } from "./cs/leagues";
+import { players } from "./cs/players";
+import { publicView } from "./cs/publicView";
+import { results } from "./cs/results";
+import { shell } from "./cs/shell";
+import { standings } from "./cs/standings";
+import { tournaments } from "./cs/tournaments";
+import type { CsMessages } from "./en";
 
-export const cs: Messages = {
-  app: {
-    name: "TourneyHub",
-  },
-  language: {
-    switchLabel: "Jazyk",
-    en: { short: "EN", name: "English" },
-    cs: { short: "CS", name: "Čeština" },
-  },
-  home: {
-    title: "Vítejte v aplikaci TourneyHub",
-    lead: "Turnaje a sezóny vaší skupiny přímo z telefonu.",
-  },
-  notFound: {
-    title: "Stránka nenalezena",
-    body: "Hledaná stránka neexistuje.",
-    home: "Zpět na úvodní stránku",
-  },
+export const cs: CsMessages = {
+  ...common,
+  shell,
+  auth,
+  leagues,
+  players,
+  standings,
+  tournaments,
+  fields,
+  results,
+  publicView,
 };

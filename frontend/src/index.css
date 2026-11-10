@@ -10,6 +10,61 @@
   --color-*: initial;
   --color-black: #000;
   --color-white: #fff;
+
+  /* The design's fonts, self-hosted from @fontsource (main.tsx),
+     since the CSP allows only 'self'. */
+  --font-sans:
+    "Atkinson Hyperlegible Next", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Big Shoulders", ui-sans-serif, system-ui, sans-serif;
+
+  /* The Figma text styles: size, line height and weight. Display and Score
+     styles go with font-display, the others with the default font-sans. */
+  --text-display-hero: 4rem;
+  --text-display-hero--line-height: 1;
+  --text-display-hero--font-weight: 800;
+  --text-display-title: 2.5rem;
+  --text-display-title--line-height: 1;
+  --text-display-title--font-weight: 800;
+  --text-display-screen: 2.125rem;
+  --text-display-screen--line-height: 1;
+  --text-display-screen--font-weight: 800;
+  --text-display-name: 1.75rem;
+  --text-display-name--line-height: 1.05;
+  --text-display-name--font-weight: 800;
+  --text-display-section: 1.5rem;
+  --text-display-section--line-height: 1.05;
+  --text-display-section--font-weight: 800;
+  --text-score-xl: 4.5rem;
+  --text-score-xl--line-height: 0.85;
+  --text-score-xl--font-weight: 800;
+  --text-score-l: 2rem;
+  --text-score-l--line-height: 1;
+  --text-score-l--font-weight: 800;
+  --text-score-m: 1.625rem;
+  --text-score-m--line-height: 1;
+  --text-score-m--font-weight: 800;
+  --text-score-s: 1.1875rem;
+  --text-score-s--line-height: 1;
+  --text-score-s--font-weight: 800;
+  --text-body-lg: 1.0625rem;
+  --text-body-lg--line-height: 1.4;
+  --text-body-md: 0.9375rem;
+  --text-body-md--line-height: 1.4;
+  --text-body-sm: 0.875rem;
+  --text-body-sm--line-height: 1.45;
+  --text-button-lg: 1.125rem;
+  --text-button-lg--line-height: 1.2;
+  --text-button-lg--font-weight: 700;
+  --text-button-sm: 0.9375rem;
+  --text-button-sm--line-height: 1.2;
+  --text-button-sm--font-weight: 700;
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.35;
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 1.3;
+
+  /* The phone's bottom bar is 72 px high in the design. */
+  --spacing-bottom-bar: 4.5rem;
 }
 
 @theme inline {
@@ -35,8 +90,11 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
+  --color-border-surface: var(--border-surface);
   --color-input: var(--input);
+  --color-input-background: var(--input-background);
   --color-ring: var(--ring);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -51,86 +109,161 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-team-a: var(--team-a);
+  --color-team-a-foreground: var(--team-a-foreground);
+  --color-team-b: var(--team-b);
+  --color-team-b-foreground: var(--team-b-foreground);
+  --color-notice-info: var(--notice-info);
+  --color-notice-info-foreground: var(--notice-info-foreground);
+  --color-notice-warning: var(--notice-warning);
+  --color-notice-warning-foreground: var(--notice-warning-foreground);
+  --color-nav: var(--nav);
+  --color-nav-foreground: var(--nav-foreground);
+  --color-nav-active: var(--nav-active);
+  --color-nav-active-foreground: var(--nav-active-foreground);
+  --color-bead-empty: var(--bead-empty);
+  --color-bead-rod: var(--bead-rod);
+  --color-field: var(--field);
+  --color-field-foreground: var(--field-foreground);
+  --color-feature: var(--feature);
+  --color-feature-foreground: var(--feature-foreground);
 }
 
+/* Values from the Figma file's variables (ADR-003), light here and dark
+   below. destructive, ring and chart-* are not in the design;
+   docs/frontend-style.md §5.2 records them and their contrast ratios. */
 :root {
   color-scheme: light dark;
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --background: #f2f4f1;
+  --foreground: #1e3327;
+  --card: #ffffff;
+  --card-foreground: #1e3327;
+  --popover: #ffffff;
+  --popover-foreground: #1e3327;
+  --primary: #1e7a4c;
+  --primary-foreground: #ffffff;
+  --secondary: #e3ede6;
+  --secondary-foreground: #1e784b;
+  --muted: #e3ede6;
+  --muted-foreground: #4e6157;
+  --accent: #e3ede6;
+  --accent-foreground: #1e784b;
+  --destructive: #b42318;
+  --destructive-foreground: #ffffff;
+  --border: #c9d3cc;
+  --border-surface: #c9d3cc;
+  --input: #7b9085;
+  --input-background: #ffffff;
+  --ring: #1e7a4c;
+  --chart-1: #1e7a4c;
+  --chart-2: #e36414;
+  --chart-3: #2251c9;
+  --chart-4: #4e6157;
+  --chart-5: #7a3409;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1e3327;
+  --sidebar-primary: #1e7a4c;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e3ede6;
+  --sidebar-accent-foreground: #1e784b;
+  --sidebar-border: #c9d3cc;
+  --sidebar-ring: #1e7a4c;
+  --team-a: #e36414;
+  --team-a-foreground: #1a2430;
+  --team-b: #2251c9;
+  --team-b-foreground: #ffffff;
+  --notice-info: #e3ede6;
+  --notice-info-foreground: #1e3327;
+  --notice-warning: #fdebdd;
+  --notice-warning-foreground: #7a3409;
+  --nav: #ffffff;
+  --nav-foreground: #4e6157;
+  --nav-active: #e3ede6;
+  --nav-active-foreground: #1e784b;
+  --bead-empty: #ffffff;
+  --bead-rod: #85988d;
+  /* The playfield (field/bg) and the Feature button on it (feature/button,
+     components.md); the label colour is text/default. */
+  --field: #1e7a4c;
+  --field-foreground: #ffffff;
+  --feature: #ffffff;
+  --feature-foreground: #1e3327;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+    --background: #1a2430;
+    --foreground: #edf2f6;
+    --card: #233140;
+    --card-foreground: #edf2f6;
+    --popover: #233140;
+    --popover-foreground: #edf2f6;
+    --primary: #edf2f6;
+    --primary-foreground: #1a2430;
+    --secondary: #2b3a4b;
+    --secondary-foreground: #edf2f6;
+    --muted: #233140;
+    --muted-foreground: #a9b8c6;
+    --accent: #2b3a4b;
+    --accent-foreground: #edf2f6;
+    --destructive: #ff9c8f;
+    --destructive-foreground: #1a2430;
+    --border: #34465a;
+    --border-surface: #233140;
+    --input: #657c93;
+    --input-background: #233140;
+    --ring: #edf2f6;
+    --chart-1: #5cc98a;
+    --chart-2: #f4b740;
+    --chart-3: #74b9f0;
+    --chart-4: #a9b8c6;
+    --chart-5: #f6d9a6;
+    --sidebar: #151e28;
+    --sidebar-foreground: #edf2f6;
+    --sidebar-primary: #edf2f6;
+    --sidebar-primary-foreground: #1a2430;
+    --sidebar-accent: #2b3a4b;
+    --sidebar-accent-foreground: #edf2f6;
+    --sidebar-border: #34465a;
+    --sidebar-ring: #edf2f6;
+    --team-a: #f4b740;
+    --team-a-foreground: #1a2430;
+    --team-b: #74b9f0;
+    --team-b-foreground: #1a2430;
+    --notice-info: #233140;
+    --notice-info-foreground: #edf2f6;
+    --notice-warning: #3a2e1a;
+    --notice-warning-foreground: #f6d9a6;
+    --nav: #151e28;
+    --nav-foreground: #a9b8c6;
+    --nav-active: #2b3a4b;
+    --nav-active-foreground: #edf2f6;
+    --bead-empty: #1a2430;
+    --bead-rod: #5b6f84;
+    /* Provisional: the Figma file has no dark field/bg or feature/button
+       (tokens.md, "Not read"). A darker field green and the dark primary
+       pair stand in until the design defines them (guide §5.2). */
+    --field: #1d5a3c;
+    --field-foreground: #edf2f6;
+    --feature: #edf2f6;
+    --feature-foreground: #1a2430;
   }
 }
 
 @layer base {
+  /* A solid ring: at 50 % it would fall below 3:1 (WCAG 1.4.11). */
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring;
+  }
+  /* The fixed bottom bar never hides the focused element (WCAG 2.4.11). */
+  html {
+    scroll-padding-bottom: calc(
+      var(--spacing-bottom-bar) + env(safe-area-inset-bottom)
+    );
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background font-sans text-foreground;
   }
 
   /* Cuts the animations and transitions shipped by shadcn/ui and

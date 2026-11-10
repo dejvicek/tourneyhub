@@ -161,6 +161,14 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      # The demo's fake API never ships: no MSW, no worker script, in any text
+      # file of the build (-I skips the binary fonts). See src/main.tsx.
+      - name: The build contains no demo
+        run: |
+          if grep -rlIE 'msw|setupWorker|mockServiceWorker' dist; then
+            echo "::error::frontend/dist contains the demo's MSW code"
+            exit 1
+          fi
 
   # Playwright against the production images behind Caddy (ADR-013).
   e2e:
