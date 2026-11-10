@@ -53,3 +53,31 @@ test("switching to Czech changes the text and survives a reload", async ({
     "Vítejte v aplikaci TourneyHub",
   );
 });
+
+test("the theme follows the device's light or dark setting", async ({
+  page,
+}) => {
+  // body takes its background from the --background token (index.css), so it
+  // shows which theme is active. A probe element resolves the token itself.
+  const readBackgrounds = () =>
+    page.evaluate(() => {
+      const probe = document.createElement("div");
+      probe.style.backgroundColor = "var(--background)";
+      document.body.append(probe);
+      const token = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return { body: getComputedStyle(document.body).backgroundColor, token };
+    });
+
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.goto("/");
+  const light = await readBackgrounds();
+
+  await page.emulateMedia({ colorScheme: "dark" });
+  const dark = await readBackgrounds();
+
+  expect(dark.body).not.toBe(light.body);
+  expect(light.body).toBe(light.token);
+  expect(dark.body).toBe(dark.token);
+  expect(dark.token).not.toBe(light.token);
+});
