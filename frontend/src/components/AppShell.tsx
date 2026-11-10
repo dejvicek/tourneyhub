@@ -1,11 +1,16 @@
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, Outlet } from "react-router";
 
 import { DemoNotice } from "@/components/DemoNotice";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
 
-/** The shell of the pages outside a league: home, login, my leagues, share links. */
-export function AppShell() {
+/**
+ * The shell of the pages outside a league: home, login, my leagues, share
+ * links. `account` is the signed-in user's menu, which the route table
+ * passes in; it sits next to the language switch.
+ */
+export function AppShell({ account }: { account?: ReactNode }) {
   const { t } = useTranslation();
 
   return (
@@ -15,7 +20,10 @@ export function AppShell() {
           <Link to="/" className="font-display text-display-section">
             {t("app.name")}
           </Link>
-          <LanguageSwitch />
+          <div className="flex shrink-0 items-center gap-2">
+            <LanguageSwitch />
+            {account}
+          </div>
         </div>
       </header>
       <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-4 py-6">

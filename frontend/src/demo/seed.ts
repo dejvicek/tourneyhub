@@ -52,7 +52,7 @@ export interface StoredSeason extends SeasonRead {
 }
 export interface StoredTournament extends Omit<
   TournamentRead,
-  "waiting" | "places"
+  "waiting" | "places" | "current_phase_id" | "current_phase_done"
 > {
   league_id: string;
 }

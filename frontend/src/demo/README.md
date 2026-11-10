@@ -17,7 +17,7 @@ The Vitest tests use the same handlers (`src/test/server.ts`).
 
 ## Adding a screen
 
-1. Its route and placeholder already exist: find the path in `src/lib/paths.ts` and the page in `src/features/<area>/`. Fill in the page; do not rename it.
+1. Its route and placeholder already exist: find the path in `src/lib/paths.ts` and the page in `src/features/<area>/`. Fill in the page; do not rename it. An overlay (6c, 6d, 7, 7b) is a nested route: its page renders `ResponsiveSheet`, and its parent screen keeps its `<Outlet />`.
 2. Put its texts in `src/i18n/locales/en/<area>.ts` and `cs/<area>.ts`.
 3. Put its queries and mutations in `src/features/<area>/api.ts`. A route the backend has goes through `api`; a route it does not have yet goes through `provisionalApi`.
 4. A route that is new to the demo needs a contract entry in your area's section of `contract.ts` and a handler in `handlers/<area>.ts`, written with `route()` so its body is typed. A write sends the target state (ADR-008).

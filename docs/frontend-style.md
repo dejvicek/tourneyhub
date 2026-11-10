@@ -233,6 +233,8 @@ Checked by tools: ESLint `no-restricted-imports` (`Form`, `useActionData`, `useF
 - The last child route, `path: "*"`, renders `NotFoundPage`, because Caddy answers every unknown path with `index.html` [N7].
 - Organizer and admin routes are guarded by one client `middleware` on their parent route, which redirects to the login without a session; a test covers a logged-out deep link [N8].
 - Paths are constants, and links are built with `generatePath`, never by joining strings [N9].
+- An overlay, a sheet or dialog over a screen (Figma 6c, 6d, 7, 7b), is a nested route of that screen: the parent renders `<Outlet />`, and the overlay's page renders `ResponsiveSheet` (`src/components/ResponsiveSheet.tsx`), a bottom sheet on a phone, a centred dialog from `md` and a non-modal side panel from `lg`, which goes to the parent route when it closes. A link or a reload opens the overlay over its screen.
+- Inside a tournament and its setup, `TournamentLayout` shows the tournament's header with its tabs, and on a phone the league's header and bottom bar step aside; the layout route says so through its `handle` (`src/lib/routeHandle.ts`). The tournament's own path redirects to the screen for its state, phase and format (`tournamentHome` in `src/features/tournaments/tournamentViews.ts`).
 - `useParams()` types every parameter `string | undefined`; each area narrows them once, in a helper [N10].
 
 ## 10. Tests

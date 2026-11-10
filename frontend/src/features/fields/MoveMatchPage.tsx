@@ -1,9 +1,9 @@
 import { useTranslation } from "react-i18next";
 
-import { PlaceholderPage } from "@/components/PlaceholderPage";
+import { PlaceholderSheet } from "@/components/PlaceholderSheet";
 
-// Placeholder (FR-093).
+// Placeholder (FR-093), an overlay over the fields (6b).
 export function MoveMatchPage() {
   const { t } = useTranslation();
-  return <PlaceholderPage screen="6c" title={t("fields.move.title")} />;
+  return <PlaceholderSheet screen="6c" title={t("fields.move.title")} />;
 }

@@ -4,6 +4,7 @@ import { generatePath } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { DEMO_LEAGUE_ID, DEMO_SHARE_TOKEN } from "@/demo/ids";
+import { createSeed } from "@/demo/seed";
 import { i18n } from "@/i18n";
 import { paths } from "@/lib/paths";
 import { stubViewport } from "@/test/media";
@@ -11,6 +12,12 @@ import { renderAt } from "@/test/renderApp";
 
 const tournaments = generatePath(paths.tournaments, {
   leagueId: DEMO_LEAGUE_ID,
+});
+
+const running = createSeed().tournaments.find((t) => t.state === "in_progress");
+const schedule = generatePath(paths.schedule, {
+  leagueId: DEMO_LEAGUE_ID,
+  tournamentId: running?.id ?? "",
 });
 
 describe("LeagueShell", () => {
@@ -122,6 +129,44 @@ describe("LeagueShell", () => {
     expect(within(nav).getByRole("link", { name: "Turnaje" })).toBeVisible();
     expect(
       await screen.findByRole("heading", { level: 1, name: "Turnaje sezóny" }),
+    ).toBeInTheDocument();
+  });
+
+  it("on a phone, gives a tournament the whole screen with its own header", async () => {
+    renderAt(schedule);
+
+    const tabs = await screen.findByRole("navigation", {
+      name: "Views of this tournament",
+    });
+    expect(
+      within(tabs)
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual(["Schedule", "Fields", "Standings"]);
+    expect(
+      within(tabs).getByRole("link", { name: "Schedule" }),
+    ).toHaveAttribute("aria-current", "page");
+    expect(
+      screen.getByRole("link", { name: "Back to tournaments" }),
+    ).toHaveAttribute("href", tournaments);
+    expect(await screen.findByText("Thursday DYP")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("navigation", { name: "Main" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("banner")).not.toBeInTheDocument();
+  });
+
+  it("on a tablet, keeps the league's header and tabs inside a tournament", async () => {
+    stubViewport(768);
+    renderAt(schedule);
+
+    expect(
+      await screen.findByRole("navigation", {
+        name: "Views of this tournament",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("navigation", { name: "Main" }),
     ).toBeInTheDocument();
   });
 });

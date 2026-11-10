@@ -102,6 +102,18 @@ export interface SeasonStandingRow {
 
 // ---------------------------------------------------------------- tournaments
 
+export type PhaseKind = "group" | "knockout";
+export type GroupFormat = "round_robin" | "swiss" | "monster_dyp";
+export type PhaseFormat = GroupFormat | "single_elimination";
+
+/** A phase as the tournament list and the tournament's header need it (DATA-MODEL §4.3). */
+export interface PhaseSummary {
+  id: Uuid;
+  position: number;
+  kind: PhaseKind;
+  format: PhaseFormat;
+}
+
 export interface TournamentSummary {
   id: Uuid;
   season_id: Uuid;
@@ -109,13 +121,22 @@ export interface TournamentSummary {
   date: IsoDate;
   type: TournamentType;
   state: TournamentState;
+  /** In order: at most one group phase and one knockout (DATA-MODEL §4.3). */
+  phases: PhaseSummary[];
+  /**
+   * Computed on read: the phase being played, the last one with a round
+   * drawn; null before the first draw.
+   */
+  current_phase_id: Uuid | null;
+  /**
+   * Computed on read: every match of the current phase drawn so far has a
+   * result. A round robin's schedule is drawn whole, so it is then done; a
+   * Swiss or Monster DYP phase is between rounds.
+   */
+  current_phase_done: boolean;
 }
 
-export interface PhaseRead {
-  id: Uuid;
-  position: number;
-  kind: "group" | "knockout";
-  format: "round_robin" | "swiss" | "monster_dyp" | "single_elimination";
+export interface PhaseRead extends PhaseSummary {
   round_robin_legs: 1 | 2 | null;
   sit_out_points: 0 | 1 | null;
   tiebreakers: SwissTiebreaker[] | null;

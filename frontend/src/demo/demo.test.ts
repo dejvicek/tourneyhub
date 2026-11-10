@@ -59,6 +59,18 @@ describe("the demo's fake API", () => {
       ["Autumn Open DYP", "dyp", "finished"],
       ["Thursday DYP", "dyp", "in_progress"],
     ]);
+    // What a tournament's own path needs to pick its screen.
+    expect(
+      summaries.map((t) => [
+        t.phases.map((phase) => phase.kind),
+        t.current_phase_id === t.phases.at(-1)?.id,
+        t.current_phase_done,
+      ]),
+    ).toEqual([
+      [["group"], true, true],
+      [["group", "knockout"], true, true],
+      [["group"], true, false],
+    ]);
 
     const [singles, autumn, running] = await Promise.all(
       summaries.map((t) => tournament(t.id)),

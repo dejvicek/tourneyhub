@@ -1,7 +1,8 @@
 // The one route table (docs/frontend-style.md §9). Screens load lazily; the
 // build groups each feature folder into one chunk (vite.config.ts), so an
 // area costs one request, not one per screen. A screen's number is its frame
-// in the Figma file's "Tournament lifecycle" page.
+// in the Figma file's "Tournament lifecycle" page. Overlays (6c, 6d, 7, 7b)
+// are child routes of the screen they open over, which renders <Outlet />.
 //
 // `lazy` is a function, not an object: React Router clears a lazy object's
 // properties in place once loaded, which would break a second router built
@@ -13,8 +14,16 @@ import { AppShell } from "@/components/AppShell";
 import { PageFallback } from "@/components/PageFallback";
 import { RouteError } from "@/components/RouteError";
 import { paths } from "@/lib/paths";
+import type { RouteHandle } from "@/lib/routeHandle";
 import { HomePage } from "@/pages/HomePage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
+
+// The result overlay (7, or 7b for a best-of match) over the screen that
+// opened it: the schedule, the fields, the knockout or the rounds.
+const enterResult = async () => ({
+  Component: (await import("@/features/results/EnterResultPage"))
+    .EnterResultPage,
+});
 
 export const routes: RouteObject[] = [
   {
@@ -40,6 +49,21 @@ export const routes: RouteObject[] = [
                 lazy: async () => ({
                   Component: (await import("@/features/auth/SignUpPage"))
                     .SignUpPage,
+                }),
+              },
+              {
+                path: paths.changePassword,
+                lazy: async () => ({
+                  Component: (
+                    await import("@/features/auth/ChangePasswordPage")
+                  ).ChangePasswordPage,
+                }),
+              },
+              {
+                path: paths.admin,
+                lazy: async () => ({
+                  Component: (await import("@/features/auth/AdminPage"))
+                    .AdminPage,
                 }),
               },
               {
@@ -93,123 +117,160 @@ export const routes: RouteObject[] = [
             }),
           },
           {
-            path: paths.newTournament, // 2
+            // The tournament's frame: on a phone it replaces the league's
+            // header and bottom bar (src/lib/routeHandle.ts).
             lazy: async () => ({
               Component: (
-                await import("@/features/tournaments/SetupFormatPage")
-              ).SetupFormatPage,
+                await import("@/features/tournaments/TournamentLayout")
+              ).TournamentLayout,
             }),
-          },
-          {
-            path: paths.setupPlayers, // 3
-            lazy: async () => ({
-              Component: (
-                await import("@/features/tournaments/SetupPlayersPage")
-              ).SetupPlayersPage,
-            }),
-          },
-          {
-            path: paths.setupDraw, // 4
-            lazy: async () => ({
-              Component: (await import("@/features/tournaments/SetupDrawPage"))
-                .SetupDrawPage,
-            }),
-          },
-          {
-            path: paths.setupReview, // 5
-            lazy: async () => ({
-              Component: (
-                await import("@/features/tournaments/SetupReviewPage")
-              ).SetupReviewPage,
-            }),
-          },
-          {
-            path: paths.tournament, // 6
-            lazy: async () => ({
-              Component: (await import("@/features/tournaments/RoundRobinPage"))
-                .RoundRobinPage,
-            }),
-          },
-          {
-            path: paths.fields, // 6b
-            lazy: async () => ({
-              Component: (await import("@/features/fields/FieldsPage"))
-                .FieldsPage,
-            }),
-          },
-          {
-            path: paths.moveMatch, // 6c
-            lazy: async () => ({
-              Component: (await import("@/features/fields/MoveMatchPage"))
-                .MoveMatchPage,
-            }),
-          },
-          {
-            path: paths.editFields, // 6d
-            lazy: async () => ({
-              Component: (await import("@/features/fields/EditFieldsPage"))
-                .EditFieldsPage,
-            }),
-          },
-          {
-            path: paths.enterResult, // 7
-            lazy: async () => ({
-              Component: (await import("@/features/results/EnterResultPage"))
-                .EnterResultPage,
-            }),
-          },
-          {
-            path: paths.bestOfResult, // 7b
-            lazy: async () => ({
-              Component: (await import("@/features/results/BestOfResultPage"))
-                .BestOfResultPage,
-            }),
-          },
-          {
-            path: paths.groupPhaseDone, // 8
-            lazy: async () => ({
-              Component: (
-                await import("@/features/tournaments/GroupPhaseDonePage")
-              ).GroupPhaseDonePage,
-            }),
-          },
-          {
-            path: paths.knockout, // 9
-            lazy: async () => ({
-              Component: (await import("@/features/tournaments/KnockoutPage"))
-                .KnockoutPage,
-            }),
-          },
-          {
-            path: paths.finished, // 10
-            lazy: async () => ({
-              Component: (await import("@/features/tournaments/FinishedPage"))
-                .FinishedPage,
-            }),
-          },
-          {
-            path: paths.betweenRounds, // 11
-            lazy: async () => ({
-              Component: (
-                await import("@/features/tournaments/BetweenRoundsPage")
-              ).BetweenRoundsPage,
-            }),
-          },
-          {
-            path: paths.lateAndDisabled, // 12
-            lazy: async () => ({
-              Component: (
-                await import("@/features/tournaments/LateAndDisabledPage")
-              ).LateAndDisabledPage,
-            }),
-          },
-          {
-            path: paths.startKnockout, // 13
-            lazy: async () => ({
-              Component: (
-                await import("@/features/tournaments/StartKnockoutPage")
-              ).StartKnockoutPage,
-            }),
+            handle: { hidesLeagueChrome: true } satisfies RouteHandle,
+            children: [
+              {
+                path: paths.newTournament, // 2
+                lazy: async () => ({
+                  Component: (
+                    await import("@/features/tournaments/SetupFormatPage")
+                  ).SetupFormatPage,
+                }),
+              },
+              {
+                path: paths.tournament,
+                children: [
+                  {
+                    index: true,
+                    lazy: async () => ({
+                      Component: (
+                        await import("@/features/tournaments/TournamentRedirect")
+                      ).TournamentRedirect,
+                    }),
+                  },
+                  {
+                    path: paths.setupPlayers, // 3
+                    lazy: async () => ({
+                      Component: (
+                        await import("@/features/tournaments/SetupPlayersPage")
+                      ).SetupPlayersPage,
+                    }),
+                  },
+                  {
+                    path: paths.setupDraw, // 4
+                    lazy: async () => ({
+                      Component: (
+                        await import("@/features/tournaments/SetupDrawPage")
+                      ).SetupDrawPage,
+                    }),
+                  },
+                  {
+                    path: paths.setupReview, // 5
+                    lazy: async () => ({
+                      Component: (
+                        await import("@/features/tournaments/SetupReviewPage")
+                      ).SetupReviewPage,
+                    }),
+                  },
+                  {
+                    path: paths.schedule, // 6
+                    lazy: async () => ({
+                      Component: (
+                        await import("@/features/tournaments/RoundRobinPage")
+                      ).RoundRobinPage,
+                    }),
+                    children: [
+                      { path: paths.scheduleResult, lazy: enterResult }, // 7, 7b
+                    ],
+                  },
+                  {
+                    path: paths.fields, // 6b
+                    lazy: async () => ({
+                      Component: (await import("@/features/fields/FieldsPage"))
+                        .FieldsPage,
+                    }),
+                    children: [
+                      {
+                        path: paths.moveMatch, // 6c
+                        lazy: async () => ({
+                          Component: (
+                            await import("@/features/fields/MoveMatchPage")
+                          ).MoveMatchPage,
+                        }),
+                      },
+                      {
+                        path: paths.editFields, // 6d
+                        lazy: async () => ({
+                          Component: (
+                            await import("@/features/fields/EditFieldsPage")
+                          ).EditFieldsPage,
+                        }),
+                      },
+                      { path: paths.fieldsResult, lazy: enterResult }, // 7, 7b
+                    ],
+                  },
+                  {
+                    path: paths.tournamentStandings,
+                    lazy: async () => ({
+                      Component: (
+                        await import("@/features/tournaments/TournamentStandingsPage")
+                      ).TournamentStandingsPage,
+                    }),
+                  },
+                  {
+                    path: paths.groupPhaseDone, // 8
+                    lazy: async () => ({
+                      Component: (
+                        await import("@/features/tournaments/GroupPhaseDonePage")
+                      ).GroupPhaseDonePage,
+                    }),
+                  },
+                  {
+                    path: paths.knockout, // 9
+                    lazy: async () => ({
+                      Component: (
+                        await import("@/features/tournaments/KnockoutPage")
+                      ).KnockoutPage,
+                    }),
+                    children: [
+                      { path: paths.knockoutResult, lazy: enterResult }, // 7, 7b
+                    ],
+                  },
+                  {
+                    path: paths.startKnockout, // 13
+                    lazy: async () => ({
+                      Component: (
+                        await import("@/features/tournaments/StartKnockoutPage")
+                      ).StartKnockoutPage,
+                    }),
+                  },
+                  {
+                    path: paths.finished, // 10
+                    lazy: async () => ({
+                      Component: (
+                        await import("@/features/tournaments/FinishedPage")
+                      ).FinishedPage,
+                    }),
+                  },
+                  {
+                    path: paths.betweenRounds, // 11
+                    lazy: async () => ({
+                      Component: (
+                        await import("@/features/tournaments/BetweenRoundsPage")
+                      ).BetweenRoundsPage,
+                    }),
+                    children: [
+                      { path: paths.roundsResult, lazy: enterResult }, // 7, 7b
+                    ],
+                  },
+                  {
+                    path: paths.lateAndDisabled, // 12
+                    lazy: async () => ({
+                      Component: (
+                        await import("@/features/tournaments/LateAndDisabledPage")
+                      ).LateAndDisabledPage,
+                    }),
+                  },
+                ],
+              },
+            ],
           },
           {
             path: paths.seasonStandings,

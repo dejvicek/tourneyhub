@@ -92,6 +92,24 @@ export function leagueSummary(row: StoredLeague): LeagueSummary | undefined {
   };
 }
 
+/** The phase being played and whether its matches drawn so far are played. */
+function currentPhase(
+  t: StoredTournament,
+): Pick<TournamentSummary, "current_phase_id" | "current_phase_done"> {
+  const current = t.phases
+    .toSorted((a, b) => b.position - a.position)
+    .find((phase) => t.rounds.some((round) => round.phase_id === phase.id));
+  if (!current) {
+    return { current_phase_id: null, current_phase_done: false };
+  }
+  return {
+    current_phase_id: current.id,
+    current_phase_done: t.rounds
+      .filter((round) => round.phase_id === current.id)
+      .every((round) => round.matches.every((m) => m.outcome !== null)),
+  };
+}
+
 export function tournamentSummary(t: StoredTournament): TournamentSummary {
   return {
     id: t.id,
@@ -100,6 +118,13 @@ export function tournamentSummary(t: StoredTournament): TournamentSummary {
     date: t.date,
     type: t.type,
     state: t.state,
+    phases: t.phases.map(({ id, position, kind, format }) => ({
+      id,
+      position,
+      kind,
+      format,
+    })),
+    ...currentPhase(t),
   };
 }
 
@@ -155,6 +180,7 @@ function places(t: StoredTournament): PlaceRow[] | null {
 export function tournamentRead(t: StoredTournament): TournamentRead {
   return {
     ...withoutLeague(t),
+    ...currentPhase(t),
     waiting: waitingMatches(t.rounds, t.fields).map((match) => match.id),
     places: places(t),
   };

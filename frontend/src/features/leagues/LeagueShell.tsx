@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "cn";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, Outlet } from "react-router";
+import { Link, Outlet, useMatches } from "react-router";
 
 import { DemoNotice } from "@/components/DemoNotice";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
@@ -13,17 +14,25 @@ import { useSeasonName } from "@/features/leagues/useSeasonName";
 import { useLayout } from "@/hooks/useLayout";
 import { useRouteParam } from "@/hooks/useRouteParam";
 import { paths } from "@/lib/paths";
+import { hidesLeagueChrome } from "@/lib/routeHandle";
 
 /**
  * The organizer's shell inside a league (Figma: app shell). Phone: the league
  * and season on top, a bottom bar with the four sections. Tablet: the same
  * header with tabs. Desktop: a sidebar with the league switcher, the
  * sections, "Copy share link" and the user. The language switch stays in the
- * header, as everywhere else.
+ * header, as everywhere else. Inside a tournament the phone shows neither
+ * the header nor the bottom bar; the tournament's own header takes their
+ * place (TournamentLayout).
+ *
+ * `account` is the signed-in user's menu, which the route table passes in:
+ * in the sidebar's user area on a desktop, in the header on a phone or
+ * tablet.
  */
-export function LeagueShell() {
+export function LeagueShell({ account }: { account?: ReactNode }) {
   const { t } = useTranslation();
   const layout = useLayout();
+  const inTournament = hidesLeagueChrome(useMatches());
   const leagueId = useRouteParam("leagueId");
   const seasonName = useSeasonName();
   const league = useQuery(leagueQueries.detail(leagueId));
@@ -57,7 +66,7 @@ export function LeagueShell() {
           <LeagueNav leagueId={leagueId} variant="sidebar" />
           <div className="mt-auto space-y-3">
             <CopyShareLink leagueId={leagueId} />
-            <UserName />
+            {account ?? <UserName />}
           </div>
         </header>
         <main className="min-w-0 flex-1 space-y-6 px-8 py-6">
@@ -68,38 +77,46 @@ export function LeagueShell() {
     );
   }
 
+  const phoneInTournament = layout === "phone" && inTournament;
+  const bottomBar = layout === "phone" && !inTournament;
+
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="border-b bg-nav">
-        <div className="flex items-center justify-between gap-4 px-4 py-3">
-          <Link
-            to={paths.myLeagues}
-            className="min-w-0 font-display text-display-section break-words"
-          >
-            {leagueName !== undefined && activeName !== undefined
-              ? t("shell.leagueContext", {
-                  league: leagueName,
-                  season: activeName,
-                })
-              : t("app.name")}
-          </Link>
-          <LanguageSwitch />
-        </div>
-        {layout === "tablet" && (
-          <LeagueNav leagueId={leagueId} variant="tabs" />
-        )}
-      </header>
+      {!phoneInTournament && (
+        <header className="border-b bg-nav">
+          <div className="flex items-center justify-between gap-4 px-4 py-3">
+            <Link
+              to={paths.myLeagues}
+              className="min-w-0 font-display text-display-section break-words"
+            >
+              {leagueName !== undefined && activeName !== undefined
+                ? t("shell.leagueContext", {
+                    league: leagueName,
+                    season: activeName,
+                  })
+                : t("app.name")}
+            </Link>
+            <div className="flex shrink-0 items-center gap-2">
+              <LanguageSwitch />
+              {account}
+            </div>
+          </div>
+          {layout === "tablet" && (
+            <LeagueNav leagueId={leagueId} variant="tabs" />
+          )}
+        </header>
+      )}
       <main
         className={cn(
           "flex-1 space-y-6 px-4 py-6",
-          layout === "phone" &&
+          bottomBar &&
             "pb-[calc(var(--spacing-bottom-bar)+env(safe-area-inset-bottom)+1.5rem)]",
         )}
       >
         <DemoNotice />
         <Outlet />
       </main>
-      {layout === "phone" && <LeagueNav leagueId={leagueId} variant="bottom" />}
+      {bottomBar && <LeagueNav leagueId={leagueId} variant="bottom" />}
     </div>
   );
 }
