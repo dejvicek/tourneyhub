@@ -4,3 +4,6 @@
 !.env.example
 node_modules/
 .idea/
+
+# pnpm store that frontend checks in Docker leave in the working directory
+.pnpm-store/
