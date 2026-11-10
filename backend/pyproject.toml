@@ -31,7 +31,7 @@ test = [
   "coverage>=7.17", "httpx2>=2.16", "hypothesis>=6.170",
   "pytest>=9.2", "pytest-alembic>=0.13.2", "pytest-randomly>=5.0",
 ]
-lint = ["import-linter>=2.15", "mypy>=2.4.1", "ruff>=0.17.3", "types-networkx"]
+lint = ["import-linter>=2.16", "mypy>=2.4.1", "ruff>=0.17.3", "types-networkx"]
 dev = [{ include-group = "test" }, { include-group = "lint" }, "watchfiles>=1.3"]  # watchfiles: --reload
 
 [tool.uv]
