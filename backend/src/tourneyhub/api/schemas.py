@@ -89,6 +89,9 @@ type DisplayName = Annotated[
     StringConstraints(strip_whitespace=True, min_length=1, max_length=100),
     AfterValidator(_reject_invisible_characters),
 ]
+# A player's name looks like a person's: the same limits, and the same refusal of
+# invisible characters, so that no two names look alike (BR-001).
+type PlayerName = DisplayName
 # No email-validator dependency: one @, no spaces, a dot in the domain.
 type Email = Annotated[
     str,

@@ -29,6 +29,10 @@ class ErrorCode(StrEnum):
     SEASON_NOT_FOUND = "season_not_found"
     SEASON_CLOSED = "season_closed"
     SEASON_NUMBER_CHANGED = "season_number_changed"
+    # Players
+    PLAYER_NOT_FOUND = "player_not_found"
+    PLAYER_NAME_TAKEN = "player_name_taken"  # also a removed player's name (BR-001)
+    PLAYER_REMOVED = "player_removed"  # a removed player cannot be renamed
 
 
 class AppError(Exception):
