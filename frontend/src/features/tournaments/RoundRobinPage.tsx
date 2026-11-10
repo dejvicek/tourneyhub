@@ -1,77 +1,87 @@
-import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { generatePath, Link, Outlet } from "react-router";
+import { generatePath, Link } from "react-router";
 
-import { PlaceholderPage } from "@/components/PlaceholderPage";
-import { tournamentQueries } from "@/features/tournaments/api";
+import { DocumentTitle } from "@/components/DocumentTitle";
 import { useRouteParam } from "@/hooks/useRouteParam";
 import { paths } from "@/lib/paths";
 
-// The tournament screens reached from here, until the real screens link them.
-const TOURNAMENT_SCREENS = [
-  { path: paths.setupPlayers, title: "tournaments.setupPlayers.title" },
-  { path: paths.setupDraw, title: "tournaments.setupDraw.title" },
-  { path: paths.setupReview, title: "tournaments.setupReview.title" },
-  { path: paths.fields, title: "fields.now.title" },
-  { path: paths.editFields, title: "fields.edit.title" },
-  { path: paths.tournamentStandings, title: "tournaments.standings.title" },
-  { path: paths.groupPhaseDone, title: "tournaments.groupPhaseDone.title" },
-  { path: paths.knockout, title: "tournaments.knockout.title" },
-  { path: paths.finished, title: "tournaments.finished.title" },
-  { path: paths.betweenRounds, title: "tournaments.betweenRounds.title" },
-  { path: paths.lateAndDisabled, title: "tournaments.lateAndDisabled.title" },
-  { path: paths.startKnockout, title: "tournaments.startKnockout.title" },
-] as const;
+import { FieldsStrip } from "./play/FieldsStrip";
+import { groupProgress } from "./play/model";
+import { Notice } from "./play/Notice";
+import { ProgressLine } from "./play/ProgressLine";
+import { ScheduleView } from "./play/ScheduleView";
+import { StandingsPanel } from "./play/StandingsPanel";
+import { TempChrome } from "./play/TempChrome";
+import { useEntryCount } from "./play/useEntryNoun";
+import { usePlay } from "./play/usePlay";
 
-const MATCH_SCREENS = [
-  { path: paths.scheduleResult, title: "results.enter.title" },
-  { path: paths.moveMatch, title: "fields.move.title" },
-] as const;
-
-const linkClass =
-  "inline-flex min-h-11 items-center underline-offset-4 hover:underline";
-
-// Placeholder (FR-035, FR-060, BR-050–BR-054). The result overlay opens
-// over it (<Outlet />).
+/**
+ * Screen 6: the running round robin. Progress, who is on which field, the
+ * schedule by round with results, and the live standings beside it from
+ * the tablet up (FR-035, FR-060, FR-092, BR-050–BR-053).
+ */
 export function RoundRobinPage() {
   const { t } = useTranslation();
   const leagueId = useRouteParam("leagueId");
   const tournamentId = useRouteParam("tournamentId");
-  const tournament = useQuery(tournamentQueries.detail(leagueId, tournamentId));
-  const matchId = tournament.data?.waiting[0];
+  const { model, play, failed } = usePlay(leagueId, tournamentId);
+  const entryCount = useEntryCount();
+  const params = { leagueId, tournamentId };
+
+  if (!model) {
+    return (
+      <>
+        <DocumentTitle screen={t("tournaments.roundRobin.title")} />
+        <p role={failed ? "alert" : "status"}>
+          {failed ? t("roundRobin.loadFailed") : t("loading")}
+        </p>
+      </>
+    );
+  }
+  const { tournament } = model;
+  const progress = groupProgress(model);
 
   return (
-    <PlaceholderPage screen="6" title={t("tournaments.roundRobin.title")}>
-      <nav aria-label={t("tournaments.roundRobin.screens")}>
-        <ul>
-          {TOURNAMENT_SCREENS.map((screen) => (
-            <li key={screen.path}>
-              <Link
-                to={generatePath(screen.path, { leagueId, tournamentId })}
-                className={linkClass}
-              >
-                {t(screen.title)}
-              </Link>
-            </li>
-          ))}
-          {matchId !== undefined &&
-            MATCH_SCREENS.map((screen) => (
-              <li key={screen.path}>
-                <Link
-                  to={generatePath(screen.path, {
-                    leagueId,
-                    tournamentId,
-                    matchId,
-                  })}
-                  className={linkClass}
-                >
-                  {t(screen.title)}
-                </Link>
-              </li>
-            ))}
-        </ul>
-      </nav>
-      <Outlet />
-    </PlaceholderPage>
+    <TempChrome
+      leagueId={leagueId}
+      tournamentId={tournamentId}
+      title={tournament.name}
+      subtitle={t("roundRobin.subtitle", {
+        entries: entryCount(tournament.type, tournament.entries.length),
+      })}
+    >
+      <DocumentTitle screen={tournament.name} />
+      <ProgressLine progress={progress} />
+      {play?.group_done === true && tournament.state === "in_progress" && (
+        <Notice variant="info" title={t("roundRobin.done.title")}>
+          <Link
+            to={generatePath(paths.groupPhaseDone, params)}
+            className="inline-flex min-h-11 items-center font-bold underline underline-offset-4"
+          >
+            {t("roundRobin.done.link")}
+          </Link>
+        </Notice>
+      )}
+      <FieldsStrip
+        model={model}
+        manageHref={generatePath(paths.editFields, params)}
+      />
+      <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,20rem)] lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
+        <section aria-labelledby="schedule" className="space-y-3">
+          <h2 id="schedule" className="font-display text-display-section">
+            {t("roundRobin.schedule.title")}
+          </h2>
+          <ScheduleView
+            model={model}
+            resultHref={(matchId) =>
+              generatePath(paths.enterResult, { ...params, matchId })
+            }
+          />
+        </section>
+        <aside className="hidden md:block">
+          <StandingsPanel model={model} play={play} />
+        </aside>
+      </div>
+    </TempChrome>
   );
 }
