@@ -1,0 +1,51 @@
+# Development services, loaded by `docker compose` together with compose.yaml (ADR-004).
+
+services:
+  api:
+    build:
+      context: ./backend
+      target: dev
+    # Settings come only from the environment (docs/python-style.md §6).
+    environment:
+      TOURNEYHUB_ENV: ${TOURNEYHUB_ENV:?set TOURNEYHUB_ENV in .env}
+      TOURNEYHUB_DATABASE_URL: ${TOURNEYHUB_DATABASE_URL:?set TOURNEYHUB_DATABASE_URL in .env}
+      TOURNEYHUB_JWT_SECRET: ${TOURNEYHUB_JWT_SECRET:?set TOURNEYHUB_JWT_SECRET in .env}
+      TOURNEYHUB_COOKIE_SECURE: ${TOURNEYHUB_COOKIE_SECURE:?set TOURNEYHUB_COOKIE_SECURE in .env}
+    # The image's editable install points at /src/src; uvicorn reloads on changes there.
+    # The venv is in /app/.venv, so the host's backend/.venv is not used.
+    volumes:
+      - ./backend:/src
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # The Vite dev server with hot reload (ADR-004).
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    environment:
+      # Vite proxies /api here, so the browser sees one origin (ADR-005).
+      API_PROXY_TARGET: http://api:8000
+    # node_modules is a named volume: the macOS host and the Linux container
+    # need different native binaries. `pnpm generate:api` reads the schema
+    # from ../backend (ADR-008).
+    volumes:
+      - ./frontend:/src/frontend
+      - frontend-node-modules:/src/frontend/node_modules
+      - ./backend/openapi.json:/src/backend/openapi.json:ro
+    # On every interface of the host, so that a phone on the LAN opens
+    # http://<the machine's LAN address>:5173 (ADR-004). It reaches the api
+    # through the proxy, on the same origin; the api itself stays on
+    # 127.0.0.1.
+    ports:
+      - "5173:5173"
+    # tini as PID 1 passes `docker stop` on to pnpm and Vite.
+    init: true
+    depends_on:
+      - api
+
+volumes:
+  frontend-node-modules:

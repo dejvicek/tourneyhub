@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+# Playwright's output (traces, screenshots, videos, reports)
+e2e/test-results/
+e2e/playwright-report/
+# Generated from ../backend/openapi.json by `pnpm generate:api` (ADR-008)
+src/api/schema.d.ts

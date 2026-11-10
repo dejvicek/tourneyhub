@@ -1,0 +1,12 @@
+# The image installs from pnpm-lock.yaml and generates the API types itself;
+# keep host artefacts and local settings out of the build context. Vite would
+# build any .env file into the bundle.
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+src/api/schema.d.ts
+# The Playwright tests run against the image, not in it.
+e2e/
+.env
+.env.*

@@ -32,7 +32,7 @@ Where the view list appears:
 
 ## How to read the diagrams
 
-- Blue is TourneyHub, grey external services (GitHub), green the engine (pure functions), purple cylinders table groups, figures actors. Technology icons (React, Python, PostgreSQL, Git, GitHub, Docker, Vite, TypeScript, Apple) are only for quick recognition; GHCR carries the Docker icon because it holds container images, and so does the VPS, because it runs Docker Compose (the ADRs name no other technology for the VPS).
+- Blue is TourneyHub, grey external services (GitHub), green the engine (pure functions), purple cylinders table groups, figures actors. Technology icons (React, Python, PostgreSQL, Git, GitHub, GitHub Actions, Dependabot, Docker, Vite, TypeScript, Apple) are only for quick recognition; GHCR carries the Docker icon because it holds container images, and so does the VPS, because it runs Docker Compose (the ADRs name no other technology for the VPS).
 - The orange stripe on TourneyHub is the `#proposed` tag: all ADRs are still Proposed.
 - View 4 does not draw the API container frame: with it Graphviz pushes PostgreSQL below the frame and the five lines to the database snake around the engine. Everything in it except the SPA and PostgreSQL is inside the API (view 2); the components carry the prefix "API:" in their title, the engine is green.
 - The short text in a node is the `summary`; the full description, the technology and the links to the ADRs, the PRD and the data model open with the card icon in the node's top right corner (or a double click).

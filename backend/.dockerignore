@@ -1,0 +1,9 @@
+# The image installs from uv.lock and copies src/; keep host artefacts out of the
+# build context.
+.env
+.venv/
+**/__pycache__/
+.coverage
+.*_cache/
+.hypothesis/
+dist/

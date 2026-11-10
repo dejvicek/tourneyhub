@@ -32,12 +32,13 @@ model {
     link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md "ADR"
 
     spa = webapp "Web application (SPA)" {
-      technology "React 19, Vite, TypeScript, Tailwind, shadcn/ui, React Router, TanStack Query, react-i18next"
+      technology "React 19, Vite 8, TypeScript, Tailwind, shadcn/ui, React Router, TanStack Query, react-i18next"
       icon tech:react
       summary "Mobile-first, English and Czech. Every screen works on a phone; entering a result takes three taps."
       description "
         Mobile-first, English and Czech. Every screen works on a phone; entering a result takes at most three taps (FR-082).
-        Runs in the user's browser; served by Vite (development) or Caddy (production), and /api goes through the same origin.
+        Built with Node 26 LTS and pnpm (versions pinned in .nvmrc, engines and packageManager).
+        Runs in the user's browser; served by the Vite dev server (development) or Caddy (production), and /api goes through the same origin.
       "
       link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-003--frontend-react-vite-typescript-tailwind-shadcnui "ADR-003"
       link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#69-language-and-devices "PRD §6.9 Language and devices (FR-080 to FR-082)"
@@ -76,15 +77,18 @@ model {
     }
 
     api = container "API" {
-      technology "Python 3.15, FastAPI on uvicorn, Pydantic v2, SQLAlchemy 2 (synchronous), psycopg 3, Alembic migrations"
+      technology "Python 3.15, FastAPI on uvicorn, Pydantic v2, SQLAlchemy 2.1 (synchronous), psycopg 3, Alembic migrations"
       icon tech:python
       summary "REST under /api/v1. Errors always {code, detail}. League writes lock the league, then the tournament."
       description "
         REST under /api/v1, OpenAPI schema committed in backend/openapi.json. Errors always as {code, detail}; the frontend builds the user-facing text.
         Every write in a league locks the league first, then the tournament (SELECT … FOR UPDATE); unsafe operations carry the state they expect and get 409 on a mismatch.
-        Endpoints are plain def functions; FastAPI runs them in its thread pool. Alembic migrations run when the container starts.
+        Endpoints are plain def functions; FastAPI runs them in its thread pool.
+        When the container starts, tourneyhub migrate runs the Alembic migrations and then uvicorn starts. In production uvicorn trusts X-Forwarded-For only from the Compose network 172.30.0.0/24, where Caddy is; in development it trusts no proxy.
       "
       link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-001--backend-python-fastapi-sqlalchemy-alembic "ADR-001"
+      link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-004--repository-layout-and-local-development-in-docker "ADR-004"
+      link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-006--authentication-jwt-access-token-and-rotating-refresh-token "ADR-006"
       link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-008--api-conventions-and-generated-client-types "ADR-008"
 
       authApi = component "API: auth" {
@@ -140,7 +144,9 @@ model {
     cli = tool "tourneyhub CLI" {
       technology "Python, runs in the api container"
       icon tech:python
-      description "create-admin, grant-admin, revoke-admin. No web route can create an admin, so a stranger cannot claim the instance on first start."
+      summary "migrate, run as the api container starts; create-admin, grant-admin, revoke-admin. No web route can create an admin."
+      description "migrate, which the api container runs on start; create-admin, grant-admin, revoke-admin. No web route can create an admin, so a stranger cannot claim the instance on first start."
+      link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-004--repository-layout-and-local-development-in-docker "ADR-004"
       link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-007--instance-admin-admin-flag-admin-screens-cli-bootstrap "ADR-007"
     }
 
@@ -189,12 +195,16 @@ model {
       link https://github.com/dejvicek/tourneyhub "dejvicek/tourneyhub"
     }
     actions = externalComponent "GitHub Actions" {
-      technology "workflow with checks, ci-ok"
+      technology "ci.yml, aggregate check ci-ok"
       icon tech:github-actions
-      summary "ruff, mypy, pytest with Hypothesis, Vitest, Playwright against the production images. Free: 2,000 minutes a month."
+      summary "Jobs changes (path filter), backend, frontend and e2e (Playwright against compose.prod.yaml); ci-ok waits for all of them."
       description "
-        Checks from ADR-012: ruff, mypy, pytest with Hypothesis, Vitest, openapi.json drift check and more.
-        Playwright runs against the production images (compose.prod.yaml): desktop Chromium on every PR, mobile emulation and WebKit before the pilot (ADR-013).
+        The workflow .github/workflows/ci.yml runs on every PR and on every push to main; a newer push cancels the run it supersedes.
+        - changes: the path filter, inside the workflow; each of the next three jobs runs only when its area changed.
+        - backend: ruff, mypy, import-linter, pytest under coverage (100 % in the engine), openapi.json drift, alembic upgrade head and alembic check, uv audit, against a PostgreSQL 17 service with the builtin locale.
+        - frontend: ESLint, Prettier, typecheck, Vitest and the build, on the API types generated from the committed openapi.json.
+        - e2e: Playwright in desktop Chromium against the production stack (compose.yaml and compose.prod.yaml). Only on failure are the traces, screenshots and videos uploaded, as artifacts kept for 7 days. Mobile emulation and WebKit come before the pilot (ADR-013).
+        - ci-ok: waits for all four and fails if one of them failed or was cancelled; a job skipped because nothing in its area changed counts as passed. The one check to require (ADR-012).
         Free: 2,000 minutes a month and 500 MB of storage shared by artifacts and packages.
       "
       link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-012--quality-gates-in-github-actions "ADR-012"
@@ -206,9 +216,22 @@ model {
       description "Private api and web images; only the last few versions are kept. The VPS logs in with a token that can only read packages."
       link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-014--deployment-images-in-ghcr-manual-pull-on-the-vps "ADR-014"
     }
+    dependabot = externalComponent "Dependabot" {
+      technology "dependabot.yml, weekly"
+      icon tech:dependabot
+      summary "Weekly update PRs: uv in /backend, npm in /frontend, Docker base images in /backend and /frontend, GitHub Actions."
+      description "
+        .github/dependabot.yml looks for updates every week and opens a PR for them, which CI checks like any other PR:
+        - uv: backend/pyproject.toml and backend/uv.lock;
+        - npm: frontend/package.json and frontend/pnpm-lock.yaml;
+        - docker: the base images in backend/Dockerfile and frontend/Dockerfile;
+        - github-actions: the actions used in .github/workflows.
+      "
+    }
 
     repo -> actions "runs the checks on PRs and after merge"
     actions -> ghcr "pushes the tested images"
+    dependabot -> repo "opens weekly update PRs"
   }
 
   // Who uses what

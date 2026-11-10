@@ -1,0 +1,41 @@
+# Caddy in the web image, the only public entry point (ADR-005). It serves the
+# built frontend and proxies /api to the api service.
+{
+	# The container has no trust store to add Caddy's local root CA to.
+	skip_install_trust
+}
+
+# SITE_ADDRESS is localhost locally, the domain on the VPS. For localhost and
+# IP addresses Caddy issues the certificate from its internal CA, the same as
+# `tls internal` (ADR-004); for a domain, from Let's Encrypt.
+{$SITE_ADDRESS} {
+	header {
+		# 'unsafe-inline' for styles: Radix UI's dialogs and menus inject <style>.
+		Content-Security-Policy "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		X-Content-Type-Options nosniff
+		Referrer-Policy same-origin
+	}
+
+	# /api itself too, so that no API path ever gets index.html.
+	@api path /api /api/*
+	handle @api {
+		# Caddy sets X-Forwarded-For to the address of the client, ignoring
+		# whatever the client sent; uvicorn trusts the header only from the
+		# Compose network (ADR-006).
+		reverse_proxy api:8000
+	}
+
+	# Client-side routes get index.html.
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# HTTP to HTTPS on the published HTTPS port: Caddy's own redirect names the
+# container's port 443, which is wrong when HTTPS_PORT is not 443. Routes of
+# an explicit http:// site take precedence over the automatic redirect.
+http://{$SITE_ADDRESS} {
+	redir https://{host}:{$HTTPS_PORT:443}{uri} 308
+}

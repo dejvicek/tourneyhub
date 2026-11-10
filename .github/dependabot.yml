@@ -1,3 +1,9 @@
+# Pins Dependabot does not update, so bump them by hand and keep copies in step:
+#   - postgres:17 in compose.yaml and .github/workflows/ci.yml (a major upgrade
+#     is a deliberate step, ADR-002)
+#   - pnpm in frontend/package.json (packageManager) and frontend/Dockerfile
+#   - uv in .github/workflows/ci.yml
+# Node stays on the current Active LTS (ADR-003), so Node majors are ignored.
 version: 2
 updates:
   # backend/pyproject.toml and backend/uv.lock (docs/python-style.md §2)
@@ -5,7 +11,26 @@ updates:
     directory: "/backend"
     schedule:
       interval: "weekly"
-  # Keeps the actions in .github/workflows, pinned to commit SHAs, current
+  # frontend/package.json and frontend/pnpm-lock.yaml (ADR-003)
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+  # The base images in backend/Dockerfile and frontend/Dockerfile (ADR-014)
+  - package-ecosystem: "docker"
+    directories:
+      - "/backend"
+      - "/frontend"
+    schedule:
+      interval: "weekly"
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
+  # Keeps the actions in .github/workflows current; third-party actions
+  # are pinned to commit SHAs, actions/* to a major tag
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

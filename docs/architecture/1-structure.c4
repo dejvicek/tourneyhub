@@ -30,7 +30,7 @@ views "I. Structure" {
       title "REST /api/v1: Bearer JWT, anonymous for viewers, refresh cookie only on /auth"
     }
     include tourneyhub.api -> tourneyhub.db with {
-      title "SQLAlchemy 2, psycopg 3; FOR UPDATE locks"
+      title "SQLAlchemy 2.1, psycopg 3; FOR UPDATE locks"
     }
     autoLayout LeftRight
   }
@@ -98,7 +98,7 @@ views "I. Structure" {
   view devops of github {
     title "6. Development, CI and images"
     order 6
-    description "The path of the code from a PR through GitHub Actions to GHCR. The GitHub parts are grey because they are external."
+    description "The path of the code from a PR through GitHub Actions to GHCR, and Dependabot's weekly update PRs. The GitHub parts are grey because they are external."
     include *
     include developer, admin
     include github.actions with { navigateTo release }

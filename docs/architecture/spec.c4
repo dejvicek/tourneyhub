@@ -60,6 +60,9 @@ specification {
   deploymentNode machine {
     notation "Machine"
   }
+  deploymentNode network {
+    notation "Docker network"
+  }
   deploymentNode dockerContainer {
     notation "Docker container"
   }
@@ -77,6 +80,9 @@ specification {
     tail crow
     color slate
   }
+
+  // A relationship of the deployment model, drawn instead of the relations inferred from the logical model
+  tag deployment
 
   tag proposed {
     color #f59e0b

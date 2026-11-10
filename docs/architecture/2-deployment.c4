@@ -3,35 +3,46 @@
 // The SPA runs in a browser in both; the frontend and web containers only serve it and proxy /api.
 deployment {
 
-  dev = environment "Development: docker compose" {
+  dev = environment "Development" {
     technology "compose.yaml + compose.override.yaml"
-    description "Plain HTTP on localhost and on the LAN address. TOURNEYHUB_ENV=development, TOURNEYHUB_COOKIE_SECURE=false; with any other combination the API refuses to start."
+    description "
+      Docker Compose on the developer's machine, and a phone on the same Wi-Fi. The services share the Compose network 172.30.0.0/24 from compose.yaml, as in production.
+      Plain HTTP on localhost and on the machine's LAN address, so .env sets TOURNEYHUB_ENV=development and TOURNEYHUB_COOKIE_SECURE=false. The API refuses to start with TOURNEYHUB_COOKIE_SECURE=false unless TOURNEYHUB_ENV=development.
+    "
     link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-004--repository-layout-and-local-development-in-docker "ADR-004"
 
     laptop = machine "Developer's machine" {
       technology "macOS, Docker"
       icon tech:apple
       browser = instanceOf tourneyhub.spa {
-        title "SPA in the browser"
+        technology "React 19"
+        summary "Browser on the laptop."
       }
       frontend = dockerContainer "frontend: Vite dev server" {
-        technology "Vite, hot reload, /api proxy"
+        technology "Vite 8 on Node 26 LTS, pnpm; hot reload"
         icon tech:vite
-        description "Hot reload; proxies /api to api, so the browser sees one origin as in production. node_modules in a named volume because macOS and Linux need different native binaries."
+        summary "Proxies /api to api:8000, so the browser sees one origin. Port 5173 is open on the LAN for a phone."
+        description "
+          Vite dev server with hot reload; proxies /api to http://api:8000, so the browser sees one origin as in production.
+          Port 5173 is published on all of the machine's interfaces, so a phone on the same Wi-Fi opens the app on the LAN address.
+          node_modules in a named volume, installed from the lockfile on every start, because macOS and Linux need different native binaries.
+        "
       }
-      api = dockerContainer "api: uvicorn --reload" {
-        technology "uvicorn --reload, Alembic on start"
-        icon tech:python
-        description "Source mounted, Alembic migrations on start. The same container hosts the tourneyhub CLI."
-        instanceOf tourneyhub.api
-        instanceOf tourneyhub.cli
+      // Compose services that run a logical element are drawn as its instance, titled "<service>: <process>"
+      api = instanceOf tourneyhub.api {
+        title "api: uvicorn --reload"
+        technology "Python 3.15; tourneyhub migrate on start"
+        summary "127.0.0.1:8000, local only: the phone reaches it only through Vite. Reloads on source changes."
+        description "
+          The api service: source mounted from backend/, uvicorn reloads on changes. tourneyhub migrate runs the Alembic migrations on start.
+          The same container also runs the tourneyhub CLI: migrate on start, and the admin commands of ADR-007.
+          Port 8000 is published only on the machine's localhost, so the phone reaches the API only through the Vite proxy.
+        "
       }
-      db = dockerContainer "db: postgres:17" {
-        technology "PostgreSQL 17"
-        icon tech:postgresql
-        description "The db service in compose.yaml is shared by development and production."
-        link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-002--database-postgresql "ADR-002"
-        instanceOf tourneyhub.db
+      db = instanceOf tourneyhub.db {
+        title "db: PostgreSQL 17"
+        summary "The db service of compose.yaml, shared with production. Data in the db-data volume, no host port."
+        description "The db service in compose.yaml, shared by development and production: builtin locale C.UTF-8 through POSTGRES_INITDB_ARGS, data in the db-data volume, no host port."
       }
     }
 
@@ -39,17 +50,20 @@ deployment {
       description "Trying the app on a real phone through the machine's LAN address (FR-082). Hence the cookie without Secure: browsers do not keep it over HTTP, Safari not even on localhost."
       link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#69-language-and-devices "PRD §6.9 (FR-082)"
       browser = instanceOf tourneyhub.spa {
-        title "SPA in the browser"
+        technology "React 19"
+        summary "Browser on the phone."
       }
     }
 
-    laptop.browser -> laptop.frontend "http://localhost"
-    phone.browser -> laptop.frontend "http://192.168.x.x"
-    laptop.frontend -> laptop.api "/api proxy (HTTP)"
-    laptop.api -> laptop.db "SQL over psycopg 3"
+    laptop.browser -> laptop.frontend "http://localhost:5173"
+    phone.browser -> laptop.frontend "http://192.168.x.x:5173"
+    laptop.frontend -> laptop.api "/api to api:8000"
+    laptop.api -> laptop.db "SQL over psycopg 3" {
+      #deployment
+    }
   }
 
-  prod = environment "Production: VPS" {
+  prod = environment "Production" {
     technology "compose.yaml + compose.prod.yaml"
     description "COMPOSE_FILE in .env, no source code on the VPS. Updating: docker compose pull && docker compose up -d. Hosting in the EU is decided before the pilot."
     link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-014--deployment-images-in-ghcr-manual-pull-on-the-vps "ADR-014"
@@ -57,32 +71,46 @@ deployment {
     client = device "User's phone or computer" {
       description "Organizer, admin and viewer alike. The SPA runs in the browser."
       browser = instanceOf tourneyhub.spa {
-        title "SPA in the browser"
+        technology "React 19"
+        summary "Browser of an organizer, admin or viewer."
       }
     }
 
     vps = machine "VPS" {
       technology "Docker Compose"
       icon tech:docker
-      web = dockerContainer "web: Caddy with the SPA build" {
-        technology "Caddy, HTTPS from Let's Encrypt"
-        description "The only public entry point, on ports 80 and 443, HTTPS from Let's Encrypt. Serves the SPA build (falling back to index.html) and proxies /api/* to api. No CORS; the refresh cookie is first-party."
-        link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-005--one-origin-behind-caddy "ADR-005"
-      }
-      api = dockerContainer "api" {
-        technology "api image from GHCR, Alembic on start"
-        icon tech:python
-        description "Image from GHCR that passed Playwright. Migrations on start. Internal Docker network only."
-        link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-014--deployment-images-in-ghcr-manual-pull-on-the-vps "ADR-014"
-        instanceOf tourneyhub.api
-        instanceOf tourneyhub.cli
-      }
-      db = dockerContainer "db: PostgreSQL 17" {
-        technology "PostgreSQL 17"
-        icon tech:postgresql
-        description "Internal Docker network only."
-        link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-002--database-postgresql "ADR-002"
-        instanceOf tourneyhub.db
+
+      // The fixed range from compose.yaml; uvicorn trusts X-Forwarded-For only from it (ADR-006)
+      net = network "Compose network 172.30.0.0/24" {
+        description "The default network of compose.yaml, with a fixed range so that uvicorn's FORWARDED_ALLOW_IPS (set in compose.prod.yaml) can trust X-Forwarded-For only from it, where Caddy is. Only web publishes ports on the VPS; api and db have none."
+        link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-006--authentication-jwt-access-token-and-rotating-refresh-token "ADR-006"
+
+        web = dockerContainer "web: Caddy with the SPA build" {
+          technology "Caddy 2.11, HTTPS from Let's Encrypt"
+          summary "The only public entry, ports 80 and 443. Serves the SPA build, index.html for client routes; proxies /api to api:8000."
+          description "
+            The only public entry point and the only service with host ports: 80, which redirects to HTTPS, and 443, also over UDP for HTTP/3.
+            Serves the SPA build, falling back to index.html for client-side routes, and proxies /api and /api/* to api:8000; Caddy sets X-Forwarded-For itself. No CORS; the refresh cookie is first-party.
+            Sets security headers (a Content-Security-Policy, nosniff, Referrer-Policy); HSTS comes in the deployment phase (ADR-014).
+            HTTPS from Let's Encrypt for the domain on the VPS; with SITE_ADDRESS=localhost (end-to-end tests) from Caddy's internal CA. Certificates and the CA live in the caddy-data volume.
+          "
+          link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-005--one-origin-behind-caddy "ADR-005"
+          link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-004--repository-layout-and-local-development-in-docker "ADR-004"
+        }
+        api = instanceOf tourneyhub.api {
+          title "api: uvicorn"
+          technology "api image from GHCR; tourneyhub migrate on start"
+          summary "Port 8000, no host port. Trusts X-Forwarded-For only from 172.30.0.0/24, where Caddy is."
+          description "
+            Image from GHCR that passed Playwright. tourneyhub migrate runs the Alembic migrations on start, then uvicorn listens on port 8000 and trusts X-Forwarded-For only from 172.30.0.0/24. No host port.
+            The same container also runs the tourneyhub CLI: migrate on start, and the admin commands of ADR-007.
+          "
+          link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-014--deployment-images-in-ghcr-manual-pull-on-the-vps "ADR-014"
+        }
+        db = instanceOf tourneyhub.db {
+          title "db: PostgreSQL 17"
+          summary "The same db service as in development. Data in the db-data volume, no host port."
+        }
       }
     }
 
@@ -91,10 +119,12 @@ deployment {
       link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-014--deployment-images-in-ghcr-manual-pull-on-the-vps "ADR-014"
     }
 
-    client.browser -> vps.web "HTTPS 443: / and /api/*"
-    vps.web -> vps.api "/api/* (reverse proxy)"
-    vps.api -> vps.db "SQL over psycopg 3"
-    vps.db -> backup "pg_dump"
+    client.browser -> vps.net.web "HTTPS 443: / and /api; HTTP 80 redirects"
+    vps.net.web -> vps.net.api "/api to api:8000"
+    vps.net.api -> vps.net.db "SQL over psycopg 3" {
+      #deployment
+    }
+    vps.net.db -> backup "pg_dump"
   }
 }
 
@@ -103,27 +133,27 @@ views "II. Deployment" {
   deployment view devDeployment {
     title "7. Development: Docker Compose on a laptop"
     order 7
-    description "Docker Compose on the developer's machine. The browser on the machine and the phone both go through Vite, which proxies /api to api."
+    description "Docker Compose on the developer's machine. The browser on the machine and the phone both go through Vite, which proxies /api to api; the api's port is published only on the machine's localhost."
     include dev, dev.**
     include dev with { navigateTo prodDeployment }
     include dev.laptop.frontend with { navigateTo spa }
     // The SPA's calls to the API go through Vite; hide the edges inferred from the logical model
-    exclude dev.laptop.browser -> dev.laptop.api.api
-    exclude dev.phone.browser -> dev.laptop.api.api
-    // Replaced by one labelled edge between the api and db containers
-    exclude dev.laptop.api.api -> dev.laptop.db.db
+    exclude dev.laptop.browser -> dev.laptop.api
+    exclude dev.phone.browser -> dev.laptop.api
+    // One labelled api -> db edge instead of the API's relations inferred from the logical model
+    exclude dev.laptop.api -> dev.laptop.db where not tag is #deployment
   }
 
   deployment view prodDeployment {
     title "8. Production: VPS behind Caddy"
     order 8
-    description "Caddy on 80 and 443 is the only public entry point; api and db live only on the internal Docker network."
+    description "Caddy on 80 and 443 is the only public entry point; api and db live only on the Compose network 172.30.0.0/24."
     include prod, prod.**
     include prod with { navigateTo devDeployment }
-    include prod.vps.web with { navigateTo containers }
+    include prod.vps.net.web with { navigateTo containers }
     // The SPA's calls to the API go through Caddy; hide the edge inferred from the logical model
-    exclude prod.client.browser -> prod.vps.api.api
-    // Replaced by one labelled edge between the api and db containers
-    exclude prod.vps.api.api -> prod.vps.db.db
+    exclude prod.client.browser -> prod.vps.net.api
+    // One labelled api -> db edge instead of the API's relations inferred from the logical model
+    exclude prod.vps.net.api -> prod.vps.net.db where not tag is #deployment
   }
 }
