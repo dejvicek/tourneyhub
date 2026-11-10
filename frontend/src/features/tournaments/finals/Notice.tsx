@@ -1,5 +1,6 @@
-import { cn } from "cn";
 import type { ReactNode } from "react";
+
+import { cn } from "@/lib/utils";
 
 interface NoticeProps {
   tone: "info" | "warning";

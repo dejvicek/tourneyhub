@@ -1,4 +1,3 @@
-import { cn } from "cn";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 
@@ -7,6 +6,7 @@ import type {
   BracketMatchData as BracketMatch,
   BracketRoundData as BracketRound,
 } from "@/features/finals/api";
+import { cn } from "@/lib/utils";
 
 import { type BracketContext, sideAt } from "./bracketContext";
 

@@ -71,10 +71,17 @@ describe("Knockout (screen 9)", () => {
   it("shows 4 entries as the design does: semifinals, the BO3 final on its field, places so far", async () => {
     renderAt(at(paths.knockout, DYP_EVENING));
 
+    // The first test of the file also loads the screens' chunk.
     expect(
-      await screen.findByRole("heading", { level: 1, name: "Knockout" }),
+      await screen.findByRole(
+        "heading",
+        { level: 1, name: "Knockout" },
+        { timeout: 5000 },
+      ),
     ).toBeInTheDocument();
-    expect(await screen.findByText("Semifinal 1")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Semifinal 1", {}, { timeout: 5000 }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Semifinal 2")).toBeInTheDocument();
     const final = screen.getByRole("region", { name: "Final" });
     expect(within(final).getByText("Best of 3, Field 1")).toBeInTheDocument();

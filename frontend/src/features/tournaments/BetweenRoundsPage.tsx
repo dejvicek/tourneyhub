@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { cn } from "cn";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { generatePath, Link, Outlet, useNavigate } from "react-router";
@@ -27,6 +26,7 @@ import { tournamentQueries } from "@/features/tournaments/api";
 import { useLayout } from "@/hooks/useLayout";
 import { useRouteParam } from "@/hooks/useRouteParam";
 import { paths } from "@/lib/paths";
+import { cn } from "@/lib/utils";
 
 type MatchData = TournamentData["rounds"][number]["matches"][number];
 import { errorText } from "./finals/errorText";

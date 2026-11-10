@@ -4,7 +4,6 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { cn } from "cn";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { generatePath, Link, Navigate, useNavigate } from "react-router";
@@ -25,6 +24,7 @@ import {
 import { tournamentQueries } from "@/features/tournaments/api";
 import { useRouteParam } from "@/hooks/useRouteParam";
 import { paths } from "@/lib/paths";
+import { cn } from "@/lib/utils";
 
 import { errorText } from "./finals/errorText";
 import { localDate, useRoster } from "./finals/names";

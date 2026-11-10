@@ -1,9 +1,9 @@
-import { cn } from "cn";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { BracketData as BracketRead } from "@/features/finals/api";
+import { cn } from "@/lib/utils";
 
 import { type BracketContext, sideAt } from "./bracketContext";
 import { FinalCard, MatchBox, MatchCard } from "./BracketParts";

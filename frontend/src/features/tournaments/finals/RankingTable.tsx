@@ -1,7 +1,7 @@
-import { cn } from "cn";
 import { useTranslation } from "react-i18next";
 
 import type { ParticipantRead, RankingRead, RankingRow } from "@/demo/contract";
+import { cn } from "@/lib/utils";
 
 interface RankingTableProps {
   ranking: RankingRead;
