@@ -377,18 +377,20 @@ function PlayerRow({
                   <AlertDialogAction
                     className={buttonVariants({ variant: "destructive" })}
                     onClick={() => {
-                      remove.mutate(
-                        { playerId: player.id, removed: true },
-                        {
-                          onSuccess: () => {
+                      // mutateAsync, not mutate's callbacks: the reload drops
+                      // this row before they would run, and the news is lost.
+                      remove
+                        .mutateAsync({ playerId: player.id, removed: true })
+                        .then(
+                          () => {
                             onDone(
                               t("players.remove.removed", {
                                 name: player.name,
                               }),
                             );
                           },
-                        },
-                      );
+                          () => undefined, // shown by remove.error
+                        );
                     }}
                   >
                     {t("players.remove.confirm")}
@@ -434,13 +436,13 @@ function RemovedRow({
         aria-label={t("players.removed.restoreLabel", { name: player.name })}
         disabled={restore.isPending}
         onClick={() => {
-          restore.mutate(
-            { playerId: player.id, removed: false },
-            {
-              onSuccess: () => {
-                onDone(t("players.removed.restored", { name: player.name }));
-              },
+          // mutateAsync, not mutate's callbacks: the reload drops this row
+          // before they would run, and the news is lost.
+          restore.mutateAsync({ playerId: player.id, removed: false }).then(
+            () => {
+              onDone(t("players.removed.restored", { name: player.name }));
             },
+            () => undefined,
           );
         }}
       >
