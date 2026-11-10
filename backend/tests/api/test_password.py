@@ -6,12 +6,12 @@ from uuid import UUID, uuid7
 import httpx2
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
 from tourneyhub.api.schemas import MIN_PASSWORD_LENGTH
 from tourneyhub.app import create_app
-from tourneyhub.db.models.accounts import RefreshToken, User
+from tourneyhub.db.models.accounts import AuthAttempt, RefreshToken, User
 from tourneyhub.engine.accounts import Language
 from tourneyhub.services import accounts as account_service
 from tourneyhub.services import auth as auth_service
@@ -274,6 +274,93 @@ def test_adr006_a_request_cannot_name_another_user(
     assert response.json()["detail"]["errors"][0]["type"] == "extra_forbidden"
 
 
+# The throttle
+
+
+WRONG = "not my password at all"
+
+
+def test_adr006_after_three_wrong_current_passwords_the_change_answers_429(
+    client: TestClient, ana: User, session: Session
+) -> None:
+    headers = _bearer(_log_in(client, ana))
+    for _ in range(3):
+        assert _change(client, headers, current=WRONG).status_code == 422
+
+    response = _change(client, headers)  # the right password is not checked
+
+    assert response.status_code == 429
+    assert response.json() == {
+        "code": "too_many_attempts",
+        "detail": {"retry_after": 1},
+    }
+    assert response.headers["retry-after"] == "1"
+    session.refresh(ana)
+    assert auth_service.verify_password(ana.password_hash, PASSWORD)
+
+
+def test_adr006_the_change_is_checked_again_after_its_waiting_period(
+    client: TestClient,
+    ana: User,
+    travel: Callable[[timedelta], datetime],
+) -> None:
+    headers = _bearer(_log_in(client, ana))
+    for _ in range(3):
+        _change(client, headers, current=WRONG)
+    assert _change(client, headers).status_code == 429
+
+    travel(timedelta(seconds=1))
+
+    assert _change(client, headers).status_code == 204
+
+
+def test_adr006_failed_logins_use_up_the_budget_of_the_password_change(
+    client: TestClient, ana: User
+) -> None:
+    headers = _bearer(_log_in(client, ana))
+    for _ in range(3):
+        assert _log_in(client, ana, WRONG).status_code == 401
+
+    assert _change(client, headers).status_code == 429
+
+
+def test_adr006_failed_password_changes_use_up_the_budget_of_the_login(
+    client: TestClient, ana: User
+) -> None:
+    headers = _bearer(_log_in(client, ana))
+    for _ in range(3):
+        _change(client, headers, current=WRONG)
+
+    assert _log_in(client, ana).status_code == 429
+
+
+def test_adr006_a_correct_current_password_is_not_counted_as_a_failure(
+    client: TestClient, ana: User, session: Session
+) -> None:
+    headers = _bearer(_log_in(client, ana))
+    _change(client, headers, current=WRONG)
+
+    _change(client, headers)
+
+    session.expire_all()
+    failed = session.scalar(
+        select(func.count())
+        .select_from(AuthAttempt)
+        .where(AuthAttempt.succeeded.is_(False))
+    )
+    assert failed == 2  # the wrong guess, per email and per IP
+
+
+def test_adr006_a_request_without_a_valid_token_is_not_counted(
+    client: TestClient, session: Session, auth_header: Callable[..., dict[str, str]]
+) -> None:
+    _change(client, auth_header(uuid7()))
+    _change(client, {})
+
+    session.expire_all()
+    assert session.scalar(select(func.count()).select_from(AuthAttempt)) == 0
+
+
 # Races
 
 
@@ -300,6 +387,7 @@ def test_adr006_a_password_change_racing_a_refresh_also_revokes_the_token_it_iss
             setup, user_id=user_id, key=key, now=at
         )
         phone = auth_service.start_session(setup, user_id=user_id, key=key, now=at)
+        email = user.email
         setup.commit()
     keep = auth_service.read_access_token(this_device.access_token, key=key, now=at)
 
@@ -316,6 +404,9 @@ def test_adr006_a_password_change_racing_a_refresh_also_revokes_the_token_it_iss
         def change_password() -> None:
             account_service.change_password(
                 changing,
+                attempt=auth_service.start_login_attempt(
+                    changing, email=email, ip="192.0.2.1", now=at
+                ),
                 user=changing.get_one(User, user_id),
                 keep_family_id=keep.family_id,
                 current_password=PASSWORD,

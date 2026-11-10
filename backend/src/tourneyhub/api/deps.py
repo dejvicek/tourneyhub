@@ -148,6 +148,28 @@ def throttle_signup(
 SignUpThrottleDep = Annotated[auth_service.Attempt, Depends(throttle_signup)]
 
 
+def throttle_password_change(
+    session_factory: SessionFactoryDep,
+    claims: AccessClaimsDep,
+    client_ip: ClientIpDep,
+    now: NowDep,
+) -> auth_service.Attempt:
+    """Count a password change before its current password is checked (ADR-006).
+
+    On the login's budget, per email and per client IP, as `throttle_login`: a
+    short transaction of its own, 429 inside the waiting period, nothing sleeps.
+    """
+    with session_factory.begin() as session:
+        return account_service.start_password_change_attempt(
+            session, user_id=claims.user_id, ip=client_ip, now=now
+        )
+
+
+PasswordChangeThrottleDep = Annotated[
+    auth_service.Attempt, Depends(throttle_password_change)
+]
+
+
 def require_custom_header(
     _x_requested_with: Annotated[str, Header(alias="X-Requested-With", max_length=64)],
 ) -> None:

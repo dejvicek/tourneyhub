@@ -11,6 +11,7 @@ from tourneyhub.api.deps import (
     CustomHeaderDep,
     LoginThrottleDep,
     NowDep,
+    PasswordChangeThrottleDep,
     SessionDep,
     SettingsDep,
     SignUpThrottleDep,
@@ -200,9 +201,13 @@ def log_out(
 @router.post(
     "/password",
     status_code=HTTPStatus.NO_CONTENT,
-    responses={HTTPStatus.UNAUTHORIZED: {"model": ErrorResponse}},
+    responses={
+        HTTPStatus.UNAUTHORIZED: {"model": ErrorResponse},
+        HTTPStatus.TOO_MANY_REQUESTS: _TOO_MANY_ATTEMPTS,
+    },
 )
 def change_password(
+    attempt: PasswordChangeThrottleDep,
     claims: AccessClaimsDep,
     user: AccountDep,
     body: PasswordChange,
@@ -213,10 +218,14 @@ def change_password(
 
     Works while an admin reset requires a new password, and then ends that
     requirement. The login this call came from stays. 422 `wrong_password` is a
-    wrong current password; 422 `password_unchanged` a new one equal to it.
+    wrong current password; 422 `password_unchanged` a new one equal to it. The
+    current password is checked on the login's budget: after repeated failures,
+    here or at login, an attempt within a growing waiting period gets 429 with
+    `Retry-After`.
     """
     account_service.change_password(
         session,
+        attempt=attempt,
         user=user,
         keep_family_id=claims.family_id,
         current_password=body.current_password.get_secret_value(),

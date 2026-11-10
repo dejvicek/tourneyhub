@@ -73,9 +73,25 @@ def _code_matches(stored: str | None, given: str) -> bool:
     return stored is not None and matches
 
 
+def start_password_change_attempt(
+    session: Session, *, user_id: UUID, ip: str, now: datetime
+) -> auth_service.Attempt:
+    """Count a password change before its current password is checked (ADR-006).
+
+    The check guesses the password like a login does, for someone with a stolen
+    refresh cookie or access token, so it spends the budget of the login: the
+    same kinds, `login_email` and `login_ip`, with the same limits.
+    """
+    email = session.scalar(select(User.email).where(User.id == user_id))
+    if email is None:
+        raise NotAuthenticatedError(ErrorCode.NOT_AUTHENTICATED)
+    return auth_service.start_login_attempt(session, email=email, ip=ip, now=now)
+
+
 def change_password(
     session: Session,
     *,
+    attempt: auth_service.Attempt,
     user: User,
     keep_family_id: UUID,
     current_password: str,
@@ -84,7 +100,9 @@ def change_password(
 ) -> None:
     """Set a new password and log the user out everywhere else (FR-004, ADR-006).
 
-    The login this request came from stays; every other family is revoked. The
+    `attempt` is the throttle's count of this call, a failure until the current
+    password is right. The login this request came from stays; every other
+    family is revoked. The
     new password also ends `must_change_password` after an admin reset, and it
     has to differ from the current one, so that the admin's password does not
     survive the reset.
@@ -103,6 +121,7 @@ def change_password(
         raise RuleViolationError(ErrorCode.WRONG_PASSWORD)
     if new_password == current_password:
         raise RuleViolationError(ErrorCode.PASSWORD_UNCHANGED)
+    auth_service.mark_attempt_succeeded(session, attempt=attempt)
     locked.password_hash = auth_service.hash_password(new_password)
     locked.must_change_password = False
     locked.updated_at = now
