@@ -1,0 +1,49 @@
+# The production images (ADR-004, ADR-014), used for the end-to-end tests and on
+# the VPS: `docker compose -f compose.yaml -f compose.prod.yaml`, or
+# COMPOSE_FILE=compose.yaml:compose.prod.yaml in .env. compose.override.yaml is
+# not loaded then, so the definitions here are complete.
+
+services:
+  api:
+    build:
+      context: ./backend
+      target: runtime
+    # Not the default tourneyhub-api, which is the development build.
+    image: tourneyhub-api-runtime
+    # Settings come only from the environment (docs/python-style.md §6).
+    environment:
+      TOURNEYHUB_ENV: production
+      TOURNEYHUB_DATABASE_URL: ${TOURNEYHUB_DATABASE_URL:?set TOURNEYHUB_DATABASE_URL in .env}
+      TOURNEYHUB_JWT_SECRET: ${TOURNEYHUB_JWT_SECRET:?set TOURNEYHUB_JWT_SECRET in .env}
+      TOURNEYHUB_COOKIE_SECURE: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+    # No ports: only web reaches it, on the Compose network (ADR-005).
+
+  # Caddy with the built frontend, the only service with host ports (ADR-005).
+  web:
+    build:
+      context: ./frontend
+      target: runtime
+      # The image generates the API types from backend/openapi.json (ADR-008).
+      additional_contexts:
+        backend: ./backend
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS in .env}
+      # The redirect from HTTP names the published HTTPS port.
+      HTTPS_PORT: ${HTTPS_PORT:-443}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      # HTTP/3
+      - "${HTTPS_PORT:-443}:443/udp"
+    # Certificates and the local CA survive a new container; on the VPS this
+    # also keeps Let's Encrypt from issuing again at every update.
+    volumes:
+      - caddy-data:/data
+    depends_on:
+      - api
+
+volumes:
+  caddy-data:
