@@ -363,4 +363,30 @@ type MergePaths<A, B> = {
       : never;
 };
 
+/** The HTTP methods a path item defines: openapi-typescript writes `get?: never` for the others. */
+type DefinedMethods<T> = {
+  [K in keyof T]-?: K extends "parameters"
+    ? never
+    : [Exclude<T[K], undefined>] extends [never]
+      ? never
+      : K;
+}[keyof T];
+
+/** "path method" for each method that both the contract and the generated schema define. */
+type Duplicates = {
+  [P in keyof ProvisionalPaths & keyof GeneratedPaths]: `${P} ${DefinedMethods<
+    ProvisionalPaths[P]
+  > &
+    DefinedMethods<GeneratedPaths[P]> &
+    string}`;
+}[keyof ProvisionalPaths & keyof GeneratedPaths];
+
+/**
+ * Fails `pnpm typecheck` once the backend serves a route the contract still
+ * declares; the error names it as "path method". Delete it here
+ * (src/demo/README.md, "Switching an area to the real API").
+ */
+type NoDuplicates<T extends never> = T;
+export type ContractDuplicates = NoDuplicates<Duplicates>;
+
 export type DemoPaths = MergePaths<GeneratedPaths, ProvisionalPaths>;
