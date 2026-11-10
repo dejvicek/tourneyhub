@@ -1,0 +1,6 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+# Generated from ../backend/openapi.json by `pnpm generate:api` (ADR-008)
+src/api/schema.d.ts

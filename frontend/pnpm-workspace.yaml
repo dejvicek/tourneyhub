@@ -1,0 +1,13 @@
+# Install scripts of dependencies run only for the packages allowed here
+# (ADR-003); pnpm's strictDepBuilds, on by default, fails the install on
+# any other package that has one. None needs one now: Vite 8 bundles with
+# Rolldown, whose native binary comes as an optional dependency, so
+# esbuild is not in the tree. Review an entry like code before adding it.
+allowBuilds: {}
+
+peerDependencyRules:
+  allowedVersions:
+    # openapi-typescript 7.13 declares typescript ^5; it generates the same
+    # schema.d.ts with TypeScript 5.9 and 6.0, and typescript-eslint caps
+    # TypeScript below 6.1.
+    openapi-typescript>typescript: "6"

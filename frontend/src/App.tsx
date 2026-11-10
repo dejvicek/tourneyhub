@@ -1,0 +1,16 @@
+import { type QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { DataRouter } from "react-router";
+import { RouterProvider } from "react-router/dom";
+
+interface AppProps {
+  router: DataRouter;
+  queryClient: QueryClient;
+}
+
+export function App({ router, queryClient }: AppProps) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  );
+}
