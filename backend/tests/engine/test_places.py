@@ -116,7 +116,7 @@ def test_br102_a_third_place_match_gives_third_and_fourth() -> None:
     entries = [entry(n) for n in range(1, 5)]
     results = [win(1, 1, 4), win(1, 2, 3), win(2, 2, 1), third(4, 3)]
 
-    places = place_entries(entries, knockout=results)
+    places = place_entries(entries, knockout=results, third_place_match=True)
 
     assert table(places) == {2: 1, 1: 2, 4: 3, 3: 4}
 
@@ -188,7 +188,7 @@ def test_br102_a_third_place_match_leaves_earlier_rounds_unchanged() -> None:
         third(3, 4),
     ]
 
-    places = place_entries(entries, knockout=results)
+    places = place_entries(entries, knockout=results, third_place_match=True)
 
     assert table(places) == {1: 1, 2: 2, 3: 3, 4: 4, 8: 5, 5: 5, 6: 5, 7: 5}
 
@@ -254,10 +254,11 @@ def test_br103_a_tie_group_cut_by_the_knockout_leaves_the_rest_together() -> Non
 
     places = place_entries(
         [*group, *knockout_entries],
-        standing=standing((1,), (2, 3), (4,), (5,)),
+        standing=standing((1,), (2,), (3, 4), (5,)),
         knockout=results,
     )
 
+    # entry 4 stays behind alone from the tie (3, 4), and 5 follows it
     assert table(places) == {11: 1, 12: 2, 13: 3, 4: 4, 5: 5}
 
 
@@ -307,7 +308,9 @@ def test_an_entry_in_the_standing_twice_is_refused() -> None:
 
 def test_a_knockout_of_only_a_third_place_match_is_refused() -> None:
     with pytest.raises(ValueError, match="needs a final"):
-        place_entries([entry(1), entry(2)], knockout=[third(1, 2)])
+        place_entries(
+            [entry(1), entry(2)], knockout=[third(1, 2)], third_place_match=True
+        )
 
 
 def test_a_last_round_with_two_matches_is_refused() -> None:
@@ -322,7 +325,7 @@ def test_two_third_place_matches_are_refused() -> None:
     results = [win(1, 1, 4), win(1, 2, 3), win(2, 2, 1), third(4, 3), third(3, 4)]
 
     with pytest.raises(ValueError, match="third-place matches"):
-        place_entries(entries, knockout=results)
+        place_entries(entries, knockout=results, third_place_match=True)
 
 
 def test_an_entry_that_loses_twice_is_refused() -> None:
@@ -344,14 +347,54 @@ def test_a_third_place_match_between_other_entries_is_refused() -> None:
     results = [win(1, 1, 4), win(1, 2, 3), win(2, 2, 1), third(4, 1)]
 
     with pytest.raises(ValueError, match="semifinal losers"):
-        place_entries(entries, knockout=results)
+        place_entries(entries, knockout=results, third_place_match=True)
 
 
 def test_a_third_place_match_without_semifinals_is_refused() -> None:
     entries = [entry(n) for n in range(1, 5)]
 
     with pytest.raises(ValueError, match="semifinal losers"):
-        place_entries(entries, knockout=[win(2, 2, 1), third(4, 3)])
+        place_entries(
+            entries, knockout=[win(2, 2, 1), third(4, 3)], third_place_match=True
+        )
+
+
+def test_an_entry_missing_from_the_knockout_is_refused() -> None:
+    entries = [entry(n) for n in range(1, 5)]
+    results = [win(1, 1, 4), win(2, 1, 2)]  # the match of 2 against 3 is missing
+
+    with pytest.raises(ValueError, match="without a place"):
+        place_entries(entries, knockout=results)
+
+
+def test_an_entry_missing_from_the_standing_is_refused() -> None:
+    entries = [entry(n) for n in range(1, 4)]
+
+    with pytest.raises(ValueError, match="without a place"):
+        place_entries(entries, standing=standing((1,), (2,)))
+
+
+def test_a_group_entry_only_partly_in_the_knockout_is_refused() -> None:
+    entries = [entry(1, 11, 12), entry(21, 11, 99), entry(22, 31, 32)]
+
+    with pytest.raises(ValueError, match="without a place"):
+        place_entries(entries, standing=standing((1,)), knockout=[win(1, 21, 22)])
+
+
+def test_fr037_a_third_place_match_without_a_result_is_refused() -> None:
+    entries = [entry(n) for n in range(1, 5)]
+    results = [win(1, 1, 4), win(1, 2, 3), win(2, 2, 1)]
+
+    with pytest.raises(ValueError, match="no result"):
+        place_entries(entries, knockout=results, third_place_match=True)
+
+
+def test_fr037_a_third_place_result_without_the_flag_is_refused() -> None:
+    entries = [entry(n) for n in range(1, 5)]
+    results = [win(1, 1, 4), win(1, 2, 3), win(2, 2, 1), third(4, 3)]
+
+    with pytest.raises(ValueError, match="without that match"):
+        place_entries(entries, knockout=results)
 
 
 # Properties
@@ -411,7 +454,11 @@ def test_br102_each_round_loses_to_the_place_after_the_entries_still_in(
     rounds = (size - 1).bit_length()
 
     places = table(
-        place_entries([entry(n) for n in range(1, size + 1)], knockout=results)
+        place_entries(
+            [entry(n) for n in range(1, size + 1)],
+            knockout=results,
+            third_place_match=has_third_place,
+        )
     )
 
     final = next(r for r in results if r.round_no == rounds and not r.is_third_place)
@@ -432,9 +479,13 @@ def test_br102_each_round_loses_to_the_place_after_the_entries_still_in(
 def test_br104_a_knockout_places_every_entry_with_numbering_that_skips(
     bracket: tuple[int, list[KnockoutResult], bool],
 ) -> None:
-    size, results, _ = bracket
+    size, results, has_third_place = bracket
 
-    placed = place_entries([entry(n) for n in range(1, size + 1)], knockout=results)
+    placed = place_entries(
+        [entry(n) for n in range(1, size + 1)],
+        knockout=results,
+        third_place_match=has_third_place,
+    )
 
     assert sorted(place.entry_id.int for place in placed) == list(range(1, size + 1))
     assert [place.place for place in placed] == sorted(place.place for place in placed)
@@ -448,14 +499,14 @@ def test_br104_a_knockout_places_every_entry_with_numbering_that_skips(
 def test_br102_the_places_do_not_depend_on_the_order_of_the_results(
     bracket: tuple[int, list[KnockoutResult], bool], data: st.DataObject
 ) -> None:
-    size, results, _ = bracket
+    size, results, has_third_place = bracket
     entries = [entry(n) for n in range(1, size + 1)]
 
     shuffled = data.draw(st.permutations(results))
 
-    assert place_entries(entries, knockout=shuffled) == place_entries(
-        entries, knockout=results
-    )
+    assert place_entries(
+        entries, knockout=shuffled, third_place_match=has_third_place
+    ) == place_entries(entries, knockout=results, third_place_match=has_third_place)
 
 
 @st.composite
@@ -471,7 +522,7 @@ def standings(draw: st.DrawFn) -> tuple[int, list[tuple[int, ...]], int]:
 
 
 @given(case=standings())
-def test_br101_a_standing_alone_places_each_tie_group_at_its_first_position(
+def test_br101_a_standing_alone_places_in_contiguous_blocks_from_first(
     case: tuple[int, list[tuple[int, ...]], int],
 ) -> None:
     size, groups, _ = case
@@ -482,10 +533,50 @@ def test_br101_a_standing_alone_places_each_tie_group_at_its_first_position(
         )
     )
 
-    position = 1
+    assert sorted(places) == list(range(1, size + 1))
     for group in groups:
-        assert {places[n] for n in group} == {position}
-        position += len(group)
+        assert len({places[n] for n in group}) == 1  # level entries share a place
+    block_places = sorted(set(places.values()))
+    assert block_places[0] == 1
+    for place in block_places:
+        # a block's place is 1 plus the number of entries ahead of it
+        assert place == 1 + sum(1 for other in places.values() if other < place)
+
+
+@given(case=standings(), data=st.data())
+def test_br101_the_places_do_not_depend_on_any_input_order(
+    case: tuple[int, list[tuple[int, ...]], int], data: st.DataObject
+) -> None:
+    size, groups, _ = case
+    entries = [entry(n) for n in range(1, size + 1)]
+    reordered = [tuple(data.draw(st.permutations(group))) for group in groups]
+
+    assert place_entries(
+        data.draw(st.permutations(entries)), standing=standing(*reordered)
+    ) == place_entries(entries, standing=standing(*groups))
+
+
+@given(
+    players=st.integers(min_value=8, max_value=24),
+    pair_count=st.integers(min_value=2, max_value=4),
+    flips=st.lists(st.booleans(), max_size=4),
+)
+def test_prd52_a_monster_dyp_night_places_every_player_exactly_once(
+    players: int, pair_count: int, flips: list[bool]
+) -> None:
+    singles = [entry(n) for n in range(1, players + 1)]
+    # the best 2 * pair_count players form pairs: best with worst, and so on
+    pairs = [entry(1000 + i, i + 1, 2 * pair_count - i) for i in range(pair_count)]
+    results = play_bracket([1000 + i for i in range(pair_count)], flips)
+
+    placed = place_entries(
+        [*singles, *pairs],
+        standing=standing(*((n,) for n in range(1, players + 1))),
+        knockout=results,
+    )
+
+    given_places = sorted(player.int for place in placed for player in place.player_ids)
+    assert given_places == list(range(1, players + 1))
 
 
 @given(case=standings())

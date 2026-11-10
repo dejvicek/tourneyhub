@@ -273,12 +273,19 @@ def test_br110_a_better_place_never_earns_fewer_points(
 
 
 @given(places=results_of_a_tournament(), table=tables)
-def test_br111_sharing_never_hands_out_more_than_the_table_has(
+def test_br111_a_block_hands_out_about_what_its_covered_places_are_worth(
     places: list[EntryPlace], table: list[int]
 ) -> None:
     entry_points = {row.entry_id: row.points for row in season_points(places, table)}
 
-    assert sum(entry_points.values()) <= sum(table)
+    for place in {entry.place for entry in places}:
+        block = [entry for entry in places if entry.place == place]
+        points = entry_points[block[0].entry_id]
+        covered = sum(
+            table[p - 1] if p <= len(table) else 0
+            for p in range(place, place + len(block))
+        )
+        assert len(block) * points <= covered < len(block) * (points + 1)
 
 
 @given(places=results_of_a_tournament(), table=tables, data=st.data())
