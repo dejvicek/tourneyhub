@@ -1,5 +1,4 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { cn } from "cn";
 import { type CSSProperties, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { generatePath, Link, useNavigate } from "react-router";
@@ -28,10 +27,11 @@ import {
   type TournamentDetail,
 } from "@/features/tournaments/api";
 import { paths } from "@/lib/paths";
+import { cn } from "@/lib/utils";
 
 import { shortDate } from "./dates";
 import { MoreIcon } from "./icons";
-import { entryName, typeLabel } from "./summary";
+import { entryName } from "./summary";
 
 interface TournamentItemProps {
   leagueId: string;
@@ -176,10 +176,7 @@ export function TournamentItem({
             {shortDate(summary.date)}
           </span>
         </span>
-        <span className="text-body-sm text-muted-foreground">
-          {typeLabel(t, summary.type)}
-          {detailText === "" ? "" : `. ${detailText}`}
-        </span>
+        <span className="text-body-sm text-muted-foreground">{detailText}</span>
         {summary.state === "in_progress" && progress !== undefined && (
           <span
             role="progressbar"

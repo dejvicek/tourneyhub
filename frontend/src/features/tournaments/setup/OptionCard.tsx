@@ -1,7 +1,7 @@
-import { cn } from "cn";
 import { useId } from "react";
 
 import { RadioGroupItem } from "@/components/ui/radio-group";
+import { cn } from "@/lib/utils";
 
 interface OptionCardProps {
   value: string;

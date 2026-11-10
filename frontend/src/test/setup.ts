@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, beforeEach, vi } from "vitest";
 
 import { resetDemoStore } from "@/demo/store";
@@ -21,6 +21,10 @@ globalThis.Request = class extends NodeRequest {
     );
   }
 };
+
+// A screen's first test also loads its lazy chunk, which can take over the
+// default second when the whole suite runs at once.
+configure({ asyncUtilTimeout: 4000 });
 
 beforeAll(() => {
   server.listen({ onUnhandledFrame: "error" });

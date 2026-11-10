@@ -1,6 +1,7 @@
-import { cn } from "cn";
 import { RadioGroup as RadioGroupPrimitive } from "radix-ui";
 import { useId } from "react";
+
+import { cn } from "@/lib/utils";
 
 interface SegmentedControlProps<Value extends string> {
   label: string;

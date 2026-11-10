@@ -65,7 +65,7 @@ describe("setup: review and start (screen 5)", () => {
 
     await waitFor(() => {
       expect(view.state.location.pathname).toBe(
-        generatePath(paths.tournament, { leagueId, tournamentId: id }),
+        generatePath(paths.schedule, { leagueId, tournamentId: id }),
       );
     });
     const started = await tournamentOf(id);

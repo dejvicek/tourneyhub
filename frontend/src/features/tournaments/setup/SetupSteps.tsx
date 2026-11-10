@@ -1,8 +1,8 @@
-import { cn } from "cn";
 import { useTranslation } from "react-i18next";
 
 import { CheckIcon } from "@/components/ui/icons";
 import type { TournamentType } from "@/demo/contract";
+import { cn } from "@/lib/utils";
 
 export type SetupStep = 1 | 2 | 3 | 4;
 

@@ -44,7 +44,18 @@ function Review({ data }: { data: SetupData }) {
   const format = setup.format;
   const settings = useQuery(leagueQueries.settings(leagueId));
   const preview = useQuery(setupQueries.preview(leagueId, tournamentId));
-  const start = useMutation(setupMutations.start(leagueId, tournamentId));
+  // Once the tournament is started this screen unmounts (the gate in
+  // SetupPage), so the way on is not a per-call callback: it waits for the
+  // reload, then opens the tournament on the screen for its state.
+  const start = useMutation({
+    ...setupMutations.start(leagueId, tournamentId),
+    onSuccess: async (_data, _counter, _result, context) => {
+      await context.client.invalidateQueries({
+        queryKey: ["leagues", leagueId],
+      });
+      void navigate(generatePath(paths.tournament, params));
+    },
+  });
   const params = { leagueId, tournamentId };
 
   const entries = tournament.entries.filter((entry) => entry.stage === "main");
@@ -274,11 +285,7 @@ function Review({ data }: { data: SetupData }) {
           size="lg"
           className="md:min-w-60"
           onClick={() => {
-            start.mutate(setup.draw_counter, {
-              onSuccess: () => {
-                void navigate(generatePath(paths.tournament, params));
-              },
-            });
+            start.mutate(setup.draw_counter);
           }}
         >
           {t("tournaments.setup.review.start")}
