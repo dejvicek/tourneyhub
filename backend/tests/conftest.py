@@ -12,15 +12,16 @@ from alembic.config import Config
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
-from sqlalchemy import Engine, event, make_url, select, text
+from sqlalchemy import Engine, event, func, make_url, select, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from tourneyhub.api.deps import get_now, get_session, get_session_factory
 from tourneyhub.app import create_app
 from tourneyhub.db.models.accounts import InstanceSettings, User
-from tourneyhub.db.models.leagues import League
+from tourneyhub.db.models.leagues import League, Season
 from tourneyhub.db.session import create_db_engine
 from tourneyhub.engine.accounts import Language
+from tourneyhub.engine.leagues import DEFAULT_PLACEMENT_POINTS, SeasonState
 from tourneyhub.services import auth as auth_service
 from tourneyhub.settings import Settings
 
@@ -83,6 +84,17 @@ def assert_invariants(session: Session) -> None:
         select(League.id).where(text("btrim(leagues.name) = ''"))
     ).all()
     assert blank_names == []
+    # Season 1 comes with its league, and a new season closes the active one in
+    # the same transaction (FR-010, FR-021).
+    active_seasons = (
+        select(func.count())
+        .where(Season.league_id == League.id, Season.state == SeasonState.ACTIVE)
+        .scalar_subquery()
+    )
+    without_one_active = session.scalars(
+        select(League.id).where(active_seasons != 1)
+    ).all()
+    assert without_one_active == []
 
 
 @pytest.fixture
@@ -201,7 +213,17 @@ def make_league(
             id=uuid7(),
             owner_user_id=owner_user_id or make_user().id,
             name=name or f"League {uuid7()}",
+            share_token=f"token-{uuid7()}",
             created_at=now,
+            seasons=[
+                Season(
+                    number=1,
+                    state=SeasonState.ACTIVE,
+                    placement_points=list(DEFAULT_PLACEMENT_POINTS),
+                    started_at=now,
+                    created_at=now,
+                )
+            ],
         )
         session.add(league)
         session.flush()
