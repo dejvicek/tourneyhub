@@ -134,6 +134,8 @@ Checked by tools: ESLint better-tailwindcss `no-unknown-classes`, `no-conflictin
   | `bead-rod` | `#8fa197` light (dark `#5b6f84` unchanged, 3.03 on `bead-empty`) | `#85988d` light | on `bead-empty` 3.06 (was 2.72) |
   | `nav-active-foreground` | `#1e7a4c` light (dark unchanged) | `#1e784b` light | on `nav-active` 4.56 (was 4.44, for 13 px text) |
 
+  The design maps `secondary-foreground`, `accent-foreground` and `sidebar-accent-foreground` to the same light green as `nav-active-foreground` (`#1e7a4c` on `#e3ede6`, 4.44), so they move with it to `#1e784b` (4.56 on `secondary`, `accent` and `sidebar-accent`); dark values are unchanged.
+
   `team-a` keeps `#e36414` / `#f4b740`: light `team-a` is 3.44 on a white card and 3.11 on the page, so as text it is for large text only (3:1), that is scores (`text-score-*`, `text-display-*`). The dark `team-a` is 7.38 on a card and `team-b` passes everywhere (6.80 / 6.27 on a card), but the rule is the same for both so the sides can be swapped. Smaller text (names, labels, captions) uses `team-a-foreground` or `team-b-foreground`, or the ordinary text tokens, never the team colour; the colour is carried by a dot or border next to it.
 
 ### 5.3 shadcn/ui
