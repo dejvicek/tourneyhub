@@ -195,7 +195,7 @@ model {
       link https://github.com/dejvicek/tourneyhub "dejvicek/tourneyhub"
     }
     actions = externalComponent "GitHub Actions" {
-      technology "ci.yml, required check ci-ok"
+      technology "ci.yml, aggregate check ci-ok"
       icon tech:github-actions
       summary "Jobs changes (path filter), backend, frontend and e2e (Playwright against compose.prod.yaml); ci-ok waits for all of them."
       description "
@@ -225,7 +225,7 @@ model {
         - uv: backend/pyproject.toml and backend/uv.lock;
         - npm: frontend/package.json and frontend/pnpm-lock.yaml;
         - docker: the base images in backend/Dockerfile and frontend/Dockerfile;
-        - github-actions: the actions in .github/workflows, pinned to commit SHAs.
+        - github-actions: the actions used in .github/workflows.
       "
     }
 

@@ -35,7 +35,7 @@ deployment {
         summary "127.0.0.1:8000, local only: the phone reaches it only through Vite. Reloads on source changes."
         description "
           The api service: source mounted from backend/, uvicorn reloads on changes. tourneyhub migrate runs the Alembic migrations on start.
-          The same container also runs the tourneyhub CLI: migrate on start; create-admin, grant-admin, revoke-admin.
+          The same container also runs the tourneyhub CLI: migrate on start, and the admin commands of ADR-007.
           Port 8000 is published only on the machine's localhost, so the phone reaches the API only through the Vite proxy.
         "
       }
@@ -103,7 +103,7 @@ deployment {
           summary "Port 8000, no host port. Trusts X-Forwarded-For only from 172.30.0.0/24, where Caddy is."
           description "
             Image from GHCR that passed Playwright. tourneyhub migrate runs the Alembic migrations on start, then uvicorn listens on port 8000 and trusts X-Forwarded-For only from 172.30.0.0/24. No host port.
-            The same container also runs the tourneyhub CLI: migrate on start; create-admin, grant-admin, revoke-admin.
+            The same container also runs the tourneyhub CLI: migrate on start, and the admin commands of ADR-007.
           "
           link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-014--deployment-images-in-ghcr-manual-pull-on-the-vps "ADR-014"
         }
