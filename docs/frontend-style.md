@@ -126,7 +126,15 @@ Checked by tools: ESLint better-tailwindcss `no-unknown-classes`, `no-conflictin
   | `team-a-foreground`, `team-b-foreground` | `#1a2430`, `#ffffff` | `#1a2430`, `#1a2430` | on the team colour 4.56 / 8.73, 6.80 / 7.42 |
 
 - The ring is solid, never `ring/50`, with a 2 px offset in the background colour (technique C40), so it keeps 3:1 next to a primary button of the same colour; `src/components/ui/button.tsx` and the base layer were changed for it. The destructive Button uses its token pair instead of `text-white` and `dark:bg-destructive/60`.
-- Below AA in the design itself, reported to its owners and not changed here: the input border (`#8fa197` on white 2.72, `#5b6f84` on `#233140` 2.56) and the light bead rod (2.72) fall short of 3:1; light `nav-active-foreground` on `nav-active` is 4.44 for 13 px text; light `team-a` on white is 3.44, enough only for large text such as scores.
+- Deviations from Figma. The design falls below WCAG 2.2 AA in four places. Three tokens moved, each keeping its hue (HSL hue and saturation) and changing only lightness; ratios measured with a script (WCAG relative luminance), light / dark:
+
+  | Token | Figma | Now | Ratios |
+  |---|---|---|---|
+  | `input` (border) | `#8fa197` / `#5b6f84` | `#7b9085` / `#657c93` | on `input-background` 3.40 / 3.07, on page 3.08 / 3.63 (was 2.72 / 2.56 on the field, 2.46 on the light page) |
+  | `bead-rod` | `#8fa197` light (dark `#5b6f84` unchanged, 3.03 on `bead-empty`) | `#85988d` light | on `bead-empty` 3.06 (was 2.72) |
+  | `nav-active-foreground` | `#1e7a4c` light (dark unchanged) | `#1e784b` light | on `nav-active` 4.56 (was 4.44, for 13 px text) |
+
+  `team-a` keeps `#e36414` / `#f4b740`: light `team-a` is 3.44 on a white card and 3.11 on the page, so as text it is for large text only (3:1), that is scores (`text-score-*`, `text-display-*`). The dark `team-a` is 7.38 on a card and `team-b` passes everywhere (6.80 / 6.27 on a card), but the rule is the same for both so the sides can be swapped. Smaller text (names, labels, captions) uses `team-a-foreground` or `team-b-foreground`, or the ordinary text tokens, never the team colour; the colour is carried by a dot or border next to it.
 
 ### 5.3 shadcn/ui
 

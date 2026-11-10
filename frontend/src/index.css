@@ -153,7 +153,7 @@
   --destructive-foreground: #ffffff;
   --border: #c9d3cc;
   --border-surface: #c9d3cc;
-  --input: #8fa197;
+  --input: #7b9085;
   --input-background: #ffffff;
   --ring: #1e7a4c;
   --chart-1: #1e7a4c;
@@ -180,9 +180,9 @@
   --nav: #ffffff;
   --nav-foreground: #4e6157;
   --nav-active: #e3ede6;
-  --nav-active-foreground: #1e7a4c;
+  --nav-active-foreground: #1e784b;
   --bead-empty: #ffffff;
-  --bead-rod: #8fa197;
+  --bead-rod: #85988d;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -205,7 +205,7 @@
     --destructive-foreground: #1a2430;
     --border: #34465a;
     --border-surface: #233140;
-    --input: #5b6f84;
+    --input: #657c93;
     --input-background: #233140;
     --ring: #edf2f6;
     --chart-1: #5cc98a;
