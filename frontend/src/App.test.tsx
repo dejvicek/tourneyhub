@@ -11,7 +11,10 @@ import { routes } from "@/routes";
 
 function renderAt(path: string) {
   const router = createMemoryRouter(routes, { initialEntries: [path] });
-  render(<App router={router} queryClient={new QueryClient()} />);
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  render(<App router={router} queryClient={queryClient} />);
 }
 
 describe("App", () => {

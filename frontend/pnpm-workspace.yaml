@@ -5,6 +5,10 @@
 # esbuild is not in the tree. Review an entry like code before adding it.
 allowBuilds: {}
 
+# Installing on a Node.js other than the one in package.json's engines fails
+# instead of warning (ADR-003 pins Node.js).
+engineStrict: true
+
 peerDependencyRules:
   allowedVersions:
     # openapi-typescript 7.13 declares typescript ^5; it generates the same

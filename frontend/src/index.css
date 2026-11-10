@@ -2,7 +2,15 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (@media (prefers-color-scheme: dark));
+/* Colours come only from the theme tokens below (ADR-003): without Tailwind's
+   palette, a class such as bg-red-500 does not exist and fails lint. Black
+   and white keep Tailwind's values for the copied shadcn/ui components; lint
+   bans bg-white and the like outside src/components/ui/. */
+@theme {
+  --color-*: initial;
+  --color-black: #000;
+  --color-white: #fff;
+}
 
 @theme inline {
   --radius-sm: calc(var(--radius) * 0.6);
@@ -123,5 +131,18 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Cuts the animations and transitions shipped by shadcn/ui and
+     tw-animate-css; our own use motion-safe: (WCAG 2.3.3, technique C39). */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
