@@ -6,7 +6,13 @@ import {
 } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { generatePath, Link, Navigate, useNavigate } from "react-router";
+import {
+  generatePath,
+  Link,
+  Navigate,
+  useNavigate,
+  useSearchParams,
+} from "react-router";
 
 import { DocumentTitle } from "@/components/DocumentTitle";
 import { Button } from "@/components/ui/button";
@@ -62,7 +68,6 @@ export function StartKnockoutPage() {
 }
 
 function StartKnockoutLoader() {
-  const { t } = useTranslation();
   const leagueId = useRouteParam("leagueId");
   const tournamentId = useRouteParam("tournamentId");
   const tournament = useQuery(tournamentQueries.detail(leagueId, tournamentId));
@@ -79,9 +84,6 @@ function StartKnockoutLoader() {
   }
   if (data === undefined || group === undefined) {
     return <Loading />;
-  }
-  if (group.format !== "swiss" && group.format !== "monster_dyp") {
-    return <Notice tone="info" title={t("finals.rounds.notRounds")} />;
   }
   if (data.phases.some((phase) => phase.kind === "knockout")) {
     return (
@@ -115,8 +117,17 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
   const placeLabel = usePlaceLabel();
   const roster = useRoster(leagueId, data.entries);
   const monster = group.format === "monster_dyp";
-  const [qualifiers, setQualifiers] = useState(group.qualifiers ?? 8);
-  const [thirdPlace, setThirdPlace] = useState(false);
+  // Screen 8 hands over its choices in the query; a bad value is ignored.
+  const [search] = useSearchParams();
+  const fromQuery = Number(search.get("qualifiers"));
+  const [qualifiers, setQualifiers] = useState(
+    Number.isInteger(fromQuery) && fromQuery >= 2
+      ? fromQuery
+      : (group.qualifiers ?? 8),
+  );
+  const [thirdPlace, setThirdPlace] = useState(
+    search.get("thirdPlace") === "true",
+  );
   const [mode, setMode] = useState<MonsterKnockoutMode | null>(
     rules.monsterKnockoutModes[0] ?? null,
   );
@@ -162,9 +173,13 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
     style: "short",
     type: "unit",
   });
-  const lastRound = data.rounds.filter((r) => r.phase_id === group.id).at(-1);
+  const groupRounds = data.rounds.filter((r) => r.phase_id === group.id);
   const roundDone =
-    lastRound?.matches.every((m) => m.outcome !== null) ?? false;
+    groupRounds.length > 0 &&
+    (group.format === "round_robin"
+      ? groupRounds
+      : groupRounds.slice(-1)
+    ).every((r) => r.matches.every((m) => m.outcome !== null));
   const canDraw = roundDone && entriesCount >= (thirdPlace ? 4 : 2);
   const mainCount = data.entries.filter((e) => e.stage === "main").length;
   const followers = mainCount - shown;

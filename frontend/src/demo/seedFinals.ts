@@ -297,6 +297,41 @@ function knockoutOnly(args: {
   return b.tournament;
 }
 
+/** Screen 8 to 13: a singles round robin whose group phase is done and whose knockout is not drawn yet. */
+function roundRobinDone(
+  players: StoredPlayer[],
+  kit: SeedKit,
+): StoredTournament {
+  const date = "2026-11-07";
+  const rng = createRng(1107);
+  const b = kit.tournament(3800, {
+    name: "Round robin night",
+    date,
+    type: "singles",
+    state: "in_progress",
+  });
+  const group = b.phase(GROUP_BASE);
+  const entries = players.slice(0, 6).map((p, i) => b.entry([p.id], i + 1));
+  for (const pairing of roundRobinRounds(entries)) {
+    const round = roundFromDraw({
+      ids: () => b.id(),
+      phaseId: group.id,
+      roundNo: roundsOf(b.tournament, group).length + 1,
+      drawn: {
+        matches: pairing.matches.map(([x, y]) => [
+          { entry_id: x.id, player_ids: x.player_ids, is_bye: false },
+          { entry_id: y.id, player_ids: y.player_ids, is_bye: false },
+        ]),
+        sitting_out: pairing.sittingOut.map((e) => e.id),
+      },
+    });
+    b.tournament.rounds.push(round);
+    playRound(round, b.tournament, rng, date);
+  }
+  b.fields(2);
+  return b.tournament;
+}
+
 /** The finals screens' tournaments, for the seed (ids 3000–3999). */
 export const seedFinals: SeedPart = {
   area: "finals",
@@ -328,6 +363,7 @@ export const seedFinals: SeedPart = {
         playedMatches: 3,
         onFieldMatches: 2,
       }),
+      roundRobinDone(players, kit),
     );
   },
 };

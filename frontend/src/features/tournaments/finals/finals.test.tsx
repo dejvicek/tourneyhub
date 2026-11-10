@@ -16,6 +16,7 @@ const MONSTER = demoId(3300);
 const SWISS = demoId(3450);
 const SPRING_CUP = demoId(3600);
 const GRAND_PRIX = demoId(3700);
+const ROUND_ROBIN_DONE = demoId(3800);
 
 const at = (path: string, tournamentId: string) =>
   generatePath(path, { leagueId: DEMO_LEAGUE_ID, tournamentId });
@@ -515,6 +516,29 @@ describe("Start the knockout (screen 13)", () => {
       await screen.findByRole("button", { name: "Draw the knockout" }),
     );
     expect(await screen.findByText("Semifinal 1")).toBeInTheDocument();
+  });
+
+  it("takes over screen 8's choices after a round robin and draws the bracket", async () => {
+    const user = userEvent.setup();
+    renderAt(
+      `${at(paths.startKnockout, ROUND_ROBIN_DONE)}?qualifiers=4&thirdPlace=true`,
+    );
+
+    await user.click(
+      await screen.findByRole("button", { name: "Draw the knockout" }),
+    );
+    expect(await screen.findByText("Semifinal 1")).toBeInTheDocument();
+    expect(screen.getByText("Third place")).toBeInTheDocument();
+  });
+
+  it("ignores query values it cannot use", async () => {
+    renderAt(
+      `${at(paths.startKnockout, ROUND_ROBIN_DONE)}?qualifiers=lots&thirdPlace=maybe`,
+    );
+
+    expect(
+      await screen.findByRole("button", { name: "Draw the knockout" }),
+    ).toBeEnabled();
   });
 
   it("has no axe violations", async () => {

@@ -67,8 +67,10 @@ function refillFields(t: StoredTournament): void {
 
 function roundIsComplete(t: StoredTournament): boolean {
   const group = groupPhase(t);
-  const last = group ? roundsOf(t, group).at(-1) : undefined;
-  return last === undefined || last.matches.every((m) => m.outcome !== null);
+  const rounds = group ? roundsOf(t, group) : [];
+  // A round robin has all its rounds from the start; the others have one at a time.
+  const open = group?.format === "round_robin" ? rounds : rounds.slice(-1);
+  return open.every((r) => r.matches.every((m) => m.outcome !== null));
 }
 
 function usesRounds(t: StoredTournament): boolean {
