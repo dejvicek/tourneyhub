@@ -5,6 +5,18 @@ updates:
     directory: "/backend"
     schedule:
       interval: "weekly"
+  # frontend/package.json and frontend/pnpm-lock.yaml (ADR-003)
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+  # The base images in backend/Dockerfile and frontend/Dockerfile (ADR-014)
+  - package-ecosystem: "docker"
+    directories:
+      - "/backend"
+      - "/frontend"
+    schedule:
+      interval: "weekly"
   # Keeps the actions in .github/workflows, pinned to commit SHAs, current
   - package-ecosystem: "github-actions"
     directory: "/"
