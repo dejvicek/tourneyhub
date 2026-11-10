@@ -1,6 +1,8 @@
 // The demo's data: one league with 16 players and its current season, two
 // finished tournaments with results, and a DYP tournament running its round
 // robin tonight (PRD §5.1). The same seed gives the same data every time.
+// The screen areas add their own data through seedParts.ts, each in its own
+// id range (ids.ts).
 import type {
   EntryRead,
   GameRead,
@@ -24,18 +26,18 @@ import {
   roundRobinStandings,
   waitingMatches,
 } from "./engine";
+import {
+  DEMO_EMAIL,
+  DEMO_LEAGUE_ID,
+  DEMO_SEASON_ID,
+  DEMO_SHARE_TOKEN,
+  DEMO_USER_ID,
+  demoId,
+  SEED_AREAS,
+  type SeedArea,
+} from "./ids";
 import { DEFAULT_PLACEMENT_POINTS } from "./rules";
-
-/** Ids in UUIDv7 form; fixed, so links into the demo stay valid. */
-export function demoId(n: number): string {
-  return `019a0000-0000-7000-8000-${n.toString(16).padStart(12, "0")}`;
-}
-
-export const DEMO_USER_ID = demoId(1);
-export const DEMO_LEAGUE_ID = demoId(2);
-export const DEMO_SEASON_ID = demoId(3);
-export const DEMO_SHARE_TOKEN = "demo-share-token-k3vQ9xLr2TbW8sNe";
-export const DEMO_EMAIL = "organizer@demo.tourneyhub.test";
+import { seedParts } from "./seedParts";
 
 export interface StoredLeague {
   league: LeagueRead;
@@ -92,17 +94,20 @@ function at(date: string, time: string): string {
 }
 
 /** Builds a tournament's rows; ids come from one counter per tournament. */
-class TournamentBuilder {
+export class TournamentBuilder {
   private next: number;
+  private readonly area: SeedArea;
   readonly tournament: StoredTournament;
 
   constructor(
+    area: SeedArea,
     base: number,
     summary: Pick<StoredTournament, "name" | "date" | "type" | "state">,
   ) {
+    this.area = area;
     this.next = base;
     this.tournament = {
-      id: demoId(base),
+      id: demoId(base, area),
       league_id: DEMO_LEAGUE_ID,
       season_id: DEMO_SEASON_ID,
       goals_per_game: 10,
@@ -116,7 +121,7 @@ class TournamentBuilder {
 
   id(): string {
     this.next += 1;
-    return demoId(this.next);
+    return demoId(this.next, this.area);
   }
 
   phase(fields: Omit<PhaseRead, "id" | "position">): PhaseRead {
@@ -229,7 +234,7 @@ function octoberSingles(
   rng: () => number,
 ): StoredTournament {
   const date = "2026-10-15";
-  const t = new TournamentBuilder(1000, {
+  const t = new TournamentBuilder("foundation", 200, {
     name: "October Singles",
     date,
     type: "singles",
@@ -254,7 +259,7 @@ function autumnOpenDyp(
   rng: () => number,
 ): StoredTournament {
   const date = "2026-10-29";
-  const t = new TournamentBuilder(2000, {
+  const t = new TournamentBuilder("foundation", 300, {
     name: "Autumn Open DYP",
     date,
     type: "dyp",
@@ -312,7 +317,7 @@ function thursdayDyp(
   rng: () => number,
   date: string,
 ): StoredTournament {
-  const t = new TournamentBuilder(3000, {
+  const t = new TournamentBuilder("foundation", 400, {
     name: "Thursday DYP",
     date,
     type: "dyp",
@@ -354,7 +359,7 @@ function thursdayDyp(
 export function createSeed(today: Date = new Date()): DemoState {
   const rng = createRng(20261110);
   const players: StoredPlayer[] = PLAYER_NAMES.map((name, i) => ({
-    id: demoId(100 + i),
+    id: demoId(100 + i, "foundation"),
     league_id: DEMO_LEAGUE_ID,
     name,
     removed_at: null,
@@ -364,7 +369,7 @@ export function createSeed(today: Date = new Date()): DemoState {
     autumnOpenDyp(players, rng),
     thursdayDyp(players, rng, isoDate(today)),
   ];
-  return {
+  const state: DemoState = {
     me: {
       id: DEMO_USER_ID,
       email: DEMO_EMAIL,
@@ -404,5 +409,50 @@ export function createSeed(today: Date = new Date()): DemoState {
       },
     ],
     tournaments,
+  };
+  for (const part of seedParts) {
+    part.add(state, seedKit(part.area, isoDate(today)));
+  }
+  return state;
+}
+
+/** What a seed part gets to build its rows with. */
+export interface SeedKit {
+  /** An id in the part's own range (ids.ts). */
+  id: (n: number) => string;
+  /** A tournament of the demo league's active season; its ids count up from `base`. */
+  tournament: (
+    base: number,
+    summary: Pick<StoredTournament, "name" | "date" | "type" | "state">,
+  ) => TournamentBuilder;
+  /** The part's own random numbers, the same on every seed. */
+  rng: () => number;
+  /** Today, YYYY-MM-DD, the date of a tournament played tonight. */
+  today: string;
+  /** Gives a match random games until a side has won `gamesToWin` of them. */
+  play: typeof play;
+  /** A group phase: one round robin leg, BO1, no sit-out points. */
+  roundRobinPhase: Omit<PhaseRead, "id" | "position">;
+}
+
+/**
+ * One screen area's addition to the seed, registered in seedParts.ts. It
+ * changes `state` in place, with ids from its own range. A seed part
+ * imports only types from this file; what it needs at run time comes in
+ * the kit, so that seed.ts → seedParts.ts → the part is not a cycle.
+ */
+export interface SeedPart {
+  area: Exclude<SeedArea, "foundation">;
+  add: (state: DemoState, kit: SeedKit) => void;
+}
+
+function seedKit(area: SeedArea, today: string): SeedKit {
+  return {
+    id: (n) => demoId(n, area),
+    tournament: (base, summary) => new TournamentBuilder(area, base, summary),
+    rng: createRng(20261110 + SEED_AREAS[area][0]),
+    today,
+    play,
+    roundRobinPhase: ROUND_ROBIN,
   };
 }

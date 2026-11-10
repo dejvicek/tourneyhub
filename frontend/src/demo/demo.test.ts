@@ -3,7 +3,12 @@ import { describe, expect, it } from "vitest";
 import { dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
 
-import { DEMO_LEAGUE_ID, DEMO_SEASON_ID, DEMO_SHARE_TOKEN } from "./seed";
+import {
+  DEMO_LEAGUE_ID,
+  DEMO_SEASON_ID,
+  DEMO_SHARE_TOKEN,
+  demoId,
+} from "./ids";
 
 const league = { league_id: DEMO_LEAGUE_ID };
 
@@ -111,5 +116,12 @@ describe("the demo's fake API", () => {
     expect(shared.name).toBe("Thursday Foosball");
     expect(shared.tournaments.every((t) => t.state !== "setup")).toBe(true);
     expect(shared.standings[0]?.place).toBe(1);
+  });
+
+  it("keeps each area's seed ids in its own range", () => {
+    expect(demoId(1000, "setup")).toBe("019a0000-0000-7000-8000-0000000003e8");
+    expect(() => demoId(1000, "foundation")).toThrow(RangeError);
+    expect(() => demoId(2999.5, "play")).toThrow(RangeError);
+    expect(() => demoId(5000, "outside")).toThrow(RangeError);
   });
 });

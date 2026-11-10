@@ -1,7 +1,7 @@
 // Demo handlers: leagues and their settings (FR-007, FR-010, FR-011, FR-070).
+import { demoId } from "../ids";
 import { apiError, route } from "../route";
 import { DEFAULT_PLACEMENT_POINTS } from "../rules";
-import { demoId } from "../seed";
 import {
   activeSeason,
   db,

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { generatePath } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { DEMO_LEAGUE_ID, DEMO_SHARE_TOKEN } from "@/demo/seed";
+import { DEMO_LEAGUE_ID, DEMO_SHARE_TOKEN } from "@/demo/ids";
 import { i18n } from "@/i18n";
 import { paths } from "@/lib/paths";
 import { stubViewport } from "@/test/media";

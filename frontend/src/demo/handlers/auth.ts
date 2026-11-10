@@ -1,8 +1,8 @@
 // Demo handlers: accounts and login (FR-001–FR-004, ADR-006). Any email and
 // password log in the demo organizer; the tokens are placeholders and no
 // cookie is set.
+import { DEMO_EMAIL } from "../ids";
 import { route } from "../route";
-import { DEMO_EMAIL } from "../seed";
 import { db } from "../store";
 
 const DEMO_ACCESS_TOKEN = "demo-access-token";

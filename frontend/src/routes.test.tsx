@@ -2,15 +2,15 @@ import { screen } from "@testing-library/react";
 import { generatePath } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { DEMO_LEAGUE_ID, DEMO_SHARE_TOKEN, demoId } from "@/demo/seed";
+import { DEMO_LEAGUE_ID, DEMO_SHARE_TOKEN, demoId } from "@/demo/ids";
 import { i18n } from "@/i18n";
 import { paths } from "@/lib/paths";
 import { renderAt } from "@/test/renderApp";
 
 const params = {
   leagueId: DEMO_LEAGUE_ID,
-  tournamentId: demoId(3000),
-  matchId: demoId(3001),
+  tournamentId: demoId(400),
+  matchId: demoId(401),
   shareToken: DEMO_SHARE_TOKEN,
 };
 
