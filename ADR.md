@@ -354,7 +354,7 @@ Caddy adds three headers to every response: a Content-Security-Policy that allow
 
 **Order.** Local development of the MVP features → deployment to the VPS with HTTPS, backups and basic monitoring → the pilot season. Backups are a precondition for the pilot: losing a season's results would fail the MVP. Before the pilot, the monitoring must alert a person, since a down instance on a tournament evening sends the group back to paper, and hosting in the EU with a short privacy note is decided with the PRD owner, since real names and email addresses of EU residents are stored.
 
-**Designed in that phase.** Backups (scheduled `pg_dump` stored off the VPS, with a tested restore), monitoring and who it alerts, log retention (including whether share tokens in access logs are redacted, ADR-008) and secret handling on the VPS. HSTS, once Let's Encrypt works on the real domain: first with a `max-age` of one day, raised to one year after the first automatic renewal; no `includeSubDomains`, no `preload`.
+**Designed in that phase.** Backups (scheduled `pg_dump` stored off the VPS, with a tested restore), monitoring and who it alerts, log retention (including whether share tokens in access logs are redacted, ADR-008) and secret handling on the VPS. HSTS, once Let's Encrypt works on the real domain: first with a `max-age` of one day, raised to one year after the first automatic renewal; no `includeSubDomains`, no `preload`. The api's own PostgreSQL role: a non-superuser owner of the `tourneyhub` database, created before the VPS database volume first exists; until then the api connects as `postgres`.
 
 **Consequences.** What runs on the VPS is what CI tested. Updating needs a person with access to the VPS, which suits a pilot with one instance.
 
