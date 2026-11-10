@@ -24,10 +24,7 @@ class Base(DeclarativeBase):
 
 
 def str_enum[E: StrEnum](enum: type[E], *, name: str) -> Enum:
-    """A varchar column without a length and a named CHECK of the enum's values.
-
-    DATA-MODEL §2 asks for text with a CHECK; see §11.
-    """
+    """A varchar column without a length and a named CHECK of the enum's values."""
     return Enum(
         enum,
         name=name,
