@@ -365,6 +365,71 @@ def test_adr006_a_request_without_a_valid_token_is_not_counted(
 
 
 @pytest.mark.concurrency
+def test_adr006_a_login_with_the_old_password_racing_a_change_does_not_get_a_session(
+    committing_settings: Settings,
+    committing_engine: Engine,
+    wait_for_a_lock_wait: Callable[[], None],
+) -> None:
+    at = datetime.now(UTC)
+    key = committing_settings.jwt_secret
+    with Session(committing_engine) as setup:
+        user = User(
+            email=f"{uuid7()}@example.test",
+            display_name="Racer",
+            password_hash=auth_service.hash_password(PASSWORD),
+            language=Language.EN,
+            created_at=at,
+        )
+        setup.add(user)
+        setup.flush()
+        user_id, email = user.id, user.email
+        this_device = auth_service.start_session(
+            setup, user_id=user_id, key=key, now=at
+        )
+        setup.commit()
+    keep = auth_service.read_access_token(this_device.access_token, key=key, now=at)
+    outcome: list[httpx2.Response] = []
+
+    with (
+        Session(committing_engine) as changing,
+        TestClient(create_app(committing_settings)) as client,
+    ):
+        account_service.change_password(
+            changing,
+            # No advisory locks of its own, which would hold the login's throttle.
+            attempt=auth_service.Attempt(attempt_ids=()),
+            user=changing.get_one(User, user_id),
+            keep_family_id=keep.family_id,
+            current_password=PASSWORD,
+            new_password=NEW_PASSWORD,
+            now=at,
+        )  # not committed yet: the login still sees, and verifies, the old hash
+
+        def log_in_with_the_old_password() -> None:
+            outcome.append(
+                client.post(
+                    "/api/v1/auth/login",
+                    json={"email": email, "password": PASSWORD},
+                )
+            )
+
+        login = threading.Thread(target=log_in_with_the_old_password)
+        login.start()
+        wait_for_a_lock_wait()  # the login has verified and waits for the change
+        changing.commit()
+        login.join()
+
+    assert [(r.status_code, r.json()["code"]) for r in outcome] == [
+        (401, "not_authenticated")
+    ]
+    with Session(committing_engine) as reader:
+        families = reader.scalars(
+            select(RefreshToken.family_id).where(RefreshToken.user_id == user_id)
+        ).all()
+        assert list(families) == [keep.family_id]
+
+
+@pytest.mark.concurrency
 def test_adr006_a_password_change_racing_a_refresh_also_revokes_the_token_it_issued(
     committing_settings: Settings,
     committing_engine: Engine,

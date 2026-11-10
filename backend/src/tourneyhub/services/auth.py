@@ -237,7 +237,8 @@ def log_in(
 
     An unknown email is verified against a dummy hash, so it takes as long as a
     wrong password and gets the same error. A hash made with older parameters is
-    replaced, unless a password change replaced it meanwhile. A success marks
+    replaced, unless a password change replaced it meanwhile, and a login whose
+    password a change replaced while it was verified is refused. A success marks
     `attempt`, counted as a failure so far, as succeeded. Login succeeds while
     `must_change_password` is set; the other routes refuse the account until
     the password is changed.
@@ -252,6 +253,18 @@ def log_in(
     password_hash = _dummy_hash() if user is None else user.password_hash
     verified = verify_password(password_hash, password)
     if user is None or not verified:
+        raise NotAuthenticatedError(ErrorCode.NOT_AUTHENTICATED)
+    # The verification ran without a lock. A password change may have committed
+    # meanwhile, and revoked the families that existed then; this login's family
+    # would survive it with the old password. The lock waits for a change that is
+    # under way, NO KEY UPDATE as its UPDATE takes it (see `change_password`), and
+    # the hash it then reads is the one the change left.
+    current_hash = session.scalar(
+        select(User.password_hash)
+        .where(User.id == user.id)
+        .with_for_update(key_share=True)
+    )
+    if current_hash != user.password_hash:
         raise NotAuthenticatedError(ErrorCode.NOT_AUTHENTICATED)
     if _hasher.check_needs_rehash(user.password_hash):
         session.execute(
