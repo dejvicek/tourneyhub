@@ -18,8 +18,8 @@ services:
       TOURNEYHUB_JWT_SECRET: ${TOURNEYHUB_JWT_SECRET:?set TOURNEYHUB_JWT_SECRET in .env}
       TOURNEYHUB_COOKIE_SECURE: "true"
       # uvicorn trusts X-Forwarded-For only from Caddy: the subnet of the
-      # network in compose.yaml (ADR-006).
-      FORWARDED_ALLOW_IPS: 172.30.0.0/24
+      # network in compose.yaml (ADR-006); the same COMPOSE_SUBNET.
+      FORWARDED_ALLOW_IPS: ${COMPOSE_SUBNET:-172.30.0.0/24}
     depends_on:
       db:
         condition: service_healthy
