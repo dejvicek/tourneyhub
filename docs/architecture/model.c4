@@ -84,7 +84,7 @@ model {
         REST under /api/v1, OpenAPI schema committed in backend/openapi.json. Errors always as {code, detail}; the frontend builds the user-facing text.
         Every write in a league locks the league first, then the tournament (SELECT … FOR UPDATE); unsafe operations carry the state they expect and get 409 on a mismatch.
         Endpoints are plain def functions; FastAPI runs them in its thread pool.
-        When the container starts, tourneyhub migrate runs the Alembic migrations and then uvicorn starts. uvicorn trusts X-Forwarded-For only from the Compose network 172.30.0.0/24, where Caddy is.
+        When the container starts, tourneyhub migrate runs the Alembic migrations and then uvicorn starts. uvicorn trusts X-Forwarded-For only from the Compose network 172.30.0.0/24, where Caddy is in production.
       "
       link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-001--backend-python-fastapi-sqlalchemy-alembic "ADR-001"
       link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-004--repository-layout-and-local-development-in-docker "ADR-004"

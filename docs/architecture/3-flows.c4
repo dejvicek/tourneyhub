@@ -124,7 +124,7 @@ views "III. Flows" {
     github.actions -> github.ghcr "api and web images, only if Playwright passes"
     admin -> github.ghcr "on the VPS: docker compose pull"
     admin -> tourneyhub.api "on the VPS: docker compose up -d"
-    tourneyhub.api -> tourneyhub.db "Alembic migrations on start"
+    tourneyhub.api -> tourneyhub.db "tourneyhub migrate (Alembic) on start"
   }
 
   dynamic view dypEvening {

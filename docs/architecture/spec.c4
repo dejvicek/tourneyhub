@@ -81,6 +81,9 @@ specification {
     color slate
   }
 
+  // A relationship of the deployment model, drawn instead of the relations inferred from the logical model
+  tag deployment
+
   tag proposed {
     color #f59e0b
   }
