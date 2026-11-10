@@ -36,6 +36,7 @@ Run every command from `frontend/`:
 
 ```sh
 pnpm install --frozen-lockfile   # exactly what pnpm-lock.yaml says
+pnpm audit --prod                # known vulnerabilities in the production dependencies; CI fails on one
 pnpm format                      # eslint --fix, then prettier --write
 pnpm lint                        # eslint --max-warnings=0
 pnpm typecheck                   # tsc --build over src, vite.config.ts and e2e
@@ -44,7 +45,7 @@ pnpm build
 pnpm e2e                         # needs the production images running (ADR-013)
 ```
 
-`dev`, `build`, `typecheck`, `lint`, `format` and `test` run `generate:api` first, which writes `src/api/schema.d.ts` from `../backend/openapi.json` (ADR-008). CI (`.github/workflows/ci.yml`) runs `pnpm install --frozen-lockfile`, then `generate:api`, `lint`, `format:check`, `typecheck`, `test` and `build`.
+`dev`, `build`, `typecheck`, `lint`, `format` and `test` run `generate:api` first, which writes `src/api/schema.d.ts` from `../backend/openapi.json` (ADR-008). CI (`.github/workflows/ci.yml`) runs `pnpm install --frozen-lockfile`, then `pnpm audit --prod`, `generate:api`, `lint`, `format:check`, `typecheck`, `test` and `build`.
 
 Choices in the configuration that are not obvious:
 - `typescript` stays on `~6.0`. TypeScript 7 ships no compiler API [T1], and both typescript-eslint, which supports `>=4.8.4 <6.1.0` [T2], and openapi-typescript (ADR-008) import it. openapi-typescript 7.13 declares `typescript ^5`; `peerDependencyRules` in `pnpm-workspace.yaml` lets it run on 6 (§12).
@@ -61,6 +62,7 @@ Choices in the configuration that are not obvious:
 - `no-restricted-imports` has one block per folder (§11), and each block repeats the full list of banned imports, because a later block replaces the options of an earlier one.
 - `linterOptions` reports an unused `eslint-disable` comment and unused inline configuration as errors, and `--max-warnings=0` fails on warnings, such as `react-hooks/exhaustive-deps`. An `eslint-disable` names its rules and gives a reason after ` -- ` [E3].
 - Prettier and prettier-plugin-tailwindcss are pinned exactly, since both decide the output [E4], and are upgraded in a pull request that reformats the code. Every Prettier option stays at its default [E5]; `.prettierrc.json` holds the plugin, which must load last [E7], and its two options, `tailwindStylesheet` and `tailwindFunctions`. Prettier reads `.gitignore` [E8], so `.prettierignore` lists only `pnpm-lock.yaml`. No `eslint-plugin-prettier` or `prettier-eslint` [E6]; the presets have no formatting rules, so `eslint-config-prettier` is not needed.
+- `pnpm audit --prod` checks only `dependencies` and `optionalDependencies`, what ships to the browser, and fails the CI job on any advisory [E18]. An advisory the project accepts goes in `audit.ignore` in `pnpm-workspace.yaml`, as its `GHSA-…` id with a comment that links an issue. Dev dependencies are not audited; Dependabot's weekly updates cover them.
 - `format` runs `eslint --fix` before `prettier --write`, so that Prettier formats what the import sort moved.
 - Every pnpm setting is in `pnpm-workspace.yaml`; `.npmrc` would hold only auth or registry. `allowBuilds` is the reviewed allow-list for install scripts, empty today [E12]. `strictDepBuilds`, `minimumReleaseAge` (one day) and `blockExoticSubdeps` keep pnpm 12's defaults [E11]: a version published less than a day ago is not installed. `engineStrict: true` fails an install on any Node.js other than `engines` [E13], so a Node.js bump changes `.nvmrc`, `engines`, the Dockerfile and the README together.
 - `@vitejs/plugin-react` 6 needs no Babel [E15]. The React Compiler is not on.
@@ -268,7 +270,6 @@ From the first feature onward (the skeleton has none of these yet):
 | Document | Today | Proposal | Why | Status |
 |---|---|---|---|---|
 | ADR-012, frontend row | No check for hard-coded text | Add `i18next-cli lint` as a check, with its configuration and devDependency | It is the only tool that finds text outside `t()` and `<Trans>` [I1]; until then §7's first rule is left to review | Proposed |
-| ADR-012, frontend row | No dependency audit | Add `pnpm audit`, the counterpart of the backend's `uv audit`, first as a report | It checks the installed packages for known security issues [E18] | Proposed |
 | ADR-008 | Names openapi-typescript only | Name openapi-fetch as the runtime client | §8.2 relies on it. The `typescript ^5` peer override stays out of the ADR: §2 and `pnpm-workspace.yaml` explain it | Proposed |
 | ROADMAP RM-11 | "Dark mode and accessibility": "A dark theme, and every screen checked for accessibility" | Accessibility only | ADR-003 puts both themes in the MVP | Proposed |
 
