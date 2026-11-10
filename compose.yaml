@@ -1,0 +1,34 @@
+# What every setup shares (ADR-004). `docker compose` adds compose.override.yaml, the
+# development services; COMPOSE_FILE=compose.yaml:compose.prod.yaml in .env selects the
+# production images instead.
+name: tourneyhub
+
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: tourneyhub
+      # lower() folds Czech letters independently of glibc (ADR-002, DATA-MODEL §2)
+      POSTGRES_INITDB_ARGS: --locale-provider=builtin --builtin-locale=C.UTF-8
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    # -h localhost: the entrypoint's first, temporary server listens only on its socket
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "localhost", "-U", "postgres", "-d", "tourneyhub"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    # No ports: db is reachable only on the Compose network (ADR-005).
+
+# Every service of every Compose file joins the default network. Its range is fixed
+# because uvicorn's --forwarded-allow-ips trusts it, so that X-Forwarded-For counts only
+# from Caddy (ADR-006).
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
+volumes:
+  db-data:
