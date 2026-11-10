@@ -195,12 +195,16 @@ model {
       link https://github.com/dejvicek/tourneyhub "dejvicek/tourneyhub"
     }
     actions = externalComponent "GitHub Actions" {
-      technology "workflow with checks, ci-ok"
+      technology "ci.yml, required check ci-ok"
       icon tech:github-actions
-      summary "ruff, mypy, pytest with Hypothesis, Vitest, Playwright against the production images. Free: 2,000 minutes a month."
+      summary "Jobs changes (path filter), backend, frontend and e2e (Playwright against compose.prod.yaml); ci-ok waits for all of them."
       description "
-        Checks from ADR-012: ruff, mypy, pytest with Hypothesis, Vitest, openapi.json drift check and more.
-        Playwright runs against the production images (compose.prod.yaml): desktop Chromium on every PR, mobile emulation and WebKit before the pilot (ADR-013).
+        The workflow .github/workflows/ci.yml runs on every PR and on every push to main; a newer push cancels the run it supersedes.
+        - changes: the path filter, inside the workflow; each of the next three jobs runs only when its area changed.
+        - backend: ruff, mypy, import-linter, pytest under coverage (100 % in the engine), openapi.json drift, alembic upgrade head and alembic check, uv audit, against a PostgreSQL 17 service with the builtin locale.
+        - frontend: ESLint, Prettier, typecheck, Vitest and the build, on the API types generated from the committed openapi.json.
+        - e2e: Playwright in desktop Chromium against the production stack (compose.yaml and compose.prod.yaml). Only on failure are the traces, screenshots and videos uploaded, as artifacts kept for 7 days. Mobile emulation and WebKit come before the pilot (ADR-013).
+        - ci-ok: waits for all four and fails if one of them failed or was cancelled; a job skipped because nothing in its area changed counts as passed. The one check to require (ADR-012).
         Free: 2,000 minutes a month and 500 MB of storage shared by artifacts and packages.
       "
       link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-012--quality-gates-in-github-actions "ADR-012"
@@ -212,9 +216,22 @@ model {
       description "Private api and web images; only the last few versions are kept. The VPS logs in with a token that can only read packages."
       link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-014--deployment-images-in-ghcr-manual-pull-on-the-vps "ADR-014"
     }
+    dependabot = externalComponent "Dependabot" {
+      technology "dependabot.yml, weekly"
+      icon tech:dependabot
+      summary "Weekly update PRs: uv in /backend, npm in /frontend, Docker base images in /backend and /frontend, GitHub Actions."
+      description "
+        .github/dependabot.yml looks for updates every week and opens a PR for them, which CI checks like any other PR:
+        - uv: backend/pyproject.toml and backend/uv.lock;
+        - npm: frontend/package.json and frontend/pnpm-lock.yaml;
+        - docker: the base images in backend/Dockerfile and frontend/Dockerfile;
+        - github-actions: the actions in .github/workflows, pinned to commit SHAs.
+      "
+    }
 
     repo -> actions "runs the checks on PRs and after merge"
     actions -> ghcr "pushes the tested images"
+    dependabot -> repo "opens weekly update PRs"
   }
 
   // Who uses what
