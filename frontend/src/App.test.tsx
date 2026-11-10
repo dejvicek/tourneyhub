@@ -1,21 +1,10 @@
-import { QueryClient } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { createMemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { App } from "@/App";
 import { i18n } from "@/i18n";
 import { LANGUAGE_STORAGE_KEY } from "@/i18n/language";
-import { routes } from "@/routes";
-
-function renderAt(path: string) {
-  const router = createMemoryRouter(routes, { initialEntries: [path] });
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
-  render(<App router={router} queryClient={queryClient} />);
-}
+import { renderAt } from "@/test/renderApp";
 
 describe("App", () => {
   beforeEach(async () => {

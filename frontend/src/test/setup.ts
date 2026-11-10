@@ -1,10 +1,11 @@
 import "@testing-library/jest-dom/vitest";
 
 import { cleanup } from "@testing-library/react";
-import { afterAll, afterEach, beforeAll } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach } from "vitest";
 
 import { resetDemoStore } from "@/demo/store";
 
+import { stubViewport } from "./media";
 import { server } from "./server";
 
 // The API clients send requests to their own origin, "/api/v1/…", as in the
@@ -23,6 +24,11 @@ globalThis.Request = class extends NodeRequest {
 
 beforeAll(() => {
   server.listen({ onUnhandledFrame: "error" });
+});
+
+beforeEach(() => {
+  // Phones first: a test that needs a wider layout stubs its own viewport.
+  stubViewport(390);
 });
 
 afterEach(() => {

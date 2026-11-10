@@ -37,6 +37,27 @@ export default defineConfig(({ mode }) => {
         "/api": process.env.API_PROXY_TARGET ?? "http://localhost:8000",
       },
     },
+    build: {
+      rolldownOptions: {
+        output: {
+          codeSplitting: {
+            // One chunk per feature folder, the router's lazy areas: each
+            // chunk is a request that can fail on a weak connection
+            // (docs/frontend-style.md §9).
+            groups: [
+              {
+                debugName: "feature areas",
+                // Shared code (React, Query, i18n) stays in the common chunks.
+                includeDependenciesRecursively: false,
+                name: (id) =>
+                  /\/src\/features\/([^/]+)\//.exec(id)?.[1] ?? null,
+                test: /\/src\/features\//,
+              },
+            ],
+          },
+        },
+      },
+    },
     test: {
       environment: "jsdom",
       // e2e/ holds the Playwright tests, which run against the images.

@@ -10,9 +10,9 @@ export const resources = {
   cs: { translation: cs },
 } as const;
 
+// Each screen renders its own <title> in the current language.
 i18n.on("languageChanged", (language) => {
   document.documentElement.lang = language;
-  document.title = i18n.t("app.name");
 });
 
 // The resources are bundled, so initialisation finishes synchronously.
