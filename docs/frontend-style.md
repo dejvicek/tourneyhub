@@ -115,7 +115,7 @@ Checked by tools: ESLint better-tailwindcss `no-unknown-classes`, `no-conflictin
 - A new token is a pair, `x` and `x-foreground`, defined in both theme blocks and mapped in `@theme inline` [W14]. Its values come from the Figma design's variables; a colour the design lacks is added only with its contrast ratios recorded below.
 - `index.css` maps the design's variables to the shadcn tokens and adds its extras: `team-a`, `team-b`, `notice-info`, `notice-warning`, `nav`, `nav-active`, `field` (the playfield), `feature` (the Feature button on it), `border-surface`, `input-background`, `bead-empty` and `bead-rod` (the last two are a fill and a stroke, not a pair).
 - Fonts are self-hosted from `@fontsource`, because the CSP is `default-src 'self'`: Atkinson Hyperlegible Next 400 and 700 (`font-sans`, body and UI) and Big Shoulders 800 (`font-display`, titles and scores), Latin and Latin Extended only. The Figma text styles are `text-display-*`, `text-score-*`, `text-body-*`, `text-button-*`, `text-caption` and `text-micro`, each with its line height and weight.
-- `index.html` has one `<meta name="theme-color">` per scheme, with `media="(prefers-color-scheme: …)"` and the `--background` colour, `#f2f4f1` and `#1a2430` [A22]. Contrast and focus are checked in both themes (§6).
+- `index.html` has one `<meta name="theme-color">` per scheme, with `media="(prefers-color-scheme: …)"` and the `--nav` colour, `#ffffff` and `#151e28`, the colour of the header under the status bar [A22]. Contrast and focus are checked in both themes (§6).
 - The design has no destructive, focus or chart colours. These were added (ratios against page, card and, for the ring, the nav's active fill; light / dark):
 
   | Token | Light | Dark | Ratios |

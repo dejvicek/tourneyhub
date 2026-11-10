@@ -6,10 +6,6 @@
    palette, a class such as bg-red-500 does not exist and fails lint. Black
    and white keep Tailwind's values for the copied shadcn/ui components; lint
    bans bg-white and the like outside src/components/ui/. */
-/* Colours come only from the theme tokens below (ADR-003): without Tailwind's
-   palette, a class such as bg-red-500 does not exist and fails lint. Black
-   and white keep Tailwind's values for the copied shadcn/ui components; lint
-   bans bg-white and the like outside src/components/ui/. */
 @theme {
   --color-*: initial;
   --color-black: #000;
