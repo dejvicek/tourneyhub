@@ -56,7 +56,7 @@ export function SetupFormatPage() {
   const { t } = useTranslation();
   const leagueId = useRouteParam("leagueId");
   const editingId = useSearchParams()[0].get("tournament") ?? undefined;
-  const settings = useQuery(leagueQueries.settings(leagueId));
+  const settings = useQuery(leagueQueries.detail(leagueId));
   const existing = useQuery(setupQueries.detail(leagueId, editingId));
 
   const ready =

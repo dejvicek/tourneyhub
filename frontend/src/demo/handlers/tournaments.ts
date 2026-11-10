@@ -95,7 +95,7 @@ export const tournamentHandlers = [
           ? tournamentRead(existing)
           : conflict("tournament_id_taken", { id: body.id });
       }
-      const problem = formatProblem(body, league.settings.draws_allowed);
+      const problem = formatProblem(body, league.draws_allowed);
       if (problem) {
         return apiError(422, problem.code, problem.detail);
       }
@@ -121,7 +121,7 @@ export const tournamentHandlers = [
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/format",
     ({ params, body }) =>
       inSetup(params, (t, league) => {
-        const problem = formatProblem(body, league.settings.draws_allowed);
+        const problem = formatProblem(body, league.draws_allowed);
         if (problem) {
           return apiError(422, problem.code, problem.detail);
         }

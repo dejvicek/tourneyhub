@@ -1,7 +1,7 @@
 // Helpers for the tests of the list and the setup steps.
 import axe from "axe-core";
 
-import { dataOf } from "@/api/client";
+import { api, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
 
 import type { TournamentFormatWrite } from "./contract";
@@ -162,16 +162,9 @@ export function tournamentsOfSeason() {
 /** The league allows draws (BR-121), so BO2 is offered. */
 export async function allowDraws() {
   await dataOf(
-    provisionalApi.PUT("/api/v1/leagues/{league_id}/settings", {
+    api.PATCH("/api/v1/leagues/{league_id}", {
       params: { path: league },
-      body: {
-        name: "Thursday Foosball",
-        draws_allowed: true,
-        default_field_count: 2,
-        default_match_format: "bo1",
-        default_goals_per_game: 10,
-        placement_points: [10, 8, 6, 4, 2],
-      },
+      body: { draws_allowed: true },
     }),
   );
 }

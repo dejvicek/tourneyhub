@@ -42,7 +42,7 @@ function Review({ data }: { data: SetupData }) {
   const navigate = useNavigate();
   const { leagueId, tournamentId, tournament, setup, nameOf } = data;
   const format = setup.format;
-  const settings = useQuery(leagueQueries.settings(leagueId));
+  const settings = useQuery(leagueQueries.detail(leagueId));
   const preview = useQuery(setupQueries.preview(leagueId, tournamentId));
   // Once the tournament is started this screen unmounts (the gate in
   // SetupPage), so the way on is not a per-call callback: it waits for the
