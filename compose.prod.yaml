@@ -1,5 +1,6 @@
-# The production images (ADR-004, ADR-014), used for the end-to-end tests and on
-# the VPS: `docker compose -f compose.yaml -f compose.prod.yaml`, or
+# The production images (ADR-004, ADR-014), used for the end-to-end tests. Both
+# images are built locally today; the VPS waits for the GHCR images (ADR-014).
+# Run it with `docker compose -f compose.yaml -f compose.prod.yaml`, or
 # COMPOSE_FILE=compose.yaml:compose.prod.yaml in .env. compose.override.yaml is
 # not loaded then, so the definitions here are complete.
 
