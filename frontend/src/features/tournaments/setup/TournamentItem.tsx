@@ -184,7 +184,7 @@ export function TournamentItem({
             aria-valuemin={0}
             aria-valuemax={progress.total}
             aria-valuenow={progress.played}
-            className="mt-1 block h-2 overflow-hidden rounded-full bg-muted"
+            className="mt-1 block h-2 overflow-hidden rounded-full bg-nav-active"
           >
             {/* A value from the API reaches CSS through a custom property (§5.1). */}
             <span
