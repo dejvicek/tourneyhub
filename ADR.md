@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Status | Proposed — awaiting review by another developer |
-| Date | 2026-10-16, revised 2026-10-21 after review, 2026-11-03 (ADR-001: Python 3.15, SQLAlchemy 2.1), 2026-11-05 (ADR-001, ADR-006, ADR-008, ADR-010, ADR-012: decisions of the style-guide review), 2026-11-10 (ADR-003: mobile-first layout, light and dark themes in the MVP), 2026-11-10 (ADR-005, ADR-006, ADR-014: acting decisions on PR #14 while the lead reviewer is away) and 2026-11-10 (ADR-003, ADR-008, ADR-012, ADR-013: acting decisions on the frontend style guide while the lead reviewer is away) |
+| Date | 2026-10-16, revised 2026-10-21 after review, 2026-11-03 (ADR-001: Python 3.15, SQLAlchemy 2.1), 2026-11-05 (ADR-001, ADR-006, ADR-008, ADR-010, ADR-012: decisions of the style-guide review), 2026-11-10 (ADR-003: mobile-first layout, light and dark themes in the MVP), 2026-11-10 (ADR-005, ADR-006, ADR-014: acting decisions on PR #14 while the lead reviewer is away), 2026-11-10 (ADR-003, ADR-008, ADR-012, ADR-013: acting decisions on the frontend style guide while the lead reviewer is away) and 2026-11-10 (ADR-003: CI installs the Playwright browser without system packages) |
 | Scope | Technical decisions for the MVP in `PRD.md`. Once accepted, a changed decision gets a new ADR that supersedes the old one; accepted ADRs are not rewritten. |
 
 Each ADR states its status, the context, the decision, its consequences and the alternatives considered. Requirement IDs (FR-, BR-, RM-) refer to `PRD.md` and `ROADMAP.md`.
@@ -102,7 +102,7 @@ Each ADR states its status, the context, the decision, its consequences and the 
 - Both themes ship in the MVP, as the design has them. Every screen and component is built and checked in both, which costs more than one theme; tokens keep that cost to the colours, not the layout. A manual theme switch is not in the MVP.
 - pnpm keeps `node_modules` strict: code can import only what its own `package.json` declares.
 - pnpm does not run dependency install scripts unless the package is on an allow-list (`allowBuilds` in `pnpm-workspace.yaml`). An unlisted install script fails `pnpm install`, so the list is reviewed like code. Today it lets no package run one, and it denies `@swc/core`'s explicitly.
-- Node 25 and later no longer ship Corepack, so pnpm is installed explicitly: in CI with `pnpm/action-setup`, which reads the pinned version, before `actions/setup-node` with `cache: pnpm`, then `pnpm install --frozen-lockfile`; in the Dockerfile with the same pinned version. Playwright browsers are installed with `pnpm exec playwright install --with-deps`.
+- Node 25 and later no longer ship Corepack, so pnpm is installed explicitly: in CI with `pnpm/action-setup`, which reads the pinned version, before `actions/setup-node` with `cache: pnpm`, then `pnpm install --frozen-lockfile`; in the Dockerfile with the same pinned version. Playwright browsers are installed with `pnpm exec playwright install`; `--with-deps` adds the system packages where the machine lacks them (CI's runner image has them).
 
 **Alternatives considered.** Mantine (faster start, less control over the look). Plain Tailwind (most work, accessibility of dialogs and menus on us). npm (nothing extra to set up, but `node_modules` is not strict and dependency install scripts run by default).
 

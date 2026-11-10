@@ -190,7 +190,9 @@ jobs:
           cache-dependency-path: frontend/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
         working-directory: frontend
-      - run: pnpm exec playwright install --with-deps chromium
+      # The runner image already provides Chromium's system libraries; this avoids the
+      # apt download that stalled for 3 minutes in run 42843187096.
+      - run: pnpm exec playwright install chromium
         working-directory: frontend
       # Bake reads the Compose files but not COMPOSE_ENV_FILES, so the dummy
       # configuration goes into the environment of the later steps.
