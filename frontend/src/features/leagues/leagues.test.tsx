@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { generatePath } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { syncBracket } from "@/demo/finalsEngine";
 import { DEMO_LEAGUE_ID } from "@/demo/ids";
 import { activeSeason, db } from "@/demo/store";
 import { axeViolations } from "@/features/auth/axeCheck";
@@ -14,11 +15,18 @@ const settings = generatePath(paths.leagueSettings, {
   leagueId: DEMO_LEAGUE_ID,
 });
 
-/** BR-010 allows a new season only when every tournament is finished. */
+/**
+ * BR-010 allows a new season only when every tournament is finished. A
+ * bracket with matches still to play reopens itself (FR-037), so the
+ * tournaments that stay unfinished are deleted, which BR-010 allows too.
+ */
 function finishEveryTournament() {
   for (const tournament of db().tournaments) {
     tournament.state = "finished";
+    syncBracket(tournament);
   }
+  const state = db();
+  state.tournaments = state.tournaments.filter((t) => t.state === "finished");
 }
 
 describe("leagues", () => {
@@ -143,7 +151,9 @@ describe("leagues", () => {
     renderAt(settings);
 
     expect(
-      await screen.findByText(/Finish or delete Thursday DYP first\./),
+      await screen.findByText(
+        /Finish or delete these tournaments first: .*Thursday DYP/,
+      ),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Start Season 2" }),
