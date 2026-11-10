@@ -294,7 +294,7 @@ Still to come with the first screens that need them:
 - The Czech plural type for `cs` (§7).
 - The `middleware` that guards organizer routes, with the login (§9).
 
-Demo mode (`pnpm dev:demo`, `src/demo/README.md`) runs every screen against an MSW worker. MSW is a dev dependency; `main.tsx` loads the demo behind a `MODE !== "production"` check that the bundler removes, ESLint lets app code import only `@/demo/rules` and `@/demo/contract`, and Vite's MSW plugin, which serves the worker script, is on only in demo mode. Provisional API types live in `src/demo/contract.ts` until the backend's routes are generated into `schema.d.ts`; screens call those routes through `provisionalApi` (`src/api/provisional.ts`). Texts are split per area into `src/i18n/locales/{en,cs}/<area>.ts`, merged into the one namespace. The build puts each `src/features/<area>/` into one chunk.
+Demo mode (`pnpm dev:demo`, `src/demo/README.md`) runs every screen against an MSW worker. MSW is a dev dependency; `main.tsx` loads the demo behind a `MODE !== "production"` check that the bundler removes, ESLint lets app code import only `@/demo/rules` and `@/demo/contract`, and Vite's MSW plugin, which serves the worker script, is on only in demo mode. CI fails the frontend job if any text file in `dist` matches `msw|setupWorker|mockServiceWorker`. Provisional API types live in `src/demo/contract.ts` until the backend's routes are generated into `schema.d.ts`; screens call those routes through `provisionalApi` (`src/api/provisional.ts`). Texts are split per area into `src/i18n/locales/{en,cs}/<area>.ts`, merged into the one namespace. The build puts each `src/features/<area>/` into one chunk.
 
 ## 12. Proposed changes to other documents
 

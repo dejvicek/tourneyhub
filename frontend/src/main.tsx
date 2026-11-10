@@ -20,9 +20,11 @@ import { App } from "@/App";
 import { isDemoMode } from "@/lib/demoMode";
 import { routes } from "@/routes";
 
-// Demo mode serves the API from an MSW worker before the first request. The
-// MODE check is written out here so that a production build drops the import
-// and with it every byte of MSW and the demo (docs/frontend-style.md §5.2).
+// Demo mode serves the API from an MSW worker before the first request. Vite
+// replaces import.meta.env.MODE with "production" in a production build, so
+// the condition is false at build time, the bundler removes the branch and
+// never emits the chunk of the dynamic import: MSW and src/demo stay out of
+// dist. CI checks it (ci.yml, "The build contains no demo"); guide §11.
 if (import.meta.env.MODE !== "production" && isDemoMode(import.meta.env)) {
   const { startDemo } = await import("@/demo/browser");
   await startDemo();
