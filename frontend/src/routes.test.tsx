@@ -46,7 +46,7 @@ const SCREENS: Screen[] = [
   ["admin", "Admin", "Správa"],
   ["myLeagues", "My leagues", "Moje ligy"],
   ["tournaments", "Tournaments", "Turnaje"],
-  ["newTournament", "New tournament", "Nový turnaj"],
+  ["newTournament", "Choose the format", "Zvolte formát"],
   ["setupPlayers", "Who is playing tonight?", "Kdo dnes hraje?"],
   ["setupDraw", "Draw the pairs", "Losování dvojic"],
   ["setupReview", "Ready to start?", "Můžeme začít?"],

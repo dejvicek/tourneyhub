@@ -126,7 +126,7 @@ export const tournamentsSetup: CsMessages<typeof english> = {
       knockout: "Vyřazovací fáze",
     },
     format: {
-      title: "Nový turnaj",
+      title: "Zvolte formát",
       defaultName: "{{type}}, {{date}}",
       name: "Název",
       nameHint: "Hráči ho uvidí na sdíleném odkazu.",

@@ -79,12 +79,10 @@ interface SetupHeaderProps {
   step: SetupStep;
   title: string;
   type: TournamentDetail["type"] | undefined;
-  /** The tournament's name, or the league and season for a new one. */
-  context?: string;
 }
 
 /** The step strip and the screen's title (the <title> and the one h1). */
-export function SetupHeader({ step, title, type, context }: SetupHeaderProps) {
+export function SetupHeader({ step, title, type }: SetupHeaderProps) {
   return (
     <>
       <DocumentTitle screen={title} />
@@ -94,9 +92,6 @@ export function SetupHeader({ step, title, type, context }: SetupHeaderProps) {
           <h1 className="font-display text-display-screen md:text-display-title">
             {title}
           </h1>
-          {context !== undefined && (
-            <p className="text-body-md text-muted-foreground">{context}</p>
-          )}
         </div>
       </div>
     </>
@@ -120,12 +115,7 @@ export function SetupPage({ step, title, children }: SetupPageProps) {
 
   return (
     <section className="mx-auto grid w-full max-w-5xl gap-6">
-      <SetupHeader
-        step={step}
-        title={heading}
-        type={type}
-        context={data?.tournament.name}
-      />
+      <SetupHeader step={step} title={heading} type={type} />
       {data === undefined ? (
         failed ? (
           <p role="alert">{t("tournaments.errors.load")}</p>

@@ -116,7 +116,7 @@ export const tournamentsSetup = {
       knockout: "Knockout",
     },
     format: {
-      title: "New tournament",
+      title: "Choose the format",
       defaultName: "{{type}} on {{date}}",
       name: "Name",
       nameHint: "Shown to players on the share link.",
