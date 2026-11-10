@@ -109,7 +109,7 @@ model {
       }
       leaguesApi = component "API: leagues, players, seasons" {
         summary "Create a league with Season 1, settings, player list, new season, closed seasons read-only (FR-010 to FR-022)."
-        description "FR-010 to FR-022. Starting a new season carries the current season's number, otherwise 409. The client sends the new league's id (UUIDv7)."
+        description "FR-010 to FR-022. The client sends the new league's id (UUIDv7); Season 1 is created with it. Starting a new season carries the current season's number, otherwise 409. The placement points table is edited on the active season; a closed season's table is 409."
         link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#62-leagues-and-players "PRD §6.2 and §6.3"
       }
       tournamentsApi = component "API: tournaments" {
@@ -162,7 +162,7 @@ model {
         link https://github.com/dejvicek/tourneyhub/blob/docs/data-model-mvp/DATA-MODEL.md#41-accounts-and-administration "DATA-MODEL §4.1"
       }
       leagues = tableGroup "Leagues, players and seasons" {
-        description "leagues, players, seasons (with the placement points table)"
+        description "leagues (settings, share token), players, seasons (placement points table; one active per league)"
         link https://github.com/dejvicek/tourneyhub/blob/docs/data-model-mvp/DATA-MODEL.md#42-leagues-players-and-seasons "DATA-MODEL §4.2"
       }
       tournaments = tableGroup "Tournaments and entries" {

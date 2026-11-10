@@ -58,7 +58,7 @@ views "I. Structure" {
     include tourneyhub.api.engine with { navigateTo addRound }
     include tourneyhub.api.publicApi with { navigateTo shareLink }
     include tourneyhub.api.adminApi with { navigateTo adminReset }
-    include tourneyhub.api.leaguesApi with { navigateTo dypEvening }
+    include tourneyhub.api.leaguesApi with { navigateTo leagueSeasons }
     include tourneyhub.spa -> tourneyhub.api.authApi with {
       title "login, refresh (cookie)"
     }
@@ -80,6 +80,7 @@ views "I. Structure" {
     description "Coarse structure of DATA-MODEL.md. Solid lines are foreign keys, dashed lines access from the API and the CLI. Columns and constraints are in the document."
     include *
     include tourneyhub.db.accounts with { navigateTo loginRefresh }
+    include tourneyhub.db.leagues with { navigateTo leagueSeasons }
     include tourneyhub.db.play with { navigateTo resultEntry }
     include tourneyhub.api -> tourneyhub.db.accounts with {
       title "auth and instance admin"

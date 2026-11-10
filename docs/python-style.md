@@ -311,7 +311,7 @@ class LeagueCreate(RequestModel):
 ```
 
 - Request models extend `RequestModel`. `extra="forbid"` rejects unknown fields, so a client cannot slip in `is_admin` (OWASP API3). Response models extend `ResponseModel`.
-- One model per operation and direction: `LeagueCreate`, `LeagueRename`, `LeagueRead`. Class names and `type` aliases become TypeScript type names, so they are unique across the app.
+- One model per operation and direction: `LeagueCreate`, `LeagueUpdate`, `LeagueRead`. Class names and `type` aliases become TypeScript type names, so they are unique across the app.
 - Operations that are unsafe to repeat carry the expected state as required fields (`expected_round_no`, `expected_draw_counter`) or send the full target state (ADR-008).
 - JSON field names are the Python names, in snake_case, with no aliases.
 - Put constraints in the type (`StringConstraints`, `Field(ge=0)`) rather than in validators. They appear in OpenAPI and produce stable error types. Every string and list in a request has a maximum length (OWASP API4).
@@ -457,7 +457,7 @@ def migrate() -> None:
 - A test name states the rule: `test_br056_pairs_the_next_unplayed_entry_below`.
 - The PRD's worked examples (§5.1 and those inside BR-055, BR-061, BR-081, BR-111) are exact test vectors (ADR-012). §5.2 is reproduced with a seed under which no top player sits out in round 1, until the PRD owner decides whether top players are exempt from that lot (ADR-011).
 - One behaviour per test, with arrange, act and assert separated by blank lines. Parametrize with ids: `pytest.param(..., id="BR-104-shared-places")`.
-- Check domain errors by code: `with pytest.raises(ConflictError) as raised:` and then `assert raised.value.code is ErrorCode.LEAGUE_NAME_CHANGED`. Never match English messages.
+- Check domain errors by code: `with pytest.raises(ConflictError) as raised:` and then `assert raised.value.code is ErrorCode.SEASON_NUMBER_CHANGED`. Never match English messages.
 - Fixtures that need teardown use `yield`; the others `return` (ruff `PT022`). Broad scopes only for expensive, immutable things such as the migrated database.
 - Test data comes from factory fixtures named `make_<noun>`. Each returns a function with keyword-only arguments and unique defaults that adds the row, flushes and returns it: `make_league(name="Thursday DYP")`. The row's `created_at`, and `updated_at` where a service would set it, come from the `now` fixture (§4.3).
 - Property tests use Hypothesis on the pure engine only, never together with function-scoped database fixtures.
