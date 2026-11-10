@@ -101,7 +101,7 @@ Each ADR states its status, the context, the decision, its consequences and the 
 - The knockout options keep their English names in both languages (FR-080).
 - Both themes ship in the MVP, as the design has them. Every screen and component is built and checked in both, which costs more than one theme; tokens keep that cost to the colours, not the layout. A manual theme switch is not in the MVP.
 - pnpm keeps `node_modules` strict: code can import only what its own `package.json` declares.
-- pnpm does not run dependency install scripts unless the package is on an allow-list (`allowBuilds` in `pnpm-workspace.yaml`; `onlyBuiltDependencies` in pnpm 10). An unlisted install script fails `pnpm install`, so the list (typically esbuild for Vite) is reviewed like code.
+- pnpm does not run dependency install scripts unless the package is on an allow-list (`allowBuilds` in `pnpm-workspace.yaml`). An unlisted install script fails `pnpm install`, so the list is reviewed like code. Today it lets no package run one, and it denies `@swc/core`'s explicitly.
 - Node 25 and later no longer ship Corepack, so pnpm is installed explicitly: in CI with `pnpm/action-setup`, which reads the pinned version, before `actions/setup-node` with `cache: pnpm`, then `pnpm install --frozen-lockfile`; in the Dockerfile with the same pinned version. Playwright browsers are installed with `pnpm exec playwright install --with-deps`.
 
 **Alternatives considered.** Mantine (faster start, less control over the look). Plain Tailwind (most work, accessibility of dialogs and menus on us). npm (nothing extra to set up, but `node_modules` is not strict and dependency install scripts run by default).
