@@ -23,6 +23,7 @@ export type ErrorResponse = components["schemas"]["ErrorResponse"];
 export type LeagueRead = components["schemas"]["LeagueRead"];
 export type SeasonRead = components["schemas"]["SeasonRead"];
 export type UserRead = components["schemas"]["UserRead"];
+export type PlayerRead = components["schemas"]["PlayerRead"];
 
 // ---------------------------------------------------------------- shared
 
@@ -31,18 +32,6 @@ export type TournamentType = "singles" | "doubles" | "dyp" | "monster_dyp";
 export type TournamentState = "setup" | "in_progress" | "finished";
 export type Side = "side_1" | "side_2";
 export type Outcome = Side | "draw";
-
-// ---------------------------------------------------------------- players
-
-export interface Player {
-  id: Uuid;
-  name: string;
-  removed_at: IsoDateTime | null;
-}
-
-export interface PlayerCreate {
-  name: string;
-}
 
 // ---------------------------------------------------------------- seasons and standings
 
@@ -202,7 +191,7 @@ export interface ResultWrite {
 export interface PublicLeague {
   name: string;
   seasons: SeasonRead[];
-  players: Player[];
+  players: PlayerRead[];
   /** Tournaments of the active season, without those in setup (FR-070). */
   tournaments: TournamentSummary[];
   standings: SeasonStandingRow[];
@@ -228,15 +217,15 @@ interface Get<P, R> {
   requestBody?: never;
   responses: { 200: Json<R> } & Errors;
 }
-interface Put<P, B, R> {
-  parameters: P;
-  requestBody: { content: { "application/json": B } };
-  responses: { 200: Json<R> } & Errors;
-}
 interface Post<P, B, R> {
   parameters: P;
   requestBody: { content: { "application/json": B } };
   responses: { 201: Json<R> } & Errors;
+}
+interface Put<P, B, R> {
+  parameters: P;
+  requestBody: { content: { "application/json": B } };
+  responses: { 200: Json<R> } & Errors;
 }
 
 type League = Params<{ league_id: Uuid }>;
@@ -246,12 +235,6 @@ type Match = Params<{ league_id: Uuid; tournament_id: Uuid; match_id: Uuid }>;
 
 /** Routes the demo serves that the generated schema does not have yet. */
 export interface ProvisionalPaths {
-  // players
-  "/api/v1/leagues/{league_id}/players": {
-    get: Get<League, Player[]>;
-    post: Post<League, PlayerCreate, Player>;
-  };
-
   // season standings
   "/api/v1/leagues/{league_id}/seasons/{season_id}/standings": {
     get: Get<Season, SeasonStandingRow[]>;

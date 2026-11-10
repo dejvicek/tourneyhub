@@ -56,7 +56,10 @@
           "league_id_taken",
           "season_not_found",
           "season_closed",
-          "season_number_changed"
+          "season_number_changed",
+          "player_not_found",
+          "player_name_taken",
+          "player_limit_reached"
         ],
         "title": "ErrorCode",
         "type": "string"
@@ -348,6 +351,87 @@
           "placement_points"
         ],
         "title": "PlacementPointsUpdate",
+        "type": "object"
+      },
+      "PlayerCreate": {
+        "additionalProperties": false,
+        "description": "A name to add to the league's player list (FR-012).",
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/PlayerName"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "PlayerCreate",
+        "type": "object"
+      },
+      "PlayerName": {
+        "maxLength": 100,
+        "minLength": 1,
+        "type": "string"
+      },
+      "PlayerRead": {
+        "description": "A player of a league; `removed_at` is null while they are on the list.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "removed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Removed At"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "removed_at"
+        ],
+        "title": "PlayerRead",
+        "type": "object"
+      },
+      "PlayerRemoval": {
+        "additionalProperties": false,
+        "description": "Whether the player is removed from the list, the target state (BR-002).",
+        "properties": {
+          "removed": {
+            "title": "Removed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "removed"
+        ],
+        "title": "PlayerRemoval",
+        "type": "object"
+      },
+      "PlayerRename": {
+        "additionalProperties": false,
+        "description": "A player's new name, the target state (FR-012, ADR-008).",
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/PlayerName"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "PlayerRename",
         "type": "object"
       },
       "ProfileUpdate": {
@@ -1232,6 +1316,364 @@
         "summary": "Update League",
         "tags": [
           "leagues"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/players": {
+      "get": {
+        "description": "List the league's players in the order they were added (FR-012).\n\nRemoved players come only with `include_removed=true`. Players belong to the\nleague, so closed seasons need nothing special.",
+        "operationId": "list_players",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_removed",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Removed",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PlayerRead"
+                  },
+                  "title": "Response List Players",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Players",
+        "tags": [
+          "players"
+        ]
+      },
+      "post": {
+        "description": "Add a player to the league (FR-012).\n\nA name that another player has, in any case, is 422 `player_name_taken`\nwith the holder's `player_id`, `name` and `removed` (BR-001). When the\nholder is removed, the UI asks whether it is the same person and restores\nthem (ADR-002). A parallel add of the same name that wins the race to the\nunique index makes this one 409 `player_name_taken`: reload. A league holds at\nmost 500 players, removed ones included: more is 422 `player_limit_reached`.",
+        "operationId": "add_player",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayerCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Add Player",
+        "tags": [
+          "players"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/players/{player_id}/name": {
+      "put": {
+        "description": "Rename a player; the new name shows in past results too (FR-012).\n\n422 `player_name_taken` as for an add, 409 for the race. A removed player can\nbe renamed too, and the new name must be free as well (BR-011).",
+        "operationId": "rename_player",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "player_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Player Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayerRename"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Rename Player",
+        "tags": [
+          "players"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/players/{player_id}/removed": {
+      "put": {
+        "description": "Remove a player from the list, or restore them (FR-012, BR-002).\n\nA removal keeps the player, their name and their history; a restored player\nis the same player. Both are target states, so repeating one changes nothing.",
+        "operationId": "set_player_removed",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "player_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Player Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayerRemoval"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Player Removed",
+        "tags": [
+          "players"
         ]
       }
     },

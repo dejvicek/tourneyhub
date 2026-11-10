@@ -5,12 +5,13 @@ from tourneyhub.db.models.accounts import (
     RefreshToken,
     User,
 )
-from tourneyhub.db.models.leagues import League, Season
+from tourneyhub.db.models.leagues import League, Player, Season
 
 __all__ = [
     "AuthAttempt",
     "InstanceSettings",
     "League",
+    "Player",
     "RefreshToken",
     "Season",
     "User",

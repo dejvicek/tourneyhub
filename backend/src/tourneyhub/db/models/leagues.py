@@ -9,6 +9,7 @@ from sqlalchemy import (
     Integer,
     UniqueConstraint,
     false,
+    func,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -102,3 +103,34 @@ class Season(Base):
     updated_at: Mapped[datetime | None]
 
     league: Mapped[League] = relationship(back_populates="seasons", lazy="raise")
+
+
+class Player(Base):
+    """A name on a league's player list (DATA-MODEL §4.2, FR-012).
+
+    Players belong to the league, not to a season. A removed player keeps the
+    row and its history (BR-002); the row goes only with its league (D6).
+    """
+
+    __tablename__ = "players"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
+    league_id: Mapped[UUID] = mapped_column(
+        ForeignKey("leagues.id", ondelete="CASCADE")
+    )
+    name: Mapped[str]
+    removed_at: Mapped[datetime | None]  # None while the player is on the list
+    created_at: Mapped[datetime]
+    updated_at: Mapped[datetime | None]
+
+
+# Unique on (league_id, lower(name)), removed players included (BR-001, ADR-002).
+# Named here, like uq_users_lower_email, because the naming convention cannot name
+# an expression index. A lookup by name compares func.lower(Player.name) with
+# func.lower() of the input, so that it uses this index and folds as it does.
+Index(
+    "uq_players_league_id_lower_name",
+    Player.league_id,
+    func.lower(Player.name),
+    unique=True,
+)

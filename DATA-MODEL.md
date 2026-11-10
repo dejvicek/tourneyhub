@@ -168,8 +168,8 @@ The sign-up code itself is never written to `admin_actions`.
 |---|---|
 | `id` | |
 | `league_id` | FK `leagues`, `ON DELETE CASCADE`. |
-| `name` | Unique on `(league_id, lower(name))`, **including removed players** (ADR-002). Re-adding a removed player's name restores that player. |
-| `removed_at` | `NULL` while the player is on the list. |
+| `name` | Unique on `(league_id, lower(name))`, **including removed players** (ADR-002). Adding a name that a removed player holds is refused (422 `player_name_taken`, with `removed: true`), and the organizer restores that player explicitly (ADR-002). A restore needs no name check: the index includes removed players, so a name is never freed, and every add and every rename checks against all players. A removed player can be renamed (BR-011: a rename always applies), and the new name must be free like any other. The name is stored in Unicode NFC with every run of whitespace (a no-break space too) collapsed to one space, and refuses control, format, line-separator and paragraph-separator characters, U+3164 and U+2800, so that look-alike names collide (BR-001). A league holds at most 500 players, removed ones included (`MAX_PLAYERS_PER_LEAGUE`); the 501st add is refused with 422 `player_limit_reached`, checked under the league lock. The PRD sets no limit; the number is a question to the PRD team. |
+| `removed_at` | `NULL` while the player is on the list. Set when the player is removed (BR-002), cleared when they are restored; a repeated removal keeps the first time. |
 | `created_at`, `updated_at` | |
 
 **`seasons`** (FR-020–FR-022, BR-010–BR-012).

@@ -28,6 +28,12 @@ DEFAULT_PLACEMENT_POINTS: tuple[int, ...] = (10, 8, 6, 4, 2)
 MAX_FIELD_COUNT = 32
 """The most fields a league default, and later a tournament, may name (DATA-MODEL §4.2)."""
 
+MAX_PLAYERS_PER_LEAGUE = 500
+"""The most players a league may hold, removed ones included (DATA-MODEL §4.2).
+
+Removed players keep their rows and their names, so they count.
+"""
+
 MAX_GOALS_PER_GAME = 99
 """The most goals per game a league default may name (DATA-MODEL §4.2)."""
 

@@ -1,9 +1,11 @@
+import re
 import unicodedata
 from typing import Annotated
 
 from pydantic import (
     AfterValidator,
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     JsonValue,
@@ -71,24 +73,48 @@ type NewPassword = Annotated[
 ]
 
 
-def _reject_invisible_characters(name: str) -> str:
-    """Refuse control, zero-width and other format characters (Unicode Cc, Cf).
+# Control and format characters, and the line and paragraph separators, show
+# nothing or break a line; U+3164 and U+2800 are letters and symbols that draw blank.
+_INVISIBLE_CATEGORIES = frozenset({"Cc", "Cf", "Zl", "Zp"})
+_BLANK_LOOKING = frozenset({"\u3164", "\u2800"})
+_WHITESPACE_RUN = re.compile(r"\s+")
 
-    A name made of them looks empty, and one that contains them can look like
-    another person's.
+
+def _normalise_unicode(value: object) -> object:
+    """Compose a string to NFC before strip and the length check.
+
+    "Čeněk" typed as C + combining caron is then the same name as the composed
+    one, and the same length (BR-001).
     """
-    if any(unicodedata.category(char) in {"Cc", "Cf"} for char in name):
+    return unicodedata.normalize("NFC", value) if isinstance(value, str) else value
+
+
+def _reject_look_alikes(name: str) -> str:
+    """Refuse characters that make two names look alike, and tidy the spaces.
+
+    Refused: control, format, line and paragraph separator characters (Unicode
+    Cc, Cf, Zl, Zp) and the blank-looking U+3164 and U+2800. Every run of
+    whitespace inside the name, a no-break space too, becomes one ASCII space.
+    """
+    if any(
+        unicodedata.category(char) in _INVISIBLE_CATEGORIES or char in _BLANK_LOOKING
+        for char in name
+    ):
         raise PydanticCustomError(
             "invisible_characters", "the name contains invisible characters"
         )
-    return name
+    return _WHITESPACE_RUN.sub(" ", name)
 
 
 type DisplayName = Annotated[
     str,
     StringConstraints(strip_whitespace=True, min_length=1, max_length=100),
-    AfterValidator(_reject_invisible_characters),
+    AfterValidator(_reject_look_alikes),
+    BeforeValidator(_normalise_unicode),
 ]
+# A player's name looks like a person's: the same limits, the same NFC form and the
+# same refusals, so that no two names look alike (BR-001).
+type PlayerName = DisplayName
 # No email-validator dependency: one @, no spaces, a dot in the domain.
 type Email = Annotated[
     str,

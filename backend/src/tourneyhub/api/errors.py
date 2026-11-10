@@ -38,6 +38,8 @@ _CONFLICT_BY_CONSTRAINT: dict[str, ErrorCode] = {
     "pk_leagues": ErrorCode.LEAGUE_ID_TAKEN,
     # Two parallel sign-ups with one email: the check before the insert saw neither.
     "uq_users_lower_email": ErrorCode.EMAIL_TAKEN,
+    # Adding or renaming to a name that another request is inserting at the same time.
+    "uq_players_league_id_lower_name": ErrorCode.PLAYER_NAME_TAKEN,
 }
 
 

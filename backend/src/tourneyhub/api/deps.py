@@ -1,4 +1,4 @@
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
 from typing import Annotated
 
@@ -46,6 +46,17 @@ def get_now() -> datetime:
 
 
 NowDep = Annotated[datetime, Depends(get_now)]
+
+type Clock = Callable[[], datetime]
+
+
+def get_clock() -> Clock:
+    """The clock to read after a lock is held, so that stamps follow commit order."""
+    return lambda: datetime.now(UTC)
+
+
+# NowDep is read before the request waits for a lock; ClockDep is read after it.
+ClockDep = Annotated[Clock, Depends(get_clock)]
 
 
 # auto_error=False: a missing token gets our own 401 code, not FastAPI's English.
