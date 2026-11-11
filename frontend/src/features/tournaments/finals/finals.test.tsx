@@ -357,8 +357,9 @@ describe("Finished (screen 10)", () => {
   it("still shows the places when the season's effect fails, with a retry of its own", async () => {
     await playFinal(DYP_EVENING);
     server.use(
-      http.get(`*${root}/season-effect`, () =>
-        HttpResponse.json({ code: "internal_error" }, { status: 500 }),
+      http.get(
+        "*/api/v1/leagues/:league/tournaments/:tournament/season-effect",
+        () => HttpResponse.json({ code: "internal_error" }, { status: 500 }),
       ),
     );
     renderAt(at(paths.finished, DYP_EVENING));
@@ -379,10 +380,13 @@ describe("Finished (screen 10)", () => {
   it("still shows the places while the season's effect is loading", async () => {
     await playFinal(DYP_EVENING);
     server.use(
-      http.get(`*${root}/season-effect`, async () => {
-        await delay("infinite");
-        return HttpResponse.json([]);
-      }),
+      http.get(
+        "*/api/v1/leagues/:league/tournaments/:tournament/season-effect",
+        async () => {
+          await delay("infinite");
+          return HttpResponse.json([]);
+        },
+      ),
     );
     renderAt(at(paths.finished, DYP_EVENING));
 

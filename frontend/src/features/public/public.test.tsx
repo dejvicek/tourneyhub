@@ -226,11 +226,12 @@ describe("share-link views outside demo mode", () => {
     );
     renderAt(league);
 
-    const heading = await screen.findByRole("heading", { name: "Season standings" });
-    const section = heading.closest("section");
-    expect(
-      await within(section ?? document.body).findByRole("alert"),
-    ).toHaveTextContent("Could not load this.");
+    const section = await screen.findByRole("region", {
+      name: "Season standings",
+    });
+    expect(await within(section).findByRole("alert")).toHaveTextContent(
+      "Could not load this.",
+    );
     expect(
       screen.queryByText("No finished tournament in this season yet."),
     ).not.toBeInTheDocument();
