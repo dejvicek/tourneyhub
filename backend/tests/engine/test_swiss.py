@@ -12,6 +12,7 @@ from hypothesis import strategies as st
 from tourneyhub.engine.errors import NotEnoughEntriesError
 from tourneyhub.engine.ids import EntryId
 from tourneyhub.engine.lots import order_by_lot
+from tourneyhub.engine.results import tiebreak_purpose
 from tourneyhub.engine.swiss import (
     PairingMethod,
     SwissDraw,
@@ -22,7 +23,6 @@ from tourneyhub.engine.swiss import (
     draw_next_swiss_round,
     recommended_minimum_rounds,
     swiss_standings,
-    tiebreak_purpose,
 )
 from tourneyhub.engine.tournaments import DEFAULT_TIEBREAKERS, MatchOutcome, Tiebreaker
 

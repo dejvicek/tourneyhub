@@ -1,6 +1,7 @@
 import itertools
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
+from dataclasses import replace
 from functools import cache
 from uuid import UUID
 
@@ -30,8 +31,8 @@ from tourneyhub.engine.monster_dyp import (
     select_monster_knockout,
     sit_out_purpose,
     swap_purpose,
-    tiebreak_purpose,
 )
+from tourneyhub.engine.results import tiebreak_purpose
 from tourneyhub.engine.tournaments import (
     DEFAULT_TIEBREAKERS,
     MatchOutcome,
@@ -121,43 +122,87 @@ def draw_round(
     )
 
 
-def repeats(draw: MonsterDraw) -> int:
-    return sum(group.is_team_1_repeat + group.is_team_2_repeat for group in draw.groups)
-
-
-def fewest_repeats(
-    playing: Sequence[PlayerId],
-    partners: frozenset[frozenset[PlayerId]],
-    top_players: Iterable[PlayerId] = (),
-) -> int:
-    """The fewest repeated partners of any teams, two top players never together."""
-    tops = set(top_players)
-
-    @cache
-    def best(free: frozenset[PlayerId]) -> int:
-        if not free:
-            return 0
-        first = min(free)
-        rest = free - {first}
-        return min(
-            (
-                (frozenset((first, other)) in partners) + best(rest - {other})
-                for other in rest
-                if not (first in tops and other in tops)
-            ),
-            default=len(playing),  # a dead end: worse than any real grouping
-        )
-
-    return best(frozenset(playing))
-
-
-def partnerships(rounds: Iterable[MonsterRound]) -> frozenset[frozenset[PlayerId]]:
-    return frozenset(
+def partnerships(rounds: Iterable[MonsterRound]) -> Counter[frozenset[PlayerId]]:
+    """How many times each pair of players have been partners."""
+    return Counter(
         frozenset(team)
         for round_ in rounds
         for match in round_.matches
         for team in (match.team_1, match.team_2)
     )
+
+
+def earlier_counts(draw: MonsterDraw, before: Iterable[MonsterRound]) -> list[int]:
+    """How often each team of the draw has been partners before, counted afresh."""
+    counts = partnerships(before)
+    return [
+        counts[frozenset(team)]
+        for group in draw.groups
+        for team in (group.team_1, group.team_2)
+    ]
+
+
+def repeats(draw: MonsterDraw, before: Iterable[MonsterRound]) -> int:
+    """The draw's teams that were partners before, not read from the engine's flags."""
+    return sum(count > 0 for count in earlier_counts(draw, before))
+
+
+def fewest_repeats(
+    playing: Sequence[PlayerId],
+    partners: Counter[frozenset[PlayerId]],
+    top_players: Iterable[PlayerId] = (),
+) -> tuple[int, int]:
+    """The least (repeated teams, sum of earlier counts) of any teams.
+
+    Two top players are never together.
+    """
+    tops = set(top_players)
+
+    @cache
+    def best(free: frozenset[PlayerId]) -> tuple[int, int]:
+        if not free:
+            return 0, 0
+        first = min(free)
+        rest = free - {first}
+        return min(
+            (
+                (
+                    (partners[frozenset((first, other))] > 0) + tail[0],
+                    partners[frozenset((first, other))] + tail[1],
+                )
+                for other in rest
+                if not (first in tops and other in tops)
+                for tail in (best(rest - {other}),)
+            ),
+            default=(len(playing), 0),  # a dead end: worse than any real grouping
+        )
+
+    return best(frozenset(playing))
+
+
+def pairings(free: Sequence[PlayerId]) -> Iterator[list[frozenset[PlayerId]]]:
+    """Every way to split the players into teams of two."""
+    if not free:
+        yield []
+        return
+    first, *rest = free
+    for other in rest:
+        remaining = [player for player in rest if player != other]
+        for tail in pairings(remaining):
+            yield [frozenset((first, other)), *tail]
+
+
+def spread(
+    before: Counter[frozenset[PlayerId]],
+    teams: Iterable[frozenset[PlayerId]],
+    count: int,
+) -> int:
+    """Highest minus lowest partnership count over all pairs, after the teams play."""
+    after = before + Counter(teams)
+    values = [
+        after[frozenset(pair)] for pair in itertools.combinations(players(count), 2)
+    ]
+    return max(values) - min(values)
 
 
 def line(player: int, position: int, place: int | None = None) -> MonsterStanding:
@@ -392,16 +437,31 @@ def test_br061_round_2_takes_top_players_by_league_ranking() -> None:
     assert numbers(result) == [((1, 3), (5, 6)), ((2, 8), (4, 7))]
 
 
-def test_br061_round_2_can_take_top_players_by_standing() -> None:
+def test_fr041_the_standing_order_sorts_only_the_marked_top_players() -> None:
     rounds = rounds_of([((1, 4), (2, 3)), ((5, 8), (6, 7))])
     by_standing = MonsterDypOptions(top_player_order=TopPlayerOrder.STANDING)
 
     result = draw_round(
-        8, rounds, standing=(5, 6, 1, 2, 3, 4, 7, 8), options=by_standing
+        8, rounds, standing=(5, 6, 1, 2, 3, 4, 7, 8), marked=[2, 6], options=by_standing
     )
 
-    assert result.top_players == (pid(5), pid(6))
-    assert numbers(result) == [((5, 3), (1, 2)), ((6, 8), (4, 7))]
+    assert result.top_players == (pid(6), pid(2))
+    assert numbers(result) == [((6, 3), (5, 1)), ((2, 8), (4, 7))]
+
+
+def test_fr041_unmarked_top_players_always_follow_the_league_ranking() -> None:
+    rounds = rounds_of([((1, 4), (2, 3)), ((5, 8), (6, 7))])
+    by_standing = MonsterDypOptions(top_player_order=TopPlayerOrder.STANDING)
+
+    unmarked = draw_round(
+        8, rounds, standing=(5, 6, 1, 2, 3, 4, 7, 8), options=by_standing
+    )
+    one_marked = draw_round(
+        8, rounds, standing=(5, 6, 1, 2, 3, 4, 7, 8), marked=[6], options=by_standing
+    )
+
+    assert unmarked.top_players == (pid(1), pid(2))
+    assert one_marked.top_players == (pid(6), pid(1))
 
 
 def test_fr041_marked_top_players_come_first() -> None:
@@ -498,7 +558,7 @@ def test_br062_the_nearest_swap_avoids_a_repeated_partner() -> None:
 
     assert numbers(result) == [((1, 5), (2, 3)), ((4, 8), (6, 7))]
     assert result.method is GroupingMethod.SWAPS
-    assert repeats(result) == 0
+    assert repeats(result, rounds) == 0
     assert not result.is_grouping_by_lot
 
 
@@ -507,7 +567,7 @@ def test_adr011_the_lot_chooses_between_equally_good_swaps() -> None:
 
     result = draw_round(8, rounds)
 
-    assert repeats(result) == 0
+    assert repeats(result, rounds) == 0
     assert result.is_grouping_by_lot
 
 
@@ -522,8 +582,8 @@ def test_br062_a_matching_finds_new_partners_when_the_swaps_get_stuck() -> None:
     result = draw_round(8, rounds)
 
     assert result.method is GroupingMethod.MATCHING
-    assert numbers(result) == [((1, 8), (2, 5)), ((3, 4), (6, 7))]
-    assert repeats(result) == 0
+    assert numbers(result) == [((2, 4), (1, 5)), ((3, 7), (6, 8))]
+    assert repeats(result, rounds) == 0
 
 
 def test_br062_when_every_grouping_repeats_the_draw_has_the_fewest() -> None:
@@ -539,8 +599,28 @@ def test_br062_when_every_grouping_repeats_the_draw_has_the_fewest() -> None:
     result = draw_round(8, rounds)
 
     assert result.method is GroupingMethod.MATCHING
-    assert numbers(result) == [((1, 2), (3, 6)), ((7, 8), (4, 5))]
-    assert repeats(result) == fewest_repeats(players(8), partnerships(rounds)) > 0
+    assert numbers(result) == [((1, 6), (2, 4)), ((7, 8), (3, 5))]
+    fewest = fewest_repeats(players(8), partnerships(rounds))
+    assert fewest[0] > 0
+    assert (repeats(result, rounds), sum(earlier_counts(result, rounds))) == fewest
+
+
+def test_br062_a_partnership_played_twice_is_avoided_before_one_played_once() -> None:
+    # 1+4 and 2+3 have partnered twice, every other pair once: each of the
+    # three groupings repeats two teams, so the fewer earlier counts decide.
+    rounds = rounds_of(
+        [((1, 4), (2, 3))],
+        [((1, 3), (2, 4))],
+        [((1, 2), (3, 4))],
+        [((1, 4), (2, 3))],
+    )
+
+    result = draw_round(4, rounds, standing=(1, 2, 3, 4))
+
+    assert numbers(result) != [((1, 4), (2, 3))]
+    assert repeats(result, rounds) == 2
+    assert earlier_counts(result, rounds) == [1, 1]
+    assert result.method is GroupingMethod.SWAPS
 
 
 # ---------------------------------------------------------------- draw caller bugs
@@ -681,6 +761,39 @@ def test_br074_the_lot_decides_the_cut_between_level_players() -> None:
 
     assert level.is_cut_by_lot
     assert not apart.is_cut_by_lot
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected"),
+    [
+        pytest.param(
+            MonsterKnockoutMode.SINGLES, [False, True, True, False], id="singles"
+        ),
+        pytest.param(MonsterKnockoutMode.SEEDED_PAIRS, [True, True], id="seeded-pairs"),
+    ],
+)
+def test_adr009_entries_that_follow_the_standing_note_a_lot_in_it(
+    mode: MonsterKnockoutMode, expected: list[bool]
+) -> None:
+    standings = (line(1, 1), line(2, 2, place=2), line(3, 3, place=2), line(4, 4))
+
+    result = select_monster_knockout(
+        standings, qualifiers=4, mode=mode, rng_seed=SEED, draw_counter=0
+    )
+
+    assert [entry.is_drawn_by_lot for entry in result.entries] == expected
+
+
+def test_adr009_seeded_pairs_without_a_lot_in_the_standing_are_not_drawn() -> None:
+    result = select_monster_knockout(
+        table(4),
+        qualifiers=4,
+        mode=MonsterKnockoutMode.SEEDED_PAIRS,
+        rng_seed=SEED,
+        draw_counter=0,
+    )
+
+    assert not any(entry.is_drawn_by_lot for entry in result.entries)
 
 
 @pytest.mark.parametrize(
@@ -862,8 +975,67 @@ def test_br060_to_br063_hold_in_every_round(
         else:
             assert drawn.top_players == ()
         # BR-062: as few repeated partners as any grouping allows.
-        assert repeats(drawn) == fewest_repeats(
-            playing, partnerships(before), drawn.top_players
+        assert (repeats(drawn, before), sum(earlier_counts(drawn, before))) == (
+            fewest_repeats(playing, partnerships(before), drawn.top_players)
+        )
+        # The flags the engine reports are the same teams, counted separately.
+        assert [
+            flag
+            for group in drawn.groups
+            for flag in (group.is_team_1_repeat, group.is_team_2_repeat)
+        ] == [count > 0 for count in earlier_counts(drawn, before)]
+
+
+@settings(deadline=None)
+@given(tournaments(), st.data())
+def test_br063_the_players_with_the_fewest_sit_outs_sit_out(
+    tournament: tuple[
+        int, int, MonsterDypOptions, frozenset[int], list[frozenset[int]], bytes
+    ],
+    data: st.DataObject,
+) -> None:
+    count, round_count, options, marked, disabled, seed = tournament
+    # Exempt top players are the one open rule that sits others out instead.
+    options = replace(options, are_top_players_exempt=False)
+    sat_out: Counter[PlayerId] = Counter()
+    history = play(count, round_count, options, marked, disabled, seed, data)
+    for drawn, _, off in history:
+        playing = {
+            player
+            for group in drawn.groups
+            for player in (*group.team_1, *group.team_2)
+        }
+        assert not set(drawn.sitting_out) & off
+        for sitting in drawn.sitting_out:
+            assert all(sat_out[sitting] <= sat_out[other] for other in playing)
+        sat_out.update(drawn.sitting_out)
+
+
+@settings(deadline=None)
+@given(tournaments(max_players=8, can_disable=False), st.data())
+def test_br062_partnership_counts_stay_balanced(
+    tournament: tuple[
+        int, int, MonsterDypOptions, frozenset[int], list[frozenset[int]], bytes
+    ],
+    data: st.DataObject,
+) -> None:
+    for drawn, before, _ in play(*tournament, data):
+        if drawn.top_players:
+            continue  # rounds 1 and 2 keep the top players apart (BR-061)
+        playing = [
+            player
+            for group in drawn.groups
+            for player in (*group.team_1, *group.team_2)
+        ]
+        teams = [
+            frozenset(team)
+            for group in drawn.groups
+            for team in (group.team_1, group.team_2)
+        ]
+        counts = partnerships(before)
+
+        assert spread(counts, teams, tournament[0]) <= min(
+            spread(counts, grouping, tournament[0]) for grouping in pairings(playing)
         )
 
 
@@ -887,7 +1059,7 @@ def test_br063_sit_outs_stay_balanced_and_dirac_rounds_never_repeat(
         # Each player has had at most r partners, so with n >= 2r + 2 players
         # who play a repeat-free grouping exists (Dirac, ADR-011).
         if count - len(drawn.sitting_out) >= 2 * len(before) + 2:
-            assert repeats(drawn) == 0
+            assert repeats(drawn, before) == 0
 
 
 @settings(deadline=None)

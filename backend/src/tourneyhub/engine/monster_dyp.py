@@ -2,16 +2,15 @@
 
 Covers FR-041, FR-045, BR-060 to BR-063 with BR-064, BR-067 and BR-070 to
 BR-074, and BR-080 to BR-084. Repeated partners are avoided as ADR-011 says:
-swaps first, then a maximum matching when the swaps get stuck.
+swaps first, then a minimum-cost matching when the swaps get stuck.
 """
 
 from collections import Counter
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Collection, Iterable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import assert_never
 
-from tourneyhub.engine.blossom import Pair, maximum_matching
 from tourneyhub.engine.errors import (
     NotEnoughPlayersError,
     OddQualifierCountError,
@@ -19,17 +18,13 @@ from tourneyhub.engine.errors import (
 )
 from tourneyhub.engine.ids import PlayerId, ensure_distinct
 from tourneyhub.engine.lots import lot_digest, order_by_lot
+from tourneyhub.engine.matching import Pair, min_cost_matching
+from tourneyhub.engine.results import POINTS, Result, result_for, tiebreak_purpose
 from tourneyhub.engine.tournaments import (
     MatchOutcome,
     MonsterKnockoutMode,
     Tiebreaker,
 )
-
-WIN_POINTS = 2
-"""Points for a win, to both players of the team; a loss earns 0 (BR-070)."""
-
-DRAW_POINTS = 1
-"""Points for a draw, to both players of the team (BR-070)."""
 
 GROUP_SIZE = 4
 """Players in a group, who play one match: #1 + #4 v #2 + #3 (BR-060)."""
@@ -50,16 +45,18 @@ type Team = tuple[PlayerId, PlayerId]
 class TopPlayerOrder(StrEnum):
     """Which players count as top players first (FR-041, BR-061; a PRD question).
 
-    Players marked by the organizer come first, then the others, each in this
-    order; the first as many as the round has matches are its top players.
+    Players marked by the organizer come first, then the others; the first as
+    many as the round has matches are its top players. The unmarked ones are
+    always taken from the league ranking (FR-041); this order only sorts the
+    marked ones.
     """
 
     LEAGUE_RANKING = "league_ranking"
     """The league ranking (BR-020), as ADR-011 and DATA-MODEL propose."""
 
     STANDING = "standing"
-    """The order the round is drawn from: the league ranking in round 1, the
-    current standing in round 2."""
+    """The marked players in the order the round is drawn from: the league
+    ranking in round 1, the current standing in round 2."""
 
 
 class GroupingMethod(StrEnum):
@@ -72,7 +69,7 @@ class GroupingMethod(StrEnum):
     """Players were swapped to avoid repeated partners (BR-062)."""
 
     MATCHING = "matching"
-    """The swaps got stuck; a maximum matching formed the teams (ADR-011)."""
+    """The swaps got stuck; a minimum-cost matching formed the teams (ADR-011)."""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -85,7 +82,8 @@ class MonsterDypOptions:
         are_top_players_exempt: In rounds 1 and 2, the top players never sit
             out; the sit-out lot is drawn among the others. Off: BR-063 as
             written, the top players are chosen after the sit-outs.
-        top_player_order: Which players count first as top players (FR-041).
+        top_player_order: In which order the marked players count first as top
+            players (FR-041); the unmarked always follow the league ranking.
         avoids_sitting_out_twice_in_a_row: Among players with as few
             sit-outs, those who sat out the previous round sit out last
             (issue #24). Off: BR-063 as written.
@@ -236,7 +234,8 @@ class MonsterKnockoutEntry:
         seed: 1 to n; the bracket places the seeds (BR-040 to BR-042).
         player_ids: One player in the Singles mode, else two, the
             better-placed first.
-        is_drawn_by_lot: The lot drew the partner or the seed (ADR-009).
+        is_drawn_by_lot: The lot drew the partner or the seed, or decided the
+            position of a player of the entry (ADR-009).
     """
 
     seed: int
@@ -263,21 +262,6 @@ class MonsterKnockout:
     qualifiers: tuple[PlayerId, ...]
     skipped: tuple[PlayerId, ...]
     is_cut_by_lot: bool
-
-
-class _Result(StrEnum):
-    WON = "won"
-    DRAWN = "drawn"
-    LOST = "lost"
-
-
-_POINTS = {_Result.WON: WIN_POINTS, _Result.DRAWN: DRAW_POINTS, _Result.LOST: 0}
-"""The points each result earns (BR-070)."""
-
-
-def tiebreak_purpose(completed_rounds: int) -> str:
-    """Name the lot of BR-074, `tiebreak:after-round-<completed_rounds>` (ADR-010)."""
-    return f"tiebreak:after-round-{completed_rounds}"
 
 
 def sit_out_purpose(round_no: int) -> str:
@@ -343,7 +327,7 @@ def monster_standings(
         raise ValueError(msg)
 
     points: Counter[PlayerId] = Counter()
-    results: dict[PlayerId, Counter[_Result]] = {id_: Counter() for id_ in ids}
+    results: dict[PlayerId, Counter[Result]] = {id_: Counter() for id_ in ids}
     difference: Counter[PlayerId] = Counter()
     sat_out: Counter[PlayerId] = Counter()
     opponents: dict[PlayerId, list[PlayerId]] = {id_: [] for id_ in ids}
@@ -358,10 +342,10 @@ def monster_standings(
                 (match.team_1, match.team_2, MatchOutcome.SIDE_1, 1),
                 (match.team_2, match.team_1, MatchOutcome.SIDE_2, -1),
             ):
-                result = _result_for(match.outcome, own)
+                result = result_for(match.outcome, own)
                 for player_id in team:
                     results[player_id][result] += 1
-                    points[player_id] += _POINTS[result]
+                    points[player_id] += POINTS[result]
                     difference[player_id] += goals * match.score_difference
                     opponents[player_id].extend(others)
     bh1 = {id_: sum(points[other] for other in opponents[id_]) for id_ in ids}
@@ -402,9 +386,9 @@ def monster_standings(
             bh2=bh2[player_id],
             score_difference=difference[player_id],
             played=len(opponents[player_id]) // 2,
-            won=results[player_id][_Result.WON],
-            drawn=results[player_id][_Result.DRAWN],
-            lost=results[player_id][_Result.LOST],
+            won=results[player_id][Result.WON],
+            drawn=results[player_id][Result.DRAWN],
+            lost=results[player_id][Result.LOST],
             sat_out=sat_out[player_id],
             is_decided_by_lot=ties[criteria(player_id)] > 1,
         )
@@ -429,26 +413,30 @@ def draw_monster_round(
        sit out: those who have sat out the fewest times, the lot
        `sit-out:round-<n>` deciding ties (BR-063).
     2. **Top players, rounds 1 and 2 (BR-061, FR-041).** The first m playing
-       players, those marked by the organizer first and then the others,
-       each in `options.top_player_order`. A marked player who sits out or is
-       disabled is replaced by the next one.
+       players, those marked by the organizer first, in
+       `options.top_player_order`, and then the others in league-ranking
+       order. A marked player who sits out or is disabled is replaced by the
+       next one.
     3. **Groups (BR-060, BR-061).** In rounds 1 and 2, group g is the g-th
        top player and then the next three other players in standing order;
        from round 3, the playing players in standing order, four at a time.
        In each group the 1st and 4th play the 2nd and 3rd.
     4. **Swaps (BR-062, ADR-011).** While a team repeats a partnership, the
-       swap of two players' places that leaves the fewest repeats is made,
-       of those with the fewest the one that moves players least far from
-       their places in step 3, and of those the first by the lot
-       `monster-swap:round-<n>`. Top players are not swapped in rounds 1 and
-       2. The swaps stop when no repeat is left or none reduces them.
-    5. **Matching (ADR-011).** If repeats are left, a maximum matching of
-       the players over the partnerships not yet played tells whether fewer
-       are possible. If so, its teams replace the others, placed where their
-       players move least; the players it leaves over are paired in standing
-       order. Every draw therefore has the fewest repeated partners
-       possible. This happens only from round 3: in rounds 1 and 2 the swaps
-       always remove every repeat.
+       swap of two players' places that leaves the fewest repeats is made;
+       among those, the one that leaves the smallest sum of earlier counts
+       (how many times each team has been partners before); among those, the
+       one that moves players least far from their places in step 3; and of
+       those the first by the lot `monster-swap:round-<n>`. Top players are
+       not swapped in rounds 1 and 2. The swaps stop when no repeat is left
+       or none improves the draw.
+    5. **Matching (ADR-011).** If repeats are left, a minimum-cost matching
+       of all the players, where a team costs more the more often it has been
+       partners (the number of repeats first, then the sum of the counts),
+       tells whether a better draw exists. If so, its teams replace the
+       others, placed where their players move least. Every draw therefore
+       has the fewest repeated partners possible, and of those the smallest
+       sum of earlier counts. This happens only from round 3: in rounds 1 and
+       2 the swaps always remove every repeat.
 
     Repeated opponents are allowed. The result depends only on the inputs
     and the seed, so the same round is drawn on every call.
@@ -491,17 +479,15 @@ def draw_monster_round(
     if len(active) < MINIMUM_PLAYERS:
         raise NotEnoughPlayersError(minimum=MINIMUM_PLAYERS, given=len(active))
     match_count = len(active) // GROUP_SIZE
-    top_order = (
+    marked_order = (
         ranking if options.top_player_order is TopPlayerOrder.LEAGUE_RANKING else order
     )
 
     def pick_top_players(candidates: Iterable[PlayerId]) -> tuple[PlayerId, ...]:
         pool = set(candidates)
-        ranked = sorted(
-            (player for player in top_order if player in pool),
-            key=lambda player: player not in marked,
-        )
-        return tuple(ranked[:match_count])
+        first = [player for player in marked_order if player in pool & marked]
+        rest = [player for player in ranking if player in pool - marked]
+        return tuple((first + rest)[:match_count])
 
     has_top_players = round_no <= TOP_PLAYER_ROUNDS
     exempt = (
@@ -627,7 +613,11 @@ def select_monster_knockout(
     last = chosen[-1].position
     ids = [line.player_id for line in chosen]
     entries = _knockout_entries(
-        ids, mode=mode, rng_seed=rng_seed, purpose=knockout_purpose(mode, draw_counter)
+        ids,
+        mode=mode,
+        by_lot={line.player_id for line in chosen if line.is_decided_by_lot},
+        rng_seed=rng_seed,
+        purpose=knockout_purpose(mode, draw_counter),
     )
     return MonsterKnockout(
         mode=mode,
@@ -646,21 +636,34 @@ def select_monster_knockout(
 
 
 def _knockout_entries(
-    ids: Sequence[PlayerId], *, mode: MonsterKnockoutMode, rng_seed: bytes, purpose: str
+    ids: Sequence[PlayerId],
+    *,
+    mode: MonsterKnockoutMode,
+    by_lot: Collection[PlayerId],
+    rng_seed: bytes,
+    purpose: str,
 ) -> tuple[MonsterKnockoutEntry, ...]:
-    """Form the entries of one mode from the qualifiers by position (BR-081-084)."""
+    """Form the entries of one mode from the qualifiers by position (BR-081-084).
+
+    `by_lot` are the qualifiers whose position the lot decided (BR-074); an
+    entry that follows the positions is drawn by lot when one of its players
+    is among them (ADR-009).
+    """
     half = len(ids) // 2
     match mode:
         case MonsterKnockoutMode.SINGLES:
             return tuple(
                 MonsterKnockoutEntry(
-                    seed=seed, player_ids=(id_,), is_drawn_by_lot=False
+                    seed=seed, player_ids=(id_,), is_drawn_by_lot=id_ in by_lot
                 )
                 for seed, id_ in enumerate(ids, start=1)
             )
         case MonsterKnockoutMode.SEEDED_PAIRS:
             return _pair_entries(
-                ids, zip(ids[:half], ids[half:], strict=True), is_drawn_by_lot=False
+                ids,
+                zip(ids[:half], ids[half:], strict=True),
+                is_drawn_by_lot=False,
+                by_lot=by_lot,
             )
         case MonsterKnockoutMode.A_LITTLE_MERCY:
             drawn = order_by_lot(ids[half:], rng_seed=rng_seed, purpose=purpose)
@@ -681,14 +684,19 @@ def _pair_entries(
     pairs: Iterable[tuple[PlayerId, PlayerId]],
     *,
     is_drawn_by_lot: bool,
+    by_lot: Collection[PlayerId] = (),
 ) -> tuple[MonsterKnockoutEntry, ...]:
-    """Number the pairs as seeds in the order given, the better-placed player first."""
+    """Number the pairs as seeds in the order given, the better-placed player first.
+
+    A pair is drawn by lot when `is_drawn_by_lot`, or when a player of it is
+    in `by_lot`.
+    """
     place = {id_: index for index, id_ in enumerate(ids)}
     return tuple(
         MonsterKnockoutEntry(
             seed=seed,
             player_ids=tuple(sorted(pair, key=place.__getitem__)),
-            is_drawn_by_lot=is_drawn_by_lot,
+            is_drawn_by_lot=is_drawn_by_lot or any(id_ in by_lot for id_ in pair),
         )
         for seed, pair in enumerate(pairs, start=1)
     )
@@ -719,16 +727,13 @@ def _checked_rounds(
     return ordered
 
 
-def _result_for(outcome: MatchOutcome, own: MatchOutcome) -> _Result:
-    """Return a match's result from the view of the side `own`."""
-    if outcome is MatchOutcome.DRAW:
-        return _Result.DRAWN
-    return _Result.WON if outcome is own else _Result.LOST
+type Partnership = frozenset[PlayerId]
+"""Two players, in either order."""
 
 
-def _partnerships(rounds: Iterable[MonsterRound]) -> frozenset[frozenset[PlayerId]]:
-    """Return every pair of players who have been partners (BR-062)."""
-    return frozenset(
+def _partnerships(rounds: Iterable[MonsterRound]) -> Counter[Partnership]:
+    """Count how many times each pair of players have been partners (BR-062)."""
+    return Counter(
         frozenset(team)
         for round_ in rounds
         for match in round_.matches
@@ -780,14 +785,16 @@ class _Grouping:
 
     Slot `4g + k` is the (k + 1)th player of group g. `home` is each player's
     slot in the groups of BR-060 and BR-061; how far a grouping moves the
-    players from it is the sum of the distances.
+    players from it is the sum of the distances. A grouping is the better the
+    fewer teams repeat a partnership, and of those the smaller the sum of how
+    many times its teams have been partners before.
     """
 
     def __init__(
         self,
         start: Sequence[PlayerId],
         *,
-        partners: frozenset[frozenset[PlayerId]],
+        partners: Counter[Partnership],
         fixed: frozenset[int],
     ) -> None:
         self.slots = list(start)
@@ -795,10 +802,15 @@ class _Grouping:
         self.partners = partners
         self.fixed = fixed
 
+    def earlier(self, slot: int) -> int:
+        """Count how many times the team at `slot` have been partners before."""
+        return self.partners[
+            frozenset((self.slots[slot], self.slots[_partner_slot(slot)]))
+        ]
+
     def is_repeat(self, slot: int) -> bool:
         """Whether the team at `slot` were partners before."""
-        team = frozenset((self.slots[slot], self.slots[_partner_slot(slot)]))
-        return team in self.partners
+        return self.earlier(slot) > 0
 
     def repeats(self) -> int:
         """Count the teams that were partners before."""
@@ -837,7 +849,7 @@ class _Grouping:
             if slot not in self.fixed and self.is_repeat(slot)
         }
         best: list[Pair] = []
-        best_key = (0, 0)
+        best_key = (0, 0, 0)
         for first in sorted(repeated):
             for second in range(len(self.slots)):
                 if (
@@ -847,7 +859,7 @@ class _Grouping:
                 ):
                     continue
                 key = self._swap_effect(first, second)
-                if key[0] >= 0:
+                if key[:2] >= (0, 0):
                     continue
                 if not best or key < best_key:
                     best, best_key = [(first, second)], key
@@ -855,27 +867,37 @@ class _Grouping:
                     best.append((first, second))
         return best
 
-    def _swap_effect(self, first: int, second: int) -> tuple[int, int]:
-        """Return how a swap changes the repeats and the distance moved."""
+    def _swap_effect(self, first: int, second: int) -> tuple[int, int, int]:
+        """Return how a swap changes the repeats, the earlier counts and the distance.
+
+        The change in repeats is compared first, then the change in the sum of
+        the earlier counts, then the change in the distance moved from home.
+        """
         a, b = self.slots[first], self.slots[second]
         mate_a = self.slots[_partner_slot(first)]
         mate_b = self.slots[_partner_slot(second)]
-        repeats = (
-            (frozenset((b, mate_a)) in self.partners)
-            + (frozenset((a, mate_b)) in self.partners)
-            - self.is_repeat(first)
-            - self.is_repeat(second)
+        now = self.earlier(first), self.earlier(second)
+        after = (
+            self.partners[frozenset((b, mate_a))],
+            self.partners[frozenset((a, mate_b))],
         )
+        repeats = sum(count > 0 for count in after) - sum(count > 0 for count in now)
         moved = (
             abs(first - self.home[b])
             + abs(second - self.home[a])
             - abs(first - self.home[a])
             - abs(second - self.home[b])
         )
-        return repeats, moved
+        return repeats, sum(after) - sum(now), moved
 
     def match(self) -> bool:
-        """Re-form the teams by a maximum matching if that has fewer repeats.
+        """Re-form the teams by a minimum-cost matching if that is a better draw.
+
+        A pair costs more than every sum of counts together if it repeats a
+        partnership, plus the number of times it has: so the matching has the
+        fewest repeats, and of those the smallest sum of earlier counts. Of
+        equally good matchings, the one that keeps the most teams as they
+        stand is taken.
 
         It runs only from round 3, where no player is fixed. In rounds 1 and
         2 every player has had at most one partner, so a repeated team
@@ -889,30 +911,33 @@ class _Grouping:
         if not self.repeats():
             return False
         count = len(self.slots)
-        edges = [
-            (u, v)
-            for u in range(count)
-            for v in range(u + 1, count)
-            if frozenset((self.slots[u], self.slots[v])) not in self.partners
-        ]
-        kept = [
-            (slot, _partner_slot(slot))
-            for slot in range(count)
-            if slot < _partner_slot(slot) and not self.is_repeat(slot)
-        ]
-        matched = maximum_matching(count, edges, initial=kept)
-        if len(matched) == len(kept):
-            return False
-        left = sorted(
-            (
-                slot
-                for slot in range(count)
-                if all(slot not in pair for pair in matched)
-            ),
-            key=lambda slot: self.home[self.slots[slot]],
+        # More than the sum of all the teams' counts, `count / 2` teams with
+        # at most the highest count each.
+        repeat_cost = count // 2 * max(self.partners.values()) + 1
+
+        # The costs are multiplied to leave room for one more per team that
+        # does not stand as it is.
+        scale = count // 2 + 1
+
+        def worth(u: int, v: int) -> int:
+            earlier = self.partners[frozenset((self.slots[u], self.slots[v]))]
+            return repeat_cost * (earlier > 0) + earlier
+
+        def cost(u: int, v: int) -> int:
+            return scale * worth(u, v) + (v != _partner_slot(u))
+
+        matched = min_cost_matching(
+            count,
+            ((u, v, cost(u, v)) for u in range(count) for v in range(u + 1, count)),
         )
-        teams = [*matched, *zip(left[0::2], left[1::2], strict=True)]
-        self._lay_out(teams)
+        current = sum(
+            worth(slot, _partner_slot(slot))
+            for slot in range(count)
+            if slot < _partner_slot(slot)
+        )
+        if sum(worth(u, v) for u, v in matched) >= current:
+            return False
+        self._lay_out(matched)
         return True
 
     def _lay_out(self, teams: Sequence[Pair]) -> None:
