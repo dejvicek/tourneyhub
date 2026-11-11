@@ -286,10 +286,10 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 
 | ID | Rule |
 |---|---|
-| BR-064 | A disabled player or pair is not drawn into new rounds. Their results and points stay; rounds they miss earn 0 and do not count as sit-outs. Once re-enabled, they play from the next round. At the end they are placed by their standing. |
+| BR-064 | A disabled player or pair is not drawn into new rounds. Their results and points stay; rounds they miss earn 0 and do not count as sit-outs. Once re-enabled, they are in the draw from the next round. At the end they are placed by their standing. |
 | BR-065 | A round's results can be changed until the next round or the knockout is drawn; after that they are locked. |
 | BR-066 | Deleting the newest round removes its matches and results and unlocks the round before it. |
-| BR-067 | In a Swiss or Monster DYP, a late player starts on 0 points and plays from the next round; rounds they missed earn 0 and do not count as sit-outs. A round robin fits a late entry into its schedule (BR-054), and a knockout without a group phase only lets one take a bye (BR-045). DYP takes no late players, because its pairs are drawn at the start, and neither does a knockout after a group phase, whose qualifiers are fixed. |
+| BR-067 | In a Swiss or Monster DYP, a late player starts on 0 points and is in the draw from the next round; rounds they missed earn 0 and do not count as sit-outs. A round robin fits a late entry into its schedule (BR-054), and a knockout without a group phase only lets one take a bye (BR-045). DYP takes no late players, because its pairs are drawn at the start, and neither does a knockout after a group phase, whose qualifiers are fixed. |
 | BR-068 | The recommended minimum number of rounds is log₂ of the number of entries, rounded up — the usual Swiss minimum, after which at most one entry can have won every match. Monster DYP counts players. 5–8 entries → 3 rounds, 9–16 → 4, 17–32 → 5. Late players count from when they join. |
 
 ### 7.10 Group-phase points and standings
