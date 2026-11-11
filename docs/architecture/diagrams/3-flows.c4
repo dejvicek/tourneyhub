@@ -348,10 +348,10 @@ views "III. Flows" {
     tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "PUT name"
     tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "locks the league, looks up lower(name) and the note among the other players"
     alt {
-      when "no other player has it, or the name and note tell them apart" {
+      when "no other player has the name, or the player has a note and no other player has the same name and note" {
         tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "200: the player with the new name"
       }
-      when "another player has the same name and note" {
+      when "another player has the name, and the player has no note or the same note" {
         tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "422 player_name_taken: the holders; the UI asks for a note"
       }
     }

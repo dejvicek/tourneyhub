@@ -432,7 +432,7 @@ Fields change nothing the engine computes for standings, places, points or sit-o
 | Rule | Where |
 |---|---|
 | Unique email (FR-002) | Unique index on `lower()` |
-| Name and note together unique in a league, removed players included (BR-001, proposed (#48); today a unique index on the name alone); a note exactly when the name alone is taken (BR-004) | Unique index on `(league_id, lower(name), lower(coalesce(note, '')))`; the application checks first, under the league lock, to answer 422 |
+| Name and note together unique in a league, removed players included (BR-001, proposed (#48); today a unique index on the name alone); a note on an add or a rename to a name another player has (BR-004) | Unique index on `(league_id, lower(name), lower(coalesce(note, '')))`; the application checks first, under the league lock, to answer 422 |
 | At most 1000 active players per league (BR-006, proposed (#48)) | Application, under the league lock |
 | One active season per league | Partial unique index |
 | A player at most once per stage of a tournament (BR-003) | Unique `(tournament_id, stage, player_id)` |
