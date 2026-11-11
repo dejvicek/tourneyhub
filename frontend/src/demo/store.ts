@@ -6,6 +6,7 @@ import type {
   PlaceRow,
   PlacesRead,
   PublicLeague,
+  PublicTournamentRead,
   SeasonStandingRow,
   TournamentRead,
   TournamentStandingRow,
@@ -241,14 +242,21 @@ export function placesRead(t: StoredTournament): PlacesRead {
   };
 }
 
+/** The whole tournament as GET …/tournaments/{tournament_id} returns it. */
 export function tournamentRead(t: StoredTournament): TournamentRead {
   syncBracket(t); // finals: the winners move on, the tournament finishes (FR-037)
   return {
     ...withoutLeague(t),
     ...currentPhase(t),
     waiting: waitingMatches(t.rounds, t.fields).map((match) => match.id),
-    places: places(t),
   };
+}
+
+/** The tournament as the share link shows it, with its places once finished. */
+export function publicTournamentRead(
+  t: StoredTournament,
+): PublicTournamentRead {
+  return { ...tournamentRead(t), places: places(t) };
 }
 
 export function seasonStandingsOf(seasonId: string): SeasonStandingRow[] {

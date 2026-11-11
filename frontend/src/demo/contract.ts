@@ -13,8 +13,6 @@ import type { components, paths as GeneratedPaths } from "@/api/schema";
 import type { MonsterKnockoutMode, SwissTiebreaker } from "./rules";
 
 type Uuid = string;
-/** An instant, ISO 8601 in UTC. */
-type IsoDateTime = string;
 
 export type ErrorResponse = components["schemas"]["ErrorResponse"];
 // Generated types the provisional ones below build on.
@@ -59,76 +57,16 @@ export type PhaseKind = "group" | "knockout";
 export type GroupFormat = "round_robin" | "swiss" | "monster_dyp";
 export type PhaseFormat = GroupFormat | "single_elimination";
 
-/**
- * The tournament as the running screens read it. The backend serves the
- * summary (the season's list) and the setup; this whole read, with rounds,
- * fields and places, waits for the rounds and matches (P7b, P8).
- */
-type TournamentHeader = Omit<
-  TournamentSummary,
-  "phases" | "player_count" | "progress" | "winner_player_ids"
->;
-
-export interface PhaseRead extends PhaseSummary {
-  round_robin_legs: 1 | 2 | null;
-  sit_out_points: 0 | 1 | null;
-  tiebreakers: SwissTiebreaker[] | null;
-  qualifiers: number | null;
-  third_place_match: boolean | null;
-  monster_knockout_mode: MonsterKnockoutMode | null;
-  match_format: MatchFormat;
-  final_match_format: Exclude<MatchFormat, "bo2"> | null;
-}
-
-export interface EntryRead {
-  id: Uuid;
-  stage: "main" | "knockout";
-  kind: "player" | "pair";
-  seed: number | null;
-  player_ids: Uuid[];
-  is_disabled: boolean;
-  is_top_player: boolean;
-}
-
-export interface GameRead {
-  game_no: number;
-  winner: Outcome;
-  score_1: number | null;
-  score_2: number | null;
-}
-
-export interface MatchSideRead {
-  entry_id: Uuid | null;
-  player_ids: Uuid[];
-  is_bye: boolean;
-}
-
-export interface MatchRead {
-  id: Uuid;
-  round_id: Uuid;
-  position: number;
-  kind: "standard" | "third_place";
-  sides: [MatchSideRead, MatchSideRead];
-  outcome: Outcome | null;
-  is_walkover: boolean;
-  games: GameRead[];
-  result_entered_at: IsoDateTime | null;
-}
-
-export interface RoundRead {
-  id: Uuid;
-  phase_id: Uuid;
-  round_no: number;
-  matches: MatchRead[];
-  /** Entries that sit this round out (BR-051, BR-058, BR-063). */
-  sitting_out: Uuid[];
-}
-
-export interface FieldRead {
-  id: Uuid;
-  number: number;
-  match_id: Uuid | null;
-}
+// The whole tournament with its rounds and fields (P7b): generated. The
+// running screens read it from GET …/tournaments/{tournament_id}.
+export type PhaseRead = components["schemas"]["PhaseRead"];
+export type EntryRead = components["schemas"]["EntryRead"];
+export type GameRead = components["schemas"]["GameRead"];
+export type MatchSideRead = components["schemas"]["MatchSideRead"];
+export type MatchRead = components["schemas"]["MatchRead"];
+export type RoundRead = components["schemas"]["RoundRead"];
+export type FieldRead = components["schemas"]["FieldRead"];
+export type TournamentRead = components["schemas"]["TournamentRead"];
 
 export interface PlaceRow {
   place: number;
@@ -137,15 +75,11 @@ export interface PlaceRow {
   points_per_player: number;
 }
 
-export interface TournamentRead extends TournamentHeader {
-  goals_per_game: number;
-  phases: PhaseRead[];
-  entries: EntryRead[];
-  rounds: RoundRead[];
-  fields: FieldRead[];
-  /** Matches waiting for a field, in the order they will get one (FR-092). */
-  waiting: Uuid[];
-  /** Set once the tournament is finished (§7.13). */
+/**
+ * The tournament as the share link shows it: the organizer's read plus the
+ * places once it is finished (§7.13). The places wait for P10.
+ */
+export interface PublicTournamentRead extends TournamentRead {
   places: PlaceRow[] | null;
 }
 
@@ -240,9 +174,6 @@ export interface ProvisionalPaths {
   };
 
   // tournaments
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}": {
-    get: Get<Tournament, TournamentRead>;
-  };
   "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/standings": {
     get: Get<Tournament, TournamentStandingRow[]>;
   };
@@ -259,7 +190,7 @@ export interface ProvisionalPaths {
   "/api/v1/public/{share_token}/tournaments/{tournament_id}": {
     get: Get<
       Params<{ share_token: string; tournament_id: Uuid }>,
-      TournamentRead
+      PublicTournamentRead
     >;
   };
   "/api/v1/public/{share_token}/tournaments/{tournament_id}/standings": {
@@ -335,33 +266,10 @@ export type DemoPaths = MergePaths<
 // ================================================================ setup
 // Tournament list and setup, screens 1-5 (FR-030-FR-039). The backend serves
 // the list, creating, the format, the picks, the pairs, the halves, the
-// seeds, "draw again" and deleting (P7a); these routes wait for the next P7
-// pull requests: the Monster DYP top players (FR-041), the schedule preview
-// and "Generate and start" (FR-035), and "Back to setup" (FR-036). Start
-// and the preview carry the expected draw counter (409 when it is stale).
-
-export interface PreviewMatch {
-  /** The players of each side. */
-  sides: [Uuid[], Uuid[]];
-}
-
-export interface PreviewRound {
-  round_no: number;
-  matches: PreviewMatch[];
-  /** The players of each entry that sits the round out. */
-  sitting_out: Uuid[][];
-}
-
-/** What "Generate and start" would create (FR-035). */
-export interface SchedulePreview {
-  /** Round robin: all rounds. Swiss, Monster DYP and a knockout: the first round. */
-  rounds: PreviewRound[];
-  /** Null when rounds are added one by one. */
-  match_count: number | null;
-  round_count: number | null;
-  /** A knockout's bracket size (BR-040). */
-  bracket_size: number | null;
-}
+// seeds, "draw again" and deleting (P7a), and "Generate and start" (FR-035)
+// and "Back to setup" (FR-036, P7b), and the schedule preview of the review
+// screen; this route waits for a later pull request: the Monster DYP top
+// players (FR-041).
 
 // ================================================================ play
 // The running group phase, its fields and its end (screens 6–8, FR-040,
@@ -617,19 +525,6 @@ interface Action<P, B, R> {
 export interface SetupPaths {
   "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/top-players": {
     put: Put<Tournament, { player_ids: Uuid[] }, TournamentSetupRead>;
-  };
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/preview": {
-    get: Get<Tournament, SchedulePreview>;
-  };
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/start": {
-    post: Action<Tournament, { expected_draw_counter: number }, TournamentRead>;
-  };
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/back-to-setup": {
-    post: Action<
-      Tournament,
-      { expected_state: TournamentState },
-      TournamentRead
-    >;
   };
 }
 

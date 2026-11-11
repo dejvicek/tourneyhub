@@ -7,7 +7,7 @@ import {
   db,
   placesRead,
   publicLeague,
-  tournamentRead,
+  publicTournamentRead,
   tournamentStandings,
 } from "../store";
 
@@ -39,7 +39,7 @@ export const publicHandlers = [
     ({ params }) => {
       const t = visibleTournament(params.share_token, params.tournament_id);
       return t
-        ? tournamentRead(t)
+        ? publicTournamentRead(t)
         : apiError(404, "not_found", { tournament_id: params.tournament_id });
     },
   ),
