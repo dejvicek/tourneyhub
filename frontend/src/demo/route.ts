@@ -63,11 +63,13 @@ export function route<M extends Method, P extends PathsWith<M>>(
 ) {
   return http[method](mswPath(path), async ({ request, params }) => {
     const hasBody = ["POST", "PUT", "PATCH"].includes(request.method);
+    // A POST may carry no body at all, such as a generate.
+    const text = hasBody ? await request.text() : "";
     const result: unknown = await resolve({
       // MSW parses the parameters the contract names from the same path.
       params: params as PathParams<Operation<P, M>>,
       // demo only: the fake API trusts its typed caller and validates nothing.
-      body: (hasBody ? await request.json() : undefined) as RequestBody<
+      body: (text === "" ? undefined : JSON.parse(text)) as RequestBody<
         Operation<P, M>
       >,
       url: new URL(request.url),

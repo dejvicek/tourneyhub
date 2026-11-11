@@ -355,6 +355,63 @@ def test_adr006_an_access_token_of_a_deleted_user_is_not_authenticated(
     assert response.json()["code"] == "not_authenticated"
 
 
+def _bearer(response: httpx2.Response) -> dict[str, str]:
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+
+def test_adr006_an_access_token_stops_at_once_after_a_logout(
+    client: TestClient, ana: User
+) -> None:
+    login = _log_in(client, ana.email)
+    headers = _bearer(login)
+    assert client.get("/api/v1/me", headers=headers).status_code == 200
+
+    _present(client, "/api/v1/auth/logout", _cookie(login))
+
+    refused = client.get("/api/v1/me", headers=headers)
+    assert refused.status_code == 401
+    assert refused.json() == {"code": "token_expired", "detail": {}}
+
+
+def test_adr006_a_rotated_family_keeps_its_access_tokens_working(
+    client: TestClient, ana: User
+) -> None:
+    login = _log_in(client, ana.email)
+    first = _bearer(login)
+
+    refreshed = _refresh(client, _cookie(login))
+    again = _refresh(client, _cookie(refreshed))
+
+    assert (refreshed.status_code, again.status_code) == (200, 200)
+    for headers in (first, _bearer(refreshed), _bearer(again)):
+        assert client.get("/api/v1/me", headers=headers).status_code == 200
+
+
+def test_adr006_a_revoked_family_refuses_only_its_own_access_tokens(
+    client: TestClient, ana: User
+) -> None:
+    phone = _log_in(client, ana.email)
+    laptop = _log_in(client, ana.email)
+
+    _present(client, "/api/v1/auth/logout", _cookie(phone))
+
+    assert client.get("/api/v1/me", headers=_bearer(phone)).status_code == 401
+    assert client.get("/api/v1/me", headers=_bearer(laptop)).status_code == 200
+
+
+def test_adr006_reuse_of_a_rotated_refresh_token_stops_the_family_access_tokens(
+    client: TestClient, ana: User, travel: Callable[[timedelta], datetime]
+) -> None:
+    login = _log_in(client, ana.email)
+    refreshed = _refresh(client, _cookie(login))
+    travel(timedelta(minutes=5))  # past the 60-second window of the first token
+
+    reused = _refresh(client, _cookie(login))
+
+    assert reused.status_code == 401
+    assert client.get("/api/v1/me", headers=_bearer(refreshed)).status_code == 401
+
+
 def test_adr006_no_route_accepts_x_user_id_any_more(
     client: TestClient, make_league: Callable[..., League]
 ) -> None:

@@ -22,6 +22,10 @@ class ErrorCode(StrEnum):
     EMAIL_TAKEN = "email_taken"
     WRONG_PASSWORD = "wrong_password"  # the current password of a change
     PASSWORD_UNCHANGED = "password_unchanged"
+    # Admin
+    USER_NOT_FOUND = "user_not_found"
+    OWN_ACCOUNT = "own_account"  # an admin resets their own password
+    ADMIN_TARGET = "admin_target"  # the account to reset is an admin's: the CLI
     # Leagues
     LEAGUE_NOT_FOUND = "league_not_found"
     LEAGUE_ID_TAKEN = "league_id_taken"

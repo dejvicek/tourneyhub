@@ -2,6 +2,7 @@
 // keys. Each area keeps its texts in its own module under en/ and cs/, so
 // that screens built in parallel do not edit the same file; they merge here
 // into the one namespace.
+import { admin } from "./en/admin";
 import { auth } from "./en/auth";
 import { common } from "./en/common";
 import { fields } from "./en/fields";
@@ -19,6 +20,7 @@ export const en = {
   ...common,
   shell,
   auth,
+  admin,
   leagues,
   players,
   standings,

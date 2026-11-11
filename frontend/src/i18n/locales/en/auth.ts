@@ -68,11 +68,11 @@ export const auth = {
     passwordUnchanged: "The new password must differ from the current one.",
     generic: "That did not work. Check the connection and try again.",
   },
-  admin: { title: "Admin" },
   account: {
     menu: "Account: {{name}}",
     signedInAs: "Signed in as {{name}}",
     myLeagues: "My leagues",
+    administration: "Administration",
     changePassword: "Change password",
     logOut: "Log out",
     logIn: "Log in",

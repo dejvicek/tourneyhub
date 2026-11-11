@@ -57,6 +57,8 @@ export const seedOutside: SeedPart = {
 export interface StoredAccount {
   user: UserRead;
   password: string;
+  /** ISO 8601, for the admin's list. */
+  createdAt: string;
 }
 
 /** Failed attempts and the waiting period of one throttle (ADR-006). */
@@ -73,6 +75,10 @@ export interface OutsideState {
    * opens; a reload starts again from here.
    */
   signedInUserId: string | null;
+  /** The instance's sign-up code, or null while sign-up is closed (FR-005). */
+  signupCode: string | null;
+  /** When the code last changed, ISO 8601. */
+  signupCodeUpdatedAt: string | null;
   loginThrottle: Throttle;
   signupThrottle: Throttle;
 }
@@ -84,6 +90,7 @@ export function createOutsideState(organizer: UserRead): OutsideState {
         // The seed's own user, so that PATCH /me and the shells agree.
         user: organizer,
         password: DEMO_PASSWORD,
+        createdAt: "2026-08-20T17:30:00Z",
       },
       {
         user: {
@@ -95,9 +102,37 @@ export function createOutsideState(organizer: UserRead): OutsideState {
           must_change_password: false,
         },
         password: "another-organizer-password",
+        createdAt: "2026-09-04T17:45:00Z",
+      },
+      {
+        user: {
+          id: demoId(4003, "outside"),
+          email: "eva.novakova@demo.tourneyhub.test",
+          display_name: "Eva Nováková",
+          language: "cs",
+          is_admin: false,
+          // Reset by the admin, has not logged in since (ADR-006).
+          must_change_password: true,
+        },
+        password: "temporary-password-eva",
+        createdAt: "2026-09-18T19:10:00Z",
+      },
+      {
+        user: {
+          id: demoId(4004, "outside"),
+          email: "tomas.cerny@demo.tourneyhub.test",
+          display_name: "Tomáš Černý",
+          language: "en",
+          is_admin: false,
+          must_change_password: false,
+        },
+        password: "tomas-organizer-password",
+        createdAt: "2026-10-02T16:20:00Z",
       },
     ],
     signedInUserId: DEMO_USER_ID,
+    signupCode: DEMO_SIGNUP_CODE,
+    signupCodeUpdatedAt: "2026-08-20T17:30:00Z",
     loginThrottle: { failures: [], blockedUntil: 0 },
     signupThrottle: { failures: [], blockedUntil: 0 },
   };

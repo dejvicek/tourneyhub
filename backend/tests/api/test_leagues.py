@@ -200,7 +200,7 @@ def test_adr008_a_retry_racing_its_uncommitted_first_attempt_is_a_conflict(
     settings: Settings,
     committing_engine: Engine,
     now: datetime,
-    auth_header: Callable[..., dict[str, str]],
+    committed_auth_header: Callable[..., dict[str, str]],
     wait_for_a_lock_wait: Callable[[], None],
 ) -> None:
     with Session(committing_engine) as setup:
@@ -234,7 +234,7 @@ def test_adr008_a_retry_racing_its_uncommitted_first_attempt_is_a_conflict(
                 "/api/v1/leagues",
                 json={"id": str(league_id), "name": "Thursday DYP"},
                 # The app reads the system clock here, not the test's `now`.
-                headers=auth_header(owner_id, issued_at=datetime.now(UTC)),
+                headers=committed_auth_header(owner_id, issued_at=datetime.now(UTC)),
             )
             outcome.append((response.status_code, response.json()))
 
@@ -710,7 +710,7 @@ def test_adr008_of_two_starts_of_season_2_exactly_one_wins(
     committing_settings: Settings,
     committing_engine: Engine,
     now: datetime,
-    auth_header: Callable[..., dict[str, str]],
+    committed_auth_header: Callable[..., dict[str, str]],
     wait_for_a_lock_wait: Callable[[], None],
 ) -> None:
     with Session(committing_engine) as setup:
@@ -747,7 +747,7 @@ def test_adr008_of_two_starts_of_season_2_exactly_one_wins(
                 f"/api/v1/leagues/{league_id}/seasons",
                 json={"expected_current_number": 1},
                 # The app reads the system clock here, not the test's `now`.
-                headers=auth_header(owner_id, issued_at=datetime.now(UTC)),
+                headers=committed_auth_header(owner_id, issued_at=datetime.now(UTC)),
             )
             outcome.append((response.status_code, response.json()))
 
@@ -799,7 +799,7 @@ def test_adr008_a_season_start_racing_a_league_delete_is_not_found(
     committing_settings: Settings,
     committing_engine: Engine,
     now: datetime,
-    auth_header: Callable[..., dict[str, str]],
+    committed_auth_header: Callable[..., dict[str, str]],
     wait_for_a_lock_wait: Callable[[], None],
 ) -> None:
     owner_id, league_id, _ = _commit_league(
@@ -818,7 +818,7 @@ def test_adr008_a_season_start_racing_a_league_delete_is_not_found(
                 f"/api/v1/leagues/{league_id}/seasons",
                 json={"expected_current_number": 1},
                 # The app reads the system clock here, not the test's `now`.
-                headers=auth_header(owner_id, issued_at=datetime.now(UTC)),
+                headers=committed_auth_header(owner_id, issued_at=datetime.now(UTC)),
             )
             outcome.append((response.status_code, response.json()))
 
@@ -839,7 +839,7 @@ def test_br012_a_table_edit_racing_the_season_close_is_a_conflict(
     committing_settings: Settings,
     committing_engine: Engine,
     now: datetime,
-    auth_header: Callable[..., dict[str, str]],
+    committed_auth_header: Callable[..., dict[str, str]],
     wait_for_a_lock_wait: Callable[[], None],
 ) -> None:
     owner_id, league_id, season_1_id = _commit_league(
@@ -863,7 +863,7 @@ def test_br012_a_table_edit_racing_the_season_close_is_a_conflict(
             response = client.put(
                 f"/api/v1/leagues/{league_id}/seasons/{season_1_id}/placement-points",
                 json={"placement_points": [99, 1]},
-                headers=auth_header(owner_id, issued_at=datetime.now(UTC)),
+                headers=committed_auth_header(owner_id, issued_at=datetime.now(UTC)),
             )
             outcome.append((response.status_code, response.json()))
 

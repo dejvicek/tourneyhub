@@ -13,11 +13,12 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 from sqlalchemy import Engine, event, func, make_url, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from tourneyhub.api.deps import get_clock, get_now, get_session, get_session_factory
 from tourneyhub.app import create_app
-from tourneyhub.db.models.accounts import InstanceSettings, User
+from tourneyhub.db.models.accounts import InstanceSettings, RefreshToken, User
 from tourneyhub.db.models.leagues import League, Player, Season
 from tourneyhub.db.models.tournaments import Field, Tournament, TournamentPhase
 from tourneyhub.db.session import create_db_engine
@@ -290,22 +291,74 @@ def travel(client: TestClient, now: datetime) -> Callable[[timedelta], datetime]
     return travel
 
 
+def _login_row(user_id: UUID, family_id: UUID, now: datetime) -> RefreshToken:
+    """A refresh token that makes `family_id` a live login of the user (ADR-006)."""
+    return RefreshToken(
+        user_id=user_id,
+        family_id=family_id,
+        parent_id=None,
+        token_hash=uuid7().bytes,
+        expires_at=now + auth_service.REFRESH_TOKEN_LIFETIME,
+        created_at=now,
+    )
+
+
 @pytest.fixture
-def auth_header(settings: Settings, now: datetime) -> Callable[..., dict[str, str]]:
-    """An `Authorization: Bearer` header for a user, issued at `now`."""
+def auth_header(
+    settings: Settings, session: Session, now: datetime
+) -> Callable[..., dict[str, str]]:
+    """An `Authorization: Bearer` header for a user, issued at `now`.
+
+    A user who exists gets a login of their own, a refresh-token family with one
+    unrevoked row, because the API refuses a token whose family has none
+    (ADR-006). A user who does not exist gets a token with a family of no rows.
+    The row is not committed: for apps that commit, see `committed_auth_header`.
+    """
 
     def auth_header(
         user_id: UUID, *, issued_at: datetime | None = None
     ) -> dict[str, str]:
+        family_id = uuid7()
+        try:
+            with session.begin_nested():
+                session.add(_login_row(user_id, family_id, now))
+                session.flush()
+        except IntegrityError:  # no such user
+            pass
         token = auth_service.issue_access_token(
             user_id=user_id,
-            family_id=uuid7(),
+            family_id=family_id,
             key=settings.jwt_secret,
             now=issued_at or now,
         )
         return {"Authorization": f"Bearer {token}"}
 
     return auth_header
+
+
+@pytest.fixture
+def committed_auth_header(
+    settings: Settings, committing_engine: Engine, now: datetime
+) -> Callable[..., dict[str, str]]:
+    """`auth_header` for tests that commit: the user is committed already, and so
+    is the login (§9)."""
+
+    def committed_auth_header(
+        user_id: UUID, *, issued_at: datetime | None = None
+    ) -> dict[str, str]:
+        family_id = uuid7()
+        with Session(committing_engine) as committing:
+            committing.add(_login_row(user_id, family_id, now))
+            committing.commit()
+        token = auth_service.issue_access_token(
+            user_id=user_id,
+            family_id=family_id,
+            key=settings.jwt_secret,
+            now=issued_at or now,
+        )
+        return {"Authorization": f"Bearer {token}"}
+
+    return committed_auth_header
 
 
 @pytest.fixture(autouse=True, scope="session")

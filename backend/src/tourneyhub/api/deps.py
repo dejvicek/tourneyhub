@@ -81,10 +81,16 @@ AccessClaimsDep = Annotated[auth_service.AccessClaims, Depends(get_access_claims
 def get_account(claims: AccessClaimsDep, session: SessionDep) -> User:
     """Load the caller's row from the user id in the access token (ADR-006).
 
+    The token's refresh-token family must still be live: after a reset, a logout
+    or a password change elsewhere the token is refused at once, with the answer
+    for an expired token, so the SPA refreshes once and then logs out.
+
     For the routes that work while `must_change_password` is set: the password
     change and `GET /me`. The other routes use `CurrentUserDep`.
     """
-    return account_service.load_user(session, user_id=claims.user_id)
+    user = account_service.load_user(session, user_id=claims.user_id)
+    auth_service.require_live_family(session, claims=claims)
+    return user
 
 
 AccountDep = Annotated[User, Depends(get_account)]
