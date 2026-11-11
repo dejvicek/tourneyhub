@@ -328,7 +328,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | BR-093 | A walkover counts as a normal win and loss everywhere. |
 | BR-094 | In a knockout, a result is locked once any later match it feeds has a result: the next match for its winner and, for a semifinal with a third-place match, that match for its loser. That later result must be cleared first. Changing a winner updates the sides of the later matches. |
 | BR-095 | Clearing a result in a finished tournament puts it back in progress. |
-| BR-096 | A phase, a final or a whole tournament has no result while none of its matches has one. A phase has none again once every result in it is cleared (FR-053) or its round 1 is deleted (FR-046). |
+| BR-096 | A phase, a final or a whole tournament has no result while none of its matches has one. It has none again once every result in it is cleared (FR-053), and a phase also once its round 1 is deleted (FR-046). |
 
 ### 7.13 Tournament places
 
