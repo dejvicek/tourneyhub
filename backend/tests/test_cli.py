@@ -332,6 +332,31 @@ def test_adr007_set_signup_code_records_a_cli_action_without_the_code(
 
 
 @pytest.mark.concurrency
+def test_adr007_set_signup_code_records_nothing_when_the_code_is_unchanged(
+    cli_environment: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _run("set-signup-code", "--clear")  # sign-up is closed already
+    _answer_prompt(monkeypatch, "the-same-code-123")
+    _run("set-signup-code")
+    changed_at = _updated_at(cli_environment)
+
+    _run("set-signup-code")  # the same code again
+    _run("set-signup-code", "--clear")
+    _run("set-signup-code", "--clear")  # closed twice
+
+    assert [a.action for a in _actions(cli_environment)] == [
+        AdminActionKind.SET_SIGNUP_CODE
+    ] * 2  # set, then clear
+    assert _updated_at(cli_environment) != changed_at  # the clear changed it
+    assert _stored_code(cli_environment) is None
+
+
+def _updated_at(engine: Engine) -> datetime | None:
+    with Session(engine) as reader:
+        return reader.get_one(InstanceSettings, 1).updated_at
+
+
+@pytest.mark.concurrency
 def test_adr007_a_refused_code_records_nothing(
     cli_environment: Engine, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -383,6 +408,72 @@ def test_adr007_create_admin_takes_a_display_name(
     user = _user(cli_environment, "boss@example.test")
     assert user is not None
     assert user.display_name == "Šéf"
+
+
+@pytest.mark.concurrency
+def test_adr007_create_admin_stores_the_display_name_as_the_api_does(
+    cli_environment: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _answer_prompts(monkeypatch, PASSWORD, PASSWORD)
+
+    # C + combining caron, then a run of spaces with a no-break space
+    _run(
+        "create-admin",
+        "--email",
+        "boss@example.test",
+        "--display-name",
+        "  C\u030cen\u011bk \u00a0 Boss ",
+    )
+
+    user = _user(cli_environment, "boss@example.test")
+    assert user is not None
+    assert user.display_name == "Čeněk Boss"
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize(
+    ("name", "message"),
+    [
+        pytest.param("", "1 to 100", id="empty"),
+        pytest.param("   \u00a0 ", "1 to 100", id="blank"),
+        pytest.param("x" * 101, "1 to 100", id="too-long"),
+        pytest.param("Boss\u200b", "invisible", id="zero-width-space"),
+        pytest.param("Bo\u202ess", "invisible", id="right-to-left-override"),
+        pytest.param("\u3164", "invisible", id="hangul-filler"),
+        pytest.param("\u2800 Boss", "invisible", id="braille-blank"),
+        pytest.param("Boss\nTwo", "invisible", id="line-break"),
+    ],
+)
+def test_adr007_create_admin_refuses_a_display_name_the_api_would_refuse(
+    cli_environment: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
+    message: str,
+) -> None:
+    prompts = _answer_prompts(monkeypatch, PASSWORD, PASSWORD)
+
+    code, stdout, _ = _run(
+        "create-admin", "--email", "boss@example.test", "--display-name", name
+    )
+
+    assert code == 1
+    assert message in stdout
+    assert prompts == []  # refused before the password is asked
+    assert _user(cli_environment, "boss@example.test") is None
+    assert _actions(cli_environment) == []
+
+
+@pytest.mark.concurrency
+def test_adr007_create_admin_with_no_usable_name_in_the_email_asks_for_one(
+    cli_environment: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _answer_prompts(monkeypatch, PASSWORD, PASSWORD)
+
+    code, stdout, _ = _run("create-admin", "--email", f"{'x' * 101}@example.test")
+
+    assert code == 1
+    assert "--display-name" in stdout
+    assert _actions(cli_environment) == []
 
 
 @pytest.mark.concurrency

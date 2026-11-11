@@ -54,13 +54,16 @@ def set_signup_code(
     admin_user_id: UUID | None,
     code: str | None,
     now: datetime,
-) -> None:
+) -> bool:
     """Set, change or clear the sign-up code, and record it (FR-005, ADR-007).
 
     Setting and clearing are one action, `set_signup_code`, without a target; the
-    code itself is not recorded.
+    code itself is not recorded. A call that leaves the code as it was, such as
+    closing sign-up that is closed, changes nothing and records nothing; the
+    result says whether the code changed.
     """
-    instance_service.set_signup_code(session, code=code, now=now)
+    if not instance_service.set_signup_code(session, code=code, now=now):
+        return False
     record_action(
         session,
         source=source,
@@ -69,6 +72,7 @@ def set_signup_code(
         target_user_id=None,
         now=now,
     )
+    return True
 
 
 def generate_signup_code(
@@ -105,7 +109,9 @@ def reset_password(
     is set, so its next login must choose a new password before anything else.
     With no `temporary_password` a random one is made and returned, to be shown
     once; a password the admin typed is not returned. The admin's own account is
-    refused: it would revoke the admin's own login.
+    refused (`own_account`): it would revoke the admin's own login. Another
+    admin's account is refused too (`admin_target`): a stolen admin session could
+    otherwise take over every other admin, so admins are handled with the CLI.
     """
     if user_id == admin.id:
         raise RuleViolationError(ErrorCode.OWN_ACCOUNT)
@@ -119,6 +125,8 @@ def reset_password(
     ).one_or_none()
     if target is None:
         raise NotFoundError(ErrorCode.USER_NOT_FOUND)
+    if target.is_admin:
+        raise RuleViolationError(ErrorCode.ADMIN_TARGET)
     if temporary_password is None:
         password = generated = secrets.token_urlsafe(_GENERATED_PASSWORD_BYTES)
     else:

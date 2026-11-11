@@ -1,8 +1,10 @@
-"""create admin_actions
+"""create admin_actions and index live refresh-token families
 
 DATA-MODEL §4.1: the record of admin actions from the web and the CLI (ADR-007).
 The two CHECKs work in one direction only, so that ON DELETE SET NULL can clear
 the reference of a deleted account. The sign-up code is never stored here.
+Every authenticated request asks whether its token's family still has an
+unrevoked row (ADR-006); a partial index on family_id answers that.
 
 Revision ID: 4502d5926476
 Revises: 2df115cf6eb5
@@ -76,7 +78,18 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_admin_actions")),
     )
+    op.create_index(
+        "ix_refresh_tokens_live_family_id",
+        "refresh_tokens",
+        ["family_id"],
+        postgresql_where=sa.text("revoked_at IS NULL"),
+    )
 
 
 def downgrade() -> None:
+    op.drop_index(
+        "ix_refresh_tokens_live_family_id",
+        table_name="refresh_tokens",
+        postgresql_where=sa.text("revoked_at IS NULL"),
+    )
     op.drop_table("admin_actions")

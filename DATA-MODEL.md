@@ -108,7 +108,7 @@ Standalone tables: `instance_settings` (one row) and `auth_attempts` (rate limit
 |---|---|
 | `id` | |
 | `user_id` | FK `users`, `ON DELETE CASCADE`. Indexed: a password change revokes the user's other families (ADR-006). |
-| `family_id` | `uuid`; all tokens of one login share it. Indexed. The refresh endpoint locks the family's rows (`SELECT … FOR UPDATE`) before reading them, so presentations within one family are handled one at a time. |
+| `family_id` | `uuid`; all tokens of one login share it. Indexed, and a second, partial index `WHERE revoked_at IS NULL` answers the check every authenticated request makes: does the access token's family still have an unrevoked row (ADR-006)? The refresh endpoint locks the family's rows (`SELECT … FOR UPDATE`) before reading them, so presentations within one family are handled one at a time. |
 | `parent_id` | FK `refresh_tokens`, nullable, `ON DELETE SET NULL`: the token this one was rotated from. Indexed. Siblings are tokens with the same `family_id` and the same non-null `parent_id`; a normal rotation revokes the presented token's unrotated siblings. A parent expires before its children, hence `SET NULL`. |
 | `token_hash` | `bytea`, SHA-256 of the token. Unique. |
 | `expires_at` | 90 days after issue; each rotation issues a new token with a new expiry, so a device in use stays logged in (ADR-006). Rows past `expires_at` are deleted regularly; rotated rows stay until then, because reuse detection needs them. |
@@ -140,7 +140,7 @@ Standalone tables: `instance_settings` (one row) and `auth_attempts` (rate limit
 | `id` | |
 | `source` | `web` or `cli`. |
 | `admin_user_id` | FK `users`, nullable, `ON DELETE SET NULL`. `NULL` for CLI actions; on a `web` row it means the admin's account was deleted. |
-| `action` | `set_signup_code`, `reset_password` (web); `create_admin`, `grant_admin`, `revoke_admin` (CLI). |
+| `action` | `set_signup_code` (web or CLI), `reset_password` (web); `create_admin`, `grant_admin`, `revoke_admin` (CLI). |
 | `target_user_id` | FK `users`, nullable, `ON DELETE SET NULL`. `NULL` for `set_signup_code`; on other rows it means the target's account was deleted. |
 | `created_at` | |
 
@@ -150,7 +150,7 @@ The sign-up code itself is never written to `admin_actions`, and neither is a pa
 
 - `source` and `action` are `varchar` columns with a named CHECK of the allowed values (§2), like every enumeration. Setting, changing and clearing the code are one action, `set_signup_code`; the row does not tell them apart. The code is never read from this table.
 - Reading the sign-up code or the list of accounts is not recorded; only changes are.
-- A CLI command that changes nothing (`grant-admin` for an account that is an admin already, `revoke-admin` for one that is not) records nothing. `create-admin` records one row for the new account, `target_user_id` set.
+- A command or request that changes nothing records nothing: `grant-admin` for an account that is an admin already, `revoke-admin` for one that is not, and setting the sign-up code to the value it has (closing a closed sign-up too). `create-admin` records one row for the new account, `target_user_id` set.
 - A row is inserted in the transaction of the action it records, so both commit or both roll back.
 - The table has no index besides its primary key: the MVP never queries it, and a foreign key's index would only speed up deleting an account, which the MVP has no screen for.
 

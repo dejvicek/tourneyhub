@@ -9,6 +9,7 @@ from sqlalchemy import (
     SmallInteger,
     false,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -45,6 +46,15 @@ class RefreshToken(Base):
     """One rotating refresh token, stored only as its SHA-256 hash (ADR-006)."""
 
     __tablename__ = "refresh_tokens"
+    __table_args__ = (
+        # Every authenticated request asks whether its token's family is still
+        # live (ADR-006); the index holds only the rows that answer yes.
+        Index(
+            "ix_refresh_tokens_live_family_id",
+            "family_id",
+            postgresql_where=text("revoked_at IS NULL"),
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
     # Indexed for a password change, which revokes the user's other families.

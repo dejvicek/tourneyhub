@@ -1,5 +1,3 @@
-import re
-import unicodedata
 from typing import Annotated
 
 from pydantic import (
@@ -18,10 +16,14 @@ from tourneyhub.engine.accounts import Language
 from tourneyhub.engine.leagues import first_increase
 from tourneyhub.errors import ErrorCode
 from tourneyhub.services.accounts import (
+    DISPLAY_NAME_MAX_LENGTH,
     EMAIL_MAX_LENGTH,
     EMAIL_PATTERN,
     MAX_PASSWORD_LENGTH,
     MIN_PASSWORD_LENGTH,
+    collapse_whitespace,
+    compose_unicode,
+    has_invisible_characters,
 )
 from tourneyhub.services.instance import SIGNUP_CODE_MAX_LENGTH
 
@@ -38,11 +40,21 @@ class ResponseModel(BaseModel):
 
 
 type LeagueName = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        min_length=1,
+        max_length=DISPLAY_NAME_MAX_LENGTH,
+    ),
 ]
 
 type SeasonName = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        min_length=1,
+        max_length=DISPLAY_NAME_MAX_LENGTH,
+    ),
 ]
 
 
@@ -73,42 +85,34 @@ type NewPassword = Annotated[
 ]
 
 
-# Control and format characters, and the line and paragraph separators, show
-# nothing or break a line; U+3164 and U+2800 are letters and symbols that draw blank.
-_INVISIBLE_CATEGORIES = frozenset({"Cc", "Cf", "Zl", "Zp"})
-_BLANK_LOOKING = frozenset({"\u3164", "\u2800"})
-_WHITESPACE_RUN = re.compile(r"\s+")
-
-
 def _normalise_unicode(value: object) -> object:
     """Compose a string to NFC before strip and the length check.
 
     "Čeněk" typed as C + combining caron is then the same name as the composed
     one, and the same length (BR-001).
     """
-    return unicodedata.normalize("NFC", value) if isinstance(value, str) else value
+    return compose_unicode(value) if isinstance(value, str) else value
 
 
 def _reject_look_alikes(name: str) -> str:
     """Refuse characters that make two names look alike, and tidy the spaces.
 
-    Refused: control, format, line and paragraph separator characters (Unicode
-    Cc, Cf, Zl, Zp) and the blank-looking U+3164 and U+2800. Every run of
-    whitespace inside the name, a no-break space too, becomes one ASCII space.
+    The rules are the service's, shared with the CLI's `create-admin`.
     """
-    if any(
-        unicodedata.category(char) in _INVISIBLE_CATEGORIES or char in _BLANK_LOOKING
-        for char in name
-    ):
+    if has_invisible_characters(name):
         raise PydanticCustomError(
             "invisible_characters", "the name contains invisible characters"
         )
-    return _WHITESPACE_RUN.sub(" ", name)
+    return collapse_whitespace(name)
 
 
 type DisplayName = Annotated[
     str,
-    StringConstraints(strip_whitespace=True, min_length=1, max_length=100),
+    StringConstraints(
+        strip_whitespace=True,
+        min_length=1,
+        max_length=DISPLAY_NAME_MAX_LENGTH,
+    ),
     AfterValidator(_reject_look_alikes),
     BeforeValidator(_normalise_unicode),
 ]

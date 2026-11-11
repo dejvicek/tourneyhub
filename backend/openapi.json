@@ -211,6 +211,7 @@
           "password_unchanged",
           "user_not_found",
           "own_account",
+          "admin_target",
           "league_not_found",
           "league_id_taken",
           "season_not_found",
@@ -1805,7 +1806,7 @@
   "paths": {
     "/api/v1/admin/organizers": {
       "get": {
-        "description": "Every account by email, admins included (ADR-007).",
+        "description": "Every account by email, admins included (ADR-007); not cached.",
         "operationId": "list_organizers",
         "responses": {
           "200": {
@@ -1866,7 +1867,7 @@
     },
     "/api/v1/admin/organizers/{user_id}/password-reset": {
       "post": {
-        "description": "Give an organizer a temporary password (FR-006, ADR-006).\n\nEvery login of the account is revoked and its next login must choose a new\npassword. With no `temporary_password` a random one is generated and returned\nonce. 422 `own_account` for the admin's own account; 404 `user_not_found`.",
+        "description": "Give an organizer a temporary password (FR-006, ADR-006).\n\nEvery login of the account is revoked and its next login must choose a new\npassword. With no `temporary_password` a random one is generated and returned\nonce. 422 `own_account` for the admin's own account, 422 `admin_target` for\nanother admin's (the CLI handles admins); 404 `user_not_found`.",
         "operationId": "reset_password",
         "parameters": [
           {

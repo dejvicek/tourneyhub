@@ -137,6 +137,13 @@ def create_admin(*, email: str, display_name: str | None) -> int:
     ):
         print("That is not an email address.")
         return 1
+    try:
+        name = account_service.clean_display_name(
+            email.partition("@")[0] if display_name is None else display_name
+        )
+    except ValueError as error:
+        print(f"{error} Use --display-name.")
+        return 1
     password = getpass.getpass("Password: ")
     shortest = account_service.MIN_PASSWORD_LENGTH
     longest = account_service.MAX_PASSWORD_LENGTH
@@ -146,7 +153,6 @@ def create_admin(*, email: str, display_name: str | None) -> int:
     if getpass.getpass("Password again: ") != password:
         print("The passwords differ.")
         return 1
-    name = (display_name or email.partition("@")[0]).strip()[:100]
     with _transaction() as session:
         user = admin_service.create_admin(
             session,

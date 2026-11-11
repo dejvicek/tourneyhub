@@ -1,3 +1,4 @@
+import re
 import secrets
 import unicodedata
 from datetime import datetime
@@ -22,6 +23,55 @@ MAX_PASSWORD_LENGTH = 1024
 # No email-validator dependency: one @, no spaces, a dot in the domain.
 EMAIL_MAX_LENGTH = 320
 EMAIL_PATTERN = r"^[^@\s]+@[^@\s.]+(\.[^@\s.]+)+$"
+
+
+# A display name (and a player's name, BR-001): NFC, 1 to 100 characters after strip,
+# no invisible characters, runs of whitespace collapsed. The API's `DisplayName` and
+# the CLI's `create-admin` share these rules.
+DISPLAY_NAME_MAX_LENGTH = 100
+# Control and format characters, and the line and paragraph separators, show
+# nothing or break a line; U+3164 and U+2800 are letters and symbols that draw blank.
+_INVISIBLE_CATEGORIES = frozenset({"Cc", "Cf", "Zl", "Zp"})
+_BLANK_LOOKING = frozenset({"\u3164", "\u2800"})
+_WHITESPACE_RUN = re.compile(r"\s+")
+
+
+def compose_unicode(value: str) -> str:
+    """NFC: a letter typed as a base letter and a combining mark is one letter."""
+    return unicodedata.normalize("NFC", value)
+
+
+def has_invisible_characters(name: str) -> bool:
+    """Whether the name holds a character that shows nothing or draws blank.
+
+    Control, format, line and paragraph separator characters (Unicode Cc, Cf, Zl,
+    Zp), and the blank-looking U+3164 and U+2800.
+    """
+    return any(
+        unicodedata.category(char) in _INVISIBLE_CATEGORIES or char in _BLANK_LOOKING
+        for char in name
+    )
+
+
+def collapse_whitespace(name: str) -> str:
+    """Every run of whitespace, a no-break space too, becomes one ASCII space."""
+    return _WHITESPACE_RUN.sub(" ", name)
+
+
+def clean_display_name(raw: str) -> str:
+    """The display name as the API stores it, or a `ValueError` saying why not.
+
+    The same steps as `DisplayName`: NFC, strip, 1 to 100 characters, no invisible
+    characters, whitespace collapsed (BR-001).
+    """
+    name = compose_unicode(raw).strip()
+    if not 1 <= len(name) <= DISPLAY_NAME_MAX_LENGTH:
+        raise ValueError(
+            f"The display name needs 1 to {DISPLAY_NAME_MAX_LENGTH} characters."
+        )
+    if has_invisible_characters(name):
+        raise ValueError("The display name contains invisible characters.")
+    return collapse_whitespace(name)
 
 
 def load_user(session: Session, *, user_id: UUID) -> User:

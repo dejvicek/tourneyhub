@@ -127,8 +127,9 @@ def generate_signup_code(
 
 
 @router.get("/organizers")
-def list_organizers(session: SessionDep) -> list[OrganizerRead]:
-    """Every account by email, admins included (ADR-007)."""
+def list_organizers(session: SessionDep, response: Response) -> list[OrganizerRead]:
+    """Every account by email, admins included (ADR-007); not cached."""
+    response.headers["Cache-Control"] = _NO_STORE
     users = admin_service.list_organizers(session)
     return [OrganizerRead.model_validate(user) for user in users]
 
@@ -152,7 +153,8 @@ def reset_password(
 
     Every login of the account is revoked and its next login must choose a new
     password. With no `temporary_password` a random one is generated and returned
-    once. 422 `own_account` for the admin's own account; 404 `user_not_found`.
+    once. 422 `own_account` for the admin's own account, 422 `admin_target` for
+    another admin's (the CLI handles admins); 404 `user_not_found`.
     """
     response.headers["Cache-Control"] = _NO_STORE
     generated = admin_service.reset_password(

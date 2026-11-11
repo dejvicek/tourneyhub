@@ -1,7 +1,7 @@
 import re
 import threading
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid7
 
 import httpx2
@@ -294,6 +294,60 @@ def test_fr005_null_closes_sign_up_and_is_recorded(
     assert action.target_user_id is None
 
 
+def test_fr005_closing_a_closed_sign_up_records_nothing(
+    client: TestClient, admin_headers: dict[str, str], session: Session
+) -> None:
+    response = client.put(
+        "/api/v1/admin/signup-code", json={"signup_code": None}, headers=admin_headers
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"signup_code": None, "updated_at": None}
+    assert _actions(session) == []
+
+
+def test_fr005_setting_the_same_code_records_nothing_and_keeps_the_time(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    session: Session,
+    travel: Callable[[timedelta], datetime],
+    now: datetime,
+) -> None:
+    first = client.put(
+        "/api/v1/admin/signup-code", json={"signup_code": CODE}, headers=admin_headers
+    )
+    travel(timedelta(minutes=5))
+
+    again = client.put(
+        "/api/v1/admin/signup-code",
+        json={"signup_code": f" {CODE} "},  # the same once stripped
+        headers=admin_headers,
+    )
+
+    assert again.status_code == 200
+    assert again.json() == first.json()
+    assert again.json()["updated_at"] == now.isoformat().replace("+00:00", "Z")
+    assert len(_actions(session)) == 1
+
+
+def test_fr005_a_changed_code_after_a_no_op_is_recorded_again(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    set_signup_code: Callable[[str | None], None],
+    session: Session,
+) -> None:
+    set_signup_code(CODE)
+
+    for code in (CODE, CODE + "2", None, None):
+        client.put(
+            "/api/v1/admin/signup-code",
+            json={"signup_code": code},
+            headers=admin_headers,
+        )
+
+    assert len(_actions(session)) == 2  # CODE2, then null
+
+
 @pytest.mark.parametrize(
     "body",
     [
@@ -390,6 +444,7 @@ def test_fr006_the_list_has_every_account_by_email_without_secrets(
         for user in (amy, admin, zed)
     ]
     assert "password" not in response.text.replace("must_change_password", "")
+    assert response.headers["cache-control"] == "no-store"
 
 
 # --- the password reset -----------------------------------------------------
@@ -543,22 +598,50 @@ def test_adr006_the_revoked_login_cannot_refresh(
     assert refreshed.status_code == 401
 
 
-def test_adr006_an_access_token_issued_before_the_reset_is_refused_at_once(
+def _token_of(response: httpx2.Response) -> dict[str, str]:
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+
+def test_adr006_an_access_token_issued_before_the_reset_is_refused_at_once_as_expired(
     client: TestClient,
     admin_headers: dict[str, str],
     make_user: Callable[..., User],
 ) -> None:
     organizer = make_user(password=PASSWORD)
-    old = {
-        "Authorization": f"Bearer {_log_in(client, organizer, PASSWORD).json()['access_token']}"
-    }
+    old = _token_of(_log_in(client, organizer, PASSWORD))
     assert client.get("/api/v1/leagues", headers=old).status_code == 200
 
     _reset(client, admin_headers, organizer)
 
+    # The revoked family refuses the token, not the required password change: the
+    # SPA refreshes once, fails and logs out.
+    for path in ("/api/v1/leagues", "/api/v1/me"):
+        refused = client.get(path, headers=old)
+        assert refused.status_code == 401
+        assert refused.json() == {"code": "token_expired", "detail": {}}
+
+
+def test_adr006_the_old_access_token_stays_refused_after_the_organizer_changes_the_password(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    make_user: Callable[..., User],
+) -> None:
+    organizer = make_user(password=PASSWORD)
+    old = _token_of(_log_in(client, organizer, PASSWORD))
+    temporary = _reset(client, admin_headers, organizer).json()["temporary_password"]
+    fresh = _token_of(_log_in(client, organizer, temporary))
+
+    changed = client.post(
+        "/api/v1/auth/password",
+        json={"current_password": temporary, "new_password": "my own new passphrase"},
+        headers=fresh,
+    )
+
+    assert changed.status_code == 204
+    assert client.get("/api/v1/leagues", headers=fresh).status_code == 200
     refused = client.get("/api/v1/leagues", headers=old)
-    assert refused.status_code == 403
-    assert refused.json()["code"] == "password_change_required"
+    assert (refused.status_code, refused.json()["code"]) == (401, "token_expired")
+    assert client.get("/api/v1/me", headers=old).status_code == 401
 
 
 def test_adr006_a_password_change_after_a_reset_ends_the_requirement(
@@ -617,14 +700,41 @@ def test_adr007_an_admin_cannot_reset_their_own_password(
     assert _actions(session) == []
 
 
-def test_adr007_another_admins_password_can_be_reset(
+def test_adr007_another_admins_password_is_not_reset_by_the_web(
     client: TestClient,
     admin_headers: dict[str, str],
     make_user: Callable[..., User],
+    session: Session,
 ) -> None:
-    other = make_user(is_admin=True)
+    other = make_user(is_admin=True, password=PASSWORD)
+    login = _log_in(client, other, PASSWORD)
+    before = other.password_hash
 
-    assert _reset(client, admin_headers, other).status_code == 200
+    response = _reset(client, admin_headers, other)
+    chosen = _reset(client, admin_headers, other, temporary_password=TEMPORARY)
+
+    for refused in (response, chosen):
+        assert refused.status_code == 422
+        assert refused.json() == {"code": "admin_target", "detail": {}}
+        assert "temporary_password" not in refused.text
+    session.expire_all()
+    assert (other.password_hash, other.must_change_password) == (before, False)
+    assert _actions(session) == []
+    # Nothing was revoked: the admin's own login still works.
+    assert client.get("/api/v1/me", headers=_token_of(login)).status_code == 200
+
+
+def test_adr007_an_admin_who_lost_the_flag_can_be_reset(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    make_user: Callable[..., User],
+    session: Session,
+) -> None:
+    former = make_user(is_admin=True)
+    former.is_admin = False  # `revoke-admin` from the CLI
+    session.flush()
+
+    assert _reset(client, admin_headers, former).status_code == 200
 
 
 def test_adr007_an_unknown_account_is_404_and_records_nothing(
@@ -775,17 +885,12 @@ def test_adr006_a_reset_also_revokes_the_token_a_racing_refresh_issued(
         first = auth_service.start_session(
             setup, user_id=organizer.id, key=committing_settings.jwt_secret, now=at
         )
-        setup.commit()
-        admin_id, organizer_id = admin.id, organizer.id
-    headers = {
-        "Authorization": "Bearer "
-        + auth_service.issue_access_token(
-            user_id=admin_id,
-            family_id=uuid7(),
-            key=committing_settings.jwt_secret,
-            now=at,
+        boss = auth_service.start_session(
+            setup, user_id=admin.id, key=committing_settings.jwt_secret, now=at
         )
-    }
+        setup.commit()
+        organizer_id = organizer.id
+    headers = {"Authorization": f"Bearer {boss.access_token}"}
     outcome: list[int] = []
 
     with (

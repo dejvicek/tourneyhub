@@ -14,7 +14,7 @@ import jwt
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 from pydantic import SecretStr
-from sqlalchemy import func, select, update
+from sqlalchemy import exists, func, select, update
 from sqlalchemy.orm import Session
 
 from tourneyhub.db.models.accounts import AuthAttempt, RefreshToken, User
@@ -335,6 +335,28 @@ def refresh_session(
         key=key,
         now=now,
     )
+
+
+def require_live_family(session: Session, *, claims: AccessClaims) -> None:
+    """Refuse an access token whose refresh-token family has no unrevoked row.
+
+    A reset, a logout, a password change on another device and a detected reuse
+    revoke families; their access tokens stop working at once, not when they
+    expire (ADR-006). The answer is the one for an expired token, so the SPA
+    refreshes once, fails and logs out. One indexed lookup
+    (`ix_refresh_tokens_live_family_id`). A rotation revokes nothing, and adds a
+    row, so the family stays live.
+    """
+    live = session.scalar(
+        select(
+            exists().where(
+                RefreshToken.family_id == claims.family_id,
+                RefreshToken.revoked_at.is_(None),
+            )
+        )
+    )
+    if not live:
+        raise NotAuthenticatedError(ErrorCode.TOKEN_EXPIRED)
 
 
 def _revoke(family: Sequence[RefreshToken], *, now: datetime) -> None:
