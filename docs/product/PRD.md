@@ -149,7 +149,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | FR-036 | Until the first result is entered, the organizer can go back to setup, change anything — including a new DYP draw — and generate again. |
 | FR-037 | A tournament with a knockout finishes automatically when every knockout match has a result. A tournament without one finishes when the organizer finishes it after the group phase (FR-040). |
 | FR-038 | The organizer can delete a tournament after confirming, unless its season is closed. |
-| FR-039 | Swiss and Monster DYP have a setup setting, **points for sitting out**: 0, 1 or 2. The default is 1 when a group-phase match can be drawn (BR-090), otherwise 2 (BR-071). Setup does not show it for a round robin, which has no points for sitting out (BR-071). |
+| FR-039 | Swiss and Monster DYP have a setup setting, **points for sitting out**: 0, 1 or 2. The default is 1 when a group-phase match can be drawn (BR-090), otherwise 2 (BR-071, BR-075–BR-079). Setup does not show it for a round robin, which has no points for sitting out (BR-071). |
 
 ### 6.5 Group phase and knockout
 
@@ -173,7 +173,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | FR-051 | A result can include the score of each game — goals for each side, in whole numbers. Swiss and Monster DYP rounds require them (BR-092). Without game scores, the organizer picks the winner of each game. |
 | FR-052 | A match can be recorded as a walkover: a winner, with no score. |
 | FR-053 | The organizer can change or clear a result, subject to BR-011, BR-053, BR-065 and BR-094. |
-| FR-054 | The organizer can change a phase's match format until the phase's first result is entered, and the final's format until the final has a result. |
+| FR-054 | The organizer can change a phase's match format while the phase has no result: until its first result is entered, and again once every result in it is cleared (FR-053) or its round 1 is deleted (FR-046), as in BR-077. The final's format can change until the final has a result. |
 
 ### 6.7 Standings
 
@@ -224,7 +224,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 |---|---|
 | BR-010 | A new season cannot start while any tournament in the current season is unfinished. The organizer finishes or deletes it first. |
 | BR-011 | Nothing in a closed season can change: no new tournaments, results, corrections or deletions. Renaming the league, the season or a player, and deleting the whole league, still apply. |
-| BR-012 | Changing the placement points table recalculates the active season's standings; a closed season keeps the table it was played under. Turning draws off affects only results entered afterwards. |
+| BR-012 | Changing the placement points table recalculates the active season's standings; a closed season keeps the table it was played under. Turning draws off affects only results entered afterwards. A change of the draw setting, off or on, also moves the points for sitting out of every Swiss or Monster DYP phase that has no result yet, unless the organizer picked them by hand (BR-075). |
 
 ### 7.3 League ranking and seeding
 
@@ -297,10 +297,15 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | ID | Rule |
 |---|---|
 | BR-070 | In round robin, Swiss and Monster DYP rounds, a win is worth 2 points, a draw 1 and a loss 0. In Monster DYP, both players of a team get the points. |
-| BR-071 | In Swiss and Monster DYP, a sit-out is worth the tournament's points for sitting out: 0, 1 or 2, with the default of FR-039, so that the default is never worth a result no match can produce. Until the phase's first result is entered, the same boundary as FR-054, the default follows the phase's match format and the league's draw setting, also when either changes, unless the organizer has picked a value by hand; their value then stays. From the phase's first result, the value is fixed. Sit-out points count as points in the standings (BR-072). In Monster DYP, each player who sits out gets them. Match points stay as in BR-070. A round-robin phase has no points for sitting out, not even 0, and a value stored for one earlier is removed: in a complete round robin every entry sits out equally often (BR-051), and with a late entry (BR-054) the points would distort the order. |
+| BR-071 | In Swiss and Monster DYP, a sit-out is worth the tournament's points for sitting out (FR-039): 0, 1 or 2. A round-robin phase has no points for sitting out, not even 0, and a value stored for one earlier is removed: in a complete round robin every entry sits out equally often (BR-051), and with a late entry (BR-054) the points would distort the order. |
 | BR-072 | Swiss and Monster DYP: entries level on points are ordered by the enabled tie-breakers, in the organizer's order (FR-043). |
 | BR-073 | BH1 is the sum of the current points of every opponent faced, counted once per match. BH2 is the sum of those opponents' BH1. Score difference is goals for minus goals against over all games. Sit-outs add nothing to BH1 or BH2, and score difference counts only entered game scores. |
 | BR-074 | Entries still level share the place. Where a strict order is needed — pairing the next round, or the knockout's cut and seeding — the lot decides. |
+| BR-075 | While the phase has no result (BR-077), its points for sitting out are the default of FR-039 for the phase's current match format and the league's current draw setting, so that the default is never worth a result no match can produce. A change of either, the format (FR-054) or the draw setting off or on (BR-012), moves them with it, unless the organizer has picked a value by hand (BR-076). |
+| BR-076 | The organizer can pick the points for sitting out by hand in setup (FR-036). A picked value replaces the default of BR-075 and stays when the match format or the draw setting changes. |
+| BR-077 | A phase has no result while none of its matches has one: until its first result is entered, and again once every result in it is cleared (FR-053) or its round 1 is deleted (FR-046). From the phase's first result, its points for sitting out are fixed, whether they came from the default or by hand. |
+| BR-078 | Sit-out points count as points in the standings (BR-072). Match points stay as in BR-070. |
+| BR-079 | In Monster DYP, each player who sits out a round (BR-063) gets the points for sitting out. |
 
 ### 7.11 From group phase to knockout
 
