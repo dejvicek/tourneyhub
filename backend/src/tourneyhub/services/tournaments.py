@@ -3139,6 +3139,7 @@ def _placing_entries(tournament: Tournament) -> list[PlacingEntry]:
         PlacingEntry(
             entry_id=EntryId(entry.id),
             player_ids=tuple(PlayerId(m.player_id) for m in entry.members),
+            seed=entry.seed,
         )
         for entry in tournament.entries
     ]
