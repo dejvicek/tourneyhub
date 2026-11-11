@@ -1062,6 +1062,9 @@ export function preview(t: StoredTournament): SchedulePreview {
   };
 }
 
+/** The most entries a round robin is generated for; the backend's limit (FR-032). */
+export const MAX_ROUND_ROBIN_ENTRIES = 64;
+
 /**
  * The reason the tournament cannot start, with the backend's codes (FR-032,
  * FR-033); null when it can. Unlike the backend, which generates only the
@@ -1083,8 +1086,14 @@ export function startProblem(t: StoredTournament): SetupFailure | null {
       : draft.format.group_phase === "none" && draft.format.third_place_match
         ? 4
         : 2;
-  return entries.length < minimum
-    ? fail(422, "not_enough_entries", { minimum, given: entries.length })
+  if (entries.length < minimum) {
+    return fail(422, "not_enough_entries", { minimum, given: entries.length });
+  }
+  return draft.format.group_phase === "round_robin" &&
+    entries.length > MAX_ROUND_ROBIN_ENTRIES
+    ? fail(422, "too_many_entries_for_round_robin", {
+        limit: MAX_ROUND_ROBIN_ENTRIES,
+      })
     : null;
 }
 

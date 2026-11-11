@@ -12,6 +12,7 @@ const CODE_TEXTS = {
   dyp_halves_incomplete: "tournaments.errors.rules.br032Incomplete",
   not_enough_entries: "tournaments.errors.rules.fr032Entries",
   players_without_partner: "tournaments.errors.rules.br030",
+  too_many_entries_for_round_robin: "tournaments.errors.rules.fr032Max",
   format_not_supported: "tournaments.errors.rules.fr035",
   tournament_has_results: "tournaments.errors.rules.fr036",
 } as const satisfies Partial<Record<ErrorCode, string>>;
@@ -35,6 +36,7 @@ export function describeError(error: unknown, t: TFunction): string {
   const { detail } = error;
   const values = {
     min: Number(detail.minimum),
+    limit: Number(detail.limit),
     count: Number(detail.unpaired),
     top: Number(detail.top),
     bottom: Number(detail.bottom),

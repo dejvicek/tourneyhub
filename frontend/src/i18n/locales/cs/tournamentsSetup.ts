@@ -360,6 +360,8 @@ export const tournamentsSetup: CsMessages<typeof english> = {
       name_required: "Zadejte název turnaje.",
       fr032: "Hráčů je málo, potřeba je alespoň {{min}}.",
       fr032Entries: "Účastníků je málo, potřeba je alespoň {{min}}.",
+      fr032Max:
+        "Každý s každým má nejvýše {{limit}} účastníků. Odeberte některé, nebo zvolte jiný formát.",
       br030_one: "{{count}} hráč ještě nemá spoluhráče.",
       br030_few: "{{count}} hráči ještě nemají spoluhráče.",
       br030_many: "{{count}} hráče ještě nemá spoluhráče.",

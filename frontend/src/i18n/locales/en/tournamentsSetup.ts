@@ -320,6 +320,8 @@ export const tournamentsSetup = {
       name_required: "Give the tournament a name.",
       fr032: "Not enough players: at least {{min}} are needed.",
       fr032Entries: "Not enough entries: at least {{min}} are needed.",
+      fr032Max:
+        "A round robin takes at most {{limit}} entries. Remove some, or pick another format.",
       br030_one: "{{count}} player has no partner yet.",
       br030_other: "{{count}} players have no partner yet.",
       fr035:
