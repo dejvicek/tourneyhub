@@ -76,6 +76,11 @@ export const fields = {
   },
   errors: {
     changed: "The fields changed elsewhere. They were reloaded.",
+    placementChanged:
+      "The fields changed in the meantime; the screen has been refreshed.",
+    notInProgress:
+      "The tournament is no longer in progress, for example because it was finished.",
+    fieldRemoved: "That field was already removed. The fields were reloaded.",
     twoFields: "That would put a player on two fields at once.",
     lastField: "The last field can't be removed.",
     sidesUnknown: "This match can't be played yet: a side isn't known.",

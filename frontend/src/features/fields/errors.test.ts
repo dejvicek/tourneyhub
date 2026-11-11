@@ -45,7 +45,37 @@ describe("the texts for a refused field write (ADR-008)", () => {
     ],
     [
       "en",
+      refused(409, "placement_changed"),
+      "The fields changed in the meantime; the screen has been refreshed.",
+    ],
+    [
+      "cs",
+      refused(409, "placement_changed"),
+      "Hřiště se mezitím změnila, obrazovka byla obnovena.",
+    ],
+    [
+      "en",
+      refused(409, "tournament_not_in_progress", { state: "finished" }),
+      "The tournament is no longer in progress, for example because it was finished.",
+    ],
+    [
+      "cs",
+      refused(409, "tournament_not_in_progress", { state: "finished" }),
+      "Turnaj už neprobíhá, například proto, že byl ukončen.",
+    ],
+    [
+      "en",
       refused(404, "field_not_found"),
+      "That field was already removed. The fields were reloaded.",
+    ],
+    [
+      "cs",
+      refused(404, "field_not_found"),
+      "Toto hřiště už bylo odebráno. Hřiště byla znovu načtena.",
+    ],
+    [
+      "en",
+      refused(404, "match_not_found"),
       "The fields changed elsewhere. They were reloaded.",
     ],
     [

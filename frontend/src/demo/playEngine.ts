@@ -118,30 +118,61 @@ export function fill(t: StoredTournament, except: readonly string[] = []) {
   }
 }
 
-/** Players who would be on two fields at once (BR-131). */
+/**
+ * Players who would be on two fields at once, with the fields that would
+ * hold them, lowest number first (BR-131).
+ */
 function doubleBooked(
   t: StoredTournament,
   fields: readonly FieldRead[],
-): string[] {
-  const seen = new Set<string>();
-  const twice = new Set<string>();
+): { playerIds: string[]; fieldIds: string[] } {
+  const on = new Map<string, FieldRead[]>();
   for (const field of fields) {
     const match =
       field.match_id === null ? undefined : findMatch(t, field.match_id);
     for (const player of match ? playerIds(match) : []) {
-      if (seen.has(player)) {
-        twice.add(player);
-      }
-      seen.add(player);
+      on.set(player, [...(on.get(player) ?? []), field]);
     }
   }
-  return [...twice];
+  const twice = [...on].filter(([, held]) => held.length > 1);
+  const involved = new Map(
+    twice.flatMap(([, held]) => held.map((f) => [f.id, f] as const)),
+  );
+  return {
+    playerIds: twice.map(([player]) => player).toSorted(),
+    fieldIds: [...involved.values()]
+      .toSorted((a, b) => a.number - b.number)
+      .map((f) => f.id),
+  };
+}
+
+/**
+ * The four operations of FR-093: a waiting match on a free field, a match
+ * to a free field, a match back to waiting, a swap of two matches that are
+ * both on fields. Replacing and rotating are not allowed (ADR-008).
+ */
+function isAllowed(placements: PlacementsWrite["placements"]): boolean {
+  const [first, second] = placements;
+  if (first === undefined) {
+    return false;
+  }
+  if (second === undefined) {
+    return first.field_id !== first.from_field_id;
+  }
+  return (
+    first.from_field_id !== null &&
+    second.from_field_id !== null &&
+    first.field_id === second.from_field_id &&
+    second.field_id === first.from_field_id
+  );
 }
 
 /**
  * Places, moves, swaps or takes off matches as the request states (FR-093,
  * BR-133). Refuses a match with a result or an unknown side (BR-091), a
- * field another match keeps, and any player on two fields (BR-131).
+ * match that is not on the field the screen saw it on, a field another
+ * match keeps, anything but the operations of FR-093, and any player on two
+ * fields (BR-131).
  */
 export function place(
   t: StoredTournament,
@@ -161,7 +192,7 @@ export function place(
         ? null
         : field.match_id,
   }));
-  for (const { match_id, field_id } of placements) {
+  for (const { match_id, field_id, from_field_id } of placements) {
     const match = findMatch(t, match_id);
     if (!match) {
       return { status: 404, code: "match_not_found", detail: {} };
@@ -171,6 +202,10 @@ export function place(
     }
     if (!sidesKnown(match)) {
       return { status: 422, code: "match_sides_unknown", detail: {} };
+    }
+    const seenOn = t.fields.find((f) => f.match_id === match_id)?.id ?? null;
+    if (seenOn !== from_field_id) {
+      return { status: 409, code: "placement_changed", detail: {} };
     }
     if (field_id === null) {
       continue;
@@ -189,12 +224,15 @@ export function place(
     }
     field.match_id = match_id;
   }
+  if (!isAllowed(placements)) {
+    return { status: 422, code: "placement_not_allowed", detail: {} };
+  }
   const twice = doubleBooked(t, fields);
-  if (twice.length > 0) {
+  if (twice.playerIds.length > 0) {
     return {
       status: 422,
       code: "player_on_another_field",
-      detail: { player_ids: twice.toSorted() },
+      detail: { player_ids: twice.playerIds, field_ids: twice.fieldIds },
     };
   }
   t.fields = fields;

@@ -84,6 +84,9 @@ export const fields: CsMessages<Messages["fields"]> = {
   },
   errors: {
     changed: "Hřiště se mezitím změnila. Byla znovu načtena.",
+    placementChanged: "Hřiště se mezitím změnila, obrazovka byla obnovena.",
+    notInProgress: "Turnaj už neprobíhá, například proto, že byl ukončen.",
+    fieldRemoved: "Toto hřiště už bylo odebráno. Hřiště byla znovu načtena.",
     twoFields: "Tím by hráč hrál na dvou hřištích najednou.",
     lastField: "Poslední hřiště nejde odebrat.",
     sidesUnknown:

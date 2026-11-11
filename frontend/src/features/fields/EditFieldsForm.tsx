@@ -58,7 +58,9 @@ export function EditFieldsForm({
   const tournamentId = model.tournament.id;
   const add = useMutation(fieldMutations.add(leagueId, tournamentId));
   const remove = useMutation(fieldMutations.remove(leagueId, tournamentId));
-  const errorText = useFieldError(add.error ?? remove.error);
+  // Only the latest write's error: an earlier one is stale once the other ran.
+  const latest = add.submittedAt > remove.submittedAt ? add : remove;
+  const errorText = useFieldError(latest.error);
   const [removing, setRemoving] = useState<FieldRead | null>(null);
   const [status, setStatus] = useState("");
   const next = nextNumber(model.fields);

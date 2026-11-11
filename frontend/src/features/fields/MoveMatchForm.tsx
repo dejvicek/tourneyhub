@@ -136,6 +136,8 @@ export function MoveMatchForm({
             ? t("fields.move.swap", { number: chosen.field.number })
             : t("fields.move.to", { number: chosen.field.number });
 
+  // The field this screen shows the match on; the API refuses a changed one.
+  const from = current?.id ?? null;
   const submit = () => {
     if (choice === current?.id || (choice === WAITING && !current)) {
       onDone();
@@ -143,17 +145,33 @@ export function MoveMatchForm({
     }
     let body: PlacementsWrite;
     if (choice === WAITING) {
-      body = { placements: [{ match_id: matchId, field_id: null }] };
+      body = {
+        placements: [
+          { match_id: matchId, field_id: null, from_field_id: from },
+        ],
+      };
     } else if (chosen?.other && current) {
       // A swap names both matches with their new fields (ADR-008).
       body = {
         placements: [
-          { match_id: matchId, field_id: chosen.field.id },
-          { match_id: chosen.other.match.id, field_id: current.id },
+          {
+            match_id: matchId,
+            field_id: chosen.field.id,
+            from_field_id: current.id,
+          },
+          {
+            match_id: chosen.other.match.id,
+            field_id: current.id,
+            from_field_id: chosen.field.id,
+          },
         ],
       };
     } else {
-      body = { placements: [{ match_id: matchId, field_id: choice }] };
+      body = {
+        placements: [
+          { match_id: matchId, field_id: choice, from_field_id: from },
+        ],
+      };
     }
     place.mutate(body, { onSuccess: onDone });
   };
