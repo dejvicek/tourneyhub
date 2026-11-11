@@ -147,6 +147,9 @@ class TournamentFormatWrite(_FormatChecks):
     `sit_out_points` is 0, 1 or 2 (FR-039, BR-071). A number is the organizer's
     own choice and stays; null takes the default of the group phase's match
     format and follows it (`sit_out_points_set_by_hand` false in the read).
+    Any number counts as a manual pick, even one equal to the default, so a
+    client that read the format must send null, not the read value, while
+    `sit_out_points_set_by_hand` is false to keep following the default.
     """
 
     round_robin_legs: Literal[1, 2] | None
@@ -170,7 +173,8 @@ class TournamentCreate(_FormatChecks):
     (ADR-008). A setting left out or null takes the league's default: goals per
     game, the number of fields and the match format of the phase (FR-011); one
     round robin leg, the default sit-out points of the match format (FR-039,
-    BR-071) and no third-place match.
+    BR-071) and no third-place match. `sit_out_points` null follows the default;
+    any number counts as a manual pick.
     """
 
     id: UUID7

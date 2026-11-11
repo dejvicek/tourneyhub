@@ -665,6 +665,37 @@ def test_br071_a_pick_equal_to_the_default_still_counts_as_picked(
     assert (picked["sit_out_points"], picked["sit_out_points_set_by_hand"]) == (2, True)
 
 
+def test_br071_sending_the_read_value_back_pins_it_and_null_keeps_following(
+    client: TestClient, league: League, headers: dict[str, str]
+) -> None:
+    created = _create(client, league, headers, sit_out_points=None)
+    tid = created["tournament_id"]
+    read = created["format"]
+    assert (read["sit_out_points"], read["sit_out_points_set_by_hand"]) == (1, False)
+
+    following = _put_format(
+        client, league, tid, headers, group_match_format="bo3", sit_out_points=None
+    )
+    pinned = _put_format(
+        client,
+        league,
+        tid,
+        headers,
+        group_match_format="bo5",
+        sit_out_points=following["sit_out_points"],
+    )
+    stays = _put_format(
+        client, league, tid, headers, group_match_format="bo1", sit_out_points=None
+    )
+
+    assert (following["sit_out_points"], following["sit_out_points_set_by_hand"]) == (
+        2,
+        False,
+    )
+    assert (pinned["sit_out_points"], pinned["sit_out_points_set_by_hand"]) == (2, True)
+    assert (stays["sit_out_points"], stays["sit_out_points_set_by_hand"]) == (1, False)
+
+
 def test_br071_null_takes_the_default_back_after_a_pick(
     client: TestClient, league: League, headers: dict[str, str]
 ) -> None:
