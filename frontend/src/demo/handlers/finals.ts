@@ -385,7 +385,6 @@ export const finalsHandlers = [
         format: "single_elimination" as const,
         round_robin_legs: null,
         sit_out_points: null,
-        sit_out_points_set_by_hand: false,
         tiebreakers: null,
         qualifiers: plan.qualifiers,
         third_place_match: body.third_place_match,

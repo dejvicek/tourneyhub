@@ -7,7 +7,6 @@ import { newId } from "@/lib/newId";
 import { nameProblem, type Problem, validationFailed } from "../outsideErrors";
 import { apiError, route } from "../route";
 import { DEFAULT_PLACEMENT_POINTS } from "../rules";
-import { refreshSitOutDefaults } from "../setupEngine";
 import {
   activeSeason,
   db,
@@ -187,7 +186,6 @@ export const leagueHandlers = [
     const before = JSON.stringify(row);
     row.name = body.name?.trim() ?? row.name;
     row.draws_allowed = body.draws_allowed ?? row.draws_allowed;
-    refreshSitOutDefaults(row);
     row.default_field_count =
       body.default_field_count ?? row.default_field_count;
     row.default_match_format =

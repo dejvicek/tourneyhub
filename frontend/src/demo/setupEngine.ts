@@ -10,7 +10,7 @@
 // players, the halves, the doubles pairs) lives in a draft per tournament,
 // keyed on the store's current state so that resetDemoStore() drops it too.
 import type { components } from "@/api/schema";
-import { defaultSitOutPoints } from "@/lib/sitOutPoints";
+import { DEFAULT_SIT_OUT_POINTS } from "@/lib/sitOutPoints";
 
 import type { EntryRead, MatchRead, PhaseRead, RoundRead } from "./contract";
 import {
@@ -81,7 +81,6 @@ function formatOf(t: StoredTournament): FormatRead {
           : group.format,
     round_robin_legs: group?.round_robin_legs ?? null,
     sit_out_points: group?.sit_out_points ?? null,
-    sit_out_points_set_by_hand: group?.sit_out_points_set_by_hand ?? null,
     group_match_format: group?.match_format ?? null,
     knockout_match_format:
       knockout === undefined || knockout.match_format === "bo2"
@@ -282,18 +281,11 @@ function formatProblem(
   const applies = new Set<string>(grouped ? GROUP_SETTINGS : KNOCKOUT_SETTINGS);
   if (format.group_phase !== "round_robin") {
     applies.delete("round_robin_legs");
-  } else {
-    // BR-071: only Swiss and Monster DYP score a sit-out.
-    applies.delete("sit_out_points");
   }
   for (const name of [...GROUP_SETTINGS, ...KNOCKOUT_SETTINGS]) {
     const value = format[name] ?? null;
     if (!applies.has(name) && value !== null) {
-      return invalidBody(
-        name === "sit_out_points" && grouped
-          ? "sit_out_points_not_applicable"
-          : "setting_not_applicable",
-      );
+      return invalidBody("setting_not_applicable");
     }
     if (
       complete &&
@@ -304,6 +296,13 @@ function formatProblem(
     ) {
       return invalidBody("setting_missing");
     }
+  }
+  // BR-071: a round robin has no points for sitting out.
+  if (
+    format.group_phase === "round_robin" &&
+    (format.sit_out_points ?? null) !== null
+  ) {
+    return fail(422, "sit_out_points_not_applicable");
   }
   // BR-121: BO2 is a group-phase format of leagues that allow draws.
   if (format.group_match_format === "bo2" && !drawsAllowed) {
@@ -321,9 +320,8 @@ function resolveFormat(
   const fallback = league.default_match_format;
   const groupMatchFormat = format.group_match_format ?? fallback;
   // BR-071: only Swiss and Monster DYP score a sit-out. A number is the
-  // organizer's pick; null takes the default.
+  // organizer's pick (BR-075); null takes the default, 0 (FR-039).
   const scoresSitOuts = scoresSitOutsIn(format.group_phase);
-  const picked = format.sit_out_points ?? null;
   return {
     name: format.name.trim(),
     date: format.date,
@@ -334,11 +332,7 @@ function resolveFormat(
         ? (format.round_robin_legs ?? 1)
         : null,
     sit_out_points: scoresSitOuts
-      ? (picked ?? defaultSitOutPoints(groupMatchFormat, league.draws_allowed))
-      : null,
-    // A round robin keeps no value and no pick; only a knockout reads null.
-    sit_out_points_set_by_hand: grouped
-      ? scoresSitOuts && picked !== null
+      ? (format.sit_out_points ?? DEFAULT_SIT_OUT_POINTS)
       : null,
     group_match_format: grouped ? groupMatchFormat : null,
     knockout_match_format: grouped
@@ -366,7 +360,6 @@ function buildPhases(
         format: format.group_phase,
         round_robin_legs: format.round_robin_legs,
         sit_out_points: format.sit_out_points,
-        sit_out_points_set_by_hand: format.sit_out_points_set_by_hand ?? false,
         tiebreakers:
           format.group_phase === "round_robin"
             ? null
@@ -387,7 +380,6 @@ function buildPhases(
       format: "single_elimination",
       round_robin_legs: null,
       sit_out_points: null,
-      sit_out_points_set_by_hand: false,
       tiebreakers: null,
       qualifiers: null,
       third_place_match: format.third_place_match ?? false,
@@ -1239,39 +1231,4 @@ export function deleteTournament(t: StoredTournament): SetupFailure | null {
   const state = db();
   state.tournaments = state.tournaments.filter((other) => other.id !== t.id);
   return null;
-}
-
-/**
- * A change of the league's draw setting moves the default of every group phase
- * that follows it and has no result yet, in a tournament in setup or in progress
- * (BR-071); after the phase's first result the value is fixed (BR-071, as
- * reviewed in #46).
- */
-export function refreshSitOutDefaults(league: StoredLeague): void {
-  for (const tournament of db().tournaments) {
-    if (
-      tournament.league_id !== league.id ||
-      (tournament.state !== "setup" && tournament.state !== "in_progress")
-    ) {
-      continue;
-    }
-    for (const phase of tournament.phases) {
-      const hasResult = tournament.rounds.some(
-        (round) =>
-          round.phase_id === phase.id &&
-          round.matches.some((match) => match.outcome !== null),
-      );
-      if (
-        scoresSitOutsIn(phase.format) &&
-        !phase.sit_out_points_set_by_hand &&
-        !hasResult
-      ) {
-        phase.sit_out_points = defaultSitOutPoints(
-          phase.match_format,
-          league.draws_allowed,
-        );
-        draftOf(tournament).format.sit_out_points = phase.sit_out_points;
-      }
-    }
-  }
 }

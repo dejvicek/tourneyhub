@@ -220,7 +220,6 @@ const ROUND_ROBIN: Omit<PhaseRead, "id" | "position"> = {
   round_robin_legs: 1,
   // BR-071: a round robin keeps no sit-out points.
   sit_out_points: null,
-  sit_out_points_set_by_hand: false,
   tiebreakers: null,
   qualifiers: null,
   third_place_match: null,
