@@ -54,18 +54,30 @@ def test_br093_a_walkover_side_2_win_counts_as_a_normal_win() -> None:
     assert (rows[B].won, rows[B].points, rows[A].lost) == (1, 2, 1)
 
 
-@pytest.mark.parametrize("sit_out_points", [0, 1, 2])
-def test_br071_a_sit_out_is_worth_the_settings_points(sit_out_points: int) -> None:
-    rows = by_entry(
-        round_robin_standings(
-            [A, B, C],
-            matches=[won(A, B)],
-            sit_outs=[C],
-            sit_out_points=sit_out_points,
-        )
+def test_br071_a_sit_out_is_counted_but_earns_no_points_in_a_round_robin() -> None:
+    rows = by_entry(round_robin_standings([A, B, C], matches=[won(A, B)], sit_outs=[C]))
+
+    assert (rows[C].sat_out, rows[C].points, rows[C].played) == (1, 0, 0)
+
+
+def test_br071_sit_outs_do_not_decide_a_round_robin_with_a_late_entry() -> None:
+    # BR-054: five entries start, a sixth joins after round 3. The five have
+    # sat out three times each, the late one never; the points of their matches
+    # alone decide, so the sit-outs do not lift anyone.
+    late = EntryId(UUID(int=9))
+    five = [A, B, C, D, EntryId(UUID(int=5))]
+    matches = [won(A, B), won(C, D), won(late, five[4])]
+    without = round_robin_standings([*five, late], matches=matches)
+    with_sit_outs = round_robin_standings(
+        [*five, late], matches=matches, sit_outs=[*five, *five, *five]
     )
 
-    assert (rows[C].sat_out, rows[C].points, rows[C].played) == (1, sit_out_points, 0)
+    assert [(row.entry_id, row.points, row.place) for row in with_sit_outs] == [
+        (row.entry_id, row.points, row.place) for row in without
+    ]
+    sat_out = {row.entry_id: row.sat_out for row in with_sit_outs}
+    assert [sat_out[entry] for entry in five] == [3, 3, 3, 3, 3]
+    assert sat_out[late] == 0
 
 
 def test_br101_three_level_on_points_go_by_score_difference() -> None:
