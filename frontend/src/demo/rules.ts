@@ -100,8 +100,9 @@ export const rules: Readonly<Rules> = {
 // handlers and screens share them.
 /** BR-070, BR-122: group-phase points for a win, a draw and a loss. */
 export const MATCH_POINTS = { win: 2, draw: 1, loss: 0 } as const;
+/** FR-011: the default placement points table, 1st to 5th. */
+export const DEFAULT_PLACEMENT_POINTS = [10, 8, 6, 4, 2] as const;
+
 // BR-071: only Swiss and Monster DYP score a sit-out, not a round robin. The
 // points for sitting out default to 0 (FR-039, DEFAULT_SIT_OUT_POINTS in
 // `@/lib/sitOutPoints`); the organizer picks 0, 1 or 2 in setup (BR-075).
-/** FR-011: the default placement points table, 1st to 5th. */
-export const DEFAULT_PLACEMENT_POINTS = [10, 8, 6, 4, 2] as const;
