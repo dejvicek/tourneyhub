@@ -453,6 +453,8 @@ export function bracketOf(t: StoredTournament): BracketRead | null {
   }));
   return {
     phase_id: phase.id,
+    match_format: phase.match_format,
+    final_match_format: phase.final_match_format,
     size: Math.max(first.matches.length * 2, 4),
     third_place_match: rounds.some((round) =>
       round.matches.some((match) => match.kind === "third_place"),
@@ -1135,6 +1137,9 @@ export function previewOf(args: {
   const slots = seedSlots(size);
   const group = groupPhase(t);
   return {
+    can_start: true,
+    problem: null,
+    is_cut_by_lot: false,
     max_qualifiers: t.entries.filter(
       (e) => e.stage === "main" && !e.is_disabled,
     ).length,
@@ -1145,6 +1150,7 @@ export function previewOf(args: {
         entry_id: id,
         place: places.get(id) ?? 0,
       })),
+      decided_by_lot: false,
     })),
     first_round: Array.from(
       { length: size / 2 },

@@ -51,6 +51,15 @@ async function playOut(id: string): Promise<void> {
   }
 }
 
+/** A knockout start; the demo does not check the expected phase. */
+const KNOCKOUT = {
+  expected_current_phase_id: "",
+  qualifiers: 8,
+  third_place_match: false,
+  match_format: null,
+  final_match_format: null,
+} as const;
+
 describe("the finals in the fake API", () => {
   it.each([
     [DYP_EVENING, 4, 0],
@@ -217,7 +226,7 @@ describe("the finals in the fake API", () => {
           provisionalApi.GET(`${root}/knockout/preview`, {
             params: {
               path: base(MONSTER),
-              query: { qualifiers: 8, third_place_match: false, mode, draw: 0 },
+              query: { qualifiers: 8, third_place_match: false, mode },
             },
           }),
         );
@@ -251,10 +260,15 @@ describe("the finals in the fake API", () => {
           ]);
         }
 
-        const drawn = await dataOf(
+        await dataOf(
           provisionalApi.PUT(`${root}/knockout`, {
             params: { path: base(MONSTER) },
-            body: { qualifiers: 8, third_place_match: true, mode, draw: 0 },
+            body: { ...KNOCKOUT, third_place_match: true, mode },
+          }),
+        );
+        const drawn = await dataOf(
+          provisionalApi.GET(`${root}/bracket`, {
+            params: { path: base(MONSTER) },
           }),
         );
         expect(drawn.size).toBe(paired ? 4 : 8);
@@ -275,17 +289,13 @@ describe("the finals in the fake API", () => {
     const drawn = await dataOf(
       provisionalApi.PUT(`${root}/knockout`, {
         params: { path: base(MONSTER) },
-        body: {
-          qualifiers: 8,
-          third_place_match: false,
-          mode: "singles",
-          draw: 0,
-        },
+        body: { ...KNOCKOUT, mode: "singles" },
       }),
     );
+    const phaseId = drawn.phases.find((p) => p.kind === "knockout")?.id ?? "";
     await dataOf(
       provisionalApi.DELETE(`${root}/phases/{phase_id}`, {
-        params: { path: { ...base(MONSTER), phase_id: drawn.phase_id } },
+        params: { path: { ...base(MONSTER), phase_id: phaseId } },
       }),
     );
     const tournament = await dataOf(

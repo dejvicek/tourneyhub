@@ -20,6 +20,18 @@ export const finals = {
     },
     unknown: "Unknown player",
   },
+  errors: {
+    groupNotDone:
+      "Every group match needs a result before the knockout is drawn.",
+    qualifiers:
+      "Between {{minimum}} and {{maximum}} entries can go through to this knockout.",
+    formatNotSupported: "This knockout is not available for this format yet.",
+    modeNotApplicable:
+      "Teams are formed this way only after Monster DYP rounds.",
+    phaseNotDeletable: "Only a knockout after a group phase can be deleted.",
+    seasonClosed:
+      "The season was closed meanwhile, so nothing in it can change.",
+  },
   place: {
     label: "{{place}}{{suffix}}",
     suffix: { one: "st", two: "nd", few: "rd", other: "th" },
@@ -32,12 +44,20 @@ export const finals = {
     bo5: "Best of 5",
   },
   roundName: {
+    round_of_256: "Round of 256",
+    round_of_128: "Round of 128",
+    round_of_64: "Round of 64",
+    round_of_32: "Round of 32",
     round_of_16: "Round of 16",
     quarterfinal: "Quarterfinals",
     semifinal: "Semifinals",
     final: "Final",
   },
   matchTitle: {
+    round_of_256: "Round of 256, match {{n}}",
+    round_of_128: "Round of 128, match {{n}}",
+    round_of_64: "Round of 64, match {{n}}",
+    round_of_32: "Round of 32, match {{n}}",
     round_of_16: "Round of 16, match {{n}}",
     quarterfinal: "Quarterfinal {{n}}",
     semifinal: "Semifinal {{n}}",
@@ -103,6 +123,10 @@ export const finals = {
       won_third_place: "Won the third-place match",
       lost_third_place: "Lost the third-place match",
       lostIn: {
+        round_of_256: "Lost in the round of 256",
+        round_of_128: "Lost in the round of 128",
+        round_of_64: "Lost in the round of 64",
+        round_of_32: "Lost in the round of 32",
         round_of_16: "Lost in the round of 16",
         quarterfinal: "Lost in the quarterfinals",
         semifinal: "Lost in the semifinals",
@@ -264,7 +288,6 @@ export const finals = {
       "Places 1 to {{half}} are each drawn a partner from places {{from}} to {{to}} by lot.",
     modeLord:
       "Pairs are drawn completely at random and placed in the bracket by lot.",
-    drawAgain: "Draw the lots again",
     asTheyAre: "The best {{count}} play on as they are, seeded by their place.",
     skippedTitle_one: "{{names}} can't go through",
     skippedTitle_few: "{{names}} can't go through",
@@ -278,6 +301,10 @@ export const finals = {
     previewRow: "{{seed}}",
     previewPlaces: "{{first}} and {{second}}",
     firstRound: {
+      round_of_256: "Round of 256",
+      round_of_128: "Round of 128",
+      round_of_64: "Round of 64",
+      round_of_32: "Round of 32",
       round_of_16: "Round of 16",
       quarterfinal: "Quarterfinals",
       semifinal: "Semifinals",

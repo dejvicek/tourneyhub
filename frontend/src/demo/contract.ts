@@ -10,7 +10,7 @@
 // area, like the handlers in src/demo/handlers/.
 import type { components, paths as GeneratedPaths } from "@/api/schema";
 
-import type { MonsterKnockoutMode, SwissTiebreaker } from "./rules";
+import type { SwissTiebreaker } from "./rules";
 
 type Uuid = string;
 
@@ -128,12 +128,9 @@ export interface ProvisionalPaths {
   };
 
   // public: the league, a season's tournaments, a tournament, the season
-  // standings, a round robin's standings and the places are generated (P11,
-  // P10a); the knockout and the Swiss and Monster DYP ranking wait for P10b
-  // and P12 (the same reads as the organizer's, without an account)
-  "/api/v1/public/{share_token}/tournaments/{tournament_id}/bracket": {
-    get: Get<Params<{ share_token: string; tournament_id: Uuid }>, BracketRead>;
-  };
+  // standings, a round robin's standings, the places and the bracket are
+  // generated (P11, P10a, P10b); the Swiss and Monster DYP ranking waits for
+  // P12 (the same read as the organizer's, without an account)
   "/api/v1/public/{share_token}/tournaments/{tournament_id}/ranking": {
     get: Get<Params<{ share_token: string; tournament_id: Uuid }>, RankingRead>;
   };
@@ -222,61 +219,16 @@ export type FieldCreate = components["schemas"]["FieldCreate"];
 // Swiss and Monster DYP rounds, late and disabled players, and starting the
 // knockout. Served by handlers/finals.ts and handlers/standings.ts.
 
-export type KnockoutMatchState =
-  /** A first-round match against an empty spot; the entry goes through (BR-041). */
-  | "bye"
-  | "played"
-  | "on_field"
-  /** Both sides are known and no field is assigned. */
-  | "ready"
-  /** At least one side depends on an earlier match. */
-  | "waiting";
-
-/** The last round holds the final and, if played, the third-place match. */
-export type BracketRoundName =
-  "round_of_16" | "quarterfinal" | "semifinal" | "final";
-
-export interface BracketSide {
-  entry_id: Uuid | null;
-  seed: number | null;
-  is_bye: boolean;
-}
-
-export interface BracketMatch {
-  match_id: Uuid;
-  /** The match number in the tournament, continuing after the group phase; null for a bye. */
-  number: number | null;
-  round_no: number;
-  position: number;
-  kind: MatchRead["kind"];
-  state: KnockoutMatchState;
-  sides: [BracketSide, BracketSide];
-  outcome: Outcome | null;
-  is_walkover: boolean;
-  /** Goals of a BO1 game, otherwise the games won; null before a result. */
-  score: [number, number] | null;
-  match_format: MatchFormat;
-  field_number: number | null;
-  /** The number of the match the winner plays in. */
-  next_number: number | null;
-  /** A later match this one feeds has a result, so this one can't change (BR-094). */
-  result_locked: boolean;
-}
-
-export interface BracketRound {
-  round_no: number;
-  name: BracketRoundName;
-  matches: BracketMatch[];
-}
-
-export interface BracketRead {
-  phase_id: Uuid;
-  /** 4, 8 or 16, the smallest power of two that fits the entries (BR-040). */
-  size: number;
-  third_place_match: boolean;
-  has_group_phase: boolean;
-  rounds: BracketRound[];
-}
+// The knockout (P10b): generated. Starting it carries the phase the screen
+// saw as current (ADR-008); its preview and the bracket are reads.
+export type BracketRoundName = components["schemas"]["RoundName"];
+export type BracketSide = components["schemas"]["BracketSideRead"];
+export type BracketMatch = components["schemas"]["BracketMatchRead"];
+export type KnockoutMatchState = BracketMatch["state"];
+export type BracketRound = components["schemas"]["BracketRoundRead"];
+export type BracketRead = components["schemas"]["BracketRead"];
+export type KnockoutWrite = components["schemas"]["KnockoutWrite"];
+export type KnockoutPreview = components["schemas"]["KnockoutPreviewRead"];
 
 // The places (P8 for a round robin without a knockout): generated.
 export type PlaceReason = components["schemas"]["PlaceReasonRead"];
@@ -338,35 +290,6 @@ export interface FinishStateWrite {
   state: "finished";
 }
 
-export interface KnockoutWrite {
-  qualifiers: number;
-  third_place_match: boolean;
-  /** Null after a round robin or Swiss: the entries play as they are (BR-085). */
-  mode: MonsterKnockoutMode | null;
-  /** The draw counter: another number draws another lot (ADR-008). */
-  draw: number;
-}
-
-export interface KnockoutPreviewEntry {
-  seed: number;
-  /** The standings entries (players) that form it, with their standings places. */
-  members: { entry_id: Uuid; place: number }[];
-}
-
-export interface KnockoutPreview {
-  /** Entries that can go through: the active ones. */
-  max_qualifiers: number;
-  qualifiers: number;
-  entries: KnockoutPreviewEntry[];
-  /** The first round by seeds; null is a bye. */
-  first_round: [number, number | null][];
-  bracket_size: number;
-  /** The newest group-phase round, which the draw locks (BR-065). */
-  locks_round_no: number;
-  /** Standings places of disabled entries who would otherwise have qualified. */
-  skipped_entry_ids: Uuid[];
-}
-
 interface Delete<P> {
   parameters: P;
   requestBody?: never;
@@ -395,27 +318,8 @@ type TournamentRound = Params<{
   tournament_id: Uuid;
   round_id: Uuid;
 }>;
-type TournamentPhase = Params<{
-  league_id: Uuid;
-  tournament_id: Uuid;
-  phase_id: Uuid;
-}>;
-
-export interface KnockoutPreviewParams {
-  path: { league_id: Uuid; tournament_id: Uuid };
-  query: {
-    qualifiers: number;
-    third_place_match: boolean;
-    mode?: MonsterKnockoutMode;
-    draw: number;
-  };
-}
-
 // Reopening the interface adds the finals routes to the provisional paths.
 export interface ProvisionalPaths {
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/bracket": {
-    get: Get<Tournament, BracketRead>;
-  };
   "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/ranking": {
     get: Get<Tournament, RankingRead>;
   };
@@ -439,21 +343,5 @@ export interface ProvisionalPaths {
   };
   "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/state": {
     put: Put<Tournament, FinishStateWrite, TournamentRead>;
-  };
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout/preview": {
-    get: {
-      parameters: KnockoutPreviewParams & {
-        header?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: { 200: Json<KnockoutPreview> } & Errors;
-    };
-  };
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout": {
-    put: Put<Tournament, KnockoutWrite, BracketRead>;
-  };
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/phases/{phase_id}": {
-    delete: Delete<TournamentPhase>;
   };
 }

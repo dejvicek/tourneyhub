@@ -656,7 +656,9 @@ describe("Start the knockout (screen 13)", () => {
     const user = userEvent.setup();
     renderAt(at(paths.startKnockout, MONSTER));
 
-    const modes = await screen.findByRole("radiogroup");
+    const modes = await screen.findByRole("radiogroup", {
+      name: "How are the knockout teams formed?",
+    });
     expect(
       within(modes)
         .getAllByRole("radio")
@@ -735,6 +737,32 @@ describe("Start the knockout (screen 13)", () => {
     expect(screen.getByText("Third place")).toBeInTheDocument();
   });
 
+  it("gives the knockout its format and the final its own (BR-120)", async () => {
+    const user = userEvent.setup();
+    renderAt(`${at(paths.startKnockout, ROUND_ROBIN_DONE)}?qualifiers=4`);
+
+    await user.click(
+      within(
+        await screen.findByRole("radiogroup", { name: "Knockout matches" }),
+      ).getByRole("radio", { name: "BO3" }),
+    );
+    await user.click(
+      within(screen.getByRole("radiogroup", { name: "Final" })).getByRole(
+        "radio",
+        { name: "BO5" },
+      ),
+    );
+    await user.click(screen.getByRole("button", { name: "Draw the knockout" }));
+    await screen.findByText("Semifinal 1");
+
+    const tournament = await provisionalApi.GET(root, {
+      params: { path: ids(ROUND_ROBIN_DONE) },
+    });
+    expect(
+      tournament.data?.phases.find((phase) => phase.kind === "knockout"),
+    ).toMatchObject({ match_format: "bo3", final_match_format: "bo5" });
+  });
+
   it("ignores query values it cannot use", async () => {
     renderAt(
       `${at(paths.startKnockout, ROUND_ROBIN_DONE)}?qualifiers=lots&thirdPlace=maybe`,
@@ -747,7 +775,9 @@ describe("Start the knockout (screen 13)", () => {
 
   it("has no axe violations", async () => {
     renderAt(at(paths.startKnockout, MONSTER));
-    await screen.findByRole("radiogroup");
+    await screen.findByRole("radiogroup", {
+      name: "How are the knockout teams formed?",
+    });
     expect(await violations()).toEqual([]);
   });
 });

@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
-import type { BracketRoundName } from "@/demo/contract";
+import type { BracketRoundName, KnockoutWrite } from "@/demo/contract";
 import { type MonsterKnockoutMode, rules } from "@/demo/rules";
 import {
   finalsMutations,
@@ -27,6 +27,7 @@ import {
   type PreviewData,
   type TournamentData,
 } from "@/features/finals/api";
+import { leagueQueries } from "@/features/leagues/api";
 import { tournamentQueries } from "@/features/tournaments/api";
 import { useRouteParam } from "@/hooks/useRouteParam";
 import { paths } from "@/lib/paths";
@@ -38,23 +39,33 @@ import { Notice } from "./finals/Notice";
 import { ScreenHeader } from "./finals/ScreenHeader";
 import { LoadError, Loading } from "./finals/StateMessage";
 import { usePlaceLabel } from "./finals/usePlaceLabel";
+import { SegmentedControl } from "./setup/SegmentedControl";
 
 const FIRST_ROUND: Record<number, BracketRoundName> = {
   2: "final",
   4: "semifinal",
   8: "quarterfinal",
   16: "round_of_16",
+  32: "round_of_32",
+  64: "round_of_64",
+  128: "round_of_128",
+  256: "round_of_256",
 };
+
+type KnockoutFormat = NonNullable<KnockoutWrite["match_format"]>;
+const KNOCKOUT_FORMATS: readonly KnockoutFormat[] = ["bo1", "bo3", "bo5"];
+type FinalChoice = "same" | "bo3" | "bo5";
 
 function isPaired(mode: MonsterKnockoutMode | null): boolean {
   return mode !== null && mode !== "singles";
 }
 
 /**
- * Screen 13: configure and draw the knockout after the rounds of a Swiss or
- * Monster DYP (FR-045, BR-080–BR-087): how many go through, the third-place
- * match and, for Monster DYP, how the teams are formed. The preview comes
- * from the draw the server would make.
+ * Screen 13: configure and draw the knockout after the group phase (FR-045,
+ * BR-080–BR-087): how many go through, the third-place match, the match
+ * format of the knockout and of the final (BR-120) and, for Monster DYP, how
+ * the teams are formed. The preview comes from the draw the server would
+ * make; the start carries the phase the screen saw as current (ADR-008).
  */
 export function StartKnockoutPage() {
   const { t } = useTranslation();
@@ -131,14 +142,18 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
   const [mode, setMode] = useState<MonsterKnockoutMode | null>(
     rules.monsterKnockoutModes[0] ?? null,
   );
-  const [draw, setDraw] = useState(0);
+  const league = useQuery(leagueQueries.detail(leagueId));
+  // BR-120: the knockout plays the league's default unless picked here, and
+  // the final the knockout's format unless it has its own.
+  const [picked, setPicked] = useState<KnockoutFormat | null>(null);
+  const [finalChoice, setFinalChoice] = useState<FinalChoice>("same");
+  const matchFormat = picked ?? league.data?.default_match_format ?? "bo1";
   const effectiveMode = monster ? mode : null;
   const preview = useQuery({
     ...finalsQueries.preview(leagueId, tournamentId, {
       qualifiers,
       thirdPlaceMatch: thirdPlace,
       mode: effectiveMode,
-      draw,
     }),
     placeholderData: keepPreviousData,
   });
@@ -299,6 +314,7 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
             {t("finals.start.modes")}
           </legend>
           <RadioGroup
+            aria-label={t("finals.start.modes")}
             value={effectiveMode ?? undefined}
             onValueChange={(value) => {
               const next = rules.monsterKnockoutModes.find((m) => m === value);
@@ -330,25 +346,33 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
               </Label>
             ))}
           </RadioGroup>
-          {(effectiveMode === "a_little_mercy" ||
-            effectiveMode === "lord_have_mercy") && (
-            <Button
-              type="button"
-              variant="outline"
-
-              onClick={() => {
-                setDraw((d) => d + 1);
-              }}
-            >
-              {t("finals.start.drawAgain")}
-            </Button>
-          )}
         </fieldset>
       ) : (
         <p className="text-body-md">
           {t("finals.start.asTheyAre", { count: shown })}
         </p>
       )}
+
+      <SegmentedControl
+        label={t("tournaments.setup.format.knockoutMatches")}
+        hint={t("tournaments.setup.format.knockoutMatchesHint")}
+        value={matchFormat}
+        options={KNOCKOUT_FORMATS.map((format) => ({
+          value: format,
+          label: t(`tournaments.setup.matchFormat.${format}`),
+        }))}
+        onValueChange={setPicked}
+      />
+      <SegmentedControl<FinalChoice>
+        label={t("tournaments.setup.format.final")}
+        value={finalChoice}
+        options={[
+          { value: "same", label: t("tournaments.setup.format.finalSame") },
+          { value: "bo3", label: t("tournaments.setup.matchFormat.bo3") },
+          { value: "bo5", label: t("tournaments.setup.matchFormat.bo5") },
+        ]}
+        onValueChange={setFinalChoice}
+      />
 
       {plan.skipped_entry_ids.length > 0 && (
         <Notice
@@ -366,7 +390,7 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
     </div>
   );
 
-  const roundKey = FIRST_ROUND[plan.bracket_size] ?? "round_of_16";
+  const roundKey = FIRST_ROUND[plan.bracket_size ?? 0] ?? "round_of_16";
   const previewColumn = (
     <div className="space-y-6">
       <section aria-labelledby="preview-heading" className="space-y-2">
@@ -493,10 +517,12 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
         onClick={() => {
           drawKnockout.mutate(
             {
+              expected_current_phase_id: data.current_phase_id ?? group.id,
               qualifiers: shown,
               third_place_match: thirdPlace,
+              match_format: matchFormat,
+              final_match_format: finalChoice === "same" ? null : finalChoice,
               mode: effectiveMode,
-              draw,
             },
             {
               onSuccess: () => {

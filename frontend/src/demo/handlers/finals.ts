@@ -4,7 +4,7 @@
 // knockout. The logic is finalsEngine.ts (`// demo only, the engine decides`).
 // A write sends the target state, or the number it expects (ADR-008); an
 // expectation that is stale answers 409, which the screens meet with a reload.
-import type { BracketRead, MatchRead, ParticipantRead } from "../contract";
+import type { MatchRead, ParticipantRead, TournamentRead } from "../contract";
 import { fillFields, waitingMatches } from "../engine";
 import {
   bracketOf,
@@ -96,7 +96,7 @@ export const finalsHandlers = [
       // Results are entered through the result route, which does not know the
       // bracket: the winners move on, and the tournament finishes, when read.
       syncBracket(t);
-      return bracketOf(t) ?? apiError(404, "not_found", { knockout: "none" });
+      return bracketOf(t) ?? apiError(404, "knockout_not_found", {});
     },
   ),
 
@@ -334,7 +334,7 @@ export const finalsHandlers = [
         t,
         qualifiers: Number(url.searchParams.get("qualifiers") ?? 0),
         mode: known,
-        draw: Number(url.searchParams.get("draw") ?? 0),
+        draw: 0,
       });
     },
   ),
@@ -342,7 +342,7 @@ export const finalsHandlers = [
   route(
     "put",
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout",
-    ({ params, body }): BracketRead | Response => {
+    ({ params, body }): TournamentRead | Response => {
       const t = findTournament(params.league_id, params.tournament_id);
       const group = t ? groupPhase(t) : undefined;
       if (!t || !group) {
@@ -350,11 +350,10 @@ export const finalsHandlers = [
       }
       const existing = bracketOf(t);
       if (existing) {
-        // The target state is already there (a repeated request).
-        return t.phases.find((p) => p.id === existing.phase_id)?.qualifiers ===
-          body.qualifiers
-          ? existing
-          : stale("knockout_exists", body.qualifiers, 0);
+        // ADR-008: the start expected the group phase to be the current one.
+        return apiError(409, "current_phase_changed", {
+          current_phase_id: existing.phase_id,
+        });
       }
       if (t.state !== "in_progress" || !roundIsComplete(t)) {
         return refused("round_incomplete");
@@ -371,7 +370,7 @@ export const finalsHandlers = [
         t,
         qualifiers: body.qualifiers,
         mode,
-        draw: body.draw,
+        draw: 0,
       });
       // BR-080: at least 2 entries, or 4 with a third-place match.
       if (plan.entries.length < (body.third_place_match ? 4 : 2)) {
@@ -391,8 +390,11 @@ export const finalsHandlers = [
         third_place_match: body.third_place_match,
         monster_knockout_mode: mode,
         match_format:
-          group.match_format === "bo2" ? ("bo1" as const) : group.match_format,
-        final_match_format: group.final_match_format,
+          body.match_format ??
+          (group.match_format === "bo2"
+            ? ("bo1" as const)
+            : group.match_format),
+        final_match_format: body.final_match_format,
       };
       t.phases.push(phase);
       const mainById = new Map(t.entries.map((e) => [e.id, e]));
@@ -425,7 +427,7 @@ export const finalsHandlers = [
       );
       syncBracket(t);
       refillFields(t);
-      return need(bracketOf(t));
+      return tournamentRead(t);
     },
   ),
 
@@ -436,7 +438,7 @@ export const finalsHandlers = [
       const t = findTournament(params.league_id, params.tournament_id);
       const phase = t ? knockoutPhase(t) : undefined;
       if (phase?.id !== params.phase_id || !t) {
-        return apiError(404, "not_found", { phase_id: params.phase_id });
+        return apiError(404, "phase_not_found", {});
       }
       // BR-087: the group phase is unlocked and the organizer chooses again.
       const gone = new Set(

@@ -20,6 +20,18 @@ export const finals: CsMessages<Messages["finals"]> = {
     },
     unknown: "Neznámý hráč",
   },
+  errors: {
+    groupNotDone:
+      "Před losem vyřazovací fáze musí mít výsledek každý zápas skupiny.",
+    qualifiers:
+      "Do této vyřazovací fáze může postoupit {{minimum}} až {{maximum}} účastníků.",
+    formatNotSupported: "Tato vyřazovací fáze pro tento formát zatím není.",
+    modeNotApplicable: "Takto se týmy tvoří jen po kolech Monster DYP.",
+    phaseNotDeletable:
+      "Smazat jde jen vyřazovací fázi, která následuje po skupině.",
+    seasonClosed:
+      "Sezóna byla mezitím uzavřena, takže v ní už nic nejde změnit.",
+  },
   place: {
     label: "{{place}}{{suffix}}",
     suffix: { one: ".", two: ".", few: ".", other: "." },
@@ -32,12 +44,20 @@ export const finals: CsMessages<Messages["finals"]> = {
     bo5: "Na tři vítězné hry",
   },
   roundName: {
+    round_of_256: "Kolo 256",
+    round_of_128: "Kolo 128",
+    round_of_64: "Kolo 64",
+    round_of_32: "Šestnáctifinále",
     round_of_16: "Osmifinále",
     quarterfinal: "Čtvrtfinále",
     semifinal: "Semifinále",
     final: "Finále",
   },
   matchTitle: {
+    round_of_256: "Kolo 256, zápas {{n}}",
+    round_of_128: "Kolo 128, zápas {{n}}",
+    round_of_64: "Kolo 64, zápas {{n}}",
+    round_of_32: "Šestnáctifinále, zápas {{n}}",
     round_of_16: "Osmifinále, zápas {{n}}",
     quarterfinal: "Čtvrtfinále {{n}}",
     semifinal: "Semifinále {{n}}",
@@ -103,6 +123,10 @@ export const finals: CsMessages<Messages["finals"]> = {
       won_third_place: "Výhra v zápase o 3. místo",
       lost_third_place: "Prohra v zápase o 3. místo",
       lostIn: {
+        round_of_256: "Konec v kole 256",
+        round_of_128: "Konec v kole 128",
+        round_of_64: "Konec v kole 64",
+        round_of_32: "Konec v šestnáctifinále",
         round_of_16: "Konec v osmifinále",
         quarterfinal: "Konec ve čtvrtfinále",
         semifinal: "Konec v semifinále",
@@ -263,7 +287,6 @@ export const finals: CsMessages<Messages["finals"]> = {
     modeMercy:
       "Hráči na místech 1 až {{half}} dostanou losem partnera z míst {{from}} až {{to}}.",
     modeLord: "Dvojice se losují úplně náhodně a do pavouka se zařadí losem.",
-    drawAgain: "Losovat znovu",
     asTheyAre:
       "Nejlepší {{count}} hrají dál tak, jak jsou, nasazení podle svého místa.",
     skippedTitle_one: "{{names}} nemůže postoupit",
@@ -278,6 +301,10 @@ export const finals: CsMessages<Messages["finals"]> = {
     previewRow: "{{seed}}",
     previewPlaces: "{{first}} a {{second}}",
     firstRound: {
+      round_of_256: "Kolo 256",
+      round_of_128: "Kolo 128",
+      round_of_64: "Kolo 64",
+      round_of_32: "Šestnáctifinále",
       round_of_16: "Osmifinále",
       quarterfinal: "Čtvrtfinále",
       semifinal: "Semifinále",
