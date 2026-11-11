@@ -59,6 +59,8 @@ export function GroupPhaseDonePage() {
   const [qualifiers, setQualifiers] = useState(4);
   const [thirdPlace, setThirdPlace] = useState(false);
   const params = { leagueId, tournamentId };
+  // Singles has players, not pairs, in its standings and its knockout.
+  const singles = model?.tournament.type === "singles";
   const title = t("roundRobin.done.screenTitle");
 
   if (!model || !play) {
@@ -148,7 +150,11 @@ export function GroupPhaseDonePage() {
               <OptionCard
                 value="knockout"
                 title={t("roundRobin.done.knockout")}
-                description={t("roundRobin.done.knockoutText")}
+                description={t(
+                  singles
+                    ? "roundRobin.done.knockoutTextPlayers"
+                    : "roundRobin.done.knockoutText",
+                )}
               />
               <OptionCard
                 value="finish"
@@ -162,7 +168,11 @@ export function GroupPhaseDonePage() {
                 <div className="flex items-center justify-between gap-4 border-t pt-4">
                   <div>
                     <p id="qualifiers" className="text-body-md font-bold">
-                      {t("roundRobin.done.qualifiers")}
+                      {t(
+                        singles
+                          ? "roundRobin.done.qualifiersPlayers"
+                          : "roundRobin.done.qualifiers",
+                      )}
                     </p>
                     <p className="text-body-sm text-muted-foreground">
                       {t("roundRobin.done.qualifiersHint", { count: min })}

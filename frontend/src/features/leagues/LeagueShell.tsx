@@ -3,9 +3,11 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, Outlet, useMatches } from "react-router";
 
+import { ApiError } from "@/api/client";
 import { DemoNotice } from "@/components/DemoNotice";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { LeagueNav } from "@/components/LeagueNav";
+import { NotFoundPage } from "@/components/NotFoundPage";
 import { authQueries } from "@/features/auth/api";
 import { leagueQueries } from "@/features/leagues/api";
 import { CopyShareLink } from "@/features/leagues/CopyShareLink";
@@ -41,12 +43,24 @@ export function LeagueShell({ account }: { account?: ReactNode }) {
   const leagueName = league.data?.name;
   const activeName = active === undefined ? undefined : seasonName(active);
 
+  // An unknown league: say so, rather than wait for data that never comes.
+  if (league.error instanceof ApiError && league.error.status === 404) {
+    return (
+      <main className="mx-auto w-full max-w-3xl px-4 py-6">
+        <NotFoundPage />
+      </main>
+    );
+  }
+
   if (layout === "desktop") {
     return (
       <div className="flex min-h-dvh">
         <header className="sticky top-0 flex h-dvh w-72 shrink-0 flex-col gap-6 border-r border-sidebar-border bg-sidebar p-4 text-sidebar-foreground">
           <div className="flex items-center justify-between gap-2">
-            <Link to={paths.home} className="font-display text-display-section">
+            <Link
+              to={paths.home}
+              className="inline-flex min-h-11 items-center font-display text-display-section"
+            >
               {t("app.name")}
             </Link>
             <LanguageSwitch />

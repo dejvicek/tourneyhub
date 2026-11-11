@@ -34,13 +34,6 @@ export const results = {
     bo3: "Field {{field}}. Best of 3. {{tournament}}.",
     bo5: "Field {{field}}. Best of 5. {{tournament}}.",
   },
-  titles: {
-    final: "Final",
-    thirdPlace: "Third-place match",
-    semifinal: "Semifinal {{number}}",
-    quarterfinal: "Quarterfinal {{number}}",
-    knockoutRound: "Round {{round}}, match {{number}}",
-  },
   seed: "Seed {{seed}}",
   goalsFor: "Goals for {{names}}",
   noScore: "–",
@@ -88,13 +81,21 @@ export const results = {
     confirm: "Clear result",
   },
   locked: {
-    title: "Round robin results are locked",
-    body: "The knockout is drawn. To change this result, delete the knockout first.",
+    group: {
+      title: "Round robin results are locked",
+      body: "The knockout is drawn. To change this result, delete the knockout first.",
+    },
+    knockout: {
+      title: "This result is locked",
+      body: "A later match already has a result. To change this one, clear that result first.",
+    },
   },
   errors: {
     draw: "Draws aren't allowed here.",
     scores: "Enter both sides' goals for every game.",
     locked: "Round robin results are locked once the knockout is drawn.",
+    lockedKnockout:
+      "A later match already has a result. Clear that result first.",
     changed: "The match changed elsewhere. It was reloaded.",
     generic: "The result could not be saved. Check it and try again.",
   },

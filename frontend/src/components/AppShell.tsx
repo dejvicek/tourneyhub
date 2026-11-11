@@ -17,7 +17,10 @@ export function AppShell({ account }: { account?: ReactNode }) {
     <div className="flex min-h-dvh flex-col">
       <header className="border-b bg-nav">
         <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-4 px-4 py-3">
-          <Link to="/" className="font-display text-display-section">
+          <Link
+            to="/"
+            className="inline-flex min-h-11 items-center font-display text-display-section"
+          >
             {t("app.name")}
           </Link>
           <div className="flex shrink-0 items-center gap-2">

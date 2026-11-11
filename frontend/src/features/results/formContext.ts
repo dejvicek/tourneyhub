@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import type { PlayStandingRow, ResultWrite } from "@/demo/contract";
 import type { MatchInfo } from "@/features/tournaments/play/model";
 
@@ -17,4 +19,6 @@ export interface ResultFormContext {
   pending: boolean;
   standings: readonly PlayStandingRow[] | undefined;
   onSave: (body: ResultWrite) => void;
+  /** What goes under "Save result", in the sheet's sticky footer: errors, the walkover and clearing. */
+  actions: ReactNode;
 }

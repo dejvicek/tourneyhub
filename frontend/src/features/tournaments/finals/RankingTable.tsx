@@ -40,7 +40,18 @@ export function RankingTable({
   const number = new Intl.NumberFormat(i18n.resolvedLanguage, {
     signDisplay: "exceptZero",
   });
-  const cut = ranking.qualifiers;
+  // The line falls after the last player who can go through: disabled
+  // players don't, so they don't count towards it (BR-080).
+  let cutIndex = -1;
+  if (ranking.qualifiers !== null) {
+    let enabled = 0;
+    ranking.rows.forEach((row, index) => {
+      if (!row.is_disabled && enabled < (ranking.qualifiers ?? 0)) {
+        enabled += 1;
+        cutIndex = index;
+      }
+    });
+  }
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-72 border-collapse text-body-sm">
@@ -82,9 +93,7 @@ export function RankingTable({
                 key={row.entry_id}
                 className={cn(
                   "border-t border-border",
-                  cut !== null &&
-                    index === cut - 1 &&
-                    "border-b-2 border-b-primary",
+                  index === cutIndex && "border-b-2 border-b-primary",
                 )}
               >
                 <td className="py-2.5 pr-2 font-display text-score-s">

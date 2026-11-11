@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { StickyActions } from "@/components/StickyActions";
 import { Button } from "@/components/ui/button";
 import { MATCH_POINTS } from "@/demo/rules";
 import { sidesOf } from "@/features/tournaments/play/model";
@@ -137,14 +138,17 @@ export function SimpleResultForm({ context }: { context: ResultFormContext }) {
       <p role="status" className="text-body-lg font-bold">
         {sentence}
       </p>
-      <Button
-        type="submit"
-        disabled={body === null || context.pending || context.locked}
-        size="lg"
-        className="w-full"
-      >
-        {t("results.save")}
-      </Button>
+      <StickyActions>
+        <Button
+          type="submit"
+          disabled={body === null || context.pending || context.locked}
+          size="lg"
+          className="w-full"
+        >
+          {t("results.save")}
+        </Button>
+        {context.actions}
+      </StickyActions>
     </form>
   );
 }

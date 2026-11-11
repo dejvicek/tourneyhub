@@ -116,11 +116,21 @@ export function StandingsTable({
                           ? "roundRobin.standings.recordWithSatOut"
                           : "roundRobin.standings.record",
                         {
-                          played: row.played,
-                          won: row.won,
-                          drawn: row.drawn,
-                          lost: row.lost,
-                          satOut: row.sat_out,
+                          played: t("roundRobin.standings.played", {
+                            count: row.played,
+                          }),
+                          won: t("roundRobin.standings.won", {
+                            count: row.won,
+                          }),
+                          drawn: t("roundRobin.standings.drawn", {
+                            count: row.drawn,
+                          }),
+                          lost: t("roundRobin.standings.lost", {
+                            count: row.lost,
+                          }),
+                          satOut: t("roundRobin.standings.satOut", {
+                            count: row.sat_out,
+                          }),
                         },
                       )}
                     </span>

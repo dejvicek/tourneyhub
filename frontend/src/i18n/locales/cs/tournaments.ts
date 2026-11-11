@@ -5,6 +5,8 @@ export const tournaments: CsMessages<Messages["tournaments"]> = {
   // Screens 1-5: the list and the setup steps (src/features/tournaments/setup).
   ...tournamentsSetup,
   header: {
+    menu: "Nabídka: jazyk a účet",
+    shareLink: "Zkopírovat odkaz na tento turnaj",
     back: "Zpět na turnaje",
     tabs: "Pohledy na turnaj",
   },

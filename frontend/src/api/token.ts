@@ -3,6 +3,9 @@
 // refreshes from the cookie.
 
 let accessToken: string | null = null;
+// True after this tab logged out: the refresh cookie is gone, so asking the
+// API for a session would only get a 401 the browser logs as an error.
+let loggedOut = false;
 const sessionEndedListeners = new Set<() => void>();
 
 export function getAccessToken(): string | null {
@@ -12,6 +15,18 @@ export function getAccessToken(): string | null {
 /** Sets the token after a login or refresh; null forgets it, e.g. on logout. */
 export function setAccessToken(token: string | null): void {
   accessToken = token;
+  loggedOut = false;
+}
+
+/** Forgets the token after a logout, and remembers that no session is left. */
+export function forgetSession(): void {
+  accessToken = null;
+  loggedOut = true;
+}
+
+/** Whether this tab logged out and has not logged in since. */
+export function isLoggedOut(): boolean {
+  return loggedOut;
 }
 
 /**

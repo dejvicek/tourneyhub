@@ -40,13 +40,6 @@ export const results: CsMessages<Messages["results"]> = {
     bo3: "Hřiště {{field}}. Na 3 hry. {{tournament}}.",
     bo5: "Hřiště {{field}}. Na 5 her. {{tournament}}.",
   },
-  titles: {
-    final: "Finále",
-    thirdPlace: "Zápas o 3. místo",
-    semifinal: "{{number}}. semifinále",
-    quarterfinal: "{{number}}. čtvrtfinále",
-    knockoutRound: "{{round}}. kolo, {{number}}. zápas",
-  },
   seed: "Nasazení {{seed}}",
   goalsFor: "Góly: {{names}}",
   noScore: "–",
@@ -104,13 +97,20 @@ export const results: CsMessages<Messages["results"]> = {
     confirm: "Smazat výsledek",
   },
   locked: {
-    title: "Výsledky skupiny jsou zamčené",
-    body: "Vyřazovací fáze je vylosovaná. Chcete-li výsledek změnit, nejdřív ji smažte.",
+    group: {
+      title: "Výsledky skupiny jsou zamčené",
+      body: "Vyřazovací fáze je vylosovaná. Chcete-li výsledek změnit, nejdřív ji smažte.",
+    },
+    knockout: {
+      title: "Tento výsledek je zamčený",
+      body: "Pozdější zápas už má výsledek. Chcete-li změnit tento, nejdřív smažte ten.",
+    },
   },
   errors: {
     draw: "Remízy tu nejsou povolené.",
     scores: "Zadejte góly obou stran v každé hře.",
     locked: "Po vylosování vyřazovací fáze jsou výsledky skupiny zamčené.",
+    lockedKnockout: "Pozdější zápas už má výsledek. Nejdřív smažte ten.",
     changed: "Zápas se mezitím změnil. Byl znovu načten.",
     generic:
       "Výsledek se nepodařilo uložit. Zkontrolujte ho a zkuste to znovu.",

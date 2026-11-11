@@ -232,6 +232,11 @@ export const tournamentsSetup = {
       byHand: "By hand",
       shuffleAgain: "Shuffle again",
       noEntries: "Nothing to seed yet.",
+      noEntriesDyp:
+        "The pairs appear once both halves have the same number of players.",
+      nextBlocked: "Next unlocks once there are at least two entries to play.",
+      nextBlockedDyp:
+        "Next unlocks once both halves have the same number of players.",
       rankedPair: "Ranked {{first}} and {{second}}",
       rankedPlayer: "Ranked {{rank}}",
       moveUp: "Move {{name}} up one seed",

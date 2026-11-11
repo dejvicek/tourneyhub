@@ -57,6 +57,17 @@ function DrawStep({ data }: { data: SetupData }) {
         </Notice>
       )}
 
+      {!canContinue && !unpaired && (
+        // Why "Next" is off: nobody has to guess.
+        <p id="next-blocked" className="text-body-md text-muted-foreground">
+          {t(
+            type === "dyp"
+              ? "tournaments.setup.draw.nextBlockedDyp"
+              : "tournaments.setup.draw.nextBlocked",
+          )}
+        </p>
+      )}
+
       <div className="flex flex-col gap-3 md:flex-row md:justify-between">
         <Button asChild variant="text" size="lg">
           <Link to={generatePath(paths.setupPlayers, params)}>
@@ -70,7 +81,12 @@ function DrawStep({ data }: { data: SetupData }) {
             </Link>
           </Button>
         ) : (
-          <Button disabled size="lg" className="md:min-w-60">
+          <Button
+            disabled
+            size="lg"
+            className="md:min-w-60"
+            aria-describedby="next-blocked"
+          >
             {t("tournaments.setup.draw.next")}
           </Button>
         )}
