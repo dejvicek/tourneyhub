@@ -705,7 +705,7 @@ describe("Late and disabled players (screen 12)", () => {
 });
 
 describe("Start the knockout (screen 13)", () => {
-  it("offers the four modes from the rules and previews each", async () => {
+  it("offers the three modes from the rules and previews each", async () => {
     const user = userEvent.setup();
     renderAt(at(paths.startKnockout, MONSTER));
 
@@ -716,17 +716,16 @@ describe("Start the knockout (screen 13)", () => {
       within(modes)
         .getAllByRole("radio")
         .map((radio) => radio.parentElement?.textContent ?? ""),
-    ).toHaveLength(4);
-    for (const name of [
-      "Seeded pairs",
-      "Singles",
-      "A little mercy",
-      "Lord have mercy",
-    ]) {
+    ).toHaveLength(3);
+    for (const name of ["Seeded pairs", "Singles", "A little mercy"]) {
       expect(
         within(modes).getByRole("radio", { name: new RegExp(`^${name}`) }),
       ).toBeInTheDocument();
     }
+    // Not offered until the re-mix is built (issue #63).
+    expect(
+      within(modes).queryByRole("radio", { name: /^Lord have mercy/ }),
+    ).not.toBeInTheDocument();
     // Seeded pairs: 8 players make 4 pairs and semifinals.
     expect(screen.getAllByText("VS")).toHaveLength(2);
     expect(

@@ -286,6 +286,17 @@ describe("the finals in the fake API", () => {
     },
   );
 
+  it("refuses Lord have mercy until its re-mix is built (issue #63)", async () => {
+    await expect(
+      dataOf(
+        provisionalApi.PUT(`${root}/knockout`, {
+          params: { path: base(MONSTER) },
+          body: { ...KNOCKOUT, mode: "lord_have_mercy" },
+        }),
+      ),
+    ).rejects.toMatchObject({ status: 422 });
+  });
+
   it("deletes the knockout and unlocks the group phase (FR-046, BR-087)", async () => {
     const drawn = await dataOf(
       provisionalApi.PUT(`${root}/knockout`, {
