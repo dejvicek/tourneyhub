@@ -479,7 +479,11 @@ def _setup_of(
             for entry in entries
         ),
         ranking=tuple(
-            RankingRow(rank=ranked.position, player_id=ranked.player_id, points=0)
+            RankingRow(
+                rank=ranked.position,
+                player_id=ranked.player_id,
+                points=ranked.season_points,
+            )
             for ranked in ranking
         ),
     )

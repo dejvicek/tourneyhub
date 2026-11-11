@@ -41,12 +41,14 @@ class RankedPlayer:
         tie_group: The position of the best-ranked player this player ties on
             every criterion, the player's own position without a tie. Two
             players' order was decided by lot exactly when they share it.
+        season_points: The season points the order used (0 when not given).
     """
 
     player_id: PlayerId
     position: int
     is_decided_by_lot: bool
     tie_group: int
+    season_points: int = 0
 
 
 def rank_league(
@@ -102,6 +104,7 @@ def rank_league(
             position=position,
             is_decided_by_lot=ties[criteria(record)] > 1,
             tie_group=tie_groups[criteria(record)],
+            season_points=record.season_points,
         )
         for position, record in enumerate(ordered, start=1)
     )
