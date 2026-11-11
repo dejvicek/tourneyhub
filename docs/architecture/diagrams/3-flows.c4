@@ -427,7 +427,7 @@ views "III. Flows" {
     variant sequence
     title "20. Standings, finishing a round robin and the season standings"
     order 24
-    description "FR-040, FR-060, BR-070, BR-071, BR-101, BR-103, BR-110, BR-111 and ADR-009: the play read computes the waiting list and the round robin's standings from the stored results; a sit-out counts once its round is played. When every match has a result, the organizer confirms in the UI and finishes. The places and season points are computed on read, from the standings and the season's placement points table; nothing derived is stored. The season standings sum the points of the season's finished tournaments on read (BR-112, BR-113). A knockout after the round robin is P10."
+    description "FR-040, FR-060, BR-070, BR-071, BR-101, BR-103, BR-110, BR-111 and ADR-009: the play read computes the waiting list and the round robin's standings from the stored results; a sit-out is counted once its round is played and earns no points in a round robin (BR-071: only Swiss and Monster DYP score it). When every match has a result, the organizer confirms in the UI and finishes. The places and season points are computed on read, from the standings and the season's placement points table; nothing derived is stored. The season standings sum the points of the season's finished tournaments on read (BR-112, BR-113). A knockout after the round robin is P10."
     organizer -> tourneyhub.spa.organizerUi "opens the schedule or the Standings tab"
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "GET …/play"
     tourneyhub.api.tournamentsApi -> tourneyhub.db.play "loads the rounds, results, games and participation"
