@@ -6,13 +6,15 @@ FR-060, FR-061, FR-070, BR-002, BR-110 to BR-113.
 from collections import Counter
 from collections.abc import Callable
 from typing import Any
-from uuid import uuid7
+from uuid import UUID, uuid7
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from tourneyhub.db.models.leagues import League, Player
+from tourneyhub.db.models.tournaments import Tournament
+from tourneyhub.engine.lots import lot_digest
 
 type Json = dict[str, Any]
 
@@ -641,3 +643,77 @@ def test_br020_a_started_tournament_does_not_rank_by_the_standings(
     assert isinstance(after, dict)
     assert after["ranking"] == before["ranking"]
     assert {row["points"] for row in after["ranking"]} == {0}
+
+
+def test_br020_the_setup_ranking_shows_the_real_season_points(
+    evening: Evening,
+) -> None:
+    finished = evening.finished(evening.players[:3])
+    earned = evening.points_of(finished)
+
+    setup = evening.create(evening.players)
+
+    shown = {row["player_id"]: row["points"] for row in setup["ranking"]}
+    assert shown == {p: earned.get(p, 0) for p in evening.players}
+    assert any(shown.values())
+
+
+def test_br020_equal_points_go_by_wins_then_lot(
+    evening: Evening, league: League, session: Session
+) -> None:
+    p1, p2, p3, p4, p5 = evening.players
+    league.draws_allowed = True
+    session.flush()
+    evening.finished([p3, p4, p5], DRAW, name="Level")  # 8 points and a win each
+    evening.finished([p1, p2], name="Two")  # 10 points and a win; 8 and none
+    winner, loser = (
+        r["player_id"] for r in evening.standings() if r["player_id"] in (p1, p2)
+    )
+    rows = {r["player_id"]: r for r in evening.standings()}
+    assert rows[loser]["points"] == rows[p3]["points"] == 8
+    assert rows[loser]["tournament_wins"] == 0
+
+    setup = evening.create(evening.players)
+    stored = session.get_one(Tournament, UUID(setup["tournament_id"]))
+    stored.rng_seed = bytes(range(16))
+    session.flush()
+
+    def ranked() -> list[str]:
+        read = evening.get(f"/tournaments/{setup['tournament_id']}/setup")
+        assert isinstance(read, dict)
+        return [row["player_id"] for row in read["ranking"]]
+
+    lot = sorted(
+        (p3, p4, p5),
+        key=lambda p: lot_digest(
+            rng_seed=bytes(range(16)), purpose="league-ranking", candidate=UUID(p)
+        ),
+    )
+    assert ranked() == [winner, *lot, loser]
+    assert ranked() == ranked()
+
+
+def test_br020_equal_points_and_wins_go_by_last_seasons_place_then_lot(
+    evening: Evening, session: Session
+) -> None:
+    p1, p2, p3, p4, p5 = evening.players
+    evening.finished([p2, p1])  # last season: one of them 1st, the other 2nd
+    last = [r["player_id"] for r in evening.standings()]
+    _start_season(evening)
+
+    tournament = evening.create(evening.players)
+    stored = session.get_one(Tournament, UUID(tournament["tournament_id"]))
+    stored.rng_seed = bytes(range(16))
+    session.flush()
+
+    read = evening.get(f"/tournaments/{tournament['tournament_id']}/setup")
+    assert isinstance(read, dict)
+    lot = sorted(
+        (p3, p4, p5),
+        key=lambda p: lot_digest(
+            rng_seed=bytes(range(16)),
+            purpose="league-ranking",
+            candidate=UUID(p),
+        ),
+    )
+    assert [row["player_id"] for row in read["ranking"]] == [*last, *lot]
