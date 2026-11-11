@@ -308,7 +308,11 @@ function resolveFormat(
   const grouped = format.group_phase !== "none";
   const fallback = league.default_match_format;
   const groupMatchFormat = format.group_match_format ?? fallback;
-  // BR-071: a number is the organizer's pick; null takes the match format's default.
+  // BR-076: a number is the organizer's pick; null takes the default. The PRD
+  // default (BR-075) also follows the league's draw setting and moves while the
+  // phase has no result (BR-077); this demo takes the match format's default
+  // once, and still gives a round robin a value, which BR-071 forbids. Issues
+  // #59 and #65 change both.
   const picked = format.sit_out_points ?? null;
   return {
     name: format.name.trim(),
@@ -1191,7 +1195,11 @@ export function start(
   return null;
 }
 
-/** FR-036: back to setup is possible until the first result is entered. */
+/**
+ * FR-036: back to setup is possible while no match in the tournament has a
+ * result (BR-077): until the first result is entered, and again once every
+ * result is cleared (FR-053). This demo counts the matches with an outcome.
+ */
 export function backToSetup(t: StoredTournament): SetupFailure | null {
   if (t.state !== "in_progress") {
     return fail(409, "tournament_not_in_progress", { state: t.state });

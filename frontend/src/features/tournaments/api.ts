@@ -187,7 +187,10 @@ export const setupMutations = {
         ),
       ),
     ),
-  /** FR-036: possible until the first result; also used by the running screens. */
+  /**
+   * FR-036: possible while no match in the tournament has a result (BR-077);
+   * also used by the running screens.
+   */
   backToSetup: (leagueId: string, tournamentId: string) =>
     leagueWrite(
       leagueId,

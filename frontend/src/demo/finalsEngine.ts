@@ -495,6 +495,11 @@ export function rankingOf(t: StoredTournament): RankingRead {
       },
     ]),
   );
+  // BR-071, BR-078: a Swiss or Monster DYP sit-out is worth the phase's points
+  // for sitting out, which count as points in the standings. A round robin has
+  // none (not even 0); this demo still gives it a value, which issue #65
+  // removes. A missed round is no sit-out here and earns nothing (BR-064,
+  // BR-067); only the sit-out order counts it (issue #60).
   const sitOutPoints = group?.sit_out_points ?? 0;
   const opponents = new Map<string, string[]>();
   const membersOf = (side: MatchSideRead): string[] => [
@@ -614,6 +619,8 @@ function groupOrder(
     return roundRobinStandings(
       t.entries.filter((entry) => entry.stage === "main").map((e) => e.id),
       roundsOf(t, group),
+      // BR-071: a round robin has no points for sitting out. The demo still
+      // passes the stored value; issue #65 makes it null and drops this.
       group.sit_out_points ?? 0,
     ).map(({ entry_id, place }) => ({ entry_id, place }));
   }
