@@ -156,7 +156,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | ID | Requirement |
 |---|---|
 | FR-040 | Swiss and Monster DYP have no set number of rounds: once every match in the current round has a result, the organizer adds the next round, starts the knockout (FR-045) or finishes the tournament after confirming. The organizer sees a recommended minimum number of rounds (BR-068) but can stop earlier or play on. A round robin offers the same choice — knockout or finish — once all its matches have results. |
-| FR-041 | Monster DYP: the top players (BR-061) are taken from the league ranking, or marked by the organizer — at most one per match in a round. |
+| FR-041 | Monster DYP: the top players are the players the organizer marked, filled up from the league ranking (BR-061). The organizer can mark at most one player per match of round 1; when a later round has fewer matches, the marked players who play count in league-ranking order (BR-061). |
 | FR-042 | Each new round is drawn from the current standings (§7.7, §7.8), leaving out disabled players (BR-064). |
 | FR-043 | For a Swiss or Monster DYP, the organizer switches each tie-breaker — score difference, BH1, BH2 — on or off and puts them in order. Default: BH1, then BH2, then score difference. |
 | FR-044 | In a Swiss or Monster DYP, the organizer can disable any player — in Doubles and DYP, a pair — and re-enable them later (BR-064). |
@@ -373,4 +373,4 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 
 ## 8. Open questions
 
-1. **More marked top players than matches (BR-061, FR-041).** Round 2 can have fewer matches than round 1, for example after a player is disabled, so more players can be marked than the round has matches. Which marked players count then: the best by league ranking, as BR-061 now says, or the best by current standing?
+None at the moment.
