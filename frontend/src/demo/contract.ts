@@ -234,8 +234,9 @@ export type DemoPaths = MergePaths<
 
 // ================================================================ play
 // The running group phase, its fields and its end (screens 6–8, FR-040,
-// FR-060, FR-090–FR-094). Owned by the play screens; other areas append
-// their own sections. These declarations merge into ProvisionalPaths above.
+// FR-060, FR-090–FR-094): all generated now. Owned by the play screens;
+// other areas append their own sections, which merge into ProvisionalPaths
+// above.
 
 // The play read, finishing and the places (P8): generated. The play read's
 // standings serve every format's Standings tab (FR-060).
@@ -245,18 +246,11 @@ export type FormResult = PlayStandingRow["form"][number];
 export type PlayRead = components["schemas"]["PlayRead"];
 export type FinishWrite = components["schemas"]["FinishWrite"];
 
-/**
- * Field placements as target states (ADR-008, DATA-MODEL §4.6): a match on
- * a field, or waiting (`field_id: null`). A swap names both matches.
- */
-export interface PlacementWrite {
-  placements: { match_id: Uuid; field_id: Uuid | null }[];
-}
-
-/** A new field carries the number it expects to get, the lowest free one (BR-132). */
-export interface FieldCreate {
-  number: number;
-}
+// Fields (P9): generated. Placements are target states (ADR-008,
+// DATA-MODEL §4.6): a match on a field, or waiting (`field_id: null`); a swap
+// names both matches. A new field carries the number it expects to get.
+export type PlacementsWrite = components["schemas"]["PlacementsWrite"];
+export type FieldCreate = components["schemas"]["FieldCreate"];
 
 // ================================================================ finals
 // Screens 9–13 and the season standings tab: knockout bracket, places,
@@ -434,25 +428,8 @@ export interface SetupPaths {
   };
 }
 
-type PlayField = Params<{
-  league_id: Uuid;
-  tournament_id: Uuid;
-  field_id: Uuid;
-}>;
-
-// The results, the play read, finishing and the places are generated (P8).
-// Fields wait for P9.
-export interface ProvisionalPaths {
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/placements": {
-    put: Put<Tournament, PlacementWrite, TournamentRead>;
-  };
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/fields": {
-    post: Post<Tournament, FieldCreate, FieldRead>;
-  };
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/fields/{field_id}": {
-    delete: Delete<PlayField>;
-  };
-}
+// The results, the play read, finishing and the places are generated (P8),
+// and so are the fields (P9).
 
 type TournamentEntry = Params<{
   league_id: Uuid;

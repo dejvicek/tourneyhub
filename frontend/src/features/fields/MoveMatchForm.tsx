@@ -2,9 +2,9 @@ import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import type { components } from "@/api/schema";
 import { Button } from "@/components/ui/button";
 import { RadioGroup } from "@/components/ui/radio-group";
-import type { PlacementWrite } from "@/demo/contract";
 import { fieldMutations } from "@/features/fields/api";
 import type { PlayModel } from "@/features/tournaments/play/model";
 import { firstName } from "@/features/tournaments/play/model";
@@ -12,6 +12,8 @@ import { OptionCard } from "@/features/tournaments/play/OptionCard";
 import { useNames } from "@/features/tournaments/play/useNames";
 
 import { useFieldError } from "./useFieldError";
+
+type PlacementsWrite = components["schemas"]["PlacementsWrite"];
 
 const WAITING = "waiting";
 
@@ -139,7 +141,7 @@ export function MoveMatchForm({
       onDone();
       return;
     }
-    let body: PlacementWrite;
+    let body: PlacementsWrite;
     if (choice === WAITING) {
       body = { placements: [{ match_id: matchId, field_id: null }] };
     } else if (chosen?.other && current) {

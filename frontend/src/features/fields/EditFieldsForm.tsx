@@ -2,6 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import type { components } from "@/api/schema";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,7 +14,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import type { FieldRead } from "@/demo/contract";
 import { fieldMutations } from "@/features/fields/api";
 import { FieldBadge } from "@/features/tournaments/play/FieldBadge";
 import { PlusIcon } from "@/features/tournaments/play/icons";
@@ -23,14 +23,22 @@ import { useNames } from "@/features/tournaments/play/useNames";
 
 import { useFieldError } from "./useFieldError";
 
-/** The number the next field gets, the lowest free one; the request carries it (BR-132, ADR-008). */
-function nextNumber(fields: readonly FieldRead[]): number {
+type FieldRead = components["schemas"]["FieldRead"];
+
+/** The most fields a tournament has; the API refuses more (DATA-MODEL §4.2). */
+const MAX_FIELDS = 32;
+
+/**
+ * The number the next field gets, the lowest free one; the request carries
+ * it (BR-132, ADR-008). Null once every number up to 32 is taken.
+ */
+function nextNumber(fields: readonly FieldRead[]): number | null {
   const taken = new Set(fields.map((field) => field.number));
   let number = 1;
   while (taken.has(number)) {
     number += 1;
   }
-  return number;
+  return number <= MAX_FIELDS ? number : null;
 }
 
 interface EditFieldsFormProps {
@@ -101,8 +109,11 @@ export function EditFieldsForm({
       )}
       <button
         type="button"
-        disabled={add.isPending}
+        disabled={add.isPending || next === null}
         onClick={() => {
+          if (next === null) {
+            return;
+          }
           add.mutate(next, {
             onSuccess: (field) => {
               setStatus(t("fields.edit.added", { number: field.number }));
@@ -117,7 +128,9 @@ export function EditFieldsForm({
             {t("fields.edit.add")}
           </span>
           <span className="block text-body-sm text-muted-foreground">
-            {t("fields.edit.addHint", { number: next })}
+            {next === null
+              ? t("fields.edit.limit", { max: MAX_FIELDS })
+              : t("fields.edit.addHint", { number: next })}
           </span>
         </span>
       </button>

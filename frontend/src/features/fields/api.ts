@@ -1,13 +1,13 @@
 import { mutationOptions, queryOptions } from "@tanstack/react-query";
 
 import { api, dataOf } from "@/api/client";
-import { provisionalApi } from "@/api/provisional";
-import type { PlacementWrite } from "@/demo/contract";
+import type { components } from "@/api/schema";
 
-// The play screens' read and the league's players come from the generated
-// API; the field writes are still provisional routes of the demo's contract
-// (src/demo/contract.ts, "play", P9). The read lives here with the field
-// writes: the lint rules let only a feature's top-level api.ts call the API.
+type PlacementsWrite = components["schemas"]["PlacementsWrite"];
+
+// The play screens' read, the league's players and the field writes all come
+// from the generated API (P9). The read lives here with the field writes: the
+// lint rules let only a feature's top-level api.ts call the API.
 
 interface TournamentPath {
   league_id: string;
@@ -50,10 +50,10 @@ export const fieldMutations = {
   /** Places, moves, swaps or takes off matches (FR-093). */
   place: (leagueId: string, tournamentId: string) =>
     mutationOptions({
-      mutationFn: (body: PlacementWrite) =>
+      mutationFn: (body: PlacementsWrite) =>
         dataOf(
-          provisionalApi.PUT(
-            "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/placements",
+          api.PUT(
+            "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/fields/placements",
             { params: { path: path(leagueId, tournamentId) }, body },
           ),
         ),
@@ -66,7 +66,7 @@ export const fieldMutations = {
     mutationOptions({
       mutationFn: (number: number) =>
         dataOf(
-          provisionalApi.POST(
+          api.POST(
             "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/fields",
             {
               params: { path: path(leagueId, tournamentId) },
@@ -83,7 +83,7 @@ export const fieldMutations = {
     mutationOptions({
       mutationFn: (fieldId: string) =>
         dataOf(
-          provisionalApi.DELETE(
+          api.DELETE(
             "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/fields/{field_id}",
             {
               params: {

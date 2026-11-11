@@ -14,7 +14,7 @@ import type {
   MatchFormat,
   MatchRead,
   PhaseRead,
-  PlacementWrite,
+  PlacementsWrite,
   PlayRead,
   PlayStandingRow,
   ResultWrite,
@@ -26,10 +26,11 @@ import { MATCH_POINTS, rules } from "./rules";
 import type { StoredTournament } from "./seed";
 import { tournamentStandings } from "./store";
 
-/** A refusal with the rule it breaks, answered as 422 or 409 (ADR-008). */
+/** A refusal with the API's code, answered as 404, 409 or 422 (ADR-008). */
 export interface PlayRefusal {
   status: 404 | 409 | 422;
-  detail: Record<string, string | number | string[]>;
+  code: ErrorResponse["code"];
+  detail: Record<string, string | number | string[] | null>;
 }
 
 // DATA-MODEL §4.5 `requeued_at`: a match whose field was removed waits ahead
@@ -144,14 +145,14 @@ function doubleBooked(
  */
 export function place(
   t: StoredTournament,
-  { placements }: PlacementWrite,
+  { placements }: PlacementsWrite,
 ): PlayRefusal | null {
   const moved = new Set(placements.map((p) => p.match_id));
   const targets = placements.flatMap((p) =>
     p.field_id === null ? [] : [p.field_id],
   );
   if (new Set(targets).size !== targets.length) {
-    return { status: 422, detail: { reason: "same_field_twice" } };
+    return { status: 422, code: "validation_failed", detail: {} };
   }
   const fields = t.fields.map((field) => ({
     ...field,
@@ -163,24 +164,28 @@ export function place(
   for (const { match_id, field_id } of placements) {
     const match = findMatch(t, match_id);
     if (!match) {
-      return { status: 404, detail: { match_id } };
+      return { status: 404, code: "match_not_found", detail: {} };
     }
     if (match.outcome !== null) {
-      return { status: 422, detail: { match_id, reason: "has_result" } };
+      return { status: 409, code: "match_has_result", detail: { match_id } };
     }
     if (!sidesKnown(match)) {
-      return { status: 422, detail: { match_id, rule: "BR-091" } };
+      return { status: 422, code: "match_sides_unknown", detail: {} };
     }
     if (field_id === null) {
       continue;
     }
     const field = fields.find((f) => f.id === field_id);
     if (!field) {
-      return { status: 404, detail: { field_id } };
+      return { status: 404, code: "field_not_found", detail: {} };
     }
     if (field.match_id !== null) {
       // A swap names both matches; a field kept by another match is stale.
-      return { status: 409, detail: { field_id, reason: "field_busy" } };
+      return {
+        status: 409,
+        code: "field_not_free",
+        detail: { field_id, match_id: field.match_id },
+      };
     }
     field.match_id = match_id;
   }
@@ -188,7 +193,8 @@ export function place(
   if (twice.length > 0) {
     return {
       status: 422,
-      detail: { rule: "BR-131", player_ids: twice },
+      code: "player_on_another_field",
+      detail: { player_ids: twice.toSorted() },
     };
   }
   t.fields = fields;
@@ -222,7 +228,11 @@ export function addField(
 ): FieldRead | PlayRefusal {
   const expected = nextFieldNumber(t);
   if (number !== expected) {
-    return { status: 409, detail: { number, expected } };
+    return {
+      status: 409,
+      code: "field_number_changed",
+      detail: { number: expected },
+    };
   }
   const field: FieldRead = { id: newId(), number, match_id: null };
   t.fields = [...t.fields, field].sort((a, b) => a.number - b.number);
@@ -240,10 +250,10 @@ export function removeField(
 ): PlayRefusal | null {
   const field = t.fields.find((f) => f.id === fieldId);
   if (!field) {
-    return { status: 404, detail: { field_id: fieldId } };
+    return { status: 404, code: "field_not_found", detail: {} };
   }
   if (t.fields.length === 1) {
-    return { status: 422, detail: { rule: "BR-132", reason: "last_field" } };
+    return { status: 422, code: "last_field", detail: {} };
   }
   const match =
     field.match_id === null ? undefined : findMatch(t, field.match_id);

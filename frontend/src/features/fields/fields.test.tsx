@@ -110,7 +110,7 @@ describe("fields (screens 6b–6d)", () => {
 
     // The fake API refuses it too.
     const response = await provisionalApi.PUT(
-      "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/placements",
+      "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/fields/placements",
       {
         params: { path: { league_id: DEMO_LEAGUE_ID, tournament_id: t.id } },
         body: {
@@ -121,7 +121,7 @@ describe("fields (screens 6b–6d)", () => {
       },
     );
     expect(response.response.status).toBe(422);
-    expect(response.error?.detail).toMatchObject({ rule: "BR-131" });
+    expect(response.error?.code).toBe("player_on_another_field");
   });
 
   it("adds a field and removes it after confirming (FR-090, BR-132)", async () => {
@@ -151,6 +151,22 @@ describe("fields (screens 6b–6d)", () => {
       await within(sheet).findByText("Field 1 removed."),
     ).toBeInTheDocument();
     expect(runningDyp().fields.map((f) => f.number)).toEqual([2, 3]);
+  });
+
+  it("adds no field beyond 32 (BR-132)", async () => {
+    const t = runningDyp();
+    for (let number = t.fields.length + 1; number <= 32; number++) {
+      t.fields.push({ id: `field-${String(number)}`, number, match_id: null });
+    }
+    renderAt(playPath(paths.editFields));
+
+    const sheet = await screen.findByRole("dialog", { name: "Fields" });
+    expect(
+      await within(sheet).findByRole("button", { name: /^Add a field/ }),
+    ).toBeDisabled();
+    expect(
+      within(sheet).getByText("A tournament has at most 32 fields."),
+    ).toBeInTheDocument();
   });
 
   it("keeps the last field (BR-132)", async () => {
