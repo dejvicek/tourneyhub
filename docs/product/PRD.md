@@ -54,7 +54,7 @@ The MVP lets an organizer run a league in seasons, play tournaments inside each 
 | BH1, BH2 | Buchholz tie-breakers. BH1 sums the points of an entry's opponents; BH2 sums those opponents' BH1. |
 | Game difference | Games won minus games lost, over every match with a result. A drawn BO1 game counts as neither, and a walkover counts the games needed to win the match format: BO1 1:0, BO2 2:0, BO3 2:0, BO5 3:0. |
 | Score difference | Goals for minus goals against, over every game with an entered score. |
-| Place | An entry's finishing position in a tournament. Several entries can share a place. |
+| Place | An entry's finishing position in a tournament. Several entries can share a place. In a Lord have mercy knockout each player has a place of their own (BR-145). |
 | Placement points | Season points a player earns for their place in a finished tournament. |
 | Tournament win | Finishing 1st in a tournament — including a shared 1st, and as either player of the winning pair. |
 
@@ -147,7 +147,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | FR-034 | The first phase of a Singles, Doubles or DYP tournament is seeded by league ranking (default) or random shuffle, and the organizer can then reorder the seeds by hand. A knockout after a group phase is seeded by the group-phase places (§7.11). |
 | FR-035 | Generating creates the bracket, the round-robin schedule, or the first round of a Swiss or Monster DYP, and starts the tournament. |
 | FR-036 | While no match in the tournament has a result (BR-096), the organizer can go back to setup, change anything — including a new DYP draw — and generate again. |
-| FR-037 | A tournament with a knockout finishes automatically when every knockout match has a result. A tournament without one finishes when the organizer finishes it after the group phase (FR-040). |
+| FR-037 | A tournament with a knockout finishes automatically when every knockout match has a result. A Lord have mercy knockout draws its rounds one at a time (BR-140), so there the tournament finishes when the final has a result, and the third-place match too when it is played (BR-144, BR-150). A tournament without a knockout finishes when the organizer finishes it after the group phase (FR-040). |
 | FR-038 | The organizer can delete a tournament after confirming, unless its season is closed. |
 | FR-039 | Swiss and Monster DYP have a setup setting, **points for sitting out**: 0, 1 or 2 (BR-071, BR-075–BR-077). The default is 0. Setup does not show it for a round robin, which has no points for sitting out (BR-071). |
 
@@ -159,11 +159,12 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | FR-041 | Monster DYP: the top players are the players the organizer marked, filled up from the league ranking (BR-061). The organizer can mark at most one player per match of round 1; when a later round has fewer matches, the marked players who play count in league-ranking order (BR-061). |
 | FR-042 | Each new round is drawn from the current standings (§7.7, §7.8), leaving out disabled players (BR-064). |
 | FR-043 | For a Swiss or Monster DYP, the organizer switches each tie-breaker — score difference, BH1, BH2 — on or off and puts them in order. Default: BH1, then BH2, then score difference. |
-| FR-044 | In a Swiss or Monster DYP, the organizer can disable any player — in Doubles and DYP, a pair — and re-enable them later (BR-064). In a Lord have mercy knockout, they can also disable a player who leaves between rounds (BR-147). |
+| FR-044 | In a Swiss or Monster DYP, the organizer can disable any player — in Doubles and DYP, a pair — and re-enable them later (BR-064). In a Lord have mercy knockout, they can also disable a player who has left or gone home, and re-enable them later (BR-147). |
 | FR-045 | When starting the knockout, the organizer picks how many entries qualify and whether there is a third-place match (BR-080). After a round robin or Swiss, the qualifying entries play as they are. After Monster DYP rounds, the knockout is formed in one of four ways: **Seeded pairs**, **Singles**, **A little mercy** or **Lord have mercy** (§7.11). |
 | FR-046 | The organizer can delete the newest round of a Swiss or Monster DYP, or a knockout that follows a group phase, with any results in it (BR-066, BR-087). Deleting round 1 of a Swiss or Monster DYP takes the tournament back to setup. In a Lord have mercy knockout the organizer can also delete its newest round (BR-146); deleting its first round deletes the knockout (BR-087). |
 | FR-047 | The organizer can add late players from the league's player list — in Doubles, a pair — to any group phase except DYP: between rounds of a Swiss or Monster DYP, and until a round robin is complete (BR-054, BR-067). A knockout without a group phase takes them only in place of a bye (BR-045); a knockout after a group phase takes none. |
 | FR-048 | Before a late player joins a Swiss or Monster DYP that uses BH1 or BH2, the organizer is warned that it may be unfair: the rounds the late player missed earned no points, so everyone who meets them afterwards gets a lower BH. The organizer can go ahead anyway. |
+| FR-049 | In a Lord have mercy knockout, once every match of a knockout round has a result, the organizer draws the next round (BR-140). Before the draw is stored, the organizer sees which players come in as replacements and can skip a player who is not there by disabling them (BR-147, BR-148). |
 
 ### 6.6 Results
 
@@ -250,7 +251,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | BR-040 | The bracket is the smallest power of two that fits all entries (7 entries → 8). The empty spots are byes. |
 | BR-041 | Byes go to the top seeds, one per seed, so byes occur only in the first round and no match is ever bye against bye. A bye is not a match: the entry goes straight to the next round. |
 | BR-042 | Seeds are placed so the strongest meet as late as possible: seeds 1 and 2 can meet only in the final, and seeds 1–4 can meet one another only in the semifinals or later. |
-| BR-043 | There are no draws. The winner of each match goes through; the loser is out. |
+| BR-043 | There are no draws. The winner of each match goes through; the loser is out. In Lord have mercy, a player who is out can come in again as a replacement (BR-148). |
 | BR-044 | With a third-place match, the two semifinal losers play it. In Lord have mercy, their four players are paired again for it (BR-144). |
 | BR-045 | A generated bracket cannot be edited by hand, with one exception: in a Singles or Doubles knockout without a group phase, a late entry can take the place of a bye until every first-round match has a result, as long as the entry with the bye has no second-round result yet. The two then play a normal first-round match. |
 
@@ -286,7 +287,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 
 | ID | Rule |
 |---|---|
-| BR-064 | A disabled player or pair is not drawn into new rounds. Their results and points stay; rounds they miss earn 0 and no points for sitting out (BR-071, BR-076, BR-077). For the sit-out order only (BR-058, BR-063), each missed round counts as a sit-out. Once re-enabled, they are in the draw from the next round. At the end they are placed by their standing. |
+| BR-064 | A disabled player or pair is not drawn into new rounds. Their results and points stay; rounds they miss earn 0 and no points for sitting out (BR-071, BR-076, BR-077). For the sit-out order only (BR-058, BR-063), each missed round counts as a sit-out. Once re-enabled, they are in the draw from the next round. At the end they are placed by their standing. In a Lord have mercy knockout, §7.17 applies instead: BR-153 says whether a re-enabled player is in a draw, and BR-151 places a player who was replaced. |
 | BR-065 | A round's results can be changed until the next round or the knockout is drawn; after that they are locked. |
 | BR-066 | Deleting the newest round removes its matches and results and unlocks the round before it. |
 | BR-067 | In a Swiss or Monster DYP, a late player starts on 0 points and is in the draw from the next round; rounds they missed earn 0 and no points for sitting out (BR-071, BR-076, BR-077). For the sit-out order only (BR-058, BR-063), each missed round counts as a sit-out. A round robin fits a late entry into its schedule (BR-054), and a knockout without a group phase only lets one take a bye (BR-045). DYP takes no late players, because its pairs are drawn at the start, and neither does a knockout after a group phase, whose qualifiers are fixed. |
@@ -327,7 +328,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | BR-092 | Scores, if entered, must agree with the result: the winner of a game has the higher score, a drawn BO1 game has equal scores, and the games won must match the game scores. Swiss and Monster DYP round matches need a score for every game played, except walkovers. |
 | BR-093 | A walkover counts as a normal win and loss everywhere. |
 | BR-094 | In a knockout, a result is locked once any later match it feeds has a result: the next match for its winner and, for a semifinal with a third-place match, that match for its loser. That later result must be cleared first. Changing a winner updates the sides of the later matches. In Lord have mercy, the later sides are drawn, not fed, so BR-146 applies instead. |
-| BR-095 | Clearing a result in a finished tournament puts it back in progress. |
+| BR-095 | Clearing a result in a finished tournament puts it back in progress. So does deleting the newest round of a finished Lord have mercy knockout (BR-146). |
 | BR-096 | A phase, a final or a whole tournament has no result while none of its matches has one. It has none again once every result in it is cleared (FR-053), and a phase also once its round 1 is deleted (FR-046). |
 
 ### 7.13 Tournament places
@@ -346,7 +347,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 |---|---|
 | BR-110 | When a tournament finishes, each player in it earns the placement points for their place from the league's table. Places beyond the table earn 0. |
 | BR-111 | Entries sharing a place split the points of the places they cover: each gets the average, rounded down. With the default table, two pairs sharing 3rd cover 3rd and 4th, so each of their four players gets (6 + 4) / 2 = 5; four entries sharing 5th get (2 + 0 + 0 + 0) / 4 = 0.5, rounded down to 0. |
-| BR-112 | Only finished tournaments count. Correcting a result in a finished tournament, or deleting a tournament, recalculates the season standings. |
+| BR-112 | Only finished tournaments count. Correcting a result in a finished tournament, deleting the newest round of a finished Lord have mercy knockout (BR-146), or deleting a tournament, recalculates the season standings. |
 | BR-113 | Season standings rank players by total placement points, then tournament wins. Players still level share the place. |
 
 ### 7.15 Match formats
@@ -363,7 +364,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 
 | ID | Rule |
 |---|---|
-| BR-130 | A match can take a field once both its sides are known and none of its players is on another field. A free field takes the first such match in schedule order: in a round robin by round and then by match, so a later round's match can start while the current round finishes; in Swiss and Monster DYP within the current round; in a knockout by round, top of the bracket first. |
+| BR-130 | A match can take a field once both its sides are known and none of its players is on another field. A free field takes the first such match in schedule order: in a round robin by round and then by match, so a later round's match can start while the current round finishes; in Swiss and Monster DYP within the current round; in a knockout by round, top of the bracket first; in a Lord have mercy knockout by round, in the order the lot placed the pairs (BR-141). |
 | BR-131 | Nobody plays on two fields at once. A match whose players are still on another field waits, even when a field is free, and the next match that can be played takes the field. |
 | BR-132 | A new field takes the lowest free number and straight away takes the next waiting match. Removing a field keeps the other numbers; a match on the removed field goes back to the front of the waiting list. The last field cannot be removed. |
 | BR-133 | A field the organizer gives a match by hand overrides the automatic order until that match has a result. |
@@ -378,14 +379,36 @@ In a **Lord have mercy** knockout (BR-084) the pairs do not stay together: the p
 |---|---|
 | BR-140 | The first knockout round is drawn when the knockout starts (BR-084). Once every match of a knockout round has a result, the organizer draws the next round. |
 | BR-141 | The next round mixes the players of every pair still in: the winners of the round before and, after round 1, the pairs that had a bye. They are paired completely at random, ignoring the standings, and the new pairs are placed in the round by lot. |
-| BR-142 | The final is re-mixed too: the four players of the two winning semifinal pairs are paired again at random. |
+| BR-142 | The final is re-mixed too: the four players of the two pairs that reached it are paired again at random. |
 | BR-143 | A player can get a partner they have had before. The draw does not avoid repeat partners. |
 | BR-144 | With a third-place match, the four players of the two losing semifinal pairs are paired again completely at random for it. It is drawn together with the final. |
-| BR-145 | Places are per player. Each player takes the place of the pair they were knocked out with, or of the pair that won the final. Places are numbered and shared as if those pairs were entries (BR-102, BR-104), and placement points are split the same way (BR-111). With 4 pairs in the knockout and a third-place match, the final's winners are 1st, its losers 2nd, the third-place match's winners 3rd and its losers 4th; without one, the four semifinal losers share 3rd. Either way, the best non-qualifier is 5th (BR-103). |
-| BR-146 | Drawing the next round locks the results of the round before, as in Monster DYP rounds (BR-065, BR-066). To correct a locked result, the organizer deletes the newest knockout round with its matches and results, which unlocks the round before, fixes the result and draws the next round again. The final and the third-place match count as one round. Deleting the first knockout round deletes the knockout (BR-087). A round is never drawn again by itself: only the organizer draws again. |
-| BR-147 | A player who leaves between knockout rounds is disabled by the organizer before the next draw (FR-044). A replacement takes their place in the draw, so the number of players stays even: the best-placed player who has been knocked out and is not disabled. Best-placed means knocked out in a later round first, then the better group-phase standing, then the lot (BR-074). If no knocked-out player is available, the best non-qualifier from the group phase who is not disabled comes in, as in BR-080. With a third-place match, a semifinal loser who moves up to the final leaves a gap in the third-place draw, which is filled the same way. The player who leaves takes the place the replacement would have had, not a place by their standing (BR-064), so every place keeps its number of players. A player who leaves after the next round is drawn loses by walkover (BR-093), unless the organizer deletes that round while none of its matches has a result and draws it again. Once a replacement has been drawn in a player's place, re-enabling that player does not bring them back into the knockout. If the organizer deletes the round in which the replacement was drawn (BR-146), the replacement is undone, and a re-enabled player is in the new draw. |
+| BR-145 | Places are per player. Each player takes the place of the pair they played their last knockout match with. Places are numbered and shared as if those pairs were entries (BR-102, BR-104), and placement points are split the same way (BR-111). With 4 pairs in the knockout and a third-place match, the final's winners are 1st, its losers 2nd, the third-place match's winners 3rd and its losers 4th; without one, the four semifinal losers share 3rd. Either way, the best non-qualifier is 5th (BR-103). A player who was replaced is placed by BR-151. |
+| BR-146 | Drawing the next round locks the results of the round before, as in Monster DYP rounds (BR-065, BR-066). To correct a locked result, the organizer deletes the newest knockout round with its matches and results, which unlocks the round before, fixes the result and draws the next round again. The final and the third-place match count as one round. Deleting the first knockout round deletes the knockout (BR-087). A round is never drawn again by itself: only the organizer draws again. Drawing a round again with the same players gives the same pairs. The pairs change only when the players in the round change. The same holds for the matches the pairs are placed in. A corrected result that changes who goes through gives a new draw of the round; a replacement for a player who left changes that player's pair only (BR-152). Starting the knockout again after it was deleted (BR-087) is a new draw of round 1. Deleting the newest round of a finished tournament puts it back in progress (BR-095) and recalculates the season standings (BR-112). |
+| BR-147 | The organizer can disable a player during a Lord have mercy knockout and re-enable them later (FR-044). A player is still in while they can still win the final. A disabled player who is still in has left, and is replaced in the next draw (BR-148). Disabling a player who is no longer in only skips them as a replacement and leaves their place as it is; for a semifinal loser before the third-place match, BR-150 applies too. |
+| BR-148 | A replacement takes the place in the draw of each player who left, so the number of players stays the same. The replacement is the best-placed player who has been knocked out and is not disabled; a player who was replaced is never picked (BR-153). Best-placed means knocked out in a later round first, then the better group-phase standing, then the lot (BR-074). Semifinal losers count as knocked out, also when a third-place match is to follow. With several players to replace, the replacements are picked in that order, one after another. |
+| BR-149 | If nobody is available as a replacement, the player who left stays in the draw and their pair loses by walkover (BR-093). If both pairs of a match have such a player, the organizer records which pair wins (FR-052). |
+| BR-150 | The third-place match is played only when all four semifinal losers are in its draw. When fewer than four are left for it, because one is disabled or has moved up to the final as a replacement, it is not played and nobody comes in for it: the semifinal losers who did not move up share 3rd, as in BR-145 without a third-place match, together with a finalist one of them came in for (BR-151). |
+| BR-151 | A player who was replaced takes the place their replacement gave up: they are placed as if knocked out in the round in which the replacement was knocked out, so every place keeps its number of players. When several players are replaced in one draw, the one with the better group-phase standing takes the better of those places, then the lot decides (BR-074). A player replaced before the draw is therefore placed at least one round lower than one who leaves after it and loses by walkover (BR-152). That is intended: after the draw the organizer can still delete the round and draw it again (BR-146). |
+| BR-152 | A player who leaves after the round is drawn loses by walkover (BR-093), unless the organizer deletes that round (BR-146), disables the player and draws it again. In that draw the replacement (BR-148) takes the player's place in their pair, and the other pairs stay as they were. The third-place match follows BR-150. In the first knockout round there is no replacement: deleting the round deletes the knockout (BR-087), and when the knockout starts again the disabled player does not qualify and the next one moves up (BR-080). |
+| BR-153 | Once a replacement has been drawn in a player's place, that player is out of the knockout: re-enabling them does not bring them back into a draw, and they are not picked as a replacement. Only BR-154 undoes this. |
+| BR-154 | If the organizer deletes the round in which the replacement was drawn (BR-146), the replacement is undone, and a re-enabled player is in the new draw. A player who is still disabled is replaced again (BR-148). |
+| BR-155 | A Lord have mercy knockout is shown round by round, not as a bracket tree, on the organizer's screen and on the share link (FR-070). The view marks which player came in for which. |
 
-Consequences: the next round's pairs are not known until every match of the round before has a result (BR-140), so fields stand idle between knockout rounds (BR-130). The organizer's screen and the share link (FR-070) show a re-mixed knockout round by round, because it is not a bracket tree.
+Consequence: the next round's pairs are not known until every match of the round before has a result (BR-140), so fields stand idle between knockout rounds (BR-130).
+
+Worked case for BR-147–BR-154. Sixteen players qualify, with a third-place match and the default points table (FR-011); #n is the player placed nth after the group phase.
+
+1. **Quarterfinals.** The pairs of #1, #2, #3, #4, #9, #10, #11 and #12 win. #5, #6, #7, #8, #13, #14, #15 and #16 are knocked out.
+2. **Before the semifinal draw.** #3 has left and #5 has gone home, so the organizer disables both. #5 is only skipped (BR-147). #6 comes in for #3: every candidate was knocked out in the quarterfinals, and #6 has the best standing of those not disabled (BR-148). The semifinals are drawn from #1, #2, #4, #6, #9, #10, #11 and #12.
+3. **Semifinals.** The pairs of #1, #2, #6 and #9 win. #4, #10, #11 and #12 lose.
+4. **Before the final draw.** #2 has left. The semifinal losers come before the quarterfinal losers, and #4 has the best standing of them, so #4 moves up to the final (BR-148). Three semifinal losers are left, so the third-place match is not played (BR-150).
+5. **Final.** #1, #4, #6 and #9 are paired at random; say #1 and #6 beat #4 and #9.
+6. **Places and points.** #1 and #6 are 1st (10 each); #4 and #9 are 2nd (8 each). #10, #11, #12 and #2 share 3rd: #2 takes the place #4 gave up (BR-151), and each gets (6 + 4) / 2 = 5. #3 takes the place #6 gave up and shares 5th with #5, #7, #8, #13, #14, #15 and #16, for (2 + 0 + 0 + 0) / 4 = 0.5, rounded down to 0 (BR-111). Every place keeps its number of players: 2, 2, 4 and 8.
+
+Two variants of step 4:
+
+- **#2 leaves after the final is drawn.** #2's pair loses the final by walkover and #2 is 2nd, one round higher than in step 6 (BR-151); the third-place match is played as drawn. Or the organizer deletes the round, disables #2 and draws again: #4 takes #2's place in the pair, the other final pair stays, and the third-place match is not played (BR-152, BR-150).
+- **#1 and #2 both leave before the final draw, and #10, #11 and #12 have gone home.** #4 comes in first, then #7, the best quarterfinal loser who is not disabled. #1 has the better standing and takes #4's shared 3rd; #2 takes #7's shared 5th (BR-151). #1 shares 3rd with #10, #11 and #12, and #2 shares 5th with #3, #5, #8, #13, #14, #15 and #16.
 
 ## 8. Open questions
 
