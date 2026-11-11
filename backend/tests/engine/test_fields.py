@@ -632,3 +632,32 @@ def test_br130_to_br134_hold_through_any_evening(
         _step(data, evening)
 
         _check_evening(evening, before)
+
+
+# ---------------------------------------------------------------- knockout sides (D4)
+
+
+def test_br130_a_match_whose_side_is_no_longer_known_leaves_its_field() -> None:
+    # A semifinal result was cleared, so the final on field 1 has a side to come.
+    final = match(1, round_no=2, side_unknown=True)
+
+    placements = fill_fields(matches=[final], fields=[field(1, final.match_id)])
+
+    assert placements == (Placement(field_id=fid(1), match_id=None),)
+
+
+def test_br130_the_field_it_leaves_takes_the_next_waiting_match() -> None:
+    final = match(1, round_no=2, side_unknown=True)
+    semifinal = match(2, round_no=1)
+
+    placements = fill_fields(
+        matches=[final, semifinal], fields=[field(1, final.match_id), field(2)]
+    )
+
+    assert placements == (Placement(field_id=fid(1), match_id=semifinal.match_id),)
+
+
+def test_br133_a_match_whose_sides_changed_but_are_known_keeps_its_field() -> None:
+    final = match(1, round_no=2, on=players(1, 7))
+
+    assert fill_fields(matches=[final], fields=[field(1, final.match_id)]) == ()
