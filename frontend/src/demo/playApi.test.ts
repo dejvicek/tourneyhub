@@ -84,6 +84,34 @@ describe("the fake API for results and finishing (the backend's codes, P8)", () 
     expect(play.group_done).toBe(false);
   });
 
+  it("counts the picked points of a sit-out in the standings (BR-071)", async () => {
+    const group = runningDyp().phases.find((phase) => phase.kind === "group");
+    if (!group) {
+      throw new Error("The seed has no group phase");
+    }
+    group.sit_out_points = 2;
+    const [sitter] = runningDyp().entries;
+    const [round] = runningDyp().rounds;
+    if (!sitter || !round) {
+      throw new Error("The seed has no entry or round");
+    }
+    round.sitting_out = [sitter.id];
+    playEverything();
+
+    const play = await dataOf(
+      api.GET("/api/v1/leagues/{league_id}/tournaments/{tournament_id}/play", {
+        params: { path: tournamentPath() },
+      }),
+    );
+
+    expect(
+      play.standings.reduce((sum, row) => sum + row.sat_out, 0),
+    ).toBeGreaterThan(0);
+    for (const row of play.standings) {
+      expect(row.points).toBe(2 * row.won + row.drawn + 2 * row.sat_out);
+    }
+  });
+
   it("refuses to finish before every match has a result", async () => {
     const refused = await failure(
       dataOf(

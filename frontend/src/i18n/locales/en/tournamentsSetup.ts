@@ -89,9 +89,8 @@ export const tournamentsSetup = {
       none: "None, knockout only",
     },
     sitOut: {
-      off: "Off",
-      on_one: "On, {{count}} point",
-      on_other: "On, {{count}} points",
+      points_one: "{{count}} point",
+      points_other: "{{count}} points",
     },
     pairName: "{{first}} & {{second}}",
     soFar: {
@@ -158,8 +157,15 @@ export const tournamentsSetup = {
       fieldsLess: "Fewer fields",
       fieldsMore: "More fields",
       sitOut: "Points for sitting out",
-      sitOutHint:
-        "Off: a sit-out earns 0 points. On: 1 point. Only matters with an odd number of pairs.",
+      sitOutHint: "Only matters when someone sits out a round.",
+      sitOutOptionDefault: "{{value}} (default)",
+      sitOutLikeDraw: "like a draw",
+      sitOutLikeWin: "like a win",
+      sitOutDefault:
+        "The default for {{format}} matches: {{points}}, {{like}}.",
+      sitOutByHand:
+        "Set by you. The default for {{format}} matches is {{points}}, {{like}}.",
+      sitOutUseDefault: "Use the default ({{value}})",
       knockoutLater: {
         title: "You choose the knockout later",
         body: "Once the group phase is complete, decide how many pairs go through, or finish without a knockout.",

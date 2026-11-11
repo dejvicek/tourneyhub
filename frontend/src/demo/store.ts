@@ -20,7 +20,6 @@ import {
   withPoints,
 } from "./engine";
 import { placesOf, syncBracket } from "./finalsEngine";
-import { rules } from "./rules";
 import {
   createSeed,
   type DemoState,
@@ -169,8 +168,7 @@ export function tournamentStandings(
   if (!group) {
     return [];
   }
-  const sitOutPoints =
-    group.sit_out_points === 1 ? rules.sitOutPointsWhenOn : 0;
+  const sitOutPoints = group.sit_out_points ?? 0;
   return roundRobinStandings(
     t.entries.filter((entry) => entry.stage === "main").map((e) => e.id),
     t.rounds.filter((round) => round.phase_id === group.id),
