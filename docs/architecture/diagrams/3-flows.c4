@@ -507,7 +507,7 @@ views "III. Flows" {
     loop "the semifinals, the final and the third-place match" {
       organizer -> tourneyhub.spa.organizerUi "enters a result on the bracket"
       tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "PUT …/matches/{id}/result"
-      tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "derives the sides; a later match with a result locks this one (422 result_locked)"
+      tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "derives the sides: other entries than the screen saw 409 match_sides_changed; a later match with a result locks this one (422 result_locked)"
       tourneyhub.api.tournamentsApi -> tourneyhub.db.play "the result; a match whose side is no longer known leaves its field; the last result finishes the tournament"
     }
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "GET …/bracket and …/places"
