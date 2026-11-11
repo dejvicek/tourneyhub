@@ -11,10 +11,8 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from tourneyhub.db.base import Base, str_enum
+from tourneyhub.engine.results import MAX_GAMES
 from tourneyhub.engine.tournaments import MatchKind, Outcome, Participation
-
-MAX_GAMES = 5
-"""BO5 plays at most five games (BR-121)."""
 
 
 class Round(Base):

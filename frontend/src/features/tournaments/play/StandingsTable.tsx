@@ -1,10 +1,13 @@
 import { Fragment } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { FormResult, PlayStandingRow } from "@/demo/contract";
+import type { components } from "@/api/schema";
 import { cn } from "@/lib/utils";
 
 import { entryPlayers, type PlayModel, shortName } from "./model";
+
+type PlayStandingRow = components["schemas"]["PlayStandingRow"];
+type FormResult = PlayStandingRow["form"][number];
 
 interface StandingsTableProps {
   model: PlayModel;

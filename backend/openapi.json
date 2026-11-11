@@ -31,6 +31,39 @@
         "title": "BackToSetupWrite",
         "type": "object"
       },
+      "BracketRoundName": {
+        "enum": [
+          "round_of_16",
+          "quarterfinal",
+          "semifinal",
+          "final"
+        ],
+        "type": "string"
+      },
+      "BusyFieldRead": {
+        "description": "A field holding players of a waiting match: why it waits (BR-131).",
+        "properties": {
+          "field_id": {
+            "format": "uuid",
+            "title": "Field Id",
+            "type": "string"
+          },
+          "player_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Player Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "field_id",
+          "player_ids"
+        ],
+        "title": "BusyFieldRead",
+        "type": "object"
+      },
       "DefaultMatchFormat": {
         "description": "The match format a league's new tournaments start with (FR-011, BR-120).\n\nNot BO2: only group phases of leagues with draws can play it (BR-121), so a\ndefault that a knockout cannot take is never copied (DATA-MODEL \u00a74.2).",
         "enum": [
@@ -256,10 +289,16 @@
           "format_not_supported",
           "players_without_partner",
           "too_many_entries_for_round_robin",
+          "match_not_found",
+          "match_sides_unknown",
+          "group_phase_not_done",
           "not_enough_players",
           "not_enough_entries",
           "dyp_halves_unequal",
-          "too_many_left_out"
+          "too_many_left_out",
+          "game_score_mismatch",
+          "scores_required",
+          "result_does_not_fit_format"
         ],
         "title": "ErrorCode",
         "type": "string"
@@ -323,6 +362,32 @@
         "title": "FieldRead",
         "type": "object"
       },
+      "FinishWrite": {
+        "additionalProperties": false,
+        "description": "Finish the tournament, from the state the screen showed (FR-040, ADR-008).",
+        "properties": {
+          "expected_state": {
+            "const": "in_progress",
+            "title": "Expected State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_state"
+        ],
+        "title": "FinishWrite",
+        "type": "object"
+      },
+      "FormResult": {
+        "description": "One result in an entry's form, from the entry's side.",
+        "enum": [
+          "won",
+          "drawn",
+          "lost"
+        ],
+        "title": "FormResult",
+        "type": "string"
+      },
       "GameRead": {
         "description": "One game of a result: its winner and, if entered, its score (D11).",
         "properties": {
@@ -363,6 +428,48 @@
           "score_2"
         ],
         "title": "GameRead",
+        "type": "object"
+      },
+      "GameWrite": {
+        "additionalProperties": false,
+        "description": "One game: its winner and both scores, or neither (FR-050, FR-051, BR-092).\n\nGoals per game is a guide, not a rule: any whole number is a score (BR-123).",
+        "properties": {
+          "score_1": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score 1"
+          },
+          "score_2": {
+            "anyOf": [
+              {
+                "maximum": 2147483647.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score 2"
+          },
+          "winner": {
+            "$ref": "#/components/schemas/Outcome"
+          }
+        },
+        "required": [
+          "winner",
+          "score_1",
+          "score_2"
+        ],
+        "title": "GameWrite",
         "type": "object"
       },
       "GoalsPerGame": {
@@ -1109,6 +1216,128 @@
         "title": "PhaseSummary",
         "type": "object"
       },
+      "PlaceRead": {
+        "description": "An entry's final place and the season points each of its players earns.\n\nEntries sharing a place get the average of the places they cover,\nrounded down; places beyond the season's table earn 0 (BR-110, BR-111).",
+        "properties": {
+          "entry_id": {
+            "format": "uuid",
+            "title": "Entry Id",
+            "type": "string"
+          },
+          "place": {
+            "title": "Place",
+            "type": "integer"
+          },
+          "points_per_player": {
+            "title": "Points Per Player",
+            "type": "integer"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/PlaceReasonRead"
+          }
+        },
+        "required": [
+          "place",
+          "entry_id",
+          "points_per_player",
+          "reason"
+        ],
+        "title": "PlaceRead",
+        "type": "object"
+      },
+      "PlaceReasonKind": {
+        "enum": [
+          "won_final",
+          "lost_final",
+          "won_third_place",
+          "lost_third_place",
+          "lost_in_round",
+          "group_place"
+        ],
+        "type": "string"
+      },
+      "PlaceReasonRead": {
+        "description": "Why an entry has its place (\u00a77.13).\n\nAfter a group phase without a knockout it is `group_place`, with the\nentry's place in the standings and the phase's format (BR-103). The\nknockout's kinds, `round`, `score` (the entry's first) and the opponent\ncome with the knockout and are null until then.",
+        "properties": {
+          "group_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PhaseFormat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "group_place": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Place"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PlaceReasonKind"
+          },
+          "opponent_entry_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opponent Entry Id"
+          },
+          "round": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BracketRoundName"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          }
+        },
+        "required": [
+          "kind",
+          "round",
+          "score",
+          "opponent_entry_id",
+          "group_place",
+          "group_format"
+        ],
+        "title": "PlaceReasonRead",
+        "type": "object"
+      },
       "PlacementPoints": {
         "items": {
           "maximum": 2147483647.0,
@@ -1131,6 +1360,156 @@
           "placement_points"
         ],
         "title": "PlacementPointsUpdate",
+        "type": "object"
+      },
+      "PlacesRead": {
+        "description": "The places of a tournament (\u00a77.13, \u00a77.14), computed on read (D1).\n\n`complete` is true once the tournament is finished; before that `rows` is\nempty. Rows come best place first.",
+        "properties": {
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/PlaceRead"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "complete",
+          "rows"
+        ],
+        "title": "PlacesRead",
+        "type": "object"
+      },
+      "PlayRead": {
+        "description": "The running group phase, computed on read (ADR-009, FR-060, FR-092).\n\n`waiting` is the waiting list: requeued matches first, then schedule order\n(BR-130, BR-132). `standings` are the round robin's, best first; other\ngroup formats have none yet. `group_done` says every group-phase match has\na result, so the organizer chooses: knockout or finish (FR-040).",
+        "properties": {
+          "group_done": {
+            "title": "Group Done",
+            "type": "boolean"
+          },
+          "standings": {
+            "items": {
+              "$ref": "#/components/schemas/PlayStandingRow"
+            },
+            "title": "Standings",
+            "type": "array"
+          },
+          "waiting": {
+            "items": {
+              "$ref": "#/components/schemas/WaitingMatchRead"
+            },
+            "title": "Waiting",
+            "type": "array"
+          }
+        },
+        "required": [
+          "waiting",
+          "standings",
+          "group_done"
+        ],
+        "title": "PlayRead",
+        "type": "object"
+      },
+      "PlayStandingRow": {
+        "description": "One entry's line in the group-phase standings (BR-101, FR-060).\n\n`place` is shared by entries still level (BR-074), and the next place\nskips (BR-104). `points` include the sit-out points of every round sat\nout whose matches all have results (BR-071). `form` lists the latest five\nresults, oldest first. `ahead_by` names what ranks the entry above the\nnext one when both have the same points, and is null when the points\ndecide or the place is shared. `bh1` and `bh2` are for Swiss and Monster\nDYP, null in a round robin.",
+        "properties": {
+          "ahead_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoundRobinTiebreaker"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bh1": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bh1"
+          },
+          "bh2": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bh2"
+          },
+          "drawn": {
+            "title": "Drawn",
+            "type": "integer"
+          },
+          "entry_id": {
+            "format": "uuid",
+            "title": "Entry Id",
+            "type": "string"
+          },
+          "form": {
+            "items": {
+              "$ref": "#/components/schemas/FormResult"
+            },
+            "title": "Form",
+            "type": "array"
+          },
+          "lost": {
+            "title": "Lost",
+            "type": "integer"
+          },
+          "place": {
+            "title": "Place",
+            "type": "integer"
+          },
+          "played": {
+            "title": "Played",
+            "type": "integer"
+          },
+          "points": {
+            "title": "Points",
+            "type": "integer"
+          },
+          "sat_out": {
+            "title": "Sat Out",
+            "type": "integer"
+          },
+          "score_difference": {
+            "title": "Score Difference",
+            "type": "integer"
+          },
+          "won": {
+            "title": "Won",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "place",
+          "entry_id",
+          "played",
+          "won",
+          "drawn",
+          "lost",
+          "sat_out",
+          "points",
+          "score_difference",
+          "form",
+          "ahead_by",
+          "bh1",
+          "bh2"
+        ],
+        "title": "PlayStandingRow",
         "type": "object"
       },
       "PlayerCreate": {
@@ -1509,6 +1888,41 @@
         "title": "RankingRow",
         "type": "object"
       },
+      "ResultWrite": {
+        "additionalProperties": false,
+        "description": "A whole result, the target state (ADR-008): every game played, or a walkover.\n\nA walkover names its winner and has no games (FR-052, BR-124). No walkover\nand no games is the empty result, which clears the match's result (FR-053).",
+        "properties": {
+          "games": {
+            "items": {
+              "$ref": "#/components/schemas/GameWrite"
+            },
+            "maxItems": 5,
+            "title": "Games",
+            "type": "array"
+          },
+          "walkover_winner": {
+            "anyOf": [
+              {
+                "enum": [
+                  "side_1",
+                  "side_2"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Walkover Winner"
+          }
+        },
+        "required": [
+          "walkover_winner",
+          "games"
+        ],
+        "title": "ResultWrite",
+        "type": "object"
+      },
       "RoundRead": {
         "description": "A round in play order, with the entries that sit it out (BR-051).",
         "properties": {
@@ -1551,6 +1965,15 @@
         ],
         "title": "RoundRead",
         "type": "object"
+      },
+      "RoundRobinTiebreaker": {
+        "description": "What ranks an entry above another level on points (BR-101).",
+        "enum": [
+          "head_to_head",
+          "score_difference"
+        ],
+        "title": "RoundRobinTiebreaker",
+        "type": "string"
       },
       "SchedulePreviewRead": {
         "description": "What \"Generate and start\" would create, or why it would not (FR-035).\n\n`can_start` is false exactly when `problem` is set: the same code and detail\nas the 422 of `POST /start` (the 409s of a stale draw counter apart). Then\n`rounds` is empty and the counts are null. A round robin lists all its\nrounds; `bracket_size` is null until a knockout can start. `draw_counter`\ngoes back in the start (ADR-008).",
@@ -2648,6 +3071,29 @@
           "must_change_password"
         ],
         "title": "UserRead",
+        "type": "object"
+      },
+      "WaitingMatchRead": {
+        "description": "A match waiting for a field, in the order it will get one (FR-092).",
+        "properties": {
+          "busy": {
+            "items": {
+              "$ref": "#/components/schemas/BusyFieldRead"
+            },
+            "title": "Busy",
+            "type": "array"
+          },
+          "match_id": {
+            "format": "uuid",
+            "title": "Match Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "match_id",
+          "busy"
+        ],
+        "title": "WaitingMatchRead",
         "type": "object"
       }
     },
@@ -4713,6 +5159,105 @@
         ]
       }
     },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/finish": {
+      "post": {
+        "description": "Finish a round robin without a knockout, once the UI has asked (FR-040).\n\nA tournament that is not in progress is 409 `tournament_not_in_progress`\n(detail `state`), so a repeat changes nothing. A match without a result is\n422 `group_phase_not_done` (detail `matches_left`). A tournament with a\nknockout, a Swiss or a Monster DYP is 422 `format_not_supported` for now.\nThe standings become the places (`GET \u2026/places`).",
+        "operationId": "finish_tournament",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinishWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TournamentRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Finish Tournament",
+        "tags": [
+          "tournaments"
+        ]
+      }
+    },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/format": {
       "put": {
         "description": "Set the format of a tournament in setup (FR-030, FR-031, FR-039).\n\nA new type keeps the picked players and makes the entries again. A started\ntournament is 409 `tournament_not_in_setup`, as for every setup write.",
@@ -4807,6 +5352,273 @@
           }
         ],
         "summary": "Set Tournament Format",
+        "tags": [
+          "tournaments"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/matches/{match_id}/result": {
+      "put": {
+        "description": "Enter, replace or clear a match's result (FR-050 to FR-053, FR-094).\n\nThe body is the whole result, so a repeat changes nothing (ADR-008).\nEntering one frees the match's field, which takes the next waiting match\n(BR-130, BR-131). The empty result clears it: the match waits again, not\nput back on its old field (BR-134), and a finished tournament is back in\nprogress (BR-095). The free fields are then filled, so the first match that\ncan be played takes one, the cleared match included.\n\nA closed season is 409 `season_closed`. An unknown match is 404\n`match_not_found`. A match whose sides are not both known is 422\n`match_sides_unknown` (BR-091). A result that breaks a rule is 422:\n`result_does_not_fit_format` (BR-121, detail `format` and `games`),\n`draws_not_allowed` (BR-090), `game_score_mismatch` (BR-092, detail\n`game_no`) or `scores_required` (Swiss and Monster DYP, detail `game_no`).\nA walkover with games is 422 `validation_failed`.",
+        "operationId": "set_match_result",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Match Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResultWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Match Result",
+        "tags": [
+          "tournaments"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/places": {
+      "get": {
+        "description": "Return the places and the season points of a finished tournament (\u00a77.13, \u00a77.14).\n\nComputed on read. Before the tournament finishes, `complete` is false and\nthere are no rows. A finished tournament with a knockout is 422\n`format_not_supported` until the knockout is served.",
+        "operationId": "read_places",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlacesRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Read Places",
+        "tags": [
+          "tournaments"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/play": {
+      "get": {
+        "description": "Return the waiting list, the live standings and whether the group phase is done.\n\nComputed on read (FR-040, FR-060, FR-092). Another league's tournament is\n404 `tournament_not_found`.",
+        "operationId": "read_play",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Read Play",
         "tags": [
           "tournaments"
         ]

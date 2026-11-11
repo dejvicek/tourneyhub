@@ -12,3 +12,12 @@ export interface DemoModeEnv {
 export function isDemoMode(env: DemoModeEnv): boolean {
   return env.MODE !== "production" && env.VITE_DEMO === "true";
 }
+
+/**
+ * Routes the backend does not serve yet (src/api/provisional.ts) exist only in
+ * the demo's fake API. Outside demo mode a query for one stays off, and its
+ * screen shows that the data arrives later, instead of a 404.
+ */
+export function providesProvisionalRoutes(): boolean {
+  return isDemoMode(import.meta.env);
+}

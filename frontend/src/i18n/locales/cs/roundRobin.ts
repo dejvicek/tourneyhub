@@ -120,10 +120,6 @@ export const roundRobin: CsMessages<Messages["roundRobin"]> = {
     scoreDifference_other: "Pořadí podle rozdílu skóre: {{a}}, potom {{b}}.",
     scoreDifference_few: "Pořadí podle rozdílu skóre: {{a}}, potom {{b}}.",
     scoreDifference_many: "Pořadí podle rozdílu skóre: {{a}}, potom {{b}}.",
-    gameDifference_one: "Pořadí podle rozdílu her: {{a}}, potom {{b}}.",
-    gameDifference_other: "Pořadí podle rozdílu her: {{a}}, potom {{b}}.",
-    gameDifference_few: "Pořadí podle rozdílu her: {{a}}, potom {{b}}.",
-    gameDifference_many: "Pořadí podle rozdílu her: {{a}}, potom {{b}}.",
   },
   done: {
     title: "Každý s každým je dohrán",

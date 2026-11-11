@@ -2,7 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { generatePath } from "react-router";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { provisionalApi } from "@/api/provisional";
 import { DEMO_LEAGUE_ID, demoId } from "@/demo/ids";
@@ -10,6 +10,7 @@ import { i18n } from "@/i18n";
 import { paths } from "@/lib/paths";
 import { stubViewport } from "@/test/media";
 import { renderAt } from "@/test/renderApp";
+import { server } from "@/test/server";
 
 const DYP_EVENING = demoId(3200);
 const MONSTER = demoId(3300);
@@ -66,6 +67,63 @@ async function violations(): Promise<string[]> {
 
 beforeEach(async () => {
   await i18n.changeLanguage("en");
+  // These screens read provisional routes, which only the demo serves.
+  vi.stubEnv("VITE_DEMO", "true");
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
+describe("outside demo mode, where the season routes are not served yet (P10)", () => {
+  beforeEach(() => {
+    vi.stubEnv("VITE_DEMO", "");
+  });
+
+  /** The paths of every request the page makes while it settles. */
+  function requested(): string[] {
+    const urls: string[] = [];
+    server.events.on("request:start", ({ request }) => {
+      urls.push(new URL(request.url).pathname);
+    });
+    return urls;
+  }
+
+  it("shows a neutral line on the finished tournament, and asks for no season effect", async () => {
+    await playFinal(DYP_EVENING);
+    const calls = requested();
+    renderAt(at(paths.finished, DYP_EVENING));
+
+    expect(
+      await screen.findByText("Season standings arrive in a later version."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Top \d+ of \d+/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(calls.filter((p) => p.endsWith("/season-effect"))).toEqual([]);
+  });
+
+  it("shows a neutral line on the season standings instead of an error", async () => {
+    const calls = requested();
+    renderAt(generatePath(paths.seasonStandings, { leagueId: DEMO_LEAGUE_ID }));
+
+    expect(
+      await screen.findByText("Season standings arrive in a later version."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("This could not be loaded."),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(calls.filter((p) => p.endsWith("/standings"))).toEqual([]);
+  });
+
+  it("says it in Czech", async () => {
+    await i18n.changeLanguage("cs");
+    renderAt(generatePath(paths.seasonStandings, { leagueId: DEMO_LEAGUE_ID }));
+
+    expect(
+      await screen.findByText("Pořadí sezóny přibude v pozdější verzi."),
+    ).toBeInTheDocument();
+  });
 });
 
 describe("Knockout (screen 9)", () => {

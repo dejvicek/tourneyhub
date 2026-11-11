@@ -2,7 +2,7 @@ import { queryOptions } from "@tanstack/react-query";
 
 import { api, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
-import { isDemoMode } from "@/lib/demoMode";
+import { providesProvisionalRoutes } from "@/lib/demoMode";
 
 // The share-link views (FR-070–FR-072): no account, read-only. The backend
 // serves the league, a season's tournaments and a tournament (P11); the
@@ -13,7 +13,7 @@ import { isDemoMode } from "@/lib/demoMode";
 
 /** The demo's own routes answer only in demo mode; the backend 404s them. */
 function demoOnly(enabled = true): boolean {
-  return enabled && isDemoMode(import.meta.env);
+  return enabled && providesProvisionalRoutes();
 }
 
 function fetchLeague(shareToken: string, signal?: AbortSignal) {

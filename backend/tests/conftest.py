@@ -232,6 +232,49 @@ _TOURNAMENT_INVARIANTS = {
         SELECT g.match_id FROM match_games g
         GROUP BY g.match_id HAVING max(g.game_no) <> count(*)
     """,
+    "games that do not fit the match's format or its outcome (BR-121)": """
+        WITH g AS (
+            SELECT m.id, m.outcome::text AS outcome,
+                CASE WHEN ph.kind = 'knockout' AND m.kind = 'standard'
+                    AND ph.final_match_format IS NOT NULL
+                    AND r.round_no = (
+                        SELECT max(r2.round_no) FROM rounds r2
+                        WHERE r2.phase_id = ph.id
+                    )
+                THEN ph.final_match_format ELSE ph.match_format END AS fmt,
+                count(*) AS games,
+                count(*) FILTER (WHERE x.winner = 'side_1') AS w1,
+                count(*) FILTER (WHERE x.winner = 'side_2') AS w2,
+                count(*) FILTER (WHERE x.winner = 'draw') AS d,
+                (array_agg(x.winner::text ORDER BY x.game_no DESC))[1] AS last
+            FROM matches m
+            JOIN match_games x ON x.match_id = m.id
+            JOIN rounds r ON r.id = m.round_id
+            JOIN tournament_phases ph ON ph.id = r.phase_id
+            GROUP BY m.id, ph.id, r.round_no
+        )
+        SELECT id FROM g WHERE NOT CASE fmt
+            WHEN 'bo1' THEN games = 1 AND outcome = last
+            WHEN 'bo2' THEN games = 2 AND d = 0 AND outcome = CASE
+                WHEN w1 = 2 THEN 'side_1' WHEN w2 = 2 THEN 'side_2' ELSE 'draw'
+            END
+            ELSE d = 0 AND outcome = last AND (
+                CASE outcome WHEN 'side_1' THEN w1 ELSE w2 END
+            ) = CASE fmt WHEN 'bo3' THEN 2 ELSE 3 END
+        END
+    """,
+    "a draw outside a group phase, or a Swiss game without a score (BR-090, BR-092)": """
+        SELECT m.id FROM matches m
+        JOIN rounds r ON r.id = m.round_id
+        JOIN tournament_phases ph ON ph.id = r.phase_id
+        WHERE m.outcome = 'draw' AND ph.kind <> 'group'
+        UNION ALL
+        SELECT x.match_id FROM match_games x
+        JOIN matches m ON m.id = x.match_id
+        JOIN rounds r ON r.id = m.round_id
+        JOIN tournament_phases ph ON ph.id = r.phase_id
+        WHERE ph.format IN ('swiss', 'monster_dyp') AND x.score_1 IS NULL
+    """,
     "a field with a match of another tournament, with a result or requeued": """
         SELECT f.id FROM fields f
         JOIN matches m ON m.id = f.match_id

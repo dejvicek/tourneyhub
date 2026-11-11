@@ -74,9 +74,9 @@ export const results = {
   clear: {
     open: "Clear result",
     title: "Clear this result?",
-    body: "{{match}} goes back to waiting. It takes a field again when one frees up.",
+    body: "{{match}} goes back to waiting. It takes a free field at once if its players are not on another field.",
     bodyFinished:
-      "{{match}} goes back to waiting, and the finished tournament is back in progress.",
+      "{{match}} goes back to waiting and takes a free field at once. The finished tournament is back in progress.",
     cancel: "Keep it",
     confirm: "Clear result",
   },
@@ -93,9 +93,14 @@ export const results = {
   errors: {
     draw: "Draws aren't allowed here.",
     scores: "Enter both sides' goals for every game.",
+    mismatch:
+      "In game {{game}} the goals don't fit the winner: the winner scores more, a draw the same.",
+    format: "These games don't make a result in this match format.",
     locked: "Round robin results are locked once the knockout is drawn.",
     lockedKnockout:
       "A later match already has a result. Clear that result first.",
+    seasonClosed:
+      "This season was closed meanwhile. Its results can no longer change.",
     changed: "The match changed elsewhere. It was reloaded.",
     generic: "The result could not be saved. Check it and try again.",
   },

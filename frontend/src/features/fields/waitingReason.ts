@@ -1,8 +1,10 @@
 import type { TFunction } from "i18next";
 
-import type { WaitingMatchRead } from "@/demo/contract";
+import type { components } from "@/api/schema";
 import type { PlayModel } from "@/features/tournaments/play/model";
 import { firstName } from "@/features/tournaments/play/model";
+
+type WaitingMatchRead = components["schemas"]["WaitingMatchRead"];
 
 /**
  * Why a match waits (screen 6b, BR-131): "Waits for Jirka and Míša, who

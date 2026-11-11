@@ -46,7 +46,8 @@ class ErrorCode(StrEnum):
     TOURNAMENT_NOT_IN_SETUP = "tournament_not_in_setup"
     TOURNAMENT_TYPE_CHANGED = "tournament_type_changed"
     SEASON_HAS_UNFINISHED_TOURNAMENTS = "season_has_unfinished_tournaments"  # BR-010
-    DRAWS_NOT_ALLOWED = "draws_not_allowed"  # BO2 in a league without draws (BR-121)
+    # BO2 in a league without draws (BR-121), a drawn result there or in a knockout
+    DRAWS_NOT_ALLOWED = "draws_not_allowed"
     # Setup
     PLAYER_REMOVED = "player_removed"  # a removed player cannot be picked (BR-002)
     PLAYER_NOT_PICKED = "player_not_picked"
@@ -61,11 +62,18 @@ class ErrorCode(StrEnum):
     FORMAT_NOT_SUPPORTED = "format_not_supported"  # until its rounds are served
     PLAYERS_WITHOUT_PARTNER = "players_without_partner"  # Doubles (BR-030)
     TOO_MANY_ENTRIES_FOR_ROUND_ROBIN = "too_many_entries_for_round_robin"  # 64
+    # Results, standings and finishing
+    MATCH_NOT_FOUND = "match_not_found"
+    MATCH_SIDES_UNKNOWN = "match_sides_unknown"  # BR-091
+    GROUP_PHASE_NOT_DONE = "group_phase_not_done"  # FR-040
     # Engine rules (engine/errors.py)
     NOT_ENOUGH_PLAYERS = "not_enough_players"
     NOT_ENOUGH_ENTRIES = "not_enough_entries"  # FR-032
     DYP_HALVES_UNEQUAL = "dyp_halves_unequal"
     TOO_MANY_LEFT_OUT = "too_many_left_out"
+    GAME_SCORE_MISMATCH = "game_score_mismatch"  # BR-092
+    SCORES_REQUIRED = "scores_required"  # BR-092: Swiss and Monster DYP
+    RESULT_DOES_NOT_FIT_FORMAT = "result_does_not_fit_format"  # BR-121
 
 
 class AppError(Exception):

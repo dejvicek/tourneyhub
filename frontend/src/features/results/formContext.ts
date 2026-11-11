@@ -1,7 +1,10 @@
 import type { ReactNode } from "react";
 
-import type { PlayStandingRow, ResultWrite } from "@/demo/contract";
+import type { components } from "@/api/schema";
 import type { MatchInfo } from "@/features/tournaments/play/model";
+
+type PlayStandingRow = components["schemas"]["PlayStandingRow"];
+type ResultWrite = components["schemas"]["ResultWrite"];
 
 /** What both result forms need (screens 7 and 7b). */
 export interface ResultFormContext {

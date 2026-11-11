@@ -1,10 +1,14 @@
 import pytest
 
 from tourneyhub.engine.errors import (
+    DrawNotAllowedError,
     DypHalvesUnequalError,
     EngineError,
+    GameScoreMismatchError,
     NotEnoughEntriesError,
     NotEnoughPlayersError,
+    ResultDoesNotFitFormatError,
+    ScoresRequiredError,
     TooManyLeftOutError,
 )
 from tourneyhub.errors import ErrorCode
@@ -38,10 +42,31 @@ from tourneyhub.services.engine_errors import to_app_error
             {"maximum": 1, "given": 2},
             id="BR-032-left-out",
         ),
+        pytest.param(
+            GameScoreMismatchError(game_no=2),
+            ErrorCode.GAME_SCORE_MISMATCH,
+            {"game_no": 2},
+            id="BR-092-mismatch",
+        ),
+        pytest.param(
+            ScoresRequiredError(game_no=1),
+            ErrorCode.SCORES_REQUIRED,
+            {"game_no": 1},
+            id="BR-092-required",
+        ),
+        pytest.param(
+            DrawNotAllowedError(), ErrorCode.DRAWS_NOT_ALLOWED, {}, id="BR-090"
+        ),
+        pytest.param(
+            ResultDoesNotFitFormatError(match_format="bo3", games=1),
+            ErrorCode.RESULT_DOES_NOT_FIT_FORMAT,
+            {"format": "bo3", "games": 1},
+            id="BR-121",
+        ),
     ],
 )
 def test_an_engine_refusal_becomes_a_rule_violation_with_its_fields(
-    error: EngineError, code: ErrorCode, detail: dict[str, int]
+    error: EngineError, code: ErrorCode, detail: dict[str, int | str]
 ) -> None:
     translated = to_app_error(error)
 
