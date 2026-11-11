@@ -138,7 +138,10 @@ testpaths = ["tests"]
 addopts = ["--import-mode=importlib", "-ra"]
 strict = true                       # strict config, markers, xfail and parametrize ids
 filterwarnings = ["error"]
-markers = ["concurrency: commits real transactions (§9)"]
+markers = [
+  "concurrency: commits real transactions (§9)",
+  "benchmark: a timing bound from an ADR, run with the rest (ADR-011)",
+]
 
 [tool.coverage.run]
 branch = true
