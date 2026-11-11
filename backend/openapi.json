@@ -251,6 +251,7 @@
           "tournament_has_results",
           "format_not_supported",
           "players_without_partner",
+          "too_many_entries_for_round_robin",
           "not_enough_players",
           "not_enough_entries",
           "dyp_halves_unequal",
@@ -1853,7 +1854,7 @@
         "type": "object"
       },
       "TournamentRead": {
-        "description": "The whole tournament: settings, entries, rounds and fields (FR-035, FR-092).\n\n`current_phase_id` is the last phase with rounds; `current_phase_done` says\nwhether all its matches so far have results. `waiting` lists the matches\nwaiting for a field, in the order they will get one, computed on read.\n`entries` are the main entries by seed, as setup shows them. A tournament in\nsetup has no rounds.",
+        "description": "The whole tournament: settings, entries, rounds and fields (FR-035, FR-092).\n\n`current_phase_id` is the last phase with rounds; `current_phase_done` says\nwhether all its matches so far have results. `waiting` lists the matches\nwaiting for a field, in the order they will get one, computed on read.\n`entries` are all the tournament's entries as setup shows them: the main\nentries by seed, then the knockout-stage entries. A tournament in setup has\nno rounds.",
         "properties": {
           "current_phase_done": {
             "title": "Current Phase Done",
@@ -4700,7 +4701,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/start": {
       "post": {
-        "description": "Generate the schedule and start the tournament (FR-035).\n\nA round robin gets all its rounds (BR-050 to BR-052), and the first\nmatches take the fields (BR-130). A started tournament is 409\n`tournament_not_in_setup`; a stale `expected_draw_counter` is 409\n`draw_counter_changed`. Another format is 422 `format_not_supported` for\nnow. An incomplete setup is 422: `players_without_partner` (Doubles),\n`not_enough_players`, `dyp_halves_incomplete`, `dyp_halves_unequal`,\n`too_many_left_out` (DYP) or `not_enough_entries` (FR-032).",
+        "description": "Generate the schedule and start the tournament (FR-035).\n\nA round robin gets all its rounds (BR-050 to BR-052), and the first\nmatches take the fields (BR-130). A started tournament is 409\n`tournament_not_in_setup`; a stale `expected_draw_counter` is 409\n`draw_counter_changed`. Another format is 422 `format_not_supported` for\nnow. An incomplete setup is 422: `players_without_partner` (Doubles),\n`not_enough_players`, `dyp_halves_incomplete`, `dyp_halves_unequal`,\n`too_many_left_out` (DYP), `not_enough_entries` (FR-032) or\n`too_many_entries_for_round_robin` (detail `limit`: 64).",
         "operationId": "start_tournament",
         "parameters": [
           {

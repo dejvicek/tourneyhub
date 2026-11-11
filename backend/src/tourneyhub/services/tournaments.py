@@ -15,7 +15,7 @@ from datetime import date, datetime
 from enum import StrEnum
 from uuid import UUID, uuid7
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, insert, select
 from sqlalchemy.orm import Session, selectinload
 
 from tourneyhub.db.models.entries import Entry, EntryMember, PlayerHalf
@@ -48,6 +48,7 @@ from tourneyhub.engine.leagues import SeasonState
 from tourneyhub.engine.lots import RNG_SEED_SIZE
 from tourneyhub.engine.ranking import PlayerRecord, RankedPlayer, rank_league
 from tourneyhub.engine.schedule import (
+    MAX_ROUND_ROBIN_ENTRIES,
     ScheduledRound,
     check_entry_count,
     round_robin,
@@ -83,6 +84,9 @@ from tourneyhub.errors import (
 )
 from tourneyhub.services.engine_errors import to_app_error
 from tourneyhub.services.leagues import active_season, get_league, lock_league
+
+MATCH_SIDES = 2
+"""A match has two sides, side 1 and side 2 (DATA-MODEL §4.5)."""
 
 type Clock = Callable[[], datetime]
 
@@ -1434,7 +1438,11 @@ def _side_view(side: MatchSide, members: Mapping[UUID, tuple[UUID, ...]]) -> Sid
 
 
 def _match_view(match: Match, members: Mapping[UUID, tuple[UUID, ...]]) -> MatchView:
-    side_1, side_2 = (_side_view(side, members) for side in match.sides)
+    # Knockout sides after round 1 are not stored until they are known
+    # (DATA-MODEL §4.5); such a side is shown as an empty one.
+    by_number = {side.side: _side_view(side, members) for side in match.sides}
+    unknown = SideView(entry_id=None, player_ids=(), is_bye=False)
+    side_1, side_2 = by_number.get(1, unknown), by_number.get(2, unknown)
     return MatchView(
         id=match.id,
         round_id=match.round_id,
@@ -1456,6 +1464,22 @@ def _match_view(match: Match, members: Mapping[UUID, tuple[UUID, ...]]) -> Match
     )
 
 
+def _known_players(match: Match) -> frozenset[PlayerId] | None:
+    """Every player of both sides, or None while a side is not known yet (D4).
+
+    A side is unknown when it is not stored, or is not a bye and has neither an
+    entry nor players: a knockout side that waits for an earlier match.
+    """
+    if len(match.sides) < MATCH_SIDES or any(
+        not side.is_bye and side.entry_id is None and not side.players
+        for side in match.sides
+    ):
+        return None
+    return frozenset(
+        PlayerId(row.player_id) for side in match.sides for row in side.players
+    )
+
+
 def _match_slots(tournament: Tournament) -> list[MatchSlot]:
     """Every stored match as the field queue sees it (BR-130)."""
     return [
@@ -1465,9 +1489,7 @@ def _match_slots(tournament: Tournament) -> list[MatchSlot]:
             round_no=round_.round_no,
             kind=match.kind,
             position=match.position,
-            player_ids=frozenset(
-                PlayerId(row.player_id) for side in match.sides for row in side.players
-            ),
+            player_ids=_known_players(match),
             has_bye=any(side.is_bye for side in match.sides),
             has_result=match.outcome is not None,
             requeued_at=match.requeued_at,
@@ -1554,7 +1576,8 @@ def _check_ready(tournament: Tournament, phase: TournamentPhase) -> None:
 
     Doubles needs every picked player in a pair (422 `players_without_partner`);
     DYP needs its halves and pairs (the 422s of a new DYP draw); every type
-    needs FR-032's minimum of entries (422 `not_enough_entries`).
+    needs FR-032's minimum of entries (422 `not_enough_entries`); a round robin
+    takes at most `MAX_ROUND_ROBIN_ENTRIES` (422 `too_many_entries_for_round_robin`).
     """
     if tournament.type is TournamentType.DOUBLES:
         paired = {m.player_id for entry in tournament.entries for m in entry.members}
@@ -1565,80 +1588,142 @@ def _check_ready(tournament: Tournament, phase: TournamentPhase) -> None:
             )
     elif tournament.type is TournamentType.DYP:
         _check_dyp_draw(tournament)
+    given = sum(e.stage is EntryStage.MAIN for e in tournament.entries)
     try:
         check_entry_count(
             tournament_type=tournament.type,
             third_place_match=bool(phase.third_place_match),
-            given=sum(e.stage is EntryStage.MAIN for e in tournament.entries),
+            given=given,
         )
     except EngineError as err:
         raise to_app_error(err) from err
+    if phase.format is PhaseFormat.ROUND_ROBIN and given > MAX_ROUND_ROBIN_ENTRIES:
+        raise RuleViolationError(
+            ErrorCode.TOO_MANY_ENTRIES_FOR_ROUND_ROBIN, limit=MAX_ROUND_ROBIN_ENTRIES
+        )
 
 
-def _new_round(
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _ScheduleRows:
+    """The rows of a round robin, one list per table, in insert order (D2, D5)."""
+
+    rounds: list[dict[str, object]]
+    matches: list[dict[str, object]]
+    sides: list[dict[str, object]]
+    side_players: list[dict[str, object]]
+    participation: list[dict[str, object]]
+    slots: list[MatchSlot]
+
+
+def _schedule_rows(
     phase: TournamentPhase,
-    scheduled_round: ScheduledRound,
+    schedule: Sequence[ScheduledRound],
     members: Mapping[UUID, Sequence[UUID]],
     now: datetime,
-) -> Round:
-    """A round of the schedule with its matches, sides and participation (D2, D5)."""
-    round_id = uuid7()
-    matches = []
-    for position, scheduled in enumerate(scheduled_round.matches, start=1):
-        match_id = uuid7()
-        sides = [
-            MatchSide(
-                match_id=match_id,
-                side=side,
-                entry_id=entry_id,
-                is_bye=False,
-                created_at=now,
-                players=[
-                    MatchSidePlayer(
-                        match_id=match_id, side=side, player_id=player, created_at=now
-                    )
-                    for player in members[entry_id]
-                ],
-            )
-            for side, entry_id in ((1, scheduled.side_1), (2, scheduled.side_2))
-        ]
-        matches.append(
-            Match(
-                id=match_id,
-                round_id=round_id,
-                position=position,
-                kind=MatchKind.STANDARD,
-                is_walkover=False,
-                created_at=now,
-                sides=sides,
-                games=[],
-            )
+) -> _ScheduleRows:
+    """The rounds of the schedule with their matches, sides and participation.
+
+    Every main entry gets a participation row in every round (D5), and every
+    stored side lists its players (D2). The slots are the matches as the field
+    queue sees them, so no row needs loading to fill the fields.
+    """
+    rows = _ScheduleRows(
+        rounds=[], matches=[], sides=[], side_players=[], participation=[], slots=[]
+    )
+    for scheduled_round in schedule:
+        round_id = uuid7()
+        rows.rounds.append(
+            {
+                "id": round_id,
+                "phase_id": phase.id,
+                "round_no": scheduled_round.round_no,
+                "created_at": now,
+            }
         )
-    return Round(
-        id=round_id,
-        phase_id=phase.id,
-        round_no=scheduled_round.round_no,
-        created_at=now,
-        matches=matches,
-        participation=[
-            RoundParticipation(
-                round_id=round_id,
-                entry_id=entry_id,
-                status=Participation.SAT_OUT
+        for position, scheduled in enumerate(scheduled_round.matches, start=1):
+            match_id = uuid7()
+            rows.matches.append(
+                {
+                    "id": match_id,
+                    "round_id": round_id,
+                    "position": position,
+                    "kind": MatchKind.STANDARD,
+                    "outcome": None,
+                    "is_walkover": False,
+                    "result_entered_at": None,
+                    "requeued_at": None,
+                    "created_at": now,
+                }
+            )
+            players: set[PlayerId] = set()
+            for side, entry_id in ((1, scheduled.side_1), (2, scheduled.side_2)):
+                rows.sides.append(
+                    {
+                        "match_id": match_id,
+                        "side": side,
+                        "entry_id": entry_id,
+                        "is_bye": False,
+                        "created_at": now,
+                    }
+                )
+                for player_id in members[entry_id]:
+                    rows.side_players.append(
+                        {
+                            "match_id": match_id,
+                            "side": side,
+                            "player_id": player_id,
+                            "created_at": now,
+                        }
+                    )
+                    players.add(PlayerId(player_id))
+            rows.slots.append(
+                MatchSlot(
+                    match_id=MatchId(match_id),
+                    phase_position=phase.position,
+                    round_no=scheduled_round.round_no,
+                    kind=MatchKind.STANDARD,
+                    position=position,
+                    player_ids=frozenset(players),
+                    has_bye=False,
+                    has_result=False,
+                    requeued_at=None,
+                )
+            )
+        rows.participation.extend(
+            {
+                "round_id": round_id,
+                "entry_id": entry_id,
+                "status": Participation.SAT_OUT
                 if entry_id == scheduled_round.sitting_out
                 else Participation.PLAYED,
-                created_at=now,
-            )
+                "created_at": now,
+            }
             for entry_id in sorted(members)
-        ],
-    )
+        )
+    return rows
 
 
-def _fill_fields(tournament: Tournament, now: datetime) -> None:
+def _insert_schedule(session: Session, rows: _ScheduleRows) -> None:
+    """Write the schedule's rows in bulk, parents first.
+
+    A 64-entry double round robin has 4,032 matches and some 20,000 to 30,000
+    other rows; one ORM object per row would be far too slow.
+    """
+    for model, table_rows in (
+        (Round, rows.rounds),
+        (Match, rows.matches),
+        (MatchSide, rows.sides),
+        (MatchSidePlayer, rows.side_players),
+        (RoundParticipation, rows.participation),
+    ):
+        session.execute(insert(model), table_rows)
+
+
+def _fill_fields(
+    tournament: Tournament, slots: Sequence[MatchSlot], now: datetime
+) -> None:
     """Put waiting matches on the free fields (BR-130, BR-131, DATA-MODEL §4.6)."""
-    placements = fill_fields(
-        matches=_match_slots(tournament), fields=_field_slots(tournament)
-    )
+    placements = fill_fields(matches=slots, fields=_field_slots(tournament))
     fields = {field.id: field for field in tournament.fields}
     for placement in placements:
         field = fields[placement.field_id]
@@ -1693,12 +1778,11 @@ def start_tournament(
         legs=phase.round_robin_legs or 1,  # the CHECK sets it for a round robin
     )
     now = clock()
-    for scheduled_round in schedule:
-        phase.rounds.append(_new_round(phase, scheduled_round, members, now))
+    rows = _schedule_rows(phase, schedule, members, now)
+    _insert_schedule(session, rows)  # the matches exist before a field references one
     tournament.state = TournamentState.IN_PROGRESS
     tournament.updated_at = now
-    session.flush()  # the matches exist before a field references one
-    _fill_fields(tournament, now)
+    _fill_fields(tournament, rows.slots, now)
     session.flush()
     return read_tournament(
         session, league_id=league_id, tournament_id=tournament.id, user_id=user_id

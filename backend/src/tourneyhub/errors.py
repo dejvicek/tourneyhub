@@ -54,6 +54,7 @@ class ErrorCode(StrEnum):
     TOURNAMENT_HAS_RESULTS = "tournament_has_results"  # FR-036
     FORMAT_NOT_SUPPORTED = "format_not_supported"  # until its rounds are served
     PLAYERS_WITHOUT_PARTNER = "players_without_partner"  # Doubles (BR-030)
+    TOO_MANY_ENTRIES_FOR_ROUND_ROBIN = "too_many_entries_for_round_robin"  # 64
     # Engine rules (engine/errors.py)
     NOT_ENOUGH_PLAYERS = "not_enough_players"
     NOT_ENOUGH_ENTRIES = "not_enough_entries"  # FR-032

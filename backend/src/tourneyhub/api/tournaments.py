@@ -412,8 +412,9 @@ class TournamentRead(ResponseModel):
     `current_phase_id` is the last phase with rounds; `current_phase_done` says
     whether all its matches so far have results. `waiting` lists the matches
     waiting for a field, in the order they will get one, computed on read.
-    `entries` are the main entries by seed, as setup shows them. A tournament in
-    setup has no rounds.
+    `entries` are all the tournament's entries as setup shows them: the main
+    entries by seed, then the knockout-stage entries. A tournament in setup has
+    no rounds.
     """
 
     id: UUID
@@ -532,7 +533,8 @@ def start_tournament(
     `draw_counter_changed`. Another format is 422 `format_not_supported` for
     now. An incomplete setup is 422: `players_without_partner` (Doubles),
     `not_enough_players`, `dyp_halves_incomplete`, `dyp_halves_unequal`,
-    `too_many_left_out` (DYP) or `not_enough_entries` (FR-032).
+    `too_many_left_out` (DYP), `not_enough_entries` (FR-032) or
+    `too_many_entries_for_round_robin` (detail `limit`: 64).
     """
     tournament = tournament_service.start_tournament(
         session,

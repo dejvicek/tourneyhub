@@ -239,6 +239,12 @@ _TOURNAMENT_INVARIANTS = {
         WHERE ph.tournament_id <> f.tournament_id
             OR m.outcome IS NOT NULL OR m.requeued_at IS NOT NULL
     """,
+    "an entry in two matches of one round (BR-051)": """
+        SELECT m.round_id, s.entry_id
+        FROM match_sides s JOIN matches m ON m.id = s.match_id
+        WHERE s.entry_id IS NOT NULL
+        GROUP BY 1, 2 HAVING count(*) > 1
+    """,
     "a player on two fields at once (BR-131)": """
         SELECT f.tournament_id, sp.player_id FROM fields f
         JOIN match_side_players sp ON sp.match_id = f.match_id

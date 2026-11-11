@@ -1,4 +1,5 @@
 import threading
+import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
@@ -16,7 +17,12 @@ from tourneyhub.db.models.leagues import League, Player
 from tourneyhub.db.models.matches import Match, MatchGame, Round
 from tourneyhub.db.models.tournaments import Field, Tournament
 from tourneyhub.engine.accounts import Language
-from tourneyhub.engine.tournaments import GroupPhase, Outcome, TournamentType
+from tourneyhub.engine.tournaments import (
+    GroupPhase,
+    Outcome,
+    SeedingMethod,
+    TournamentType,
+)
 from tourneyhub.services import leagues as league_service
 from tourneyhub.services import players as player_service
 from tourneyhub.services import tournaments as tournament_service
@@ -685,12 +691,20 @@ def _commit_setup(engine: Engine, now: datetime) -> tuple[UUID, UUID, UUID, int]
             ),
             clock=lambda: now,
         )
-        counter = tournament_service.set_tournament_players(
+        tournament_service.set_tournament_players(
             setup,
             league_id=league.id,
             tournament_id=tournament_id,
             user_id=owner.id,
             player_ids=player_ids,
+            clock=lambda: now,
+        )
+        counter = tournament_service.set_seeding_method(  # a draw has seeds to shuffle
+            setup,
+            league_id=league.id,
+            tournament_id=tournament_id,
+            user_id=owner.id,
+            method=SeedingMethod.RANDOM,
             clock=lambda: now,
         ).draw_counter
         setup.commit()
@@ -784,3 +798,125 @@ def test_fr036_back_to_setup_racing_a_start_waits_and_deletes_its_schedule(
     with Session(committing_engine) as check:
         assert check.scalar(select(func.count()).select_from(Match)) == 0
         assert check.scalars(select(Field.match_id)).all() == [None]
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize("winner", ["start", "draw"])
+def test_adr008_a_start_racing_a_setup_write_has_exactly_one_winner(
+    committing_settings: Settings,
+    committing_engine: Engine,
+    now: datetime,
+    auth_header: Callable[..., dict[str, str]],
+    wait_for_a_lock_wait: Callable[[], None],
+    winner: str,
+) -> None:
+    owner_id, league_id, tournament_id, counter = _commit_setup(committing_engine, now)
+    outcome: list[tuple[int, object]] = []
+
+    with (
+        Session(committing_engine) as first,
+        TestClient(create_app(committing_settings)) as client,
+    ):
+        if winner == "start":
+            tournament_service.start_tournament(
+                first,
+                league_id=league_id,
+                tournament_id=tournament_id,
+                user_id=owner_id,
+                expected_draw_counter=counter,
+                clock=lambda: now,
+            )
+            path, body = "/setup/draw", {"target": "seeds"}
+        else:
+            tournament_service.draw_again(
+                first,
+                league_id=league_id,
+                tournament_id=tournament_id,
+                user_id=owner_id,
+                target=tournament_service.DrawTarget.SEEDS,
+                expected_draw_counter=counter,
+                clock=lambda: now,
+            )
+            path, body = "/start", {}
+
+        def second_request() -> None:
+            response = client.post(
+                _t_url(league_id, str(tournament_id), path),
+                json={"expected_draw_counter": counter, **body},
+                headers=auth_header(owner_id, issued_at=datetime.now(UTC)),
+            )
+            outcome.append((response.status_code, response.json()))
+
+        second = threading.Thread(target=second_request)
+        second.start()
+        wait_for_a_lock_wait()  # it waits for the league lock the first one holds
+        first.commit()
+        second.join()
+
+    stale = {
+        "start": {
+            "code": "tournament_not_in_setup",
+            "detail": {"state": "in_progress"},
+        },
+        "draw": {
+            "code": "draw_counter_changed",
+            "detail": {"draw_counter": counter + 1},
+        },
+    }
+    assert outcome == [(409, stale[winner])]
+    with Session(committing_engine) as check:
+        tournament = check.get_one(Tournament, tournament_id)
+        rounds = check.scalar(select(func.count()).select_from(Round))
+        if winner == "start":
+            assert (tournament.state, tournament.draw_counter, rounds) == (
+                "in_progress",
+                counter,
+                3,
+            )
+        else:
+            assert (tournament.state, tournament.draw_counter, rounds) == (
+                "setup",
+                counter + 1,
+                0,
+            )
+
+
+# ---------------------------------------------------------------- the size limit
+
+
+def test_fr032_a_round_robin_of_64_entries_starts_with_both_legs(
+    client: TestClient,
+    league: League,
+    headers: dict[str, str],
+    make_player: Callable[..., Player],
+) -> None:
+    ids = [str(make_player(league=league, name=f"Q{n}").id) for n in range(64)]
+    setup = _setup(client, league, headers, ids, round_robin_legs=2)
+
+    began = time.perf_counter()
+    status, body = _start(client, league, setup, headers)
+    took = time.perf_counter() - began
+
+    assert status == 200, body
+    assert len(body["rounds"]) == 126
+    assert sum(len(r["matches"]) for r in body["rounds"]) == 64 * 63
+    assert took < 30  # the bulk insert takes a few seconds; one object per row, minutes
+
+
+def test_fr032_a_round_robin_of_65_entries_is_refused(
+    client: TestClient,
+    league: League,
+    headers: dict[str, str],
+    make_player: Callable[..., Player],
+    session: Session,
+) -> None:
+    ids = [str(make_player(league=league, name=f"Q{n}").id) for n in range(65)]
+    setup = _setup(client, league, headers, ids)
+
+    status, body = _start(client, league, setup, headers)
+
+    assert (status, body) == (
+        422,
+        {"code": "too_many_entries_for_round_robin", "detail": {"limit": 64}},
+    )
+    assert session.scalar(select(func.count()).select_from(Round)) == 0
