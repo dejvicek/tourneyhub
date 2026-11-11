@@ -7,7 +7,7 @@ Every authenticated request asks whether its token's family still has an
 unrevoked row (ADR-006); a partial index on family_id answers that.
 
 Revision ID: 4502d5926476
-Revises: 2df115cf6eb5
+Revises: e4fa05f967f8
 Create Date: 2026-11-11 01:04:15.553347
 """
 
@@ -17,7 +17,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "4502d5926476"
-down_revision: str | None = "2df115cf6eb5"
+down_revision: str | None = "e4fa05f967f8"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
