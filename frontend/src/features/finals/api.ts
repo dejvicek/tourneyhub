@@ -20,7 +20,7 @@ import { tournamentQueries } from "@/features/tournaments/api";
 import { providesProvisionalRoutes } from "@/lib/demoMode";
 
 // Provisional routes of the demo's contract, "finals" section
-// (src/demo/contract.ts), except the places, which the backend serves (P8). Keys start with the entity (docs/frontend-style.md §8.1).
+// (src/demo/contract.ts), except the places, which the backend serves (P8). Keys start with the entity (docs/style/frontend-style.md §8.1).
 const tournamentKey = (leagueId: string, tournamentId: string) =>
   ["leagues", leagueId, "tournaments", tournamentId] as const;
 

@@ -86,7 +86,7 @@ export function tournamentOf(tournamentId: string) {
 /**
  * axe on the rendered page. jsdom computes no layout or colours, so
  * colour-contrast cannot run here (the ratios of the tokens are checked from
- * a script, docs/frontend-style.md §5.2), and the page sits in no landmark.
+ * a script, docs/style/frontend-style.md §5.2), and the page sits in no landmark.
  */
 export async function axeViolations(): Promise<string[]> {
   const results = await axe.run(document.body, {

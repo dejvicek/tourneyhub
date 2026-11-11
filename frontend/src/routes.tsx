@@ -1,4 +1,4 @@
-// The one route table (docs/frontend-style.md §9). Screens load lazily; the
+// The one route table (docs/style/frontend-style.md §9). Screens load lazily; the
 // build groups each feature folder into one chunk (vite.config.ts), so an
 // area costs one request, not one per screen. A screen's number is its frame
 // in the Figma file's "Tournament lifecycle" page. Overlays (6c, 6d, 7, 7b)

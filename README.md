@@ -1,6 +1,6 @@
 # TourneyHub
 
-TourneyHub lets an organizer run a league in seasons, play tournaments inside each season (alone, in pairs or with drawn partners), enter results from a phone and share read-only standings with the group. What it does is in [PRD.md](PRD.md), how it is built in [ADR.md](ADR.md), the database in [DATA-MODEL.md](DATA-MODEL.md) and the backend's code style in [docs/python-style.md](docs/python-style.md); [docs/architecture](docs/architecture) pictures it in LikeC4.
+TourneyHub lets an organizer run a league in seasons, play tournaments inside each season (alone, in pairs or with drawn partners), enter results from a phone and share read-only standings with the group. What it does is in [PRD.md](docs/product/PRD.md), how it is built in [ADR.md](docs/architecture/ADR.md), the database in [DATA-MODEL.md](docs/architecture/DATA-MODEL.md) and the code style in [docs/style](docs/style); [docs/architecture/diagrams](docs/architecture/diagrams) pictures it in LikeC4. [docs/README.md](docs/README.md) lists every document.
 
 ## Prerequisites
 
@@ -42,7 +42,7 @@ Open https://localhost:8443 (or https://localhost on 443). The certificate comes
 
 ## Backend checks
 
-Inside the development `api` container, with the venv's commands; `uv run` does not work there, since the venv belongs to root. The tests need two empty databases (docs/python-style.md §9), created once per database volume:
+Inside the development `api` container, with the venv's commands; `uv run` does not work there, since the venv belongs to root. The tests need two empty databases (docs/style/python-style.md §9), created once per database volume:
 
 ```sh
 docker compose up --detach --wait
@@ -58,7 +58,7 @@ docker compose exec api sh -c '
   python -W error -m tourneyhub.openapi | diff -u openapi.json -'
 ```
 
-docs/python-style.md §2 lists the same commands for uv on the host, where the tests need a PostgreSQL 17 of your own, created with the builtin locale.
+docs/style/python-style.md §2 lists the same commands for uv on the host, where the tests need a PostgreSQL 17 of your own, created with the builtin locale.
 
 ## Frontend checks
 

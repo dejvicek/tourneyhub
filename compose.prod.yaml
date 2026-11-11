@@ -11,7 +11,7 @@ services:
       target: runtime
     # Not the default tourneyhub-api, which is the development build.
     image: tourneyhub-api-runtime
-    # Settings come only from the environment (docs/python-style.md §6).
+    # Settings come only from the environment (docs/style/python-style.md §6).
     environment:
       TOURNEYHUB_ENV: production
       TOURNEYHUB_DATABASE_URL: ${TOURNEYHUB_DATABASE_URL:?set TOURNEYHUB_DATABASE_URL in .env}

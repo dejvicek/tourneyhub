@@ -5,7 +5,7 @@ services:
     build:
       context: ./backend
       target: dev
-    # Settings come only from the environment (docs/python-style.md §6).
+    # Settings come only from the environment (docs/style/python-style.md §6).
     environment:
       TOURNEYHUB_ENV: ${TOURNEYHUB_ENV:?set TOURNEYHUB_ENV in .env}
       TOURNEYHUB_DATABASE_URL: ${TOURNEYHUB_DATABASE_URL:?set TOURNEYHUB_DATABASE_URL in .env}

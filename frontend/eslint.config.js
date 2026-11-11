@@ -1,5 +1,5 @@
 // @ts-check
-// The lint rules of docs/frontend-style.md. The guide names each rule by its
+// The lint rules of docs/style/frontend-style.md. The guide names each rule by its
 // ID; a rule beyond the presets says here why it is on (guide §2).
 import js from "@eslint/js";
 import pluginQuery from "@tanstack/eslint-plugin-query";

@@ -1,11 +1,11 @@
 ---
 name: python-style
-description: Use when planning, writing, changing or reviewing Python in TourneyHub's backend/ — FastAPI routers and dependencies, Pydantic models or settings, SQLAlchemy models and queries, Alembic migrations, the tourneyhub.engine package, the tourneyhub CLI, logging, openapi.json, pytest or Hypothesis tests, backend/pyproject.toml, or the CI jobs, Dockerfile and Compose services that run backend/ — or when editing docs/python-style.md.
+description: Use when planning, writing, changing or reviewing Python in TourneyHub's backend/ — FastAPI routers and dependencies, Pydantic models or settings, SQLAlchemy models and queries, Alembic migrations, the tourneyhub.engine package, the tourneyhub CLI, logging, openapi.json, pytest or Hypothesis tests, backend/pyproject.toml, or the CI jobs, Dockerfile and Compose services that run backend/ — or when editing docs/style/python-style.md.
 ---
 
 # TourneyHub Python style
 
-The rules live in `docs/python-style.md`. Before writing code, read the sections for what you touch (§3 layers, §4 errors, time and logging, §5 FastAPI, §6 Pydantic, §7 SQLAlchemy, §8 engine, §9 tests, §10 security). Take tool versions and configuration from `backend/pyproject.toml` and `backend/uv.lock`, not from memory; the guide's §2 explains the choices in them that are not obvious. Where it disagrees with `ADR.md`, the ADR wins until it is changed; the guide's §11 lists the changes it proposes.
+The rules live in `docs/style/python-style.md`. Before writing code, read the sections for what you touch (§3 layers, §4 errors, time and logging, §5 FastAPI, §6 Pydantic, §7 SQLAlchemy, §8 engine, §9 tests, §10 security). Take tool versions and configuration from `backend/pyproject.toml` and `backend/uv.lock`, not from memory; the guide's §2 explains the choices in them that are not obvious. Where it disagrees with `ADR.md`, the ADR wins until it is changed; the guide's §11 lists the changes it proposes.
 
 ## Project decisions an agent will not guess
 
@@ -26,4 +26,4 @@ The rules live in `docs/python-style.md`. Before writing code, read the sections
 
 Run the commands of the guide's §2 from `backend/`, never from the repository root: `uv sync --locked`, `ruff format`, `ruff check`, `mypy`, `lint-imports`, the tests with coverage, and the OpenAPI drift check.
 
-If a rule stops you from doing what the task needs, do not work around it. Say which rule, and propose a change to `docs/python-style.md`.
+If a rule stops you from doing what the task needs, do not work around it. Say which rule, and propose a change to `docs/style/python-style.md`.

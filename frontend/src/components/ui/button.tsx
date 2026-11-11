@@ -4,7 +4,7 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-// Project-wide changes (docs/frontend-style.md §5.2, §6): a solid focus ring
+// Project-wide changes (docs/style/frontend-style.md §5.2, §6): a solid focus ring
 // with a background-coloured offset, 3:1 against every surface and the
 // button itself (WCAG 1.4.11, technique C40); destructive uses its token
 // pair. Sizes and variants follow the Figma Button (components.md): no size

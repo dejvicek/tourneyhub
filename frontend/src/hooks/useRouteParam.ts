@@ -4,7 +4,7 @@ type RouteParam = "leagueId" | "tournamentId" | "matchId" | "shareToken";
 
 /**
  * A path parameter the current route always has. useParams types every
- * parameter as optional (docs/frontend-style.md §9); this narrows it once.
+ * parameter as optional (docs/style/frontend-style.md §9); this narrows it once.
  */
 export function useRouteParam(name: RouteParam): string {
   const value = useParams()[name];

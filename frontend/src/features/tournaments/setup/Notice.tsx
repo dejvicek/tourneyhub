@@ -13,7 +13,7 @@ interface NoticeProps {
 
 /**
  * The design's Notice. A warning is announced as the choices change
- * (`role="status"`, docs/frontend-style.md §6); an info notice is plain text.
+ * (`role="status"`, docs/style/frontend-style.md §6); an info notice is plain text.
  */
 export function Notice({ variant, title, children, className }: NoticeProps) {
   const Symbol = variant === "warning" ? WarningIcon : InfoIcon;

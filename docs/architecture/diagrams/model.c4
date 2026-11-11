@@ -4,21 +4,21 @@ model {
 
   organizer = actor "Organizer" {
     description "Creates leagues, runs tournament evenings on a phone and enters results. The only kind of user with an account."
-    link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#2-users "PRD §2 Users"
-    link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#51-a-dyp-evening "PRD §5.1 A DYP evening"
+    link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#2-users "PRD §2 Users"
+    link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#51-a-dyp-evening "PRD §5.1 A DYP evening"
   }
   viewer = actor "Player or viewer" {
     description "No account. Follows the schedule, the bracket and the standings through the share link; changes nothing."
-    link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#68-sharing "PRD §6.8 Sharing (FR-070 to FR-072)"
+    link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#68-sharing "PRD §6.8 Sharing (FR-070 to FR-072)"
   }
   admin = actor "Instance admin" {
     description "Runs the VPS, sets the sign-up code and resets forgotten passwords. An ordinary account with the is_admin flag."
-    link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-007--instance-admin-admin-flag-admin-screens-cli-bootstrap "ADR-007"
-    link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#61-accounts "PRD §6.1 Accounts (FR-005, FR-006)"
+    link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-007--instance-admin-admin-flag-admin-screens-cli-bootstrap "ADR-007"
+    link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#61-accounts "PRD §6.1 Accounts (FR-005, FR-006)"
   }
   developer = actor "Developer" {
     description "Martin and dejvicek. Code and documents change only through a reviewed PR with passing checks."
-    link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-012--quality-gates-in-github-actions "ADR-012"
+    link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-012--quality-gates-in-github-actions "ADR-012"
   }
 
   tourneyhub = system "TourneyHub" {
@@ -28,8 +28,8 @@ model {
       Leagues and tournaments for game nights (board games, foosball, racket sports, e-sports): Singles, Doubles, DYP and Monster DYP, season standings and a share link for viewers.
       One instance for groups the owner knows. All ADRs are still Proposed (orange stripe).
     "
-    link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md "PRD"
-    link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md "ADR"
+    link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md "PRD"
+    link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md "ADR"
 
     spa = webapp "Web application (SPA)" {
       technology "React 19, Vite 8, TypeScript, Tailwind, shadcn/ui, React Router, TanStack Query, react-i18next"
@@ -40,20 +40,20 @@ model {
         Built with Node 26 LTS and pnpm (versions pinned in .nvmrc, engines and packageManager).
         Runs in the user's browser; served by the Vite dev server (development) or Caddy (production), and /api goes through the same origin.
       "
-      link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-003--frontend-react-vite-typescript-tailwind-shadcnui "ADR-003"
-      link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#69-language-and-devices "PRD §6.9 Language and devices (FR-080 to FR-082)"
+      link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-003--frontend-react-vite-typescript-tailwind-shadcnui "ADR-003"
+      link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#69-language-and-devices "PRD §6.9 Language and devices (FR-080 to FR-082)"
 
       organizerUi = component "Organizer screens" {
         description "Leagues, players, seasons, tournament setup, draws, rounds, results and the knockout."
-        link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#64-tournaments "PRD §6.4 Tournaments"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#64-tournaments "PRD §6.4 Tournaments"
       }
       adminUi = component "Admin screens" {
         description "Sign-up code (see, set, generate, clear), list of accounts, password reset with a confirmation and a one-time display of a generated password. The server checks every action against is_admin in the database."
-        link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-007--instance-admin-admin-flag-admin-screens-cli-bootstrap "ADR-007"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-007--instance-admin-admin-flag-admin-screens-cli-bootstrap "ADR-007"
       }
       publicUi = component "Viewer pages" {
         description "League, seasons, schedule, bracket and standings through the share token. Tournaments still in setup are not shown."
-        link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#68-sharing "PRD §6.8 Sharing"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#68-sharing "PRD §6.8 Sharing"
       }
       authClient = component "Client-side auth" {
         technology "Bearer JWT in memory, refresh cookie"
@@ -63,13 +63,13 @@ model {
           Refreshes on page load and after 401, with at most one refresh in flight per tab; requests that get 401 meanwhile wait for it and are retried once.
           On 403 password_change_required it opens the new-password screen; a 403 never triggers a refresh.
         "
-        link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-006--authentication-jwt-access-token-and-rotating-refresh-token "ADR-006"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-006--authentication-jwt-access-token-and-rotating-refresh-token "ADR-006"
       }
       apiTypes = component "API types" {
         technology "openapi-typescript"
         icon tech:typescript-icon
         description "Used by the whole frontend. Generated at build time from the committed openapi.json; no hand-written API types."
-        link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-008--api-conventions-and-generated-client-types "ADR-008"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-008--api-conventions-and-generated-client-types "ADR-008"
       }
 
       organizerUi -> authClient "needs the access token"
@@ -86,10 +86,10 @@ model {
         Endpoints are plain def functions; FastAPI runs them in its thread pool.
         When the container starts, tourneyhub migrate runs the Alembic migrations and then uvicorn starts. In production uvicorn trusts X-Forwarded-For only from the Compose network 172.30.0.0/24, where Caddy is; in development it trusts no proxy.
       "
-      link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-001--backend-python-fastapi-sqlalchemy-alembic "ADR-001"
-      link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-004--repository-layout-and-local-development-in-docker "ADR-004"
-      link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-006--authentication-jwt-access-token-and-rotating-refresh-token "ADR-006"
-      link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-008--api-conventions-and-generated-client-types "ADR-008"
+      link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-001--backend-python-fastapi-sqlalchemy-alembic "ADR-001"
+      link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-004--repository-layout-and-local-development-in-docker "ADR-004"
+      link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-006--authentication-jwt-access-token-and-rotating-refresh-token "ADR-006"
+      link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-008--api-conventions-and-generated-client-types "ADR-008"
 
       authApi = component "API: auth" {
         technology "JWT HS256, Argon2id"
@@ -99,18 +99,18 @@ model {
           Abuse limits answer 429 with Retry-After after repeated failures instead of locking the account or sleeping; counters live in PostgreSQL (auth_attempts). The IP from X-Forwarded-For is trusted only from Caddy.
           is_admin and must_change_password are read from the users row on every request, not from the token.
         "
-        link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-006--authentication-jwt-access-token-and-rotating-refresh-token "ADR-006"
-        link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#61-accounts "PRD §6.1 Accounts (FR-001 to FR-004)"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-006--authentication-jwt-access-token-and-rotating-refresh-token "ADR-006"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#61-accounts "PRD §6.1 Accounts (FR-001 to FR-004)"
       }
       adminApi = component "API: instance admin" {
         description "/api/v1/admin: read, set, generate and clear the sign-up code; list accounts; password reset. Every route checks is_admin in the database. A reset sets must_change_password and revokes all of the organizer's logins. Every action is recorded in admin_actions with its source and without the code."
-        link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-007--instance-admin-admin-flag-admin-screens-cli-bootstrap "ADR-007"
-        link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#61-accounts "PRD §6.1 Accounts (FR-005, FR-006)"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-007--instance-admin-admin-flag-admin-screens-cli-bootstrap "ADR-007"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#61-accounts "PRD §6.1 Accounts (FR-005, FR-006)"
       }
       leaguesApi = component "API: leagues, players, seasons" {
         summary "Create a league with Season 1, settings, player list, new season, closed seasons read-only (FR-010 to FR-022)."
         description "FR-010 to FR-022. The client sends the new league's id (UUIDv7); Season 1 is created with it. Starting a new season carries the current season's number, otherwise 409. The placement points table is edited on the active season; a closed season's table is 409. Player names are unique in a league ignoring case, removed players included: a taken name is 422 player_name_taken, and a removed player is restored explicitly. Players belong to the league, so closed seasons change nothing for them."
-        link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#62-leagues-and-players "PRD §6.2 and §6.3"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#62-leagues-and-players "PRD §6.2 and §6.3"
       }
       tournamentsApi = component "API: tournaments" {
         summary "Setup, draws, generating, rounds, results, fields, knockout, late players, disabling."
@@ -118,12 +118,12 @@ model {
           Setup, draws, generating, rounds, results, fields, knockout, late players, disabling.
           A round is deleted by its id, adding a round carries the expected round_no, “shuffle again” carries the expected draw counter, adding a field carries the number it expects; a mismatch returns 409 and the client reloads the state.
         "
-        link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#64-tournaments "PRD §6.4 to §6.7"
-        link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-008--api-conventions-and-generated-client-types "ADR-008"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#64-tournaments "PRD §6.4 to §6.7"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-008--api-conventions-and-generated-client-types "ADR-008"
       }
       publicApi = component "API: viewers" {
         description "/api/v1/public/{share_token}: read-only, no login. The share token has at least 128 bits of randomness."
-        link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#68-sharing "PRD §6.8 Sharing (FR-070 to FR-072)"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#68-sharing "PRD §6.8 Sharing (FR-070 to FR-072)"
       }
       engine = component "Engine" {
         technology "tourneyhub.engine, pure functions"
@@ -132,9 +132,9 @@ model {
           Bracket, schedule, Swiss, Monster DYP, standings with BH1 and BH2, places, season points and lots from the tournament's seed (SHA-256).
           Pure functions: no database, clock or network, so it is tested with Hypothesis. Derived data is never stored; it is computed on every read.
         "
-        link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-009--tournament-engine-as-pure-functions-derived-data-computed-on-read "ADR-009"
-        link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-010--lots-stored-seed-and-sha-256-ordering "ADR-010"
-        link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-011--pairing-when-a-repeat-cannot-be-avoided "ADR-011"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-009--tournament-engine-as-pure-functions-derived-data-computed-on-read "ADR-009"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-010--lots-stored-seed-and-sha-256-ordering "ADR-010"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-011--pairing-when-a-repeat-cannot-be-avoided "ADR-011"
         style {
           color green
         }
@@ -146,33 +146,33 @@ model {
       icon tech:python
       summary "migrate, run as the api container starts; set-signup-code, cleanup; create-admin, grant-admin, revoke-admin (each recorded in admin_actions with source cli). No web route can create an admin."
       description "migrate, which the api container runs on start; set-signup-code (a prompt, or --clear to close sign-up); cleanup (deletes expired and revoked refresh tokens and old auth_attempts); create-admin, grant-admin, revoke-admin; set-signup-code and the three admin commands are recorded in admin_actions with source cli and no admin user. No web route can create an admin, so a stranger cannot claim the instance on first start."
-      link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-004--repository-layout-and-local-development-in-docker "ADR-004"
-      link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-007--instance-admin-admin-flag-admin-screens-cli-bootstrap "ADR-007"
+      link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-004--repository-layout-and-local-development-in-docker "ADR-004"
+      link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-007--instance-admin-admin-flag-admin-screens-cli-bootstrap "ADR-007"
     }
 
     db = database "PostgreSQL 17" {
       technology "builtin locale C.UTF-8"
       icon tech:postgresql
       description "Only source data is stored; standings, places and season points are computed on every read. The same version in development and production."
-      link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-002--database-postgresql "ADR-002"
-      link https://github.com/dejvicek/tourneyhub/blob/docs/data-model-mvp/DATA-MODEL.md "DATA-MODEL.md (PR #3)"
+      link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-002--database-postgresql "ADR-002"
+      link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/DATA-MODEL.md "DATA-MODEL.md (PR #3)"
 
       accounts = tableGroup "Accounts and administration" {
         description "users, refresh_tokens, auth_attempts, instance_settings, admin_actions"
-        link https://github.com/dejvicek/tourneyhub/blob/docs/data-model-mvp/DATA-MODEL.md#41-accounts-and-administration "DATA-MODEL §4.1"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/DATA-MODEL.md#41-accounts-and-administration "DATA-MODEL §4.1"
       }
       leagues = tableGroup "Leagues, players and seasons" {
         description "leagues (settings, share token), players, seasons (placement points table; one active per league)"
-        link https://github.com/dejvicek/tourneyhub/blob/docs/data-model-mvp/DATA-MODEL.md#42-leagues-players-and-seasons "DATA-MODEL §4.2"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/DATA-MODEL.md#42-leagues-players-and-seasons "DATA-MODEL §4.2"
       }
       tournaments = tableGroup "Tournaments and entries" {
         description "tournaments, tournament_phases, fields, tournament_players, entries, entry_members, dyp_halves"
-        link https://github.com/dejvicek/tourneyhub/blob/docs/data-model-mvp/DATA-MODEL.md#43-tournaments-and-phases "DATA-MODEL §4.3"
-        link https://github.com/dejvicek/tourneyhub/blob/docs/data-model-mvp/DATA-MODEL.md#44-entries "DATA-MODEL §4.4"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/DATA-MODEL.md#43-tournaments-and-phases "DATA-MODEL §4.3"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/DATA-MODEL.md#44-entries "DATA-MODEL §4.4"
       }
       play = tableGroup "Rounds and matches" {
         description "rounds, round_participation, matches, match_games, match_sides, match_side_players; a field's match"
-        link https://github.com/dejvicek/tourneyhub/blob/docs/data-model-mvp/DATA-MODEL.md#45-rounds-matches-and-results "DATA-MODEL §4.5"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/DATA-MODEL.md#45-rounds-matches-and-results "DATA-MODEL §4.5"
       }
 
       leagues -[fk]-> accounts "league owner (owner_user_id)"
@@ -207,14 +207,14 @@ model {
         - ci-ok: waits for all four and fails if one of them failed or was cancelled; a job skipped because nothing in its area changed counts as passed. The one check to require (ADR-012).
         Free: 2,000 minutes a month and 500 MB of storage shared by artifacts and packages.
       "
-      link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-012--quality-gates-in-github-actions "ADR-012"
-      link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-013--end-to-end-tests-and-checks-with-playwright "ADR-013"
+      link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-012--quality-gates-in-github-actions "ADR-012"
+      link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-013--end-to-end-tests-and-checks-with-playwright "ADR-013"
     }
     ghcr = externalComponent "GHCR" {
       technology "GitHub Container Registry, api and web images"
       icon tech:docker
       description "Private api and web images; only the last few versions are kept. The VPS logs in with a token that can only read packages."
-      link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-014--deployment-images-in-ghcr-manual-pull-on-the-vps "ADR-014"
+      link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-014--deployment-images-in-ghcr-manual-pull-on-the-vps "ADR-014"
     }
     dependabot = externalComponent "Dependabot" {
       technology "dependabot.yml, weekly"
