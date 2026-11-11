@@ -23,6 +23,7 @@ import {
   formOf,
   type KnockoutMatchFormat,
   type MatchFormat,
+  scoresSitOuts,
   sitOutPointsOf,
   type TournamentType,
   writeOf,
@@ -427,7 +428,7 @@ function FormatForm({
             patch({ field_count: fields });
           }}
         />
-        {!noGroup && (
+        {scoresSitOuts(form.group_phase) && (
           <SitOutPointsField
             points={sitOutPoints}
             setByHand={form.sit_out_points_set_by_hand}

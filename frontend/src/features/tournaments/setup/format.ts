@@ -26,6 +26,15 @@ export type FormatForm = {
   sit_out_points_set_by_hand: boolean;
 };
 
+/**
+ * Whether the group phase scores a sit-out (FR-039, BR-071): Swiss and Monster
+ * DYP do; a round robin does not, since every entry sits out equally often and a
+ * late entry (BR-054) would make the points distort the order.
+ */
+export function scoresSitOuts(groupPhase: GroupPhase): boolean {
+  return groupPhase === "swiss" || groupPhase === "monster_dyp";
+}
+
 /** The sit-out points the form stands for: the pick, or the default (BR-071). */
 export function sitOutPointsOf(
   form: Pick<
@@ -65,13 +74,15 @@ export function formOf(
  */
 export function writeOf(form: FormatForm): FormatWrite {
   const grouped = form.group_phase !== "none";
-  // The flag is read-only; null asks for the default and keeps following it.
+  // The flag is read-only; null asks for the default and keeps following it. A
+  // round robin takes none: the API refuses a number there (BR-071).
   const { sit_out_points_set_by_hand: byHand, ...settings } = form;
   return {
     ...settings,
     round_robin_legs:
       form.group_phase === "round_robin" ? form.round_robin_legs : null,
-    sit_out_points: grouped && byHand ? form.sit_out_points : null,
+    sit_out_points:
+      scoresSitOuts(form.group_phase) && byHand ? form.sit_out_points : null,
     group_match_format: grouped ? form.group_match_format : null,
     knockout_match_format: grouped ? null : form.knockout_match_format,
     final_match_format: grouped ? null : form.final_match_format,

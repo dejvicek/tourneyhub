@@ -239,6 +239,11 @@ const fail = (
   detail: SetupFailure["detail"] = {},
 ): SetupFailure => ({ status, code, detail });
 
+/** BR-071: the group phases that score a sit-out, not a round robin. */
+function scoresSitOutsIn(groupPhase: string): boolean {
+  return groupPhase === "swiss" || groupPhase === "monster_dyp";
+}
+
 /** A request body the backend's validation refuses (422 `validation_failed`). */
 const invalidBody = (type: string): SetupFailure =>
   fail(422, "validation_failed", { errors: [{ loc: ["body"], type }] });
@@ -277,11 +282,18 @@ function formatProblem(
   const applies = new Set<string>(grouped ? GROUP_SETTINGS : KNOCKOUT_SETTINGS);
   if (format.group_phase !== "round_robin") {
     applies.delete("round_robin_legs");
+  } else {
+    // BR-071: only Swiss and Monster DYP score a sit-out.
+    applies.delete("sit_out_points");
   }
   for (const name of [...GROUP_SETTINGS, ...KNOCKOUT_SETTINGS]) {
     const value = format[name] ?? null;
     if (!applies.has(name) && value !== null) {
-      return invalidBody("setting_not_applicable");
+      return invalidBody(
+        name === "sit_out_points" && grouped
+          ? "sit_out_points_not_applicable"
+          : "setting_not_applicable",
+      );
     }
     if (
       complete &&
@@ -308,7 +320,9 @@ function resolveFormat(
   const grouped = format.group_phase !== "none";
   const fallback = league.default_match_format;
   const groupMatchFormat = format.group_match_format ?? fallback;
-  // BR-071: a number is the organizer's pick; null takes the default.
+  // BR-071: only Swiss and Monster DYP score a sit-out. A number is the
+  // organizer's pick; null takes the default.
+  const scoresSitOuts = scoresSitOutsIn(format.group_phase);
   const picked = format.sit_out_points ?? null;
   return {
     name: format.name.trim(),
@@ -319,10 +333,13 @@ function resolveFormat(
       format.group_phase === "round_robin"
         ? (format.round_robin_legs ?? 1)
         : null,
-    sit_out_points: grouped
+    sit_out_points: scoresSitOuts
       ? (picked ?? defaultSitOutPoints(groupMatchFormat, league.draws_allowed))
       : null,
-    sit_out_points_set_by_hand: grouped ? picked !== null : null,
+    // A round robin keeps no value and no pick; only a knockout reads null.
+    sit_out_points_set_by_hand: grouped
+      ? scoresSitOuts && picked !== null
+      : null,
     group_match_format: grouped ? groupMatchFormat : null,
     knockout_match_format: grouped
       ? null
@@ -1245,7 +1262,7 @@ export function refreshSitOutDefaults(league: StoredLeague): void {
           round.matches.some((match) => match.outcome !== null),
       );
       if (
-        phase.kind === "group" &&
+        scoresSitOutsIn(phase.format) &&
         !phase.sit_out_points_set_by_hand &&
         !hasResult
       ) {

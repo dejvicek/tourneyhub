@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-import type { FormatForm } from "./format";
+import { type FormatForm, scoresSitOuts } from "./format";
 import {
   formatLabel,
   groupPhaseLabel,
@@ -48,7 +48,7 @@ export function SoFarCard({ format, players }: SoFarCardProps) {
           <SummaryRow label={t("tournaments.setup.summary.fields")}>
             {format.field_count}
           </SummaryRow>
-          {!noGroup && (
+          {scoresSitOuts(format.group_phase) && (
             <SummaryRow label={t("tournaments.setup.summary.sitOut")}>
               {sitOutLabel(t, format.sit_out_points)}
             </SummaryRow>
