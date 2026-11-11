@@ -1225,16 +1225,30 @@ export function deleteTournament(t: StoredTournament): SetupFailure | null {
 }
 
 /**
- * A change of the league's draw setting moves the default of every tournament
- * still in setup that follows it (BR-071); a generated schedule keeps its value.
+ * A change of the league's draw setting moves the default of every group phase
+ * that follows it and has no result yet, in a tournament in setup or in progress
+ * (BR-071); after the phase's first result the value is fixed (BR-071, as
+ * reviewed in #46).
  */
 export function refreshSitOutDefaults(league: StoredLeague): void {
   for (const tournament of db().tournaments) {
-    if (tournament.league_id !== league.id || tournament.state !== "setup") {
+    if (
+      tournament.league_id !== league.id ||
+      (tournament.state !== "setup" && tournament.state !== "in_progress")
+    ) {
       continue;
     }
     for (const phase of tournament.phases) {
-      if (phase.kind === "group" && !phase.sit_out_points_set_by_hand) {
+      const hasResult = tournament.rounds.some(
+        (round) =>
+          round.phase_id === phase.id &&
+          round.matches.some((match) => match.outcome !== null),
+      );
+      if (
+        phase.kind === "group" &&
+        !phase.sit_out_points_set_by_hand &&
+        !hasResult
+      ) {
         phase.sit_out_points = defaultSitOutPoints(
           phase.match_format,
           league.draws_allowed,

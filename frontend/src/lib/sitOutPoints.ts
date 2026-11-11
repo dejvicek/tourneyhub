@@ -10,7 +10,10 @@ export type SitOutPoints = (typeof SIT_OUT_POINTS)[number];
  * The default points of a sit-out (BR-071): 1, worth a draw, only where a match
  * can end level, that is when the league allows draws and the group phase plays
  * BO1 or BO2. Otherwise 2, worth a win, so a sit-out never earns a result that
- * no match can produce. The backend computes the same default; this only shows it.
+ * no match can produce. The default follows the match format and the league's
+ * draw setting until the group phase's first result, unless the organizer picked
+ * a value by hand; it is then fixed (BR-071, as reviewed in #46). The backend
+ * computes the same default; this only shows it.
  */
 export function defaultSitOutPoints(
   format: MatchFormat,

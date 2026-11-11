@@ -11,6 +11,7 @@ import {
   nth,
   pickPlayers,
   setupOf,
+  startTournament,
   tournamentOf,
 } from "./setupTestHelpers";
 
@@ -101,6 +102,49 @@ describe("the fake API for tournament setup", () => {
 
     expect(await read(following)).toEqual([1, false]);
     expect(await read(byHand)).toEqual([2, true]);
+  });
+
+  it("keeps following the draw setting after generating, until the first result, and never moves a pick (BR-071)", async () => {
+    await setDraws(true);
+    const following = await createDraft({ sit_out_points: null });
+    const byHand = await createDraft({ sit_out_points: 2 });
+    for (const id of [following, byHand]) {
+      await pickPlayers(id, 12);
+      await startTournament(id);
+    }
+    const read = async (id: string) => {
+      const phase = nth((await tournamentOf(id)).phases, 0);
+      return [phase.sit_out_points, phase.sit_out_points_set_by_hand];
+    };
+    expect(await read(following)).toEqual([1, false]);
+
+    await setDraws(false);
+
+    expect(await read(following)).toEqual([2, false]);
+    expect(await read(byHand)).toEqual([2, true]);
+
+    await setDraws(true);
+    expect(await read(following)).toEqual([1, false]);
+
+    const matchId =
+      nth((await tournamentOf(following)).fields, 0).match_id ?? "";
+    await dataOf(
+      provisionalApi.PUT(
+        "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/matches/{match_id}/result",
+        {
+          params: {
+            path: { ...league, tournament_id: following, match_id: matchId },
+          },
+          body: {
+            walkover_winner: null,
+            games: [{ winner: "side_1", score_1: 10, score_2: 4 }],
+          },
+        },
+      ),
+    );
+    await setDraws(false);
+
+    expect(await read(following)).toEqual([1, false]);
   });
 
   it("follows the format with a null pick, and keeps a number", async () => {
