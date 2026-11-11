@@ -110,18 +110,28 @@ views "III. Flows" {
     variant sequence
     title "10. Result entry"
     order 12
-    description "FR-050 to FR-053, FR-082: at most three taps plus the score. The write locks the league, then the tournament. Standings are not computed on write; they are computed on every read (ADR-009)."
+    description "FR-050 to FR-053, FR-082, FR-094, BR-090 to BR-095, BR-121, BR-130 to BR-134 and ADR-008: at most three taps plus the score. The result is sent whole, every game or the walkover, as the target state; the empty result clears it. The write locks the league, then the tournament. The engine checks the games against the match's format and the draw rule; a saved result frees the field, which takes the next waiting match. Standings are not computed on write; they are computed on every read (ADR-009)."
     organizer -> tourneyhub.spa.organizerUi "opens the match, chooses the result, saves"
-    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "saves the result (Bearer JWT)"
-    tourneyhub.api.tournamentsApi -> tourneyhub.db.leagues "SELECT … FOR UPDATE on the league"
-    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "SELECT … FOR UPDATE on the tournament"
-    tourneyhub.api.tournamentsApi -> tourneyhub.db.play "loads the phase's matches and results"
-    tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "derives the sides in the bracket and checks the result lock (BR-091, BR-094)"
-    tourneyhub.api.tournamentsApi -> tourneyhub.db.play "stores the result (CHECK in matches)"
-    tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "saved match"
-    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "loads the standings and the bracket"
-    tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "computes the standings and the bracket progression"
-    tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "standings and bracket"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "PUT …/matches/{id}/result: the games, a walkover or nothing (Bearer JWT)"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.leagues "SELECT … FOR UPDATE on the league; a closed season: 409"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "SELECT … FOR UPDATE on the tournament, with its rounds and fields"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.play "finds the match: another tournament's is 404; sides not known: 422"
+    alt {
+      when "games or a walkover" {
+        tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "outcome from the games: format, draws, scores; else 422 with the rule's code"
+        tourneyhub.api.tournamentsApi -> tourneyhub.db.play "games, outcome and result time (an equal repeat changes nothing)"
+        tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "the freed field takes the first waiting match whose players are free"
+        tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "fields hold their new matches"
+      }
+      when "the empty result" {
+        tourneyhub.api.tournamentsApi -> tourneyhub.db.play "deletes the games; the match waits and takes no field by itself"
+        tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "a finished tournament is in progress again"
+      }
+    }
+    tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: the match"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "reloads the tournament and GET …/play" {
+      navigateTo roundRobinFinish
+    }
   }
 
   dynamic view addRound {
@@ -404,5 +414,34 @@ views "III. Flows" {
         tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "409 tournament_not_in_progress: reload"
       }
     }
+  }
+
+  dynamic view roundRobinFinish {
+    variant sequence
+    title "20. Standings and finishing a round robin"
+    order 24
+    description "FR-040, FR-060, BR-070, BR-071, BR-101, BR-103, BR-110, BR-111 and ADR-009: the play read computes the waiting list and the round robin's standings from the stored results; a sit-out counts once its round is played. When every match has a result, the organizer confirms in the UI and finishes. The places and season points are computed on read, from the standings and the season's placement points table; nothing derived is stored. A knockout after the round robin is P10."
+    organizer -> tourneyhub.spa.organizerUi "opens the schedule or the Standings tab"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "GET …/play"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.play "loads the rounds, results, games and participation"
+    tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "waiting order with the busy fields; standings: points, two level by their match, score difference, shared places"
+    tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: waiting, standings, group_done"
+    organizer -> tourneyhub.spa.organizerUi "group phase done: Finish the tournament now, confirms"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "POST …/finish expecting in_progress"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.leagues "locks the league"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the tournament: not in progress 409; a knockout or another format 422"
+    alt {
+      when "every match has a result" {
+        tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "state finished"
+        tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: the tournament"
+      }
+      when "a match without a result" {
+        tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "422 group_phase_not_done with matches_left"
+      }
+    }
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "GET …/places"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.leagues "the season's placement points table"
+    tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "standings to places, places to points per player, shared places split and rounded down"
+    tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: places with points per player"
   }
 }
