@@ -363,11 +363,13 @@ def draw_next_swiss_round(
     3. **Fallback (ADR-011).** If BR-056 gets stuck, the whole field is
        paired by a minimum-cost perfect matching, where a pair costs the
        square of how many places apart the two are among the entries that
-       play. Only pairs that have not met and are at most 16 apart are
+       play, times how many entries are at or below the upper one, so the
+       top of the standings is kept first. Only pairs that have not met and are at most 16 apart are
        allowed; while no perfect matching exists the window doubles (32, 64,
        ...) up to the whole field. If even the whole field has none, pairs
-       that have met are allowed at a cost above any sum of the others, so
-       the draw has as few repeats as possible (BR-057).
+       that have met are allowed at a cost above any sum of the others, once
+       per earlier meeting, so the draw has as few repeats as possible and
+       prefers pairs that met once over pairs that met twice (BR-057).
 
     The result depends only on the standing and on who has met whom, so it
     is the same for the same seed and round.
@@ -418,7 +420,7 @@ def draw_next_swiss_round(
     playing = [line for line in active if line is not sitting]
 
     index = {line.entry_id: number for number, line in enumerate(playing)}
-    met = {
+    met = Counter(
         (
             min(index[match.side_1], index[match.side_2]),
             max(index[match.side_1], index[match.side_2]),
@@ -426,7 +428,7 @@ def draw_next_swiss_round(
         for round_ in played_rounds
         for match in round_.matches
         if match.side_1 in index and match.side_2 in index
-    }
+    )
     pairs = _pair_neighbours(len(playing), met)
     method = PairingMethod.NEIGHBOURS
     if pairs is None:
@@ -483,7 +485,7 @@ def _result_for(outcome: MatchOutcome, own: MatchOutcome) -> _Result:
     return _Result.WON if outcome is own else _Result.LOST
 
 
-def _pair_neighbours(count: int, met: set[Pair]) -> tuple[Pair, ...] | None:
+def _pair_neighbours(count: int, met: Counter[Pair]) -> tuple[Pair, ...] | None:
     """Pair top-down with the next entry below that has not been met (BR-056)."""
     unpaired = list(range(count))
     pairs: list[Pair] = []
@@ -497,14 +499,24 @@ def _pair_neighbours(count: int, met: set[Pair]) -> tuple[Pair, ...] | None:
     return tuple(pairs)
 
 
-def _pair_by_matching(count: int, met: set[Pair]) -> tuple[Pair, ...]:
+def _pair_cost(count: int, top: int, bottom: int) -> int:
+    """Return the cost of a pair: far apart is dear, and more so near the top.
+
+    The weight `count - top` makes a change at the top of the standings cost
+    more than the same change further down, so the fallback keeps "1st v 2nd"
+    when a draw without repeats allows it (BR-056).
+    """
+    return (bottom - top) ** 2 * (count - top)
+
+
+def _pair_by_matching(count: int, met: Counter[Pair]) -> tuple[Pair, ...]:
     """Pair the whole field by a minimum-cost matching (ADR-011)."""
     window = PAIRING_WINDOW
     while True:
         pairs = min_cost_matching(
             count,
             (
-                (top, bottom, (bottom - top) ** 2)
+                (top, bottom, _pair_cost(count, top, bottom))
                 for top in range(count)
                 for bottom in range(top + 1, min(count, top + window + 1))
                 if (top, bottom) not in met
@@ -515,12 +527,18 @@ def _pair_by_matching(count: int, met: set[Pair]) -> tuple[Pair, ...]:
         if window >= count - 1:
             break
         window *= 2
-    # More than any sum of the other costs, so fewer repeats always win (BR-057).
-    repeat_cost = count // 2 * (count - 1) ** 2 + 1
+    # More than any sum of the other costs: each pair costs at most
+    # `(count - 1) ** 2 * count`, and `count // 2` pairs are drawn. So fewer
+    # earlier meetings always win (BR-057), and among equal ones, the closer pairs.
+    repeat_cost = count // 2 * (count - 1) ** 2 * count + 1
     return min_cost_matching(
         count,
         (
-            (top, bottom, (bottom - top) ** 2 + repeat_cost * ((top, bottom) in met))
+            (
+                top,
+                bottom,
+                _pair_cost(count, top, bottom) + repeat_cost * met[(top, bottom)],
+            )
             for top in range(count)
             for bottom in range(top + 1, count)
         ),

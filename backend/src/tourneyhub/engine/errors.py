@@ -37,7 +37,7 @@ class TooManyLeftOutError(EngineError):
 
 
 class NotEnoughEntriesError(EngineError):
-    """Too few entries can play a new round: none would have an opponent (FR-042)."""
+    """Too few entries can play a new round: none would have an opponent (FR-032, FR-044)."""
 
     def __init__(self, *, minimum: int, given: int) -> None:
         super().__init__(minimum, given)

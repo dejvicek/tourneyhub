@@ -6,7 +6,7 @@ from uuid import UUID
 
 import networkx as nx
 import pytest
-from hypothesis import example, given, settings
+from hypothesis import assume, example, given, settings
 from hypothesis import strategies as st
 
 from tourneyhub.engine.errors import NotEnoughEntriesError
@@ -434,6 +434,26 @@ def test_br057_a_forced_draw_has_as_few_repeats_as_possible() -> None:
     assert [pair.is_repeat for pair in draw.pairs] == [False, True]
 
 
+def test_br056_the_fallback_keeps_1st_v_2nd_when_a_repeat_free_draw_allows_it() -> None:
+    # BR-056 gets stuck at 4 v 6, and the fallback must not split the leaders.
+    history = met((3, 4), (4, 6))
+
+    draw = draw_next_swiss_round(table(1, 2, 3, 4, 5, 6), history)
+
+    assert draw.method is PairingMethod.MATCHING
+    assert pairs(draw) == [(1, 2), (3, 6), (4, 5)]
+    assert not any(pair.is_repeat for pair in draw.pairs)
+
+
+def test_br057_a_forced_repeat_prefers_pairs_that_met_once_to_pairs_met_twice() -> None:
+    history = met((1, 2), (1, 2), (1, 3), (1, 4), (2, 3), (2, 4), (3, 4))
+
+    draw = draw_next_swiss_round(table(1, 2, 3, 4), history)
+
+    assert pairs(draw) == [(1, 3), (2, 4)]
+    assert all(pair.is_repeat for pair in draw.pairs)
+
+
 def test_br058_the_lowest_placed_of_those_with_fewest_sit_outs_sits_out() -> None:
     lines = [*table(1, 2, 3, 4), line(5, 5, sat_out=1)]
 
@@ -561,9 +581,19 @@ def test_br068_the_minimum_is_the_smallest_r_with_2_to_the_r_at_least_n(
 
 @st.composite
 def histories(
-    draw: st.DrawFn, *, max_entries: int = 32, max_rounds: int = 12
+    draw: st.DrawFn,
+    *,
+    max_entries: int = 32,
+    max_rounds: int = 12,
+    unfinished: bool = True,
 ) -> tuple[list[EntryId], list[SwissRound]]:
-    """Entries and finished rounds: random pairings, results and absences."""
+    """Entries and rounds: random pairings, results and absences.
+
+    With `unfinished`, some matches have no result yet (a draw refuses those).
+    """
+    outcomes: list[MatchOutcome | None] = [*MatchOutcome]
+    if unfinished:
+        outcomes.append(None)
     count = draw(st.integers(min_value=2, max_value=max_entries))
     entries = ids(*range(1, count + 1))
     rounds: list[SwissRound] = []
@@ -576,7 +606,7 @@ def histories(
             SwissMatch(
                 side_1=playing[index],
                 side_2=playing[index + 1],
-                outcome=draw(st.sampled_from(MatchOutcome)),
+                outcome=draw(st.sampled_from(outcomes)),
                 score_difference=draw(st.integers(-5, 5)),
             )
             for index in range(0, len(playing), 2)
@@ -641,7 +671,7 @@ def neighbour_pairs(
 def draws(
     draw: st.DrawFn, *, max_entries: int = 32
 ) -> tuple[list[SwissStanding], list[SwissRound], list[EntryId], SwissDraw]:
-    entries, rounds = draw(histories(max_entries=max_entries))
+    entries, rounds = draw(histories(max_entries=max_entries, unfinished=False))
     lines = list(
         swiss_standings(
             entries,
@@ -700,6 +730,61 @@ def test_br057_a_forced_draw_has_the_fewest_repeats_possible(
     )
 
 
+def meetings(rounds: Iterable[SwissRound]) -> Counter[frozenset[EntryId]]:
+    return Counter(
+        frozenset((m.side_1, m.side_2)) for round_ in rounds for m in round_.matches
+    )
+
+
+def cheapest_cost(
+    positions: Sequence[int], count: int, met: Counter[tuple[int, int]]
+) -> tuple[int, int]:
+    """The least (meetings, distance cost) of any perfect matching, by brute force.
+
+    A pair of positions `top < bottom` costs `(bottom - top) ** 2 * (count - top)`.
+    """
+    if not positions:
+        return (0, 0)
+    top, *rest = positions
+    return min(
+        (
+            met[(top, bottom)] + sub[0],
+            (bottom - top) ** 2 * (count - top) + sub[1],
+        )
+        for bottom in rest
+        for sub in [cheapest_cost([p for p in rest if p != bottom], count, met)]
+    )
+
+
+@settings(deadline=None)
+@given(draws(max_entries=10))
+def test_adr011_the_fallback_is_the_cheapest_matching_by_meetings_then_distance(
+    case: tuple[list[SwissStanding], list[SwissRound], list[EntryId], SwissDraw],
+) -> None:
+    lines, rounds, disabled, result = case
+    assume(result.method is PairingMethod.MATCHING)
+    playing = playing_entries(lines, disabled, result)
+    number = {entry: index for index, entry in enumerate(playing)}
+    met = Counter(
+        {
+            (min(number[a], number[b]), max(number[a], number[b])): times
+            for pair, times in meetings(rounds).items()
+            if pair <= number.keys()
+            for a, b in [tuple(pair)]
+        }
+    )
+    count = len(playing)
+
+    chosen = [
+        sorted((number[pair.side_1], number[pair.side_2])) for pair in result.pairs
+    ]
+
+    assert (
+        sum(met[(top, bottom)] for top, bottom in chosen),
+        sum((bottom - top) ** 2 * (count - top) for top, bottom in chosen),
+    ) == cheapest_cost(list(range(count)), count, met)
+
+
 @settings(deadline=None)
 @given(draws())
 def test_br058_every_entry_plays_once_or_sits_out(
@@ -714,9 +799,15 @@ def test_br058_every_entry_plays_once_or_sits_out(
     assert (result.sitting_out is not None) == (len(active) % 2 == 1)
     assert Counter(drawn) == Counter(playing_entries(lines, disabled, result))
     if result.sitting_out is not None:
+        # BR-058: the lowest-placed of those with the fewest sit-outs.
         fewest = min(s.sat_out for s in active)
-        candidates = [s.entry_id for s in active if s.sat_out == fewest]
-        assert result.sitting_out == candidates[-1]
+        candidates = [s for s in active if s.sat_out == fewest]
+        sitting = next(s for s in lines if s.entry_id == result.sitting_out)
+        assert sitting in candidates
+        assert all(sitting.place >= s.place for s in candidates)
+        assert result.is_sit_out_by_lot == any(
+            s.place == sitting.place for s in candidates if s is not sitting
+        )
 
 
 @settings(deadline=None)
@@ -768,6 +859,10 @@ def test_adr010_draws_and_standings_do_not_depend_on_input_order(
     data: st.DataObject,
 ) -> None:
     entries, rounds = history
+    disabled = data.draw(
+        st.lists(st.sampled_from(entries), unique=True, max_size=len(entries) - 2)
+    )
+    is_finished = all(m.outcome is not None for r in rounds for m in r.matches)
     shuffled_rounds = [
         SwissRound(
             round_no=r.round_no,
@@ -778,8 +873,12 @@ def test_adr010_draws_and_standings_do_not_depend_on_input_order(
     ]
 
     def run(
-        entries: Iterable[EntryId], rounds: list[SwissRound]
-    ) -> tuple[tuple[SwissStanding, ...], SwissDraw]:
+        entries: Iterable[EntryId],
+        rounds: list[SwissRound],
+        disabled: list[EntryId],
+        *,
+        shuffle: bool,
+    ) -> tuple[tuple[SwissStanding, ...], SwissDraw | None]:
         lines = swiss_standings(
             entries,
             rounds,
@@ -787,11 +886,19 @@ def test_adr010_draws_and_standings_do_not_depend_on_input_order(
             sit_out_points=sit_out_points,
             rng_seed=seed,
         )
-        return lines, draw_next_swiss_round(lines, rounds)
+        if not is_finished:
+            return lines, None  # a draw refuses a match without a result
+        given_lines = data.draw(st.permutations(lines)) if shuffle else lines
+        return lines, draw_next_swiss_round(given_lines, rounds, disabled=disabled)
 
-    assert run(entries, rounds) == run(entries, rounds)
-    assert run(entries, rounds) == run(
-        data.draw(st.permutations(entries)), shuffled_rounds
+    assert run(entries, rounds, disabled, shuffle=False) == run(
+        entries, rounds, disabled, shuffle=False
+    )
+    assert run(entries, rounds, disabled, shuffle=False) == run(
+        data.draw(st.permutations(entries)),
+        shuffled_rounds,
+        data.draw(st.permutations(disabled)),
+        shuffle=True,
     )
 
 
