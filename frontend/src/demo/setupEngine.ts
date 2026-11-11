@@ -143,6 +143,11 @@ export function pickedCount(t: StoredTournament): number {
   return draftOf(t).playerIds.length;
 }
 
+/** BR-002: whether the player is picked for the tournament (setup) or plays in it. */
+export function isPicked(t: StoredTournament, playerId: string): boolean {
+  return draftOf(t).playerIds.includes(playerId);
+}
+
 export function setupRead(t: StoredTournament): Schemas["TournamentSetupRead"] {
   const draft = draftOf(t);
   const ranking = leagueRanking(t.league_id);

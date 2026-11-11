@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { errorCodeOf, ruleOf } from "@/features/auth/apiErrors";
+import { errorCodeOf } from "@/features/auth/apiErrors";
 import { fieldErrors } from "@/features/auth/fieldErrors";
 import { FormField } from "@/features/auth/FormField";
 import { EmptyState } from "@/features/leagues/EmptyState";
@@ -325,7 +325,7 @@ function PlayerRow({
     fieldErrors(t, rename.error).name ??
     (rename.isError ? t("players.errors.generic") : undefined);
   const removeError = remove.isError
-    ? ruleOf(remove.error) === "BR-002"
+    ? errorCodeOf(remove.error) === "player_in_unfinished_tournament"
       ? t("players.remove.inTournament", { name: player.name })
       : t("players.errors.generic")
     : undefined;

@@ -1,11 +1,12 @@
 // Demo handlers: a league's player list (FR-012, BR-001, BR-002). They follow
 // the backend's service (backend/src/tourneyhub/services/players.py).
-// BR-002 (no removal from an unfinished tournament) is the demo's own: P7 adds it.
+// BR-002 (no removal of a player picked for an unfinished tournament) follows the backend.
 import type { components } from "@/api/schema";
 import { newId } from "@/lib/newId";
 
 import { nameProblem, type Problem, validationFailed } from "../outsideErrors";
 import { apiError, route } from "../route";
+import { isPicked } from "../setupEngine";
 import { db, findLeague, tournamentSummary } from "../store";
 
 type PlayerRead = components["schemas"]["PlayerRead"];
@@ -33,12 +34,11 @@ function nameValidation(name: string): Problem | undefined {
   return nameProblem(tidyName(name), loc);
 }
 
-/** BR-002: the unfinished tournaments the player is entered in. */
+/** BR-002: the unfinished tournaments the player is picked for (setup) or plays in. */
 function unfinishedTournaments(playerId: string) {
   return db().tournaments.filter(
     (t) =>
-      t.state !== "finished" &&
-      t.entries.some((entry) => entry.player_ids.includes(playerId)),
+      t.state !== "finished" && isPicked(t, playerId),
   );
 }
 
@@ -190,12 +190,11 @@ export const playerHandlers = [
       if (typeof removed !== "boolean") {
         return apiError(422, "validation_failed", { removed: "not_a_boolean" });
       }
-      // BR-002: not in the backend yet; P7 adds it with its own code.
+      // BR-002, as the backend answers it.
       if (removed) {
         const tournamentIds = unfinishedTournaments(player.id).map((t) => t.id);
         if (tournamentIds.length > 0) {
-          return apiError(422, "validation_failed", {
-            rule: "BR-002",
+          return apiError(422, "player_in_unfinished_tournament", {
             tournament_ids: tournamentIds,
           });
         }
