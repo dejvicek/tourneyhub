@@ -139,14 +139,47 @@ export async function drawElsewhere(
   );
 }
 
-/** Generates and starts a tournament with its current draw counter. */
+/** Another device swaps seeds 1 and 2; the draw counter does not change (ADR-010). */
+export async function swapSeedsElsewhere(tournamentId: string) {
+  const [first, second, ...rest] = startBody(
+    await setupOf(tournamentId),
+  ).expected_seed_order;
+  await dataOf(
+    api.PUT(
+      "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/seed-order",
+      {
+        ...at(tournamentId),
+        body: { entry_ids: [second ?? "", first ?? "", ...rest] },
+      },
+    ),
+  );
+}
+
+type StartWrite = components["schemas"]["StartWrite"];
+
+/**
+ * The body of the start as the review would send it: the setup's draw counter
+ * (or the given one) and its entries in seed order (ADR-008).
+ */
+export function startBody(
+  setup: Awaited<ReturnType<typeof setupOf>>,
+  counter: number = setup.draw_counter,
+): StartWrite {
+  return {
+    expected_draw_counter: counter,
+    expected_seed_order: setup.entries
+      .filter((entry) => entry.stage === "main")
+      .toSorted((a, b) => (a.seed ?? 0) - (b.seed ?? 0))
+      .map((entry) => entry.id),
+  };
+}
+
+/** Generates and starts a tournament with its current draw counter and seeds. */
 export async function startTournament(tournamentId: string) {
   await dataOf(
     api.POST("/api/v1/leagues/{league_id}/tournaments/{tournament_id}/start", {
       ...at(tournamentId),
-      body: {
-        expected_draw_counter: (await setupOf(tournamentId)).draw_counter,
-      },
+      body: startBody(await setupOf(tournamentId)),
     }),
   );
 }

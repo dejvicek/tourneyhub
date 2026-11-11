@@ -175,7 +175,11 @@ export const tournamentHandlers = [
       if (!t) {
         return notFound(params);
       }
-      return failure(start(t, body.expected_draw_counter)) ?? tournamentRead(t);
+      return (
+        failure(
+          start(t, body.expected_draw_counter, body.expected_seed_order),
+        ) ?? tournamentRead(t)
+      );
     },
   ),
 

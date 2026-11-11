@@ -11,6 +11,7 @@ import {
   nth,
   pickPlayers,
   setupOf,
+  startBody,
   tournamentOf,
 } from "./setupTestHelpers";
 
@@ -201,7 +202,7 @@ describe("the fake API for tournament setup", () => {
       dataOf(
         api.POST(
           "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/start",
-          { ...at(id), body: { expected_draw_counter: expected } },
+          { ...at(id), body: startBody(setup, expected) },
         ),
       );
     const back = () =>
@@ -246,6 +247,39 @@ describe("the fake API for tournament setup", () => {
     ]);
   });
 
+  it("does not start from a seed order the review did not show (ADR-008)", async () => {
+    const id = await createDraft({ type: "singles", group_phase: "none" });
+    const setup = await pickPlayers(id, 6);
+    const shown = startBody(setup);
+    const [first, second, ...rest] = shown.expected_seed_order;
+    // another tab swaps seeds 1 and 2: the draw counter does not change
+    await dataOf(
+      api.PUT(
+        "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/seed-order",
+        {
+          ...at(id),
+          body: { entry_ids: [second ?? "", first ?? "", ...rest] },
+        },
+      ),
+    );
+    const start = (body: typeof shown) =>
+      dataOf(
+        api.POST(
+          "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/start",
+          { ...at(id), body },
+        ),
+      );
+
+    const stale = await failure(start(shown));
+    const untouched = await tournamentOf(id);
+    const started = await start(startBody(await setupOf(id)));
+
+    expect([stale.status, stale.code]).toEqual([409, "seed_order_changed"]);
+    expect(untouched.state).toBe("setup");
+    expect(untouched.rounds).toEqual([]);
+    expect(started.state).toBe("in_progress");
+  });
+
   it("previews the schedule that the start creates, and writes nothing (FR-035)", async () => {
     const id = await createDraft({ type: "singles", round_robin_legs: 2 });
     const setup = await pickPlayers(id, 5);
@@ -264,7 +298,10 @@ describe("the fake API for tournament setup", () => {
         "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/start",
         {
           ...at(id),
-          body: { expected_draw_counter: shown.draw_counter },
+          body: {
+            expected_draw_counter: shown.draw_counter,
+            expected_seed_order: shown.seed_order,
+          },
         },
       ),
     );
@@ -304,11 +341,11 @@ describe("the fake API for tournament setup", () => {
           at(id),
         ),
       );
-    const start = (id: string, expected: number) =>
+    const start = async (id: string, expected: number) =>
       dataOf(
         api.POST(
           "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/start",
-          { ...at(id), body: { expected_draw_counter: expected } },
+          { ...at(id), body: startBody(await setupOf(id), expected) },
         ),
       );
     await start(started, counter);
@@ -372,7 +409,7 @@ describe("the fake API for tournament setup", () => {
       return dataOf(
         api.POST(
           "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/start",
-          { ...at(id), body: { expected_draw_counter: setup.draw_counter } },
+          { ...at(id), body: startBody(setup) },
         ),
       );
     };
@@ -399,11 +436,11 @@ describe("the fake API for tournament setup", () => {
       group_phase: "none",
     });
     await pickPlayers(knockout, 6);
-    const run = (id: string, expected: number) =>
+    const run = async (id: string, expected: number) =>
       dataOf(
         api.POST(
           "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/start",
-          { ...at(id), body: { expected_draw_counter: expected } },
+          { ...at(id), body: startBody(await setupOf(id), expected) },
         ),
       );
 

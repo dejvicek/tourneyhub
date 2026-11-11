@@ -1056,6 +1056,7 @@ export function preview(t: StoredTournament): SchedulePreview {
   if (problem) {
     return {
       draw_counter: draft.drawCounter,
+      seed_order: [],
       can_start: false,
       problem: { code: problem.code, detail: problem.detail },
       rounds: [],
@@ -1085,6 +1086,7 @@ export function preview(t: StoredTournament): SchedulePreview {
         }));
   return {
     draw_counter: draft.drawCounter,
+    seed_order: seedOrderOf(t),
     can_start: true,
     problem: null,
     rounds: shown,
@@ -1140,9 +1142,18 @@ export function startProblem(t: StoredTournament): SetupFailure | null {
     : null;
 }
 
+/** The main entries' ids, seed 1 first: what the preview and the start agree on. */
+function seedOrderOf(t: StoredTournament): string[] {
+  return t.entries
+    .filter((entry) => entry.stage === "main")
+    .toSorted((a, b) => (a.seed ?? 0) - (b.seed ?? 0))
+    .map((entry) => entry.id);
+}
+
 export function start(
   t: StoredTournament,
   expectedCounter: number,
+  expectedSeedOrder: readonly string[],
 ): SetupFailure | null {
   const draft = draftOf(t);
   if (t.state !== "setup") {
@@ -1156,6 +1167,15 @@ export function start(
   const problem = startProblem(t);
   if (problem) {
     return problem;
+  }
+  // ADR-010: reordering the seeds by hand leaves the counter, so the start
+  // also carries the order the review showed.
+  const current = seedOrderOf(t);
+  if (
+    expectedSeedOrder.length !== current.length ||
+    current.some((id, index) => id !== expectedSeedOrder[index])
+  ) {
+    return fail(409, "seed_order_changed");
   }
   const phase = t.phases[0];
   if (!phase) {
