@@ -62,10 +62,18 @@ export function SitOutPointsField({
           value: String(value),
           label:
             value === fallback
-              ? t("tournaments.setup.format.sitOutOptionDefault", { value })
-              : String(value),
+              ? t("tournaments.setup.sitOut.pointsDefault", { count: value })
+              : sitOutLabel(t, value),
         }))}
         onValueChange={(next) => {
+          const picked = SIT_OUT_POINTS.find((value) => String(value) === next);
+          if (picked !== undefined) {
+            onPick(picked);
+          }
+        }}
+        onReselect={(next) => {
+          // Radix does not report a click on the checked option, so pinning a
+          // value that equals the default is told here (BR-071).
           const picked = SIT_OUT_POINTS.find((value) => String(value) === next);
           if (picked !== undefined) {
             onPick(picked);

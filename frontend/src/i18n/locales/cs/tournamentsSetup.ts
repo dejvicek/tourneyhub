@@ -101,6 +101,10 @@ export const tournamentsSetup: CsMessages<typeof english> = {
       points_few: "{{count}} body",
       points_many: "{{count}} bodu",
       points_other: "{{count}} bodů",
+      pointsDefault_one: "{{count}} bod (výchozí)",
+      pointsDefault_few: "{{count}} body (výchozí)",
+      pointsDefault_many: "{{count}} bodu (výchozí)",
+      pointsDefault_other: "{{count}} bodů (výchozí)",
     },
     pairName: "{{first}} & {{second}}",
     soFar: {
@@ -169,7 +173,6 @@ export const tournamentsSetup: CsMessages<typeof english> = {
       fieldsMore: "Více hřišť",
       sitOut: "Body za volno",
       sitOutHint: "Záleží jen tehdy, když někdo má volno.",
-      sitOutOptionDefault: "{{value}} (výchozí)",
       sitOutLikeDraw: "jako remíza",
       sitOutLikeWin: "jako výhra",
       sitOutDefault: "Výchozí pro zápasy {{format}}: {{points}}, {{like}}.",

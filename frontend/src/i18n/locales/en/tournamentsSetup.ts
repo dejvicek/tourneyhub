@@ -91,6 +91,8 @@ export const tournamentsSetup = {
     sitOut: {
       points_one: "{{count}} point",
       points_other: "{{count}} points",
+      pointsDefault_one: "{{count}} point (default)",
+      pointsDefault_other: "{{count}} points (default)",
     },
     pairName: "{{first}} & {{second}}",
     soFar: {
@@ -158,7 +160,6 @@ export const tournamentsSetup = {
       fieldsMore: "More fields",
       sitOut: "Points for sitting out",
       sitOutHint: "Only matters when someone sits out a round.",
-      sitOutOptionDefault: "{{value}} (default)",
       sitOutLikeDraw: "like a draw",
       sitOutLikeWin: "like a win",
       sitOutDefault:
