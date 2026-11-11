@@ -87,7 +87,11 @@ export function SeedingSection({ data }: { data: SetupData }) {
       )}
       {entries.length === 0 ? (
         <p className="text-body-md text-muted-foreground">
-          {t("tournaments.setup.draw.noEntries")}
+          {t(
+            data.setup.format.type === "dyp"
+              ? "tournaments.setup.draw.noEntriesDyp"
+              : "tournaments.setup.draw.noEntries",
+          )}
         </p>
       ) : (
         <ol
