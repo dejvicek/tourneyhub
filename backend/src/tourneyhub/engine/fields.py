@@ -1,15 +1,18 @@
-"""Fields: the waiting list and the matches that take free fields (BR-130 to BR-132).
+"""Fields: the waiting list, the matches that take free fields, and placing by hand.
 
-Field placements are stored; the application writes what `fill_fields`
-returns in the same transaction as the event that frees a field or makes a
-match playable. The waiting list is computed on every read (DATA-MODEL D10).
+Field placements are stored; the application writes what `fill_fields` and
+`place_by_hand` return in the same transaction as the event that frees a field
+or makes a match playable. The waiting list is computed on every read
+(DATA-MODEL D10). BR-130 to BR-134.
 """
 
-from collections.abc import Iterable
-from dataclasses import dataclass
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass, replace
 from datetime import datetime
 
+from tourneyhub.engine.errors import PlayerOnAnotherFieldError
 from tourneyhub.engine.ids import FieldId, MatchId, PlayerId, ensure_distinct
+from tourneyhub.engine.leagues import MAX_FIELD_COUNT
 from tourneyhub.engine.tournaments import MatchKind
 
 
@@ -164,3 +167,132 @@ def fill_fields(
         busy |= players[match.match_id]
         placements.append(Placement(field_id=field.field_id, match_id=match.match_id))
     return tuple(placements)
+
+
+def next_field_number(numbers: Iterable[int]) -> int | None:
+    """Return the number a new field gets: the lowest one no field has (BR-132).
+
+    Returns:
+        The lowest free number, or None when every number up to
+        `MAX_FIELD_COUNT` is taken.
+    """
+    taken = set(numbers)
+    return next((n for n in range(1, MAX_FIELD_COUNT + 1) if n not in taken), None)
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class HandPlacement:
+    """Where the organizer puts a match by hand (FR-093, BR-133).
+
+    Attributes:
+        match_id: The match.
+        field_id: The field it is played on, or None to send it back to
+            waiting.
+    """
+
+    match_id: MatchId
+    field_id: FieldId | None
+
+
+def _check_hand_placements(
+    matches: Sequence[MatchSlot],
+    fields: Sequence[FieldSlot],
+    placements: Sequence[HandPlacement],
+) -> None:
+    ensure_distinct(placement.match_id for placement in placements)
+    ensure_distinct(p.field_id for p in placements if p.field_id is not None)
+    by_id = {match.match_id: match for match in matches}
+    field_ids = {field.field_id for field in fields}
+    for placement in placements:
+        match = by_id.get(placement.match_id)
+        if match is None:
+            msg = f"unknown match {placement.match_id}"
+            raise ValueError(msg)
+        if match.has_result or match.has_bye or match.player_ids is None:
+            msg = f"match {match.match_id} cannot be played"
+            raise ValueError(msg)
+        if placement.field_id is not None and placement.field_id not in field_ids:
+            msg = f"unknown field {placement.field_id}"
+            raise ValueError(msg)
+
+
+def _refuse_players_on_two_fields(
+    matches: Sequence[MatchSlot], fields: Sequence[FieldSlot]
+) -> None:
+    """Raise when a player would be on two fields at once (BR-131)."""
+    players = {match.match_id: match.player_ids or frozenset() for match in matches}
+    fields_of: dict[PlayerId, list[FieldSlot]] = {}
+    for field in sorted(fields, key=lambda field: field.number):
+        if field.match_id is not None:
+            for player in players[field.match_id]:
+                fields_of.setdefault(player, []).append(field)
+    twice = {player: on for player, on in fields_of.items() if len(on) > 1}
+    if twice:
+        involved = {field.field_id: field for on in twice.values() for field in on}
+        raise PlayerOnAnotherFieldError(
+            player_ids=tuple(sorted(twice)),
+            field_ids=tuple(
+                field.field_id
+                for field in sorted(involved.values(), key=lambda f: f.number)
+            ),
+        )
+
+
+def place_by_hand(
+    *,
+    matches: Iterable[MatchSlot],
+    fields: Iterable[FieldSlot],
+    placements: Iterable[HandPlacement],
+) -> tuple[FieldSlot, ...]:
+    """Put matches where the organizer says, then fill the free fields (FR-093).
+
+    Every named match ends on its named field, or waiting when the field is
+    None; the other fields keep their matches. A move names one match and
+    its new field, a swap both matches with their new fields, so a repeat
+    changes nothing. A field that loses its match and is not named is free.
+
+    The free fields are then filled as by `fill_fields`, but not with a match
+    this request sends back to waiting: it waits in schedule order and can
+    take a field at the next fill. The filling never moves a match that is on
+    a field, so a placement by hand holds until the match has a result
+    (BR-133).
+
+    Returns:
+        Every field with its match afterwards, in the order of `fields`.
+
+    Raises:
+        PlayerOnAnotherFieldError: A player would be on two fields at once
+            (BR-131); nothing is placed.
+        ValueError: A match or a field is named twice or is unknown, a named
+            match has a result, a bye or a side not known yet, or a named
+            field keeps a match the request does not name: the caller checks
+            these first. Also as for `waiting_order`.
+    """
+    matches = tuple(matches)
+    fields = tuple(fields)
+    placements = tuple(placements)
+    _check(matches, fields)
+    _check_hand_placements(matches, fields, placements)
+    named = {placement.match_id for placement in placements}
+    target = {p.field_id: p.match_id for p in placements if p.field_id is not None}
+    placed: list[FieldSlot] = []
+    for field in fields:
+        kept = None if field.match_id in named else field.match_id
+        if field.field_id in target:
+            if kept is not None:
+                msg = f"field {field.field_id} keeps match {kept}"
+                raise ValueError(msg)
+            kept = target[field.field_id]
+        placed.append(replace(field, match_id=kept))
+    _refuse_players_on_two_fields(matches, placed)
+    sent_back = {p.match_id for p in placements if p.field_id is None}
+    filled = {
+        p.field_id: p.match_id
+        for p in fill_fields(
+            matches=[m for m in matches if m.match_id not in sent_back], fields=placed
+        )
+    }
+    return tuple(
+        replace(field, match_id=filled.get(field.field_id, field.match_id))
+        for field in placed
+    )

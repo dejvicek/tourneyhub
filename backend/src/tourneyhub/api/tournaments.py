@@ -1,3 +1,4 @@
+from dataclasses import asdict
 from datetime import date, datetime
 from http import HTTPStatus
 from typing import Annotated, Literal, Self
@@ -22,6 +23,8 @@ from tourneyhub.engine.leagues import (
     MAX_GOALS_PER_GAME,
     MAX_PLAYERS_PER_LEAGUE,
 )
+from tourneyhub.engine.results import MAX_GAMES, Game
+from tourneyhub.engine.standings import FormResult, RoundRobinTiebreaker
 from tourneyhub.engine.tournaments import (
     EntryKind,
     EntryStage,
@@ -41,7 +44,12 @@ from tourneyhub.engine.tournaments import (
 )
 from tourneyhub.errors import ErrorCode
 from tourneyhub.services import tournaments as tournament_service
-from tourneyhub.services.tournaments import DrawTarget, FormatRequest
+from tourneyhub.services.tournaments import (
+    DrawTarget,
+    FieldPlacement,
+    FormatRequest,
+    MatchResult,
+)
 
 router = APIRouter(
     prefix="/leagues/{league_id}",
@@ -80,6 +88,9 @@ type PlayerIds = Annotated[
     list[UUID], Field(max_length=MAX_PLAYERS_PER_LEAGUE), AfterValidator(_distinct)
 ]
 
+type SitOutPoints = Literal[0, 1, 2]
+"""The points of a sit-out (FR-039, BR-071)."""
+
 _GROUP_SETTINGS = ("round_robin_legs", "sit_out_points", "group_match_format")
 _KNOCKOUT_SETTINGS = (
     "knockout_match_format",
@@ -100,7 +111,8 @@ class _FormatChecks(RequestModel):
         Monster DYP always plays its own rounds, and no other type does. With a
         group phase, its settings apply; without one, the knockout's. With
         `complete`, every setting that applies must be given (`final_match_format`
-        may be null: the final plays the knockout's format).
+        may be null: the final plays the knockout's format; `sit_out_points` may
+        be null: the default of the match format, FR-039).
         """
         if (self.type is TournamentType.MONSTER_DYP) != (
             self.group_phase is GroupPhase.MONSTER_DYP
@@ -118,7 +130,11 @@ class _FormatChecks(RequestModel):
                 raise PydanticCustomError(
                     "setting_not_applicable", "a setting does not fit the phases"
                 )
-            if complete and name in applies - {"final_match_format"} and value is None:
+            if (
+                complete
+                and name in applies - {"final_match_format", "sit_out_points"}
+                and value is None
+            ):
                 raise PydanticCustomError("setting_missing", "a setting is missing")
         return self
 
@@ -132,10 +148,17 @@ class TournamentFormatWrite(_FormatChecks):
     the group phase's are null. `round_robin_legs` is only for a round robin.
     A setting that does not apply is 422 `validation_failed` with
     `setting_not_applicable`; one that applies and is missing, `setting_missing`.
+
+    `sit_out_points` is 0, 1 or 2 (FR-039, BR-071). A number is the organizer's
+    own choice and stays; null takes the default of the group phase's match
+    format and follows it (`sit_out_points_set_by_hand` false in the read).
+    Any number counts as a manual pick, even one equal to the default, so a
+    client that read the format must send null, not the read value, while
+    `sit_out_points_set_by_hand` is false to keep following the default.
     """
 
     round_robin_legs: Literal[1, 2] | None
-    sit_out_points: Literal[0, 1] | None
+    sit_out_points: SitOutPoints | None
     group_match_format: MatchFormat | None
     knockout_match_format: KnockoutMatchFormat | None
     final_match_format: KnockoutMatchFormat | None
@@ -154,12 +177,14 @@ class TournamentCreate(_FormatChecks):
     `id` is a UUIDv7 made by the client; a repeat gets the same tournament back
     (ADR-008). A setting left out or null takes the league's default: goals per
     game, the number of fields and the match format of the phase (FR-011); one
-    round robin leg, no sit-out points (FR-039) and no third-place match.
+    round robin leg, the default sit-out points of the match format (FR-039,
+    BR-071) and no third-place match. `sit_out_points` null follows the default;
+    any number counts as a manual pick.
     """
 
     id: UUID7
     round_robin_legs: Literal[1, 2] | None = None
-    sit_out_points: Literal[0, 1] | None = None
+    sit_out_points: SitOutPoints | None = None
     group_match_format: MatchFormat | None = None
     knockout_match_format: KnockoutMatchFormat | None = None
     final_match_format: KnockoutMatchFormat | None = None
@@ -241,14 +266,19 @@ class DrawWrite(RequestModel):
 
 
 class TournamentFormatRead(ResponseModel):
-    """The format as stored; settings that do not apply are null (FR-031)."""
+    """The format as stored; settings that do not apply are null (FR-031).
+
+    `sit_out_points_set_by_hand` tells whether the organizer chose the
+    sit-out points (true) or they are the default of the match format (false).
+    """
 
     name: str
     date: date
     type: TournamentType
     group_phase: GroupPhase
     round_robin_legs: Literal[1, 2] | None
-    sit_out_points: Literal[0, 1] | None
+    sit_out_points: SitOutPoints | None
+    sit_out_points_set_by_hand: bool | None
     group_match_format: MatchFormat | None
     knockout_match_format: KnockoutMatchFormat | None
     final_match_format: KnockoutMatchFormat | None
@@ -353,7 +383,8 @@ class PhaseRead(ResponseModel):
     kind: PhaseKind
     format: PhaseFormat
     round_robin_legs: Literal[1, 2] | None
-    sit_out_points: Literal[0, 1] | None
+    sit_out_points: SitOutPoints | None
+    sit_out_points_set_by_hand: bool
     tiebreakers: list[Tiebreaker] | None
     qualifiers: int | None
     third_place_match: bool | None
@@ -491,6 +522,192 @@ class BackToSetupWrite(RequestModel):
     """Back to setup, from the state the screen showed (FR-036, ADR-008)."""
 
     expected_state: Literal["in_progress"]
+
+
+class GameWrite(RequestModel):
+    """One game: its winner and both scores, or neither (FR-050, FR-051, BR-092).
+
+    Goals per game is a guide, not a rule: any whole number is a score (BR-123).
+    """
+
+    winner: Outcome
+    score_1: Annotated[int, Field(ge=0, le=INT_MAX)] | None
+    score_2: Annotated[int, Field(ge=0, le=INT_MAX)] | None
+
+
+class ResultWrite(RequestModel):
+    """A whole result, the target state (ADR-008): every game played, or a walkover.
+
+    A walkover names its winner and has no games (FR-052, BR-124). No walkover
+    and no games is the empty result, which clears the match's result (FR-053).
+    """
+
+    walkover_winner: Literal[Outcome.SIDE_1, Outcome.SIDE_2] | None
+    games: Annotated[list[GameWrite], Field(max_length=MAX_GAMES)]
+
+    @model_validator(mode="after")
+    def _walkover_has_no_games(self) -> Self:
+        if self.walkover_winner is not None and self.games:
+            raise PydanticCustomError("walkover_with_games", "a walkover has no games")
+        return self
+
+
+class BusyFieldRead(ResponseModel):
+    """A field holding players of a waiting match: why it waits (BR-131)."""
+
+    field_id: UUID
+    player_ids: list[UUID]
+
+
+class WaitingMatchRead(ResponseModel):
+    """A match waiting for a field, in the order it will get one (FR-092)."""
+
+    match_id: UUID
+    busy: list[BusyFieldRead]
+
+
+class PlayStandingRow(ResponseModel):
+    """One entry's line in the group-phase standings (BR-101, FR-060).
+
+    `place` is shared by entries still level (BR-074), and the next place
+    skips (BR-104). `points` include the sit-out points of every round sat
+    out whose matches all have results (BR-071). `form` lists the latest five
+    results, oldest first. `ahead_by` names what ranks the entry above the
+    next one when both have the same points, and is null when the points
+    decide or the place is shared. `bh1` and `bh2` are for Swiss and Monster
+    DYP, null in a round robin.
+    """
+
+    place: int
+    entry_id: UUID
+    played: int
+    won: int
+    drawn: int
+    lost: int
+    sat_out: int
+    points: int
+    score_difference: int
+    form: list[FormResult]
+    ahead_by: RoundRobinTiebreaker | None
+    bh1: int | None
+    bh2: int | None
+
+
+class PlayRead(ResponseModel):
+    """The running group phase, computed on read (ADR-009, FR-060, FR-092).
+
+    `waiting` is the waiting list: requeued matches first, then schedule order
+    (BR-130, BR-132). `standings` are the round robin's, best first; other
+    group formats have none yet. `group_done` says every group-phase match has
+    a result, so the organizer chooses: knockout or finish (FR-040).
+    """
+
+    waiting: list[WaitingMatchRead]
+    standings: list[PlayStandingRow]
+    group_done: bool
+
+
+class FieldCreate(RequestModel):
+    """A new field, with the number it expects to get: the lowest free one (BR-132).
+
+    The number is the expectation of ADR-008, so a repeat gets 409 instead of
+    a second field.
+    """
+
+    number: Annotated[int, Field(ge=1, le=MAX_FIELD_COUNT)]
+
+
+class PlacementWrite(RequestModel):
+    """A match on a field, or back to waiting when `field_id` is null (FR-093).
+
+    `from_field_id` is the field the screen saw the match on, null when it
+    saw it waiting. A match that is elsewhere now is 409 `placement_changed`.
+    """
+
+    match_id: UUID
+    field_id: UUID | None
+    from_field_id: UUID | None
+
+
+def _distinct_placements(placements: list[PlacementWrite]) -> list[PlacementWrite]:
+    _distinct([placement.match_id for placement in placements])
+    _distinct([p.field_id for p in placements if p.field_id is not None])
+    return placements
+
+
+class PlacementsWrite(RequestModel):
+    """Where matches are to be played, the target state (FR-093, ADR-008).
+
+    One placement puts a waiting match on a free field, moves a match to a
+    free field, or sends it back to waiting. A swap is two placements: both
+    matches, on fields, with each other's field. Nothing else is allowed
+    (422 `placement_not_allowed`). A match or a field named twice is 422
+    `validation_failed` (`given_twice`).
+    """
+
+    placements: Annotated[
+        list[PlacementWrite],
+        Field(min_length=1, max_length=2),
+        AfterValidator(_distinct_placements),
+    ]
+
+
+class FinishWrite(RequestModel):
+    """Finish the tournament, from the state the screen showed (FR-040, ADR-008)."""
+
+    expected_state: Literal["in_progress"]
+
+
+type PlaceReasonKind = Literal[
+    "won_final",
+    "lost_final",
+    "won_third_place",
+    "lost_third_place",
+    "lost_in_round",
+    "group_place",
+]
+type BracketRoundName = Literal["round_of_16", "quarterfinal", "semifinal", "final"]
+
+
+class PlaceReasonRead(ResponseModel):
+    """Why an entry has its place (§7.13).
+
+    After a group phase without a knockout it is `group_place`, with the
+    entry's place in the standings and the phase's format (BR-103). The
+    knockout's kinds, `round`, `score` (the entry's first) and the opponent
+    come with the knockout and are null until then.
+    """
+
+    kind: PlaceReasonKind
+    round: BracketRoundName | None
+    score: tuple[int, int] | None
+    opponent_entry_id: UUID | None
+    group_place: int | None
+    group_format: PhaseFormat | None
+
+
+class PlaceRead(ResponseModel):
+    """An entry's final place and the season points each of its players earns.
+
+    Entries sharing a place get the average of the places they cover,
+    rounded down; places beyond the season's table earn 0 (BR-110, BR-111).
+    """
+
+    place: int
+    entry_id: UUID
+    points_per_player: int
+    reason: PlaceReasonRead
+
+
+class PlacesRead(ResponseModel):
+    """The places of a tournament (§7.13, §7.14), computed on read (D1).
+
+    `complete` is true once the tournament is finished; before that `rows` is
+    empty. Rows come best place first.
+    """
+
+    complete: bool
+    rows: list[PlaceRead]
 
 
 @router.get("/seasons/{season_id}/tournaments")
@@ -830,6 +1047,255 @@ def draw_again(
         clock=clock,
     )
     return TournamentSetupRead.model_validate(setup)
+
+
+@router.put(
+    "/tournaments/{tournament_id}/matches/{match_id}/result", responses=_WRITE_ERRORS
+)
+def set_match_result(
+    league_id: UUID,
+    tournament_id: UUID,
+    match_id: UUID,
+    body: ResultWrite,
+    session: SessionDep,
+    user: CurrentUserDep,
+    clock: ClockDep,
+) -> MatchRead:
+    """Enter, replace or clear a match's result (FR-050 to FR-053, FR-094).
+
+    The body is the whole result, so a repeat changes nothing (ADR-008).
+    Entering one frees the match's field, which takes the next waiting match
+    (BR-130, BR-131). The empty result clears it: the match waits again, not
+    put back on its old field (BR-134), and a finished tournament is back in
+    progress (BR-095). The free fields are then filled, so the first match that
+    can be played takes one, the cleared match included.
+
+    A closed season is 409 `season_closed`. An unknown match is 404
+    `match_not_found`. A match whose sides are not both known is 422
+    `match_sides_unknown` (BR-091). A result that breaks a rule is 422:
+    `result_does_not_fit_format` (BR-121, detail `format` and `games`),
+    `draws_not_allowed` (BR-090), `game_score_mismatch` (BR-092, detail
+    `game_no`) or `scores_required` (Swiss and Monster DYP, detail `game_no`).
+    A walkover with games is 422 `validation_failed`.
+    """
+    match = tournament_service.set_match_result(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        match_id=match_id,
+        user_id=user.id,
+        result=MatchResult(
+            walkover_winner=body.walkover_winner,
+            games=tuple(
+                Game(winner=game.winner, score_1=game.score_1, score_2=game.score_2)
+                for game in body.games
+            ),
+        ),
+        clock=clock,
+    )
+    return MatchRead.model_validate(match)
+
+
+@router.get("/tournaments/{tournament_id}/play")
+def read_play(
+    league_id: UUID, tournament_id: UUID, session: SessionDep, user: CurrentUserDep
+) -> PlayRead:
+    """Return the waiting list, the live standings and whether the group phase is done.
+
+    Computed on read (FR-040, FR-060, FR-092). Another league's tournament is
+    404 `tournament_not_found`.
+    """
+    play = tournament_service.read_play(
+        session, league_id=league_id, tournament_id=tournament_id, user_id=user.id
+    )
+    return PlayRead(
+        waiting=[WaitingMatchRead.model_validate(match) for match in play.waiting],
+        standings=[
+            PlayStandingRow.model_validate(asdict(row) | {"bh1": None, "bh2": None})
+            for row in play.standings
+        ],
+        group_done=play.group_done,
+    )
+
+
+@router.post(
+    "/tournaments/{tournament_id}/fields",
+    status_code=HTTPStatus.CREATED,
+    responses=_WRITE_ERRORS,
+)
+def add_field(
+    league_id: UUID,
+    tournament_id: UUID,
+    body: FieldCreate,
+    session: SessionDep,
+    user: CurrentUserDep,
+    clock: ClockDep,
+) -> FieldRead:
+    """Add a field while the tournament runs (FR-090, BR-132).
+
+    The body carries the number the field expects to get, the lowest free
+    one. The new field takes the next waiting match at once; `match_id` is
+    null when no waiting match can be played.
+
+    A tournament in setup or finished is 409 `tournament_not_in_progress`
+    (detail `state`); setup sets the number of fields with the format. Any
+    other number, a repeat included, is 409 `field_number_changed` with the
+    `number` a new field would get now, null when all 32 are taken.
+    """
+    field = tournament_service.add_field(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user.id,
+        number=body.number,
+        clock=clock,
+    )
+    return FieldRead.model_validate(field)
+
+
+@router.delete(
+    "/tournaments/{tournament_id}/fields/{field_id}",
+    status_code=HTTPStatus.NO_CONTENT,
+    responses=_WRITE_ERRORS,
+)
+def remove_field(
+    league_id: UUID,
+    tournament_id: UUID,
+    field_id: UUID,
+    session: SessionDep,
+    user: CurrentUserDep,
+    clock: ClockDep,
+) -> None:
+    """Remove a field while the tournament runs; the UI asks first (FR-090, BR-132).
+
+    The other fields keep their numbers. The match on the removed field goes
+    to the front of the waiting list, so it takes the next field that frees
+    up, or a free one at once.
+
+    An unknown field, or a repeated delete, is 404 `field_not_found`: the
+    field is gone. A tournament not in progress is 409
+    `tournament_not_in_progress`. The last field is 422 `last_field`.
+    """
+    tournament_service.remove_field(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        field_id=field_id,
+        user_id=user.id,
+        clock=clock,
+    )
+
+
+@router.put("/tournaments/{tournament_id}/fields/placements", responses=_WRITE_ERRORS)
+def place_matches(
+    league_id: UUID,
+    tournament_id: UUID,
+    body: PlacementsWrite,
+    session: SessionDep,
+    user: CurrentUserDep,
+    clock: ClockDep,
+) -> TournamentRead:
+    """Place, move, swap or take off matches by hand (FR-093, BR-133).
+
+    Each named match ends on its named field, or waiting, from the field the
+    screen saw it on (`from_field_id`). A placement by hand holds until the
+    match has a result. A field a match leaves takes the next waiting match,
+    but not one this request sends back to waiting, which waits in schedule
+    order. Returns the whole
+    tournament with its fields and waiting list.
+
+    An unknown match is 404 `match_not_found`, an unknown field 404
+    `field_not_found`. A stale screen gets 409: `tournament_not_in_progress`,
+    `match_has_result` (detail `match_id`), `placement_changed` (a match is not
+    on the `from_field_id` any more) or `field_not_free` (another match is on
+    the field now; detail `field_id`, `match_id`). A match whose sides are not
+    both known, or with a bye, is 422 `match_sides_unknown` (BR-091). Anything
+    but the four operations of FR-093 (replacing the match on a field, a
+    rotation) is 422 `placement_not_allowed`.
+    A player who would be on two fields at once is 422
+    `player_on_another_field` (BR-131; detail `player_ids`, and `field_ids`,
+    the fields that would hold them, lowest number first).
+    """
+    tournament = tournament_service.place_matches(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user.id,
+        placements=[
+            FieldPlacement(
+                match_id=p.match_id,
+                field_id=p.field_id,
+                from_field_id=p.from_field_id,
+            )
+            for p in body.placements
+        ],
+        clock=clock,
+    )
+    return TournamentRead.model_validate(tournament)
+
+
+@router.post("/tournaments/{tournament_id}/finish", responses=_WRITE_ERRORS)
+def finish_tournament(
+    league_id: UUID,
+    tournament_id: UUID,
+    body: FinishWrite,  # noqa: ARG001  (only "in_progress" validates)
+    session: SessionDep,
+    user: CurrentUserDep,
+    clock: ClockDep,
+) -> TournamentRead:
+    """Finish a round robin without a knockout, once the UI has asked (FR-040).
+
+    A tournament that is not in progress is 409 `tournament_not_in_progress`
+    (detail `state`), so a repeat changes nothing. A match without a result is
+    422 `group_phase_not_done` (detail `matches_left`). A tournament with a
+    knockout, a Swiss or a Monster DYP is 422 `format_not_supported` for now.
+    The standings become the places (`GET …/places`).
+    """
+    tournament = tournament_service.finish_tournament(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user.id,
+        clock=clock,
+    )
+    return TournamentRead.model_validate(tournament)
+
+
+@router.get(
+    "/tournaments/{tournament_id}/places",
+    responses={HTTPStatus.UNPROCESSABLE_CONTENT: {"model": ErrorResponse}},
+)
+def read_places(
+    league_id: UUID, tournament_id: UUID, session: SessionDep, user: CurrentUserDep
+) -> PlacesRead:
+    """Return the places and the season points of a finished tournament (§7.13, §7.14).
+
+    Computed on read. Before the tournament finishes, `complete` is false and
+    there are no rows. A finished tournament with a knockout is 422
+    `format_not_supported` until the knockout is served.
+    """
+    places = tournament_service.read_places(
+        session, league_id=league_id, tournament_id=tournament_id, user_id=user.id
+    )
+    return PlacesRead(
+        complete=places.complete,
+        rows=[
+            PlaceRead(
+                place=row.place,
+                entry_id=row.entry_id,
+                points_per_player=row.points_per_player,
+                reason=PlaceReasonRead(
+                    kind="group_place",
+                    round=None,
+                    score=None,
+                    opponent_entry_id=None,
+                    group_place=row.group_place,
+                    group_format=places.group_format,
+                ),
+            )
+            for row in places.rows
+        ],
+    )
 
 
 def _format_request(body: TournamentFormatWrite | TournamentCreate) -> FormatRequest:

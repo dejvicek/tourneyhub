@@ -68,6 +68,7 @@ export const fields: CsMessages<Messages["fields"]> = {
     lastField: "Poslední hřiště nejde odebrat.",
     add: "Přidat hřiště",
     addHint: "Bude to hřiště {{number}} a dostane další zápas, který jde hrát.",
+    limit: "Turnaj může mít nejvýš {{max}} hřišť.",
     noticeTitle: "Odebrání hřiště, na kterém se hraje",
     noticeBody:
       "Zápas se vrátí na začátek čekajících. Ostatní hřiště si nechají svá čísla. Poslední hřiště nejde odebrat.",
@@ -83,8 +84,13 @@ export const fields: CsMessages<Messages["fields"]> = {
   },
   errors: {
     changed: "Hřiště se mezitím změnila. Byla znovu načtena.",
+    placementChanged: "Hřiště se mezitím změnila, obrazovka byla obnovena.",
+    notInProgress: "Turnaj už neprobíhá, například proto, že byl ukončen.",
+    fieldRemoved: "Toto hřiště už bylo odebráno. Hřiště byla znovu načtena.",
     twoFields: "Tím by hráč hrál na dvou hřištích najednou.",
     lastField: "Poslední hřiště nejde odebrat.",
+    sidesUnknown:
+      "Tenhle zápas zatím nejde hrát: jedna strana ještě není známá.",
     generic: "Hřiště se nepodařilo změnit. Zkuste to znovu.",
   },
 };

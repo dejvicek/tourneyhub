@@ -6,6 +6,7 @@ export const standings = {
     lead_many: "{{season}}, after {{count}} finished tournaments.",
     lead_other: "{{season}}, after {{count}} finished tournaments.",
     pick: "Season",
+    later: "Season standings arrive in a later version.",
     emptyTitle: "No finished tournaments yet",
     emptyBody:
       "Players appear here once a tournament of the season has finished and given out its points.",

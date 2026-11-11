@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 
 // The design's icons the play screens need (24 px, 2 px stroke), drawn here
-// until lucide-react is installed (docs/frontend-style.md §5.3). Hidden from
+// until lucide-react is installed (docs/style/frontend-style.md §5.3). Hidden from
 // assistive technology: the control around them carries the name.
 
 function Icon(props: ComponentProps<"svg">) {

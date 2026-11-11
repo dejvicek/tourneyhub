@@ -1,11 +1,12 @@
-"""Tournaments: setup, generate and start, back to setup, the read (FR-030 to FR-039).
+"""Tournaments: setup, start, results, fields, standings and finishing (FR-030 to FR-094).
 
 Every write locks the league row, then the tournament row (ADR-008), and loads
 every id it is given through them. A change to the entries discards the seeding
 and draws again where the inputs are complete, incrementing the draw counter
 (ADR-010). Starting creates the schedule with the engine and puts the first
 matches on the fields (FR-035, BR-130); going back to setup deletes it while no
-match has a result (FR-036).
+match has a result (FR-036). Results and placements by hand are whole target
+states (ADR-008); the standings and places are computed on read (ADR-009).
 """
 
 import secrets
@@ -23,6 +24,7 @@ from tourneyhub.db.models.entries import Entry, EntryMember, PlayerHalf
 from tourneyhub.db.models.leagues import League, Player, Season
 from tourneyhub.db.models.matches import (
     Match,
+    MatchGame,
     MatchSide,
     MatchSidePlayer,
     Round,
@@ -43,11 +45,21 @@ from tourneyhub.engine.dyp import (
     split_halves_by_ranking,
 )
 from tourneyhub.engine.errors import EngineError, NotEnoughPlayersError
-from tourneyhub.engine.fields import FieldSlot, MatchSlot, fill_fields, waiting_order
+from tourneyhub.engine.fields import (
+    FieldSlot,
+    HandPlacement,
+    MatchSlot,
+    fill_fields,
+    next_field_number,
+    place_by_hand,
+    waiting_order,
+)
 from tourneyhub.engine.ids import EntryId, FieldId, MatchId, PlayerId
 from tourneyhub.engine.leagues import SeasonState
 from tourneyhub.engine.lots import RNG_SEED_SIZE
+from tourneyhub.engine.places import PlacingEntry, place_entries
 from tourneyhub.engine.ranking import PlayerRecord, RankedPlayer, rank_league
+from tourneyhub.engine.results import Game, match_outcome
 from tourneyhub.engine.schedule import (
     MAX_ROUND_ROBIN_ENTRIES,
     ScheduledRound,
@@ -55,7 +67,14 @@ from tourneyhub.engine.schedule import (
     round_robin,
     seed_order,
 )
+from tourneyhub.engine.season_points import season_points
 from tourneyhub.engine.seeding import SeedingEntry, seed_by_lot, seed_by_ranking
+from tourneyhub.engine.standings import (
+    PlayedMatch,
+    StandingRow,
+    round_robin_standings,
+    standing_of,
+)
 from tourneyhub.engine.tournaments import (
     DEFAULT_TIEBREAKERS,
     EntryKind,
@@ -74,6 +93,7 @@ from tourneyhub.engine.tournaments import (
     Tiebreaker,
     TournamentState,
     TournamentType,
+    default_sit_out_points,
     group_phase_format,
     is_seeded,
 )
@@ -114,6 +134,7 @@ class TournamentFormat:
     group_phase: GroupPhase
     round_robin_legs: int | None
     sit_out_points: int | None
+    sit_out_points_set_by_hand: bool | None
     group_match_format: MatchFormat | None
     knockout_match_format: KnockoutMatchFormat | None
     final_match_format: KnockoutMatchFormat | None
@@ -127,8 +148,10 @@ class FormatRequest:
     """A format as a request gives it: None takes the league's default on create.
 
     `goals_per_game`, `field_count` and the applicable match format copy the
-    league's defaults (FR-030, DATA-MODEL §4.2); `round_robin_legs` is 1,
-    `sit_out_points` 0 (FR-039) and `third_place_match` false.
+    league's defaults (FR-030, DATA-MODEL §4.2); `round_robin_legs` is 1 and
+    `third_place_match` false. A `sit_out_points` of None takes the default of
+    the group phase's match format (FR-039, BR-071) and follows it; a number
+    is the organizer's own choice and stays.
     """
 
     name: str
@@ -317,9 +340,9 @@ def _ranking(
     """The league ranking of the players on the list, for this tournament (BR-020).
 
     The final lot uses the tournament's seed (ADR-010). Season points, wins and
-    last season's place come from finished tournaments, which cannot exist yet:
-    a tournament only finishes once it has been generated and played (FR-035,
-    FR-037), so every player has none.
+    last season's place come from finished tournaments through the season
+    standings, which come with the knockout (P10); until then every player has
+    none, although a round robin can finish (FR-040).
     """
     player_ids = session.scalars(
         select(Player.id).where(
@@ -360,6 +383,9 @@ def _format_of(tournament: Tournament) -> TournamentFormat:
         group_phase=GroupPhase.NONE if group is None else GroupPhase(group.format),
         round_robin_legs=None if group is None else group.round_robin_legs,
         sit_out_points=None if group is None else group.sit_out_points,
+        sit_out_points_set_by_hand=(
+            None if group is None else group.sit_out_points_set_by_hand
+        ),
         group_match_format=None if group is None else group.match_format,
         knockout_match_format=(
             None if knockout is None else KnockoutMatchFormat(knockout.match_format)
@@ -580,6 +606,7 @@ def _resolve_format(request: FormatRequest, league: League) -> TournamentFormat:
         group_phase=request.group_phase,
         round_robin_legs=None,
         sit_out_points=None,
+        sit_out_points_set_by_hand=None,
         group_match_format=None,
         knockout_match_format=None,
         final_match_format=None,
@@ -596,14 +623,18 @@ def _resolve_format(request: FormatRequest, league: League) -> TournamentFormat:
             third_place_match=bool(request.third_place_match),
         )
     else:
+        group_match_format = request.group_match_format or MatchFormat(default_format)
+        by_hand = request.sit_out_points is not None
         resolved = replace(
             base,
             round_robin_legs=(request.round_robin_legs or 1)
             if request.group_phase is GroupPhase.ROUND_ROBIN
             else None,
-            sit_out_points=request.sit_out_points or 0,
-            group_match_format=request.group_match_format
-            or MatchFormat(default_format),
+            sit_out_points=request.sit_out_points
+            if request.sit_out_points is not None
+            else default_sit_out_points(group_match_format),
+            sit_out_points_set_by_hand=by_hand,
+            group_match_format=group_match_format,
         )
     if resolved.group_match_format is MatchFormat.BO2 and not league.draws_allowed:
         raise RuleViolationError(ErrorCode.DRAWS_NOT_ALLOWED)
@@ -619,6 +650,7 @@ def _phase_settings(fmt: TournamentFormat) -> dict[str, object]:
             "format": PhaseFormat.SINGLE_ELIMINATION,
             "round_robin_legs": None,
             "sit_out_points": None,
+            "sit_out_points_set_by_hand": False,
             "third_place_match": fmt.third_place_match,
             "match_format": MatchFormat(fmt.knockout_match_format or MatchFormat.BO1),
             "final_match_format": fmt.final_match_format,
@@ -628,6 +660,7 @@ def _phase_settings(fmt: TournamentFormat) -> dict[str, object]:
         "format": group_format,
         "round_robin_legs": fmt.round_robin_legs,
         "sit_out_points": fmt.sit_out_points,
+        "sit_out_points_set_by_hand": fmt.sit_out_points_set_by_hand,
         "third_place_match": None,
         "match_format": fmt.group_match_format,
         "final_match_format": None,
@@ -1339,6 +1372,7 @@ class PhaseView:
     format: PhaseFormat
     round_robin_legs: int | None
     sit_out_points: int | None
+    sit_out_points_set_by_hand: bool
     tiebreakers: tuple[Tiebreaker, ...] | None
     qualifiers: int | None
     third_place_match: bool | None
@@ -1400,8 +1434,8 @@ class TournamentView:
     """The whole tournament: settings, entries, rounds, fields (ADR-009).
 
     `waiting` lists the matches waiting for a field in the order they get one,
-    computed on read (FR-092). Results, standings and places come later (P8,
-    P10); a tournament in setup has no rounds.
+    computed on read (FR-092). The standings and places have reads of their
+    own (`read_play`, `read_places`); a tournament in setup has no rounds.
     """
 
     id: UUID
@@ -1428,6 +1462,7 @@ def _phase_view(phase: TournamentPhase) -> PhaseView:
         format=phase.format,
         round_robin_legs=phase.round_robin_legs,
         sit_out_points=phase.sit_out_points,
+        sit_out_points_set_by_hand=phase.sit_out_points_set_by_hand,
         tiebreakers=None
         if phase.tiebreakers is None
         else tuple(Tiebreaker(t) for t in phase.tiebreakers),
@@ -1766,13 +1801,19 @@ def _insert_schedule(session: Session, rows: _ScheduleRows) -> None:
 def _fill_fields(
     tournament: Tournament, slots: Sequence[MatchSlot], now: datetime
 ) -> None:
-    """Put waiting matches on the free fields (BR-130, BR-131, DATA-MODEL §4.6)."""
+    """Put waiting matches on the free fields (BR-130, BR-131, DATA-MODEL §4.6).
+
+    A requeued match that takes a field is no longer requeued (BR-132).
+    """
     placements = fill_fields(matches=slots, fields=_field_slots(tournament))
     fields = {field.id: field for field in tournament.fields}
+    requeued = {slot.match_id for slot in slots if slot.requeued_at is not None}
     for placement in placements:
         field = fields[placement.field_id]
         field.match_id = placement.match_id
         field.updated_at = now
+        if placement.match_id in requeued:
+            _find_match(tournament, placement.match_id)[2].requeued_at = None
 
 
 def start_tournament(
@@ -1988,4 +2029,701 @@ def back_to_setup(
     session.flush()
     return read_tournament(
         session, league_id=league_id, tournament_id=tournament.id, user_id=user_id
+    )
+
+
+# ---------------------------------------------------------------- results
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class MatchResult:
+    """A whole result as the organizer sends it (ADR-008, FR-050 to FR-053).
+
+    A `walkover_winner` is a walkover, which has no games (FR-052, BR-124).
+    Neither a walkover nor games is the empty result: it clears the match.
+    """
+
+    walkover_winner: Outcome | None
+    games: tuple[Game, ...]
+
+    @property
+    def is_empty(self) -> bool:
+        return self.walkover_winner is None and not self.games
+
+
+def _require_open_season(league: League, tournament: Tournament) -> None:
+    """Refuse a change in a closed season (BR-011): 409 `season_closed`."""
+    season = next(s for s in league.seasons if s.id == tournament.season_id)
+    if season.state is SeasonState.CLOSED:
+        raise ConflictError(ErrorCode.SEASON_CLOSED)
+
+
+def _find_match(
+    tournament: Tournament, match_id: UUID
+) -> tuple[TournamentPhase, Round, Match]:
+    """A match of the tournament with its phase and round, else 404 (ADR-008)."""
+    for phase in tournament.phases:
+        for round_ in phase.rounds:
+            for match in round_.matches:
+                if match.id == match_id:
+                    return phase, round_, match
+    raise NotFoundError(ErrorCode.MATCH_NOT_FOUND)
+
+
+def _match_format(phase: TournamentPhase, round_: Round, match: Match) -> MatchFormat:
+    """The format a match plays: its phase's, or the final's own (BR-120).
+
+    The final is the standard match of the bracket's last round (D4).
+    """
+    is_final = (
+        phase.kind is PhaseKind.KNOCKOUT
+        and match.kind is MatchKind.STANDARD
+        and round_.round_no == max(r.round_no for r in phase.rounds)
+    )
+    if is_final and phase.final_match_format is not None:
+        return MatchFormat(phase.final_match_format)
+    return phase.match_format
+
+
+def _outcome_of(
+    result: MatchResult,
+    *,
+    league: League,
+    phase: TournamentPhase,
+    round_: Round,
+    match: Match,
+) -> Outcome:
+    """The outcome a result makes, checked against the match's rules (BR-090 to BR-124)."""
+    if result.walkover_winner is not None:
+        return result.walkover_winner
+    try:
+        return match_outcome(
+            result.games,
+            match_format=_match_format(phase, round_, match),
+            draws_allowed=league.draws_allowed and phase.kind is PhaseKind.GROUP,
+            scores_required=phase.format
+            in {PhaseFormat.SWISS, PhaseFormat.MONSTER_DYP},
+        )
+    except EngineError as err:
+        raise to_app_error(err) from err
+
+
+def _same_result(match: Match, result: MatchResult, outcome: Outcome) -> bool:
+    stored = [(game.winner, game.score_1, game.score_2) for game in match.games]
+    sent = [(game.winner, game.score_1, game.score_2) for game in result.games]
+    return (
+        match.outcome is outcome
+        and match.is_walkover == (result.walkover_winner is not None)
+        and stored == sent
+    )
+
+
+def set_match_result(
+    session: Session,
+    *,
+    league_id: UUID,
+    tournament_id: UUID,
+    match_id: UUID,
+    user_id: UUID,
+    result: MatchResult,
+    clock: Clock,
+) -> MatchView:
+    """Enter, replace or clear a match's result, the target state (FR-050 to FR-053).
+
+    The result is checked against the match's format, the draw rule and the
+    scores (`engine.results`). Entering it sets the result time, frees the
+    match's field and fills the free fields (FR-094, BR-130, BR-131); a waiting
+    match never takes a field once it has a result. A result equal to the
+    stored one changes nothing, the time included, so a repeat is harmless.
+
+    The empty result clears it: the match waits again like any other, not
+    put back on its old field (BR-134), and a finished tournament is back in
+    progress (BR-095). The free fields are then filled as after any result, so
+    the first match that can be played takes one (BR-130), the cleared match
+    included. Clearing a match without a result changes nothing.
+
+    A closed season is 409 `season_closed` (BR-011); an unknown match, or one
+    of another tournament, 404 `match_not_found`; a match whose sides are not
+    both known, or that has a bye, 422 `match_sides_unknown` (BR-091). The
+    knockout's result lock (BR-053, BR-094) comes with the knockout.
+    """
+    league, tournament = _lock_tournament(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user_id,
+        rounds=True,
+    )
+    _require_open_season(league, tournament)
+    phase, round_, match = _find_match(tournament, match_id)
+    if _known_players(match) is None or any(side.is_bye for side in match.sides):
+        raise RuleViolationError(ErrorCode.MATCH_SIDES_UNKNOWN)
+    now = clock()
+    if result.is_empty:
+        _clear_result(tournament, match, now)
+    else:
+        outcome = _outcome_of(
+            result, league=league, phase=phase, round_=round_, match=match
+        )
+        if not _same_result(match, result, outcome):
+            _write_result(session, tournament, match, result, outcome, now)
+    session.flush()
+    ranking = _ranking(session, league=league, tournament=tournament)
+    members = {
+        entry.id: entry.player_ids for entry in _setup_of(tournament, ranking).entries
+    }
+    return _match_view(match, members)
+
+
+def _clear_result(tournament: Tournament, match: Match, now: datetime) -> None:
+    if match.outcome is None:
+        return
+    match.games.clear()
+    match.outcome = None
+    match.is_walkover = False
+    match.result_entered_at = None
+    if tournament.state is TournamentState.FINISHED:
+        tournament.state = TournamentState.IN_PROGRESS
+        tournament.updated_at = now
+    # The match waits in schedule order like any other (BR-134); a free field
+    # takes the first match that can be played (BR-130), which can be this one.
+    _fill_fields(tournament, _match_slots(tournament), now)
+
+
+def _write_result(
+    session: Session,
+    tournament: Tournament,
+    match: Match,
+    result: MatchResult,
+    outcome: Outcome,
+    now: datetime,
+) -> None:
+    match.games.clear()
+    session.flush()  # the old games go before new ones take their numbers
+    match.games.extend(
+        MatchGame(
+            game_no=game_no,
+            winner=game.winner,
+            score_1=game.score_1,
+            score_2=game.score_2,
+            created_at=now,
+        )
+        for game_no, game in enumerate(result.games, start=1)
+    )
+    match.outcome = outcome
+    match.is_walkover = result.walkover_winner is not None
+    match.result_entered_at = now
+    match.requeued_at = None
+    for field in tournament.fields:
+        if field.match_id == match.id:
+            field.match_id = None
+            field.updated_at = now
+    _fill_fields(tournament, _match_slots(tournament), now)
+
+
+# ---------------------------------------------------------------- play
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class BusyField:
+    """A field that holds players of a waiting match (BR-131)."""
+
+    field_id: UUID
+    player_ids: tuple[UUID, ...]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class WaitingMatch:
+    """A match waiting for a field, with the fields its players are on (FR-092)."""
+
+    match_id: UUID
+    busy: tuple[BusyField, ...]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class PlayView:
+    """The running group phase as the play screens read it, computed on read.
+
+    `standings` are the round robin's (BR-101); other group formats have
+    none yet. `group_done` says every group-phase match has a result (FR-040).
+    """
+
+    waiting: tuple[WaitingMatch, ...]
+    standings: tuple[StandingRow, ...]
+    group_done: bool
+
+
+def _group_phase(tournament: Tournament) -> TournamentPhase | None:
+    return next((p for p in tournament.phases if p.kind is PhaseKind.GROUP), None)
+
+
+def _played_match(match: Match) -> PlayedMatch:
+    """A round-robin match with its result, as the standings read it."""
+    side_1, side_2 = (side.entry_id for side in match.sides)
+    if side_1 is None or side_2 is None or match.outcome is None:
+        msg = f"match {match.id} has no result between two entries"
+        raise ValueError(msg)
+    return PlayedMatch(
+        side_1=EntryId(side_1),
+        side_2=EntryId(side_2),
+        outcome=match.outcome,
+        scores=tuple(
+            (game.score_1, game.score_2)
+            for game in match.games
+            if game.score_1 is not None and game.score_2 is not None
+        ),
+    )
+
+
+def _standings_of(
+    tournament: Tournament, phase: TournamentPhase
+) -> tuple[StandingRow, ...]:
+    """The round robin's standings now (BR-070, BR-071, BR-101).
+
+    A sit-out counts once every match of its round has a result: the schedule
+    holds every round from the start, and a sit-out in a round still to come
+    must not earn its point yet.
+    """
+    main = sorted(
+        _main_entries(tournament), key=lambda e: (e.seed is None, e.seed or 0, e.id)
+    )
+    return round_robin_standings(
+        (EntryId(entry.id) for entry in main),
+        matches=[
+            _played_match(match)
+            for round_ in phase.rounds
+            for match in round_.matches
+            if match.outcome is not None
+        ],
+        sit_outs=[
+            EntryId(row.entry_id)
+            for round_ in phase.rounds
+            if all(match.outcome is not None for match in round_.matches)
+            for row in round_.participation
+            if row.status is Participation.SAT_OUT
+        ],
+        sit_out_points=phase.sit_out_points or 0,
+    )
+
+
+def _load_tournament(
+    session: Session, *, league: League, tournament_id: UUID
+) -> Tournament:
+    """A tournament of the league with its rounds, read without a lock."""
+    tournament = session.scalars(
+        _tournament_query(league, tournament_id, rounds=True)
+    ).one_or_none()
+    if tournament is None:
+        raise NotFoundError(ErrorCode.TOURNAMENT_NOT_FOUND)
+    return tournament
+
+
+def read_play(
+    session: Session, *, league_id: UUID, tournament_id: UUID, user_id: UUID
+) -> PlayView:
+    """Return the waiting list, the standings and the phase's end (FR-040, FR-060, FR-092).
+
+    Read without a lock. Each waiting match names the fields its players are
+    on, which is why it waits (BR-131). A field that points at a match the read
+    did not see counts as free.
+    """
+    league = get_league(session, league_id=league_id, user_id=user_id)
+    tournament = _load_tournament(session, league=league, tournament_id=tournament_id)
+    slots = _match_slots(tournament)
+    players = {slot.match_id: slot.player_ids or frozenset() for slot in slots}
+    # The tournament is read in separate queries, so a write that commits between
+    # them can leave a field pointing at a match that was not loaded; such a field
+    # counts as free instead of failing the read.
+    fields = [
+        replace(field, match_id=None)
+        if field.match_id is not None and field.match_id not in players
+        else field
+        for field in sorted(_field_slots(tournament), key=lambda f: f.number)
+    ]
+    on_fields = [
+        (field.field_id, players[field.match_id])
+        for field in fields
+        if field.match_id is not None
+    ]
+    waiting = tuple(
+        WaitingMatch(
+            match_id=slot.match_id,
+            busy=tuple(
+                BusyField(field_id=field_id, player_ids=tuple(sorted(shared)))
+                for field_id, on_field in on_fields
+                if (shared := players[slot.match_id] & on_field)
+            ),
+        )
+        for slot in waiting_order(matches=slots, fields=fields)
+    )
+    group = _group_phase(tournament)
+    round_robin = group is not None and group.format is PhaseFormat.ROUND_ROBIN
+    return PlayView(
+        waiting=waiting,
+        standings=_standings_of(tournament, group) if group and round_robin else (),
+        group_done=group is not None and bool(group.rounds) and _is_done(group),
+    )
+
+
+# ---------------------------------------------------------------- fields
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FieldPlacement:
+    """A match placed by hand: on a field, or back to waiting with no field (FR-093).
+
+    `from_field_id` is the field the screen saw the match on, None for waiting.
+    """
+
+    match_id: UUID
+    field_id: UUID | None
+    from_field_id: UUID | None
+
+
+def _lock_running(
+    session: Session, *, league_id: UUID, tournament_id: UUID, user_id: UUID
+) -> Tournament:
+    """Lock a tournament in progress, with its rounds, for a change to its fields.
+
+    Fields are added, removed and given matches while the tournament runs
+    (FR-090); in setup or once finished it is 409 `tournament_not_in_progress`.
+    """
+    _, tournament = _lock_tournament(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user_id,
+        rounds=True,
+    )
+    if tournament.state is not TournamentState.IN_PROGRESS:
+        raise ConflictError(
+            ErrorCode.TOURNAMENT_NOT_IN_PROGRESS, state=tournament.state
+        )
+    return tournament
+
+
+def add_field(
+    session: Session,
+    *,
+    league_id: UUID,
+    tournament_id: UUID,
+    user_id: UUID,
+    number: int,
+    clock: Clock,
+) -> FieldView:
+    """Add a field; it takes the next waiting match at once (FR-090, BR-132).
+
+    The request carries the number it expects the field to get, the lowest
+    free one (ADR-008). Any other number, a repeat included, is 409
+    `field_number_changed` with the `number` a new field would get now, null
+    once every number up to 32 is taken.
+    """
+    tournament = _lock_running(
+        session, league_id=league_id, tournament_id=tournament_id, user_id=user_id
+    )
+    expected = next_field_number(field.number for field in tournament.fields)
+    if number != expected:
+        raise ConflictError(ErrorCode.FIELD_NUMBER_CHANGED, number=expected)
+    now = clock()
+    field = Field(id=uuid7(), number=number, created_at=now)
+    tournament.fields.append(field)
+    _fill_fields(tournament, _match_slots(tournament), now)
+    session.flush()
+    return FieldView(id=field.id, number=field.number, match_id=field.match_id)
+
+
+def remove_field(
+    session: Session,
+    *,
+    league_id: UUID,
+    tournament_id: UUID,
+    field_id: UUID,
+    user_id: UUID,
+    clock: Clock,
+) -> None:
+    """Remove a field by its id; the others keep their numbers (FR-090, BR-132).
+
+    The match on it goes to the front of the waiting list (`requeued_at`),
+    and the free fields are filled, so it can take another free field at
+    once. An unknown field, one of another tournament or a repeated delete is
+    404 `field_not_found`; the last field is 422 `last_field`.
+    """
+    tournament = _lock_running(
+        session, league_id=league_id, tournament_id=tournament_id, user_id=user_id
+    )
+    field = next((f for f in tournament.fields if f.id == field_id), None)
+    if field is None:
+        raise NotFoundError(ErrorCode.FIELD_NOT_FOUND)
+    if len(tournament.fields) == 1:
+        raise RuleViolationError(ErrorCode.LAST_FIELD)
+    now = clock()
+    if field.match_id is not None:
+        _find_match(tournament, field.match_id)[2].requeued_at = now
+    tournament.fields.remove(field)
+    session.flush()  # the field lets go of its match before another field takes it
+    _fill_fields(tournament, _match_slots(tournament), now)
+    session.flush()
+
+
+def _check_placements(
+    tournament: Tournament, placements: Sequence[FieldPlacement]
+) -> None:
+    """Refuse placements the current state does not allow (ADR-008, FR-093).
+
+    Unknown ids are 404. A match with a result, a match that is not where the
+    screen saw it (`from_field_id`) or a field that holds a match the request
+    does not name only reach here from a stale screen: 409. A side not known
+    yet, or a bye, is 422 `match_sides_unknown` (BR-091). Of what is left,
+    only the four operations of FR-093 are allowed (`_refuse_other_operations`).
+    """
+    fields = {field.id: field for field in tournament.fields}
+    named = {placement.match_id for placement in placements}
+    found = [
+        (_find_match(tournament, placement.match_id)[2], placement)
+        for placement in placements
+    ]
+    if any(p.field_id is not None and p.field_id not in fields for p in placements):
+        raise NotFoundError(ErrorCode.FIELD_NOT_FOUND)
+    for match, _ in found:
+        if match.outcome is not None:
+            raise ConflictError(ErrorCode.MATCH_HAS_RESULT, match_id=str(match.id))
+        if _known_players(match) is None or any(side.is_bye for side in match.sides):
+            raise RuleViolationError(ErrorCode.MATCH_SIDES_UNKNOWN)
+    seen = {f.match_id: f.id for f in tournament.fields if f.match_id is not None}
+    if any(seen.get(p.match_id) != p.from_field_id for p in placements):
+        raise ConflictError(ErrorCode.PLACEMENT_CHANGED)
+    for placement in placements:
+        if placement.field_id is None:
+            continue
+        held = fields[placement.field_id].match_id
+        if held is not None and held not in named:
+            raise ConflictError(
+                ErrorCode.FIELD_NOT_FREE,
+                field_id=str(placement.field_id),
+                match_id=str(held),
+            )
+    _refuse_other_operations(placements)
+
+
+def _refuse_other_operations(placements: Sequence[FieldPlacement]) -> None:
+    """Allow only the four operations of FR-093, else 422 `placement_not_allowed`.
+
+    A waiting match on a free field, a match from its field to a free field,
+    a match back to waiting, and a swap of two matches that are both on
+    fields. Replacing the match on a field and a rotation are not allowed
+    until the PRD decides whether they should exist. A free target field is
+    checked before (`field_not_free`), so a single placement only has to
+    change something.
+    """
+    if len(placements) == 1:
+        (only,) = placements
+        allowed = only.field_id != only.from_field_id
+    else:
+        first, second = placements
+        allowed = (
+            first.from_field_id is not None
+            and second.from_field_id is not None
+            and first.field_id == second.from_field_id
+            and second.field_id == first.from_field_id
+        )
+    if not allowed:
+        raise RuleViolationError(ErrorCode.PLACEMENT_NOT_ALLOWED)
+
+
+def _store_fields(
+    session: Session,
+    tournament: Tournament,
+    placed: Iterable[FieldSlot],
+    now: datetime,
+) -> None:
+    """Write each field's match; a match that takes a field is no longer requeued."""
+    rows = {field.id: field for field in tournament.fields}
+    changed = [
+        (rows[slot.field_id], slot.match_id)
+        for slot in placed
+        if rows[slot.field_id].match_id != slot.match_id
+    ]
+    if not changed:
+        return
+    for field, _ in changed:
+        field.match_id = None
+    # A match moving to another field leaves the old one first: `fields.match_id`
+    # is unique, and a swap would hold one match on two fields in between.
+    session.flush()
+    for field, match_id in changed:
+        field.match_id = match_id
+        field.updated_at = now
+        if match_id is not None:
+            _find_match(tournament, match_id)[2].requeued_at = None
+
+
+def place_matches(
+    session: Session,
+    *,
+    league_id: UUID,
+    tournament_id: UUID,
+    user_id: UUID,
+    placements: Sequence[FieldPlacement],
+    clock: Clock,
+) -> TournamentView:
+    """Place, move, swap or take off matches by hand, the target state (FR-093).
+
+    Each named match ends on its named field, or waiting without one; a swap
+    names both matches with their new fields (ADR-008). A field that a match leaves and that is not named takes the
+    next waiting match, but not one this request sends back to waiting: that
+    one waits in schedule order (DATA-MODEL §4.6). The filling never moves a
+    match on a field, so a placement by hand holds until its result (BR-133).
+
+    Refusals: `_check_placements`, then 422 `player_on_another_field` when a
+    player would be on two fields at once (BR-131).
+    """
+    tournament = _lock_running(
+        session, league_id=league_id, tournament_id=tournament_id, user_id=user_id
+    )
+    _check_placements(tournament, placements)
+    try:
+        placed = place_by_hand(
+            matches=_match_slots(tournament),
+            fields=_field_slots(tournament),
+            placements=[
+                HandPlacement(
+                    match_id=MatchId(p.match_id),
+                    field_id=None if p.field_id is None else FieldId(p.field_id),
+                )
+                for p in placements
+            ],
+        )
+    except EngineError as err:
+        raise to_app_error(err) from err
+    _store_fields(session, tournament, placed, clock())
+    session.flush()
+    return read_tournament(
+        session, league_id=league_id, tournament_id=tournament.id, user_id=user_id
+    )
+
+
+# ---------------------------------------------------------------- finishing
+
+
+def _require_group_only(tournament: Tournament) -> TournamentPhase:
+    """The round robin of a tournament without a knockout (FR-040).
+
+    A knockout finishes by itself (FR-037), and Swiss and Monster DYP are not
+    played yet: 422 `format_not_supported` until they are.
+    """
+    group = _group_phase(tournament)
+    last = tournament.phases[-1]
+    if group is not last or group.format is not PhaseFormat.ROUND_ROBIN:
+        raise RuleViolationError(ErrorCode.FORMAT_NOT_SUPPORTED, format=last.format)
+    return group
+
+
+def finish_tournament(
+    session: Session,
+    *,
+    league_id: UUID,
+    tournament_id: UUID,
+    user_id: UUID,
+    clock: Clock,
+) -> TournamentView:
+    """Finish a round robin without a knockout; the UI asks first (FR-040, FR-037).
+
+    The request expects the tournament in progress; in any other state it is
+    409 `tournament_not_in_progress`, so a repeat changes nothing (ADR-008). A
+    match still without a result is 422 `group_phase_not_done` (detail
+    `matches_left`). The standings become the places, and the places earn
+    season points; both are computed on read (`read_places`, D1).
+    """
+    _, tournament = _lock_tournament(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user_id,
+        rounds=True,
+    )
+    if tournament.state is not TournamentState.IN_PROGRESS:
+        raise ConflictError(
+            ErrorCode.TOURNAMENT_NOT_IN_PROGRESS, state=tournament.state
+        )
+    group = _require_group_only(tournament)
+    left = sum(
+        match.outcome is None for round_ in group.rounds for match in _played(round_)
+    )
+    if left:
+        raise RuleViolationError(ErrorCode.GROUP_PHASE_NOT_DONE, matches_left=left)
+    tournament.state = TournamentState.FINISHED
+    tournament.updated_at = clock()
+    session.flush()
+    return read_tournament(
+        session, league_id=league_id, tournament_id=tournament.id, user_id=user_id
+    )
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class PlaceView:
+    """An entry's final place and what each of its players earns (BR-100, BR-110).
+
+    `group_place` is its place in the group-phase standings; without a
+    knockout the two are the same (BR-103).
+    """
+
+    place: int
+    entry_id: UUID
+    points_per_player: int
+    group_place: int
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class PlacesView:
+    """The places of a finished tournament; none before it finishes."""
+
+    complete: bool
+    group_format: PhaseFormat | None
+    rows: tuple[PlaceView, ...]
+
+
+def read_places(
+    session: Session, *, league_id: UUID, tournament_id: UUID, user_id: UUID
+) -> PlacesView:
+    """Return the places and season points of a finished tournament (§7.13, §7.14).
+
+    Read without a lock and computed on read (D1): the round robin's
+    standings are the places (BR-101, BR-103), and each player earns the
+    placement points of their place from the season's table, entries sharing
+    a place the average of the places they cover, rounded down (BR-110,
+    BR-111). A tournament not yet finished has no places. One with a knockout
+    is 422 `format_not_supported` until the knockout is played.
+    """
+    league = get_league(session, league_id=league_id, user_id=user_id)
+    tournament = _load_tournament(session, league=league, tournament_id=tournament_id)
+    if tournament.state is not TournamentState.FINISHED:
+        return PlacesView(complete=False, group_format=None, rows=())
+    group = _require_group_only(tournament)
+    standings = _standings_of(tournament, group)
+    entries = [
+        PlacingEntry(
+            entry_id=EntryId(entry.id),
+            player_ids=tuple(PlayerId(m.player_id) for m in entry.members),
+        )
+        for entry in _main_entries(tournament)
+    ]
+    places = place_entries(entries, standing=standing_of(standings))
+    season = next(s for s in league.seasons if s.id == tournament.season_id)
+    points = {
+        row.entry_id: row.points
+        for row in season_points(places, season.placement_points)
+    }
+    group_place = {row.entry_id: row.place for row in standings}
+    return PlacesView(
+        complete=True,
+        group_format=group.format,
+        rows=tuple(
+            PlaceView(
+                place=place.place,
+                entry_id=place.entry_id,
+                points_per_player=points.get(place.entry_id, 0),
+                group_place=group_place[place.entry_id],
+            )
+            for place in places
+        ),
     )

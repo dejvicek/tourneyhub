@@ -495,8 +495,7 @@ export function rankingOf(t: StoredTournament): RankingRead {
       },
     ]),
   );
-  const sitOutPoints =
-    group?.sit_out_points === 1 ? rules.sitOutPointsWhenOn : 0;
+  const sitOutPoints = group?.sit_out_points ?? 0;
   const opponents = new Map<string, string[]>();
   const membersOf = (side: MatchSideRead): string[] => [
     ...new Set(
@@ -615,7 +614,7 @@ function groupOrder(
     return roundRobinStandings(
       t.entries.filter((entry) => entry.stage === "main").map((e) => e.id),
       roundsOf(t, group),
-      group.sit_out_points === 1 ? rules.sitOutPointsWhenOn : 0,
+      group.sit_out_points ?? 0,
     ).map(({ entry_id, place }) => ({ entry_id, place }));
   }
   return rankingOf(t).rows.map(({ entry_id, place }) => ({ entry_id, place }));

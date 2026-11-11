@@ -2,12 +2,14 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 
+import type { components } from "@/api/schema";
 import { Button } from "@/components/ui/button";
-import type { FieldRead } from "@/demo/contract";
 import { FieldBadge } from "@/features/tournaments/play/FieldBadge";
 import type { PlayModel } from "@/features/tournaments/play/model";
 import { useNames } from "@/features/tournaments/play/useNames";
 import { cn } from "@/lib/utils";
+
+type FieldRead = components["schemas"]["FieldRead"];
 
 interface FieldCardProps {
   model: PlayModel;

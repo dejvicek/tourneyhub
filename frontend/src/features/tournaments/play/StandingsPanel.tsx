@@ -1,10 +1,12 @@
 import { useTranslation } from "react-i18next";
 
-import type { PlayRead } from "@/demo/contract";
+import type { components } from "@/api/schema";
 
 import type { PlayModel } from "./model";
 import { StandingsNotes } from "./StandingsNotes";
 import { StandingsTable } from "./StandingsTable";
+
+type PlayRead = components["schemas"]["PlayRead"];
 
 /** Live group-phase standings with the tie-break note (screens 6, 6b, FR-060). */
 export function StandingsPanel({

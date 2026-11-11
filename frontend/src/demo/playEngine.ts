@@ -8,12 +8,13 @@
 import { newId } from "@/lib/newId";
 
 import type {
+  ErrorResponse,
   FieldRead,
   FormResult,
   MatchFormat,
   MatchRead,
   PhaseRead,
-  PlacementWrite,
+  PlacementsWrite,
   PlayRead,
   PlayStandingRow,
   ResultWrite,
@@ -21,14 +22,15 @@ import type {
   TournamentStandingRow,
 } from "./contract";
 import { fillFields } from "./engine";
-import { MATCH_POINTS, type RoundRobinTiebreaker, rules } from "./rules";
+import { MATCH_POINTS, rules } from "./rules";
 import type { StoredTournament } from "./seed";
 import { tournamentStandings } from "./store";
 
-/** A refusal with the rule it breaks, answered as 422 or 409 (ADR-008). */
+/** A refusal with the API's code, answered as 404, 409 or 422 (ADR-008). */
 export interface PlayRefusal {
   status: 404 | 409 | 422;
-  detail: Record<string, string | number | string[]>;
+  code: ErrorResponse["code"];
+  detail: Record<string, string | number | string[] | null>;
 }
 
 // DATA-MODEL §4.5 `requeued_at`: a match whose field was removed waits ahead
@@ -116,41 +118,72 @@ export function fill(t: StoredTournament, except: readonly string[] = []) {
   }
 }
 
-/** Players who would be on two fields at once (BR-131). */
+/**
+ * Players who would be on two fields at once, with the fields that would
+ * hold them, lowest number first (BR-131).
+ */
 function doubleBooked(
   t: StoredTournament,
   fields: readonly FieldRead[],
-): string[] {
-  const seen = new Set<string>();
-  const twice = new Set<string>();
+): { playerIds: string[]; fieldIds: string[] } {
+  const on = new Map<string, FieldRead[]>();
   for (const field of fields) {
     const match =
       field.match_id === null ? undefined : findMatch(t, field.match_id);
     for (const player of match ? playerIds(match) : []) {
-      if (seen.has(player)) {
-        twice.add(player);
-      }
-      seen.add(player);
+      on.set(player, [...(on.get(player) ?? []), field]);
     }
   }
-  return [...twice];
+  const twice = [...on].filter(([, held]) => held.length > 1);
+  const involved = new Map(
+    twice.flatMap(([, held]) => held.map((f) => [f.id, f] as const)),
+  );
+  return {
+    playerIds: twice.map(([player]) => player).toSorted(),
+    fieldIds: [...involved.values()]
+      .toSorted((a, b) => a.number - b.number)
+      .map((f) => f.id),
+  };
+}
+
+/**
+ * The four operations of FR-093: a waiting match on a free field, a match
+ * to a free field, a match back to waiting, a swap of two matches that are
+ * both on fields. Replacing and rotating are not allowed (ADR-008).
+ */
+function isAllowed(placements: PlacementsWrite["placements"]): boolean {
+  const [first, second] = placements;
+  if (first === undefined) {
+    return false;
+  }
+  if (second === undefined) {
+    return first.field_id !== first.from_field_id;
+  }
+  return (
+    first.from_field_id !== null &&
+    second.from_field_id !== null &&
+    first.field_id === second.from_field_id &&
+    second.field_id === first.from_field_id
+  );
 }
 
 /**
  * Places, moves, swaps or takes off matches as the request states (FR-093,
  * BR-133). Refuses a match with a result or an unknown side (BR-091), a
- * field another match keeps, and any player on two fields (BR-131).
+ * match that is not on the field the screen saw it on, a field another
+ * match keeps, anything but the operations of FR-093, and any player on two
+ * fields (BR-131).
  */
 export function place(
   t: StoredTournament,
-  { placements }: PlacementWrite,
+  { placements }: PlacementsWrite,
 ): PlayRefusal | null {
   const moved = new Set(placements.map((p) => p.match_id));
   const targets = placements.flatMap((p) =>
     p.field_id === null ? [] : [p.field_id],
   );
   if (new Set(targets).size !== targets.length) {
-    return { status: 422, detail: { reason: "same_field_twice" } };
+    return { status: 422, code: "validation_failed", detail: {} };
   }
   const fields = t.fields.map((field) => ({
     ...field,
@@ -159,35 +192,47 @@ export function place(
         ? null
         : field.match_id,
   }));
-  for (const { match_id, field_id } of placements) {
+  for (const { match_id, field_id, from_field_id } of placements) {
     const match = findMatch(t, match_id);
     if (!match) {
-      return { status: 404, detail: { match_id } };
+      return { status: 404, code: "match_not_found", detail: {} };
     }
     if (match.outcome !== null) {
-      return { status: 422, detail: { match_id, reason: "has_result" } };
+      return { status: 409, code: "match_has_result", detail: { match_id } };
     }
     if (!sidesKnown(match)) {
-      return { status: 422, detail: { match_id, rule: "BR-091" } };
+      return { status: 422, code: "match_sides_unknown", detail: {} };
+    }
+    const seenOn = t.fields.find((f) => f.match_id === match_id)?.id ?? null;
+    if (seenOn !== from_field_id) {
+      return { status: 409, code: "placement_changed", detail: {} };
     }
     if (field_id === null) {
       continue;
     }
     const field = fields.find((f) => f.id === field_id);
     if (!field) {
-      return { status: 404, detail: { field_id } };
+      return { status: 404, code: "field_not_found", detail: {} };
     }
     if (field.match_id !== null) {
       // A swap names both matches; a field kept by another match is stale.
-      return { status: 409, detail: { field_id, reason: "field_busy" } };
+      return {
+        status: 409,
+        code: "field_not_free",
+        detail: { field_id, match_id: field.match_id },
+      };
     }
     field.match_id = match_id;
   }
+  if (!isAllowed(placements)) {
+    return { status: 422, code: "placement_not_allowed", detail: {} };
+  }
   const twice = doubleBooked(t, fields);
-  if (twice.length > 0) {
+  if (twice.playerIds.length > 0) {
     return {
       status: 422,
-      detail: { rule: "BR-131", player_ids: twice },
+      code: "player_on_another_field",
+      detail: { player_ids: twice.playerIds, field_ids: twice.fieldIds },
     };
   }
   t.fields = fields;
@@ -221,7 +266,11 @@ export function addField(
 ): FieldRead | PlayRefusal {
   const expected = nextFieldNumber(t);
   if (number !== expected) {
-    return { status: 409, detail: { number, expected } };
+    return {
+      status: 409,
+      code: "field_number_changed",
+      detail: { number: expected },
+    };
   }
   const field: FieldRead = { id: newId(), number, match_id: null };
   t.fields = [...t.fields, field].sort((a, b) => a.number - b.number);
@@ -239,10 +288,10 @@ export function removeField(
 ): PlayRefusal | null {
   const field = t.fields.find((f) => f.id === fieldId);
   if (!field) {
-    return { status: 404, detail: { field_id: fieldId } };
+    return { status: 404, code: "field_not_found", detail: {} };
   }
   if (t.fields.length === 1) {
-    return { status: 422, detail: { rule: "BR-132", reason: "last_field" } };
+    return { status: 422, code: "last_field", detail: {} };
   }
   const match =
     field.match_id === null ? undefined : findMatch(t, field.match_id);
@@ -285,34 +334,38 @@ export function scoresRequired(phase: PhaseRead): boolean {
 
 const GAMES_TO_WIN = { bo1: 1, bo2: 2, bo3: 2, bo5: 3 } as const;
 
+/** Why the backend would refuse a result: its 422 code and detail (ADR-008). */
+export interface ResultRefusal {
+  code: ErrorResponse["code"];
+  detail: Record<string, string | number>;
+}
+
 /**
  * Checks a whole result against the format, the draw rule and the scores
- * (BR-090, BR-092, BR-121, BR-124); null when it may be saved.
+ * (BR-090, BR-092, BR-121, BR-124) with the backend's codes; null when it
+ * may be saved.
  */
 export function checkResult(
   body: ResultWrite,
   format: MatchFormat,
   phase: PhaseRead,
   drawsAllowed: boolean,
-): PlayRefusal | null {
-  const refuse = (rule: string, reason: string): PlayRefusal => ({
-    status: 422,
-    detail: { rule, reason },
-  });
+): ResultRefusal | null {
   if (body.walkover_winner !== null) {
-    return body.games.length === 0 ? null : refuse("BR-124", "walkover_games");
+    return body.games.length === 0
+      ? null
+      : { code: "validation_failed", detail: { rule: "BR-124" } };
   }
+  const unfit: ResultRefusal = {
+    code: "result_does_not_fit_format",
+    detail: { format, games: body.games.length },
+  };
   const drawAllowed = phase.kind === "group" && drawsAllowed;
   const wins = { side_1: 0, side_2: 0 };
   for (const [index, game] of body.games.entries()) {
     const { score_1: a, score_2: b } = game;
-    if ((a === null) !== (b === null)) {
-      return refuse("BR-092", "one_score");
-    }
+    const gameNo = { game_no: index + 1 };
     if (a !== null && b !== null) {
-      if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || b < 0) {
-        return refuse("BR-092", "not_a_score");
-      }
       const agrees =
         game.winner === "draw"
           ? a === b
@@ -320,58 +373,107 @@ export function checkResult(
             ? a > b
             : b > a;
       if (!agrees) {
-        return refuse("BR-092", "score_disagrees");
+        return { code: "game_score_mismatch", detail: gameNo };
       }
+    } else if (a !== null || b !== null) {
+      return { code: "game_score_mismatch", detail: gameNo };
     } else if (scoresRequired(phase)) {
-      return refuse("BR-092", "scores_required");
+      return { code: "scores_required", detail: gameNo };
     }
+  }
+  for (const game of body.games) {
     if (game.winner === "draw") {
-      if (format !== "bo1" || !drawAllowed) {
-        return refuse("BR-090", "draw_not_allowed");
+      if (format !== "bo1") {
+        return unfit;
       }
       continue;
     }
-    const need = GAMES_TO_WIN[format];
-    if (format !== "bo2" && Math.max(wins.side_1, wins.side_2) >= need) {
-      return refuse("BR-121", "game_after_decided");
+    if (
+      format !== "bo2" &&
+      Math.max(wins.side_1, wins.side_2) >= GAMES_TO_WIN[format]
+    ) {
+      return unfit;
     }
     wins[game.winner] += 1;
-    if (format === "bo2" && index > 1) {
-      return refuse("BR-121", "too_many_games");
-    }
   }
   const played = body.games.length;
+  const draw = { code: "draws_not_allowed", detail: {} } as const;
   switch (format) {
     case "bo1":
-      return played === 1 ? null : refuse("BR-121", "games_count");
+      if (played !== 1) {
+        return unfit;
+      }
+      return body.games[0]?.winner === "draw" && !drawAllowed ? draw : null;
     case "bo2":
       if (played !== 2) {
-        return refuse("BR-121", "games_count");
+        return unfit;
       }
-      return wins.side_1 === wins.side_2 && !drawAllowed
-        ? refuse("BR-090", "draw_not_allowed")
-        : null;
+      return wins.side_1 === wins.side_2 && !drawAllowed ? draw : null;
     case "bo3":
     case "bo5":
       return Math.max(wins.side_1, wins.side_2) === GAMES_TO_WIN[format]
         ? null
-        : refuse("BR-121", "not_decided");
+        : unfit;
   }
 }
 
+type Outcome = NonNullable<MatchRead["outcome"]>;
+
+/** The outcome a checked result makes: the walkover's winner, else the games' majority. */
+function outcomeOf(body: ResultWrite): Outcome {
+  if (body.walkover_winner !== null) {
+    return body.walkover_winner;
+  }
+  const wins = { side_1: 0, side_2: 0, draw: 0 };
+  for (const game of body.games) {
+    wins[game.winner] += 1;
+  }
+  return wins.side_1 > wins.side_2
+    ? "side_1"
+    : wins.side_2 > wins.side_1
+      ? "side_2"
+      : "draw";
+}
+
+/** The backend's `_same_result`: the stored outcome, walkover and games equal the sent ones. */
+function sameResult(
+  match: MatchRead,
+  body: ResultWrite,
+  outcome: Outcome,
+): boolean {
+  return (
+    match.outcome === outcome &&
+    match.is_walkover === (body.walkover_winner !== null) &&
+    match.games.length === body.games.length &&
+    match.games.every((stored, i) => {
+      const sent = body.games[i];
+      return (
+        stored.winner === sent?.winner &&
+        stored.score_1 === sent.score_1 &&
+        stored.score_2 === sent.score_2
+      );
+    })
+  );
+}
+
 /**
- * Writes a checked result, or clears it when the body is empty (FR-053).
- * A result frees the match's field, which takes the next match (FR-094); a
- * cleared match waits like any other and is not placed again (BR-134). A
- * cleared result reopens a finished tournament (BR-095).
+ * Writes a checked result, or clears it when the body is empty (FR-053), as
+ * the backend does. A result equal to the stored one changes nothing, the time
+ * included. A new one frees the match's field, which takes the next match
+ * (FR-094). Clearing a match without a result changes nothing; clearing one
+ * with a result leaves it waiting in schedule order, not put back on its
+ * field, and the free fields are filled (BR-134, BR-130). It reopens a
+ * finished tournament (BR-095).
  */
 export function writeResult(
   t: StoredTournament,
   match: MatchRead,
   body: ResultWrite,
 ): void {
-  requeuedAt.delete(match);
   if (body.walkover_winner === null && body.games.length === 0) {
+    if (match.outcome === null) {
+      return;
+    }
     match.outcome = null;
     match.is_walkover = false;
     match.games = [];
@@ -379,21 +481,17 @@ export function writeResult(
     if (t.state === "finished") {
       t.state = "in_progress";
     }
+    fill(t);
     return;
   }
-  const wins = { side_1: 0, side_2: 0, draw: 0 };
-  for (const game of body.games) {
-    wins[game.winner] += 1;
+  const outcome = outcomeOf(body);
+  if (sameResult(match, body, outcome)) {
+    return;
   }
+  requeuedAt.delete(match);
   match.is_walkover = body.walkover_winner !== null;
   match.games = body.games.map((game, i) => ({ game_no: i + 1, ...game }));
-  match.outcome =
-    body.walkover_winner ??
-    (wins.side_1 > wins.side_2
-      ? "side_1"
-      : wins.side_2 > wins.side_1
-        ? "side_2"
-        : "draw");
+  match.outcome = outcome;
   match.result_entered_at = new Date().toISOString();
   t.fields = t.fields.map((field) =>
     field.match_id === match.id ? { ...field, match_id: null } : field,
@@ -406,6 +504,11 @@ function groupMatches(t: StoredTournament): MatchRead[] {
   return scheduleOrder(t).filter(
     (match) => phaseOf(t, match)?.id === group?.id && sidesKnown(match),
   );
+}
+
+/** Group-phase matches without a result (FR-040). */
+export function groupMatchesLeft(t: StoredTournament): number {
+  return groupMatches(t).filter((m) => m.outcome === null).length;
 }
 
 /** Every group-phase match has a result (FR-040). */
@@ -466,8 +569,7 @@ function swissStandings(
   t: StoredTournament,
   group: PhaseRead,
 ): Omit<PlayStandingRow, "form" | "ahead_by">[] {
-  const sitOutPoints =
-    group.sit_out_points === 1 ? rules.sitOutPointsWhenOn : 0;
+  const sitOutPoints = group.sit_out_points ?? 0;
   const rows = new Map<string, SwissRow>(
     t.entries
       .filter((entry) => entry.stage === "main")
@@ -603,7 +705,7 @@ function aheadBy(
   rows: readonly TournamentStandingRow[],
   row: TournamentStandingRow,
   next: TournamentStandingRow | undefined,
-): RoundRobinTiebreaker | null {
+): PlayStandingRow["ahead_by"] {
   if (next?.points !== row.points || next.place === row.place) {
     return null;
   }

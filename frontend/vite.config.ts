@@ -43,7 +43,7 @@ export default defineConfig(({ mode }) => {
           codeSplitting: {
             // One chunk per feature folder, the router's lazy areas: each
             // chunk is a request that can fail on a weak connection
-            // (docs/frontend-style.md §9).
+            // (docs/style/frontend-style.md §9).
             groups: [
               {
                 debugName: "feature areas",

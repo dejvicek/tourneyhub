@@ -160,7 +160,7 @@ function Review({ data }: { data: SetupData }) {
           </SummaryRow>
           {!noGroup && (
             <SummaryRow label={t("tournaments.setup.summary.sitOut")}>
-              {sitOutLabel(t, format.sit_out_points === 1)}
+              {sitOutLabel(t, format.sit_out_points)}
             </SummaryRow>
           )}
           <SummaryRow label={t("tournaments.setup.summary.knockout")}>

@@ -9,6 +9,8 @@ interface SegmentedControlProps<Value extends string> {
   value: Value;
   options: readonly { value: Value; label: string }[];
   onValueChange: (value: Value) => void;
+  /** The checked option was clicked, or Space or Enter pressed on it. */
+  onReselect?: (value: Value) => void;
   className?: string;
 }
 
@@ -22,6 +24,7 @@ export function SegmentedControl<Value extends string>({
   value,
   options,
   onValueChange,
+  onReselect,
   className,
 }: SegmentedControlProps<Value>) {
   const labelId = useId();
@@ -49,7 +52,18 @@ export function SegmentedControl<Value extends string>({
           <RadioGroupPrimitive.Item
             key={option.value}
             value={option.value}
-            className="inline-flex h-11 min-w-0 flex-1 items-center justify-center rounded-md px-2 text-body-sm text-nav-active-foreground outline-hidden focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[state=checked]:bg-card data-[state=checked]:font-bold data-[state=checked]:text-card-foreground"
+            onClick={() => {
+              if (option.value === value) {
+                onReselect?.(option.value);
+              }
+            }}
+            onKeyDown={(event) => {
+              // Radix keeps Enter from checking; it still means "this one".
+              if (event.key === "Enter" && option.value === value) {
+                onReselect?.(option.value);
+              }
+            }}
+            className="inline-flex min-h-11 min-w-0 flex-1 items-center justify-center rounded-md px-2 py-1 text-center text-body-sm text-nav-active-foreground outline-hidden focus-visible:ring-[3px] focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[state=checked]:bg-card data-[state=checked]:font-bold data-[state=checked]:text-card-foreground"
           >
             {option.label}
           </RadioGroupPrimitive.Item>

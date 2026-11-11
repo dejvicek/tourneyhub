@@ -90,9 +90,9 @@ export const results: CsMessages<Messages["results"]> = {
   clear: {
     open: "Smazat výsledek",
     title: "Smazat tento výsledek?",
-    body: "{{match}} se vrátí mezi čekající. Na hřiště půjde, až se nějaké uvolní.",
+    body: "{{match}} se vrátí mezi čekající. Hned půjde na volné hřiště, pokud jeho hráči nehrají jinde.",
     bodyFinished:
-      "{{match}} se vrátí mezi čekající a ukončený turnaj se znovu otevře.",
+      "{{match}} se vrátí mezi čekající a hned půjde na volné hřiště. Ukončený turnaj se znovu otevře.",
     cancel: "Ponechat",
     confirm: "Smazat výsledek",
   },
@@ -109,8 +109,13 @@ export const results: CsMessages<Messages["results"]> = {
   errors: {
     draw: "Remízy tu nejsou povolené.",
     scores: "Zadejte góly obou stran v každé hře.",
+    mismatch:
+      "Ve hře {{game}} góly neodpovídají vítězi: vítěz dá víc gólů, remíza stejně.",
+    format: "Tyto hry nedávají výsledek v tomto formátu zápasu.",
     locked: "Po vylosování vyřazovací fáze jsou výsledky skupiny zamčené.",
     lockedKnockout: "Pozdější zápas už má výsledek. Nejdřív smažte ten.",
+    seasonClosed:
+      "Sezóna byla mezitím uzavřena. Její výsledky už nejdou změnit.",
     changed: "Zápas se mezitím změnil. Byl znovu načten.",
     generic:
       "Výsledek se nepodařilo uložit. Zkontrolujte ho a zkuste to znovu.",

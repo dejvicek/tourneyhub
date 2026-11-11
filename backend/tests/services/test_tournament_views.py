@@ -1,12 +1,23 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid7
 
+import pytest
+from sqlalchemy.orm import Session
+
+from tourneyhub.db.models.leagues import League
 from tourneyhub.db.models.matches import Match, MatchSide, MatchSidePlayer, Round
-from tourneyhub.db.models.tournaments import Tournament, TournamentPhase
+from tourneyhub.db.models.tournaments import Field, Tournament, TournamentPhase
 from tourneyhub.engine.ids import PlayerId
-from tourneyhub.engine.tournaments import MatchKind
+from tourneyhub.engine.tournaments import (
+    KnockoutMatchFormat,
+    MatchFormat,
+    MatchKind,
+    PhaseKind,
+)
+from tourneyhub.services import tournaments as tournament_service
 from tourneyhub.services.tournaments import (
     SideView,
+    _match_format,
     _match_slots,
     _match_view,
 )
@@ -98,3 +109,89 @@ def test_d2_a_bye_and_a_team_without_an_entry_are_known_sides() -> None:
     assert _match_slots(_tournament(played))[0].player_ids == frozenset(
         {PlayerId(one), PlayerId(other)}
     )
+
+
+def _knockout(final_format: KnockoutMatchFormat | None) -> TournamentPhase:
+    rounds = [
+        Round(
+            id=uuid7(),
+            round_no=round_no,
+            created_at=NOW,
+            matches=[
+                Match(id=uuid7(), position=1, kind=kind, created_at=NOW)
+                for kind in kinds
+            ],
+        )
+        for round_no, kinds in (
+            (1, (MatchKind.STANDARD, MatchKind.STANDARD)),
+            (2, (MatchKind.STANDARD, MatchKind.THIRD_PLACE)),
+        )
+    ]
+    return TournamentPhase(
+        id=uuid7(),
+        position=1,
+        kind=PhaseKind.KNOCKOUT,
+        match_format=MatchFormat.BO3,
+        final_match_format=final_format,
+        rounds=rounds,
+    )
+
+
+@pytest.mark.parametrize(
+    ("final_format", "round_no", "kind", "expected"),
+    [
+        pytest.param(
+            KnockoutMatchFormat.BO5, 2, MatchKind.STANDARD, MatchFormat.BO5, id="final"
+        ),
+        pytest.param(
+            KnockoutMatchFormat.BO5,
+            2,
+            MatchKind.THIRD_PLACE,
+            MatchFormat.BO3,
+            id="third-place",
+        ),
+        pytest.param(
+            KnockoutMatchFormat.BO5, 1, MatchKind.STANDARD, MatchFormat.BO3, id="semi"
+        ),
+        pytest.param(None, 2, MatchKind.STANDARD, MatchFormat.BO3, id="no-own"),
+    ],
+)
+def test_br120_the_final_plays_its_own_format(
+    final_format: KnockoutMatchFormat | None,
+    round_no: int,
+    kind: MatchKind,
+    expected: MatchFormat,
+) -> None:
+    phase = _knockout(final_format)
+    round_ = phase.rounds[round_no - 1]
+    match = next(m for m in round_.matches if m.kind is kind)
+
+    assert _match_format(phase, round_, match) is expected
+
+
+def test_d10_a_field_pointing_at_a_match_the_read_did_not_see_counts_as_free(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The play read runs under READ COMMITTED, in separate queries (FR-092)."""
+    one, two, three, four = uuid7(), uuid7(), uuid7(), uuid7()
+    match = _match(_side(1, players=(one,)), _side(2, players=(two,)))
+    other = _match(_side(1, players=(three,)), _side(2, players=(four,)))
+    tournament = _tournament(match)
+    tournament.phases[0].rounds[0].matches.append(other)
+    tournament.fields = [
+        Field(id=uuid7(), number=1, match_id=uuid7()),  # a match that was not loaded
+        Field(id=uuid7(), number=2, match_id=other.id),
+    ]
+    monkeypatch.setattr(
+        tournament_service, "get_league", lambda *_, **__: League(id=uuid7())
+    )
+    monkeypatch.setattr(
+        tournament_service, "_load_tournament", lambda *_, **__: tournament
+    )
+
+    play = tournament_service.read_play(
+        Session(), league_id=uuid7(), tournament_id=tournament.id, user_id=uuid7()
+    )
+
+    assert [waiting.match_id for waiting in play.waiting] == [match.id]
+    assert play.waiting[0].busy == ()

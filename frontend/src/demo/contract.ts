@@ -88,18 +88,11 @@ export interface TournamentStandingRow {
 }
 
 // ---------------------------------------------------------------- results
+// A whole result, every game or a walkover (ADR-008, P8): generated. The
+// empty result clears it.
 
-export interface GameWrite {
-  winner: Outcome;
-  score_1: number | null;
-  score_2: number | null;
-}
-
-/** A whole result, every game or a walkover, never one game (ADR-008). */
-export interface ResultWrite {
-  walkover_winner: Side | null;
-  games: GameWrite[];
-}
+export type GameWrite = components["schemas"]["GameWrite"];
+export type ResultWrite = components["schemas"]["ResultWrite"];
 
 // ---------------------------------------------------------------- paths
 
@@ -140,7 +133,6 @@ interface Put<P, B, R> {
 
 type Season = Params<{ league_id: Uuid; season_id: Uuid }>;
 type Tournament = Params<{ league_id: Uuid; tournament_id: Uuid }>;
-type Match = Params<{ league_id: Uuid; tournament_id: Uuid; match_id: Uuid }>;
 
 /** Routes the demo serves that the generated schema does not have yet. */
 export interface ProvisionalPaths {
@@ -152,16 +144,6 @@ export interface ProvisionalPaths {
   // players: the unfinished tournaments a player is in, which block a removal (BR-002)
   "/api/v1/leagues/{league_id}/players/{player_id}/tournaments": {
     get: Get<Params<{ league_id: Uuid; player_id: Uuid }>, TournamentSummary[]>;
-  };
-
-  // tournaments
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/standings": {
-    get: Get<Tournament, TournamentStandingRow[]>;
-  };
-
-  // results
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/matches/{match_id}/result": {
-    put: Put<Match, ResultWrite, MatchRead>;
   };
 
   // public: the league, a season's tournaments and a tournament are
@@ -252,60 +234,23 @@ export type DemoPaths = MergePaths<
 
 // ================================================================ play
 // The running group phase, its fields and its end (screens 6–8, FR-040,
-// FR-060, FR-090–FR-094). Owned by the play screens; other areas append
-// their own sections. These declarations merge into ProvisionalPaths above.
+// FR-060, FR-090–FR-094): all generated now. Owned by the play screens;
+// other areas append their own sections, which merge into ProvisionalPaths
+// above.
 
-/** A match waiting for a field, in the order it will get one (FR-092). */
-export interface WaitingMatchRead {
-  match_id: Uuid;
-  /** The match's players who are on a field now, by field (BR-131). */
-  busy: { field_id: Uuid; player_ids: Uuid[] }[];
-}
+// The play read, finishing and the places (P8): generated. The play read's
+// standings serve every format's Standings tab (FR-060).
+export type WaitingMatchRead = components["schemas"]["WaitingMatchRead"];
+export type PlayStandingRow = components["schemas"]["PlayStandingRow"];
+export type FormResult = PlayStandingRow["form"][number];
+export type PlayRead = components["schemas"]["PlayRead"];
+export type FinishWrite = components["schemas"]["FinishWrite"];
 
-export type FormResult = "won" | "drawn" | "lost";
-
-export interface PlayStandingRow extends TournamentStandingRow {
-  /** The entry's last five results, oldest first. */
-  form: FormResult[];
-  /**
-   * The tie-breaker that ranks this entry above the next one, level on
-   * points (BR-101); null when points decide or the place is shared.
-   */
-  ahead_by: import("./rules").RoundRobinTiebreaker | null;
-  /** Swiss and Monster DYP (BR-073); null in a round robin. */
-  bh1: number | null;
-  bh2: number | null;
-}
-
-/**
- * What the running group phase looks like now, computed on read (ADR-009).
- * Its standings serve every format's Standings tab (FR-060).
- */
-export interface PlayRead {
-  /** Requeued matches first, then schedule order (BR-130, BR-132). */
-  waiting: WaitingMatchRead[];
-  standings: PlayStandingRow[];
-  /** Every group-phase match has a result: knockout or finish (FR-040). */
-  group_done: boolean;
-}
-
-/**
- * Field placements as target states (ADR-008, DATA-MODEL §4.6): a match on
- * a field, or waiting (`field_id: null`). A swap names both matches.
- */
-export interface PlacementWrite {
-  placements: { match_id: Uuid; field_id: Uuid | null }[];
-}
-
-/** A new field carries the number it expects to get, the lowest free one (BR-132). */
-export interface FieldCreate {
-  number: number;
-}
-
-/** Finishing carries the state it expects (ADR-008); a repeat gets 409. */
-export interface FinishWrite {
-  expected_state: "in_progress";
-}
+// Fields (P9): generated. Placements are target states (ADR-008,
+// DATA-MODEL §4.6): a match on a field, or waiting (`field_id: null`); a swap
+// names both matches. A new field carries the number it expects to get.
+export type PlacementsWrite = components["schemas"]["PlacementsWrite"];
+export type FieldCreate = components["schemas"]["FieldCreate"];
 
 // ================================================================ finals
 // Screens 9–13 and the season standings tab: knockout bracket, places,
@@ -368,31 +313,10 @@ export interface BracketRead {
   rounds: BracketRound[];
 }
 
-export interface PlaceReason {
-  kind:
-    | "won_final"
-    | "lost_final"
-    | "won_third_place"
-    | "lost_third_place"
-    | "lost_in_round"
-    | "group_place";
-  round: BracketRoundName | null;
-  /** The entry's score first. */
-  score: [number, number] | null;
-  opponent_entry_id: Uuid | null;
-  group_place: number | null;
-  group_format: PhaseRead["format"] | null;
-}
-
-export interface PlaceDetail extends PlaceRow {
-  reason: PlaceReason;
-}
-
-export interface PlacesRead {
-  /** True once the tournament is finished; before, only decided places. */
-  complete: boolean;
-  rows: PlaceDetail[];
-}
+// The places (P8 for a round robin without a knockout): generated.
+export type PlaceReason = components["schemas"]["PlaceReasonRead"];
+export type PlaceDetail = components["schemas"]["PlaceRead"];
+export type PlacesRead = components["schemas"]["PlacesRead"];
 
 /** One player's change in the season standings after a tournament (screen 10). */
 export interface SeasonEffectRow {
@@ -496,11 +420,6 @@ interface Delete<P> {
     204: { headers: Record<string, unknown>; content?: never };
   } & Errors;
 }
-interface Action<P, B, R> {
-  parameters: P;
-  requestBody: { content: { "application/json": B } };
-  responses: { 200: Json<R> } & Errors;
-}
 
 /** The routes of setup the backend does not serve yet; merged into DemoPaths. */
 export interface SetupPaths {
@@ -509,31 +428,8 @@ export interface SetupPaths {
   };
 }
 
-type PlayField = Params<{
-  league_id: Uuid;
-  tournament_id: Uuid;
-  field_id: Uuid;
-}>;
-
-// Clearing a result (FR-053) is a PUT of the empty target state to
-// …/matches/{match_id}/result: no walkover and no games.
-export interface ProvisionalPaths {
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/play": {
-    get: Get<Tournament, PlayRead>;
-  };
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/placements": {
-    put: Put<Tournament, PlacementWrite, TournamentRead>;
-  };
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/fields": {
-    post: Post<Tournament, FieldCreate, FieldRead>;
-  };
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/fields/{field_id}": {
-    delete: Delete<PlayField>;
-  };
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/finish": {
-    post: Action<Tournament, FinishWrite, TournamentRead>;
-  };
-}
+// The results, the play read, finishing and the places are generated (P8),
+// and so are the fields (P9).
 
 type TournamentEntry = Params<{
   league_id: Uuid;
@@ -565,9 +461,6 @@ export interface KnockoutPreviewParams {
 export interface ProvisionalPaths {
   "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/bracket": {
     get: Get<Tournament, BracketRead>;
-  };
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/places": {
-    get: Get<Tournament, PlacesRead>;
   };
   "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/season-effect": {
     get: Get<Tournament, SeasonEffectRow[]>;

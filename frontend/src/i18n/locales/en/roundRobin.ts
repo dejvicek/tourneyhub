@@ -89,8 +89,6 @@ export const roundRobin = {
       "{{a}} are ahead of {{b}} on head-to-head: they won {{score}} in round {{round}}.",
     scoreDifference_one: "{{a}} is ahead of {{b}} on score difference.",
     scoreDifference_other: "{{a}} are ahead of {{b}} on score difference.",
-    gameDifference_one: "{{a}} is ahead of {{b}} on game difference.",
-    gameDifference_other: "{{a}} are ahead of {{b}} on game difference.",
   },
   done: {
     title: "The round robin is played",

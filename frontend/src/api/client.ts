@@ -31,7 +31,7 @@ export class ApiError extends Error {
 
 // Query and mutation errors are ApiErrors: every call goes through dataOf.
 // A network failure still arrives as a TypeError, so code that tells the
-// two apart checks `instanceof ApiError` (docs/frontend-style.md §8.1).
+// two apart checks `instanceof ApiError` (docs/style/frontend-style.md §8.1).
 declare module "@tanstack/react-query" {
   interface Register {
     defaultError: ApiError;

@@ -1,11 +1,14 @@
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import type { components } from "@/api/schema";
 import { StickyActions } from "@/components/StickyActions";
 import { Button } from "@/components/ui/button";
 import { RadioGroup } from "@/components/ui/radio-group";
-import type { ResultWrite, Side } from "@/demo/contract";
+import type { Side } from "@/demo/contract";
 import { OptionCard } from "@/features/tournaments/play/OptionCard";
+
+type ResultWrite = components["schemas"]["ResultWrite"];
 
 interface WalkoverFormProps {
   names: [string, string];

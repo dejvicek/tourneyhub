@@ -6,7 +6,7 @@ import { DocumentTitle } from "@/components/DocumentTitle";
 import { Button } from "@/components/ui/button";
 
 /**
- * The ErrorBoundary of the root route and of each area (docs/frontend-style.md
+ * The ErrorBoundary of the root route and of each area (docs/style/frontend-style.md
  * §9): an unexpected failure, such as a lazy chunk that did not load or a
  * screen's main resource that threw. A missing route or record says so.
  */

@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 
 // The design's icon set (24 px, 2 px stroke) for the setup screens;
-// lucide-react is not installed (docs/frontend-style.md §5.3). The control
+// lucide-react is not installed (docs/style/frontend-style.md §5.3). The control
 // around an icon carries the name, so the icons are hidden from assistive
 // technology.
 

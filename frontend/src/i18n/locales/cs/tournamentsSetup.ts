@@ -97,11 +97,14 @@ export const tournamentsSetup: CsMessages<typeof english> = {
       none: "Žádná, jen vyřazovací fáze",
     },
     sitOut: {
-      off: "Vypnuto",
-      on_one: "Zapnuto, {{count}} bod",
-      on_few: "Zapnuto, {{count}} body",
-      on_many: "Zapnuto, {{count}} bodu",
-      on_other: "Zapnuto, {{count}} bodů",
+      points_one: "{{count}} bod",
+      points_few: "{{count}} body",
+      points_many: "{{count}} bodu",
+      points_other: "{{count}} bodů",
+      pointsDefault_one: "{{count}} bod (výchozí)",
+      pointsDefault_few: "{{count}} body (výchozí)",
+      pointsDefault_many: "{{count}} bodu (výchozí)",
+      pointsDefault_other: "{{count}} bodů (výchozí)",
     },
     pairName: "{{first}} & {{second}}",
     soFar: {
@@ -169,8 +172,13 @@ export const tournamentsSetup: CsMessages<typeof english> = {
       fieldsLess: "Méně hřišť",
       fieldsMore: "Více hřišť",
       sitOut: "Body za volno",
-      sitOutHint:
-        "Vypnuto: volno je za 0 bodů. Zapnuto: za 1 bod. Záleží jen při lichém počtu dvojic.",
+      sitOutHint: "Záleží jen tehdy, když někdo má volno.",
+      sitOutLikeDraw: "jako remíza",
+      sitOutLikeWin: "jako výhra",
+      sitOutDefault: "Výchozí pro zápasy {{format}}: {{points}}, {{like}}.",
+      sitOutByHand:
+        "Nastavili jste sami. Výchozí pro zápasy {{format}} je {{points}}, {{like}}.",
+      sitOutUseDefault: "Použít výchozí ({{value}})",
       knockoutLater: {
         title: "Vyřazovací fázi zvolíte později",
         body: "Až skončí skupinová fáze, rozhodnete, kolik dvojic postoupí, nebo turnaj ukončíte bez ní.",

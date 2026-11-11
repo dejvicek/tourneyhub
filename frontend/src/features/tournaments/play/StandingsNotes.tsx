@@ -1,9 +1,11 @@
 import { useTranslation } from "react-i18next";
 
-import type { PlayStandingRow } from "@/demo/contract";
+import type { components } from "@/api/schema";
 
 import { entryPlayers, type PlayModel, scoreOf, sidesOf } from "./model";
 import { useNames } from "./useNames";
+
+type PlayStandingRow = components["schemas"]["PlayStandingRow"];
 
 interface StandingsNotesProps {
   model: PlayModel;
@@ -66,8 +68,6 @@ export function StandingsNotes({
       }
       case "score_difference":
         return [t("roundRobin.notes.scoreDifference", values)];
-      case "game_difference":
-        return [t("roundRobin.notes.gameDifference", values)];
     }
   });
 

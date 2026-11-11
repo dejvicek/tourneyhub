@@ -55,7 +55,6 @@ export interface Rules {
   roundRobinTiebreakers: readonly RoundRobinTiebreaker[];
   swissTiebreakers: readonly SwissTiebreaker[];
   gameScoresRequired: GameScoreRequirement;
-  sitOutPointsWhenOn: number;
   monsterKnockoutModes: readonly MonsterKnockoutMode[];
 }
 
@@ -88,13 +87,6 @@ export const rules: Readonly<Rules> = {
 
   /** BR-092. Issue #24 proposes "when_score_difference_counts". */
   gameScoresRequired: "swiss_and_monster_dyp",
-
-  /**
-   * FR-039, BR-071: the points of a sit-out with "points for sitting out" on
-   * (off gives 0). Issue #24 asks whether a sit-out should count as a full
-   * win (2 points) with a synthetic score, as Kickertool's Bye Rating does.
-   */
-  sitOutPointsWhenOn: 1,
 
   /**
    * FR-045, BR-081–BR-084: the modes offered, in this order. Their names are

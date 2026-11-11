@@ -295,7 +295,7 @@ def monster_standings(
 
     Each player collects their own points: a win earns both players of the
     team 2, a draw 1 and a loss 0 (BR-070); a sit-out earns `sit_out_points`,
-    0 or 1 (BR-071). Players are ordered by points, then by `tiebreakers`, the
+    0, 1 or 2 (BR-071). Players are ordered by points, then by `tiebreakers`, the
     enabled tie-breakers in the organizer's order, each higher first (BR-072,
     FR-043). BH1 sums the current points of both opponents, once per match,
     and BH2 sums those opponents' BH1; partners and sit-outs add nothing
@@ -312,7 +312,7 @@ def monster_standings(
 
     Raises:
         ValueError: A caller bug: a player or a tie-breaker is given twice,
-            `sit_out_points` is not 0 or 1, or the rounds are not valid (see
+            `sit_out_points` is not 0, 1 or 2, or the rounds are not valid (see
             `draw_monster_round`).
     """
     ids = tuple(player_ids)
@@ -322,8 +322,8 @@ def monster_standings(
     if len(set(order)) != len(order):
         msg = f"tie-breakers {order} name one twice"
         raise ValueError(msg)
-    if sit_out_points not in {0, 1}:
-        msg = f"sit-out points must be 0 or 1, got {sit_out_points}"
+    if sit_out_points not in {0, 1, 2}:
+        msg = f"sit-out points must be 0, 1 or 2, got {sit_out_points}"
         raise ValueError(msg)
 
     points: Counter[PlayerId] = Counter()
