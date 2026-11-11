@@ -1,22 +1,18 @@
 import { queryOptions, skipToken } from "@tanstack/react-query";
 
-import { dataOf } from "@/api/client";
-import { provisionalApi } from "@/api/provisional";
-import { providesProvisionalRoutes } from "@/lib/demoMode";
+import { api, dataOf } from "@/api/client";
 
-// Provisional route of the demo's contract (src/demo/contract.ts); the backend
-// serves it with P10, so it is off outside demo mode.
+/** The season standings (FR-061, BR-110–BR-113), computed on read. */
 export const standingsQueries = {
   season: (leagueId: string, seasonId: string | undefined) =>
     queryOptions({
       queryKey: ["leagues", leagueId, "seasons", seasonId, "standings"],
-      enabled: providesProvisionalRoutes(),
       queryFn:
         seasonId === undefined
           ? skipToken
           : ({ signal }) =>
               dataOf(
-                provisionalApi.GET(
+                api.GET(
                   "/api/v1/leagues/{league_id}/seasons/{season_id}/standings",
                   {
                     params: {

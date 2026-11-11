@@ -167,6 +167,9 @@ def test_fr013_a_deleted_leagues_share_link_stops_working(
         _public(token),
         _public(token, f"/seasons/{uuid7()}/tournaments"),
         _public(token, f"/tournaments/{uuid7()}"),
+        _public(token, f"/seasons/{uuid7()}/standings"),
+        _public(token, f"/tournaments/{uuid7()}/standings"),
+        _public(token, f"/tournaments/{uuid7()}/places"),
     ):
         response = client.get(path)
         assert (response.status_code, response.json()) == (404, UNKNOWN), path
@@ -178,6 +181,9 @@ def test_fr013_a_deleted_leagues_share_link_stops_working(
         pytest.param("", id="league"),
         pytest.param("/seasons/{season}/tournaments", id="tournaments"),
         pytest.param("/tournaments/{tournament}", id="tournament"),
+        pytest.param("/seasons/{season}/standings", id="season-standings"),
+        pytest.param("/tournaments/{tournament}/standings", id="standings"),
+        pytest.param("/tournaments/{tournament}/places", id="places"),
     ],
 )
 def test_fr071_every_route_answers_an_unknown_token_alike(
@@ -359,6 +365,11 @@ def test_owasp_api1_a_valid_token_does_not_open_another_leagues_tournament(
         pytest.param("", id="league"),
         pytest.param("/seasons/{season}/tournaments", id="tournaments"),
         pytest.param("/tournaments/{tournament}", id="unknown-tournament"),
+        pytest.param("/seasons/{season}/standings", id="season-standings"),
+        pytest.param("/seasons/not-a-uuid/standings", id="season-standings-422"),
+        pytest.param("/tournaments/{tournament}/standings", id="standings"),
+        pytest.param("/tournaments/{tournament}/places", id="places"),
+        pytest.param("/tournaments/not-a-uuid/places", id="places-422"),
         pytest.param("/tournaments/not-a-uuid", id="validation-error"),
         pytest.param("/seasons/not-a-uuid/tournaments", id="invalid-season-422"),
         pytest.param("/no-such-route", id="router-404"),
@@ -389,60 +400,167 @@ def test_adr005_organizer_answers_keep_their_headers(
 # ---------------------------------------------------------------- schemas
 
 
-_ORGANIZER_ONLY = {
-    "share_token",
-    "owner_user_id",
-    "email",
-    "user_id",
-    "is_admin",
-    "draw_counter",
-    "rng_seed",
-    "seeding_method",
-    "halves_method",
-    "ranking",
-    "created_at",
-    "updated_at",
+# Every object schema that a public route can answer with, through its refs, and
+# exactly the properties it has. An allowlist: a field added to a model that a
+# viewer can reach fails this test until it is added here on purpose (FR-071).
+_PUBLIC_PROPERTIES: dict[str, set[str]] = {
+    "EntryRead": {
+        "id",
+        "is_disabled",
+        "is_top_player",
+        "kind",
+        "player_ids",
+        "seed",
+        "stage",
+    },
+    "FieldRead": {"id", "match_id", "number"},
+    "GameRead": {"game_no", "score_1", "score_2", "winner"},
+    "MatchRead": {
+        "games",
+        "id",
+        "is_walkover",
+        "kind",
+        "outcome",
+        "position",
+        "result_entered_at",
+        "round_id",
+        "sides",
+    },
+    "MatchSideRead": {"entry_id", "is_bye", "player_ids"},
+    "PhaseRead": {
+        "final_match_format",
+        "format",
+        "id",
+        "kind",
+        "match_format",
+        "monster_knockout_mode",
+        "position",
+        "qualifiers",
+        "round_robin_legs",
+        "sit_out_points",
+        "sit_out_points_set_by_hand",
+        "third_place_match",
+        "tiebreakers",
+    },
+    "PhaseSummary": {"format", "id", "kind", "position"},
+    "PublicLeagueRead": {"name", "players", "seasons"},
+    "PublicPlaceRead": {"entry_id", "place", "points_per_player", "reason"},
+    "PublicPlaceReasonRead": {
+        "group_format",
+        "group_place",
+        "kind",
+        "opponent_entry_id",
+        "round",
+        "score",
+    },
+    "PublicPlacesRead": {"complete", "rows"},
+    "PublicPlayerRead": {"id", "name"},
+    "PublicSeasonStandingRow": {
+        "place",
+        "player_id",
+        "points",
+        "tournament_wins",
+        "tournaments_played",
+    },
+    "PublicStandingRow": {
+        "drawn",
+        "entry_id",
+        "lost",
+        "place",
+        "played",
+        "points",
+        "sat_out",
+        "score_difference",
+        "won",
+    },
+    "PublicTournamentRead": {
+        "current_phase_done",
+        "current_phase_id",
+        "date",
+        "entries",
+        "fields",
+        "goals_per_game",
+        "id",
+        "name",
+        "phases",
+        "rounds",
+        "season_id",
+        "state",
+        "type",
+        "waiting",
+    },
+    "RoundRead": {"id", "matches", "phase_id", "round_no", "sitting_out"},
+    "SeasonRead": {
+        "closed_at",
+        "id",
+        "name",
+        "number",
+        "placement_points",
+        "started_at",
+        "state",
+    },
+    "TournamentProgress": {
+        "in_knockout",
+        "match_count",
+        "matches_played",
+        "round_count",
+        "round_no",
+    },
+    "TournamentSummary": {
+        "current_phase_done",
+        "current_phase_id",
+        "date",
+        "id",
+        "name",
+        "phases",
+        "player_count",
+        "progress",
+        "season_id",
+        "state",
+        "type",
+        "winner_player_ids",
+    },
 }
 
 
-def _properties(schemas: Json, node: object, seen: set[str]) -> set[str]:
-    """Every property name reachable from a schema node, through its refs."""
-    found: set[str] = set()
+def _reachable_schemas(schemas: Json, node: object, found: set[str]) -> None:
+    """Add the name of every schema reachable from a node, through its refs."""
     if isinstance(node, dict):
         ref = node.get("$ref")
         if isinstance(ref, str):
             name = ref.rsplit("/", 1)[-1]
-            if name not in seen:
-                seen.add(name)
-                found |= _properties(schemas, schemas[name], seen)
-        properties = node.get("properties")
-        if isinstance(properties, dict):
-            found |= set(properties)
+            if name not in found:
+                found.add(name)
+                _reachable_schemas(schemas, schemas[name], found)
         for value in node.values():
-            found |= _properties(schemas, value, seen)
+            _reachable_schemas(schemas, value, found)
     elif isinstance(node, list):
         for value in node:
-            found |= _properties(schemas, value, seen)
-    return found
+            _reachable_schemas(schemas, value, found)
 
 
 def test_fr071_public_schemas_carry_nothing_only_the_organizer_sees(
     client: TestClient,
 ) -> None:
     schema: Json = client.get("/openapi.json").json()
+    schemas = schema["components"]["schemas"]
     public = {
         path: item
         for path, item in schema["paths"].items()
         if path.startswith("/api/v1/public/")
     }
 
-    names = _properties(
-        schema["components"]["schemas"],
+    reachable: set[str] = set()
+    _reachable_schemas(
+        schemas,
         [item["get"]["responses"]["200"] for item in public.values()],
-        set(),
+        reachable,
     )
 
-    assert len(public) == 3
+    assert len(public) == 6
     assert all(set(item) == {"get"} for item in public.values())  # FR-072
-    assert {"name", "players", "rounds", "fields", "waiting"} <= names
-    assert not names & _ORGANIZER_ONLY
+    assert {
+        name: set(schemas[name]["properties"])
+        for name in reachable
+        if "properties" in schemas[name]
+    } == _PUBLIC_PROPERTIES

@@ -41,7 +41,7 @@ export function SeasonStandingsPage() {
   const season =
     seasons.data?.find((s) => s.id === picked) ?? active ?? seasons.data?.[0];
   const standings = useQuery(standingsQueries.season(leagueId, season?.id));
-  const players = useQuery(finalsQueries.players(leagueId));
+  const players = useQuery(finalsQueries.namedPlayers(leagueId));
   const tournaments = useQuery(
     tournamentQueries.ofSeason(leagueId, season?.id),
   );
@@ -56,16 +56,10 @@ export function SeasonStandingsPage() {
       />
     );
   }
-  // The standings are served with P10; until then there are none to show.
-  const standingsLater =
-    standings.data === undefined && standings.fetchStatus === "idle";
-  if (
-    season === undefined ||
-    (standings.data === undefined && !standingsLater)
-  ) {
+  if (season === undefined || standings.data === undefined) {
     return <Loading />;
   }
-  const rows = standings.data ?? [];
+  const rows = standings.data;
 
   const names = new Map(
     (players.data ?? []).map((p) => [p.id, shortName(p.name)] as const),
@@ -115,11 +109,7 @@ export function SeasonStandingsPage() {
         </div>
       )}
 
-      {standingsLater ? (
-        <p className="text-body-md text-muted-foreground">
-          {t("standings.season.later")}
-        </p>
-      ) : rows.length === 0 ? (
+      {rows.length === 0 ? (
         <Notice tone="info" title={t("standings.season.emptyTitle")}>
           {t("standings.season.emptyBody")}
         </Notice>

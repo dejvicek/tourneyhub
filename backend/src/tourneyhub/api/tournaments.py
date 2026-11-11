@@ -49,6 +49,7 @@ from tourneyhub.services.tournaments import (
     FieldPlacement,
     FormatRequest,
     MatchResult,
+    PlacesView,
 )
 
 router = APIRouter(
@@ -1277,6 +1278,11 @@ def read_places(
     places = tournament_service.read_places(
         session, league_id=league_id, tournament_id=tournament_id, user_id=user.id
     )
+    return places_read(places)
+
+
+def places_read(places: PlacesView) -> PlacesRead:
+    """The places as the API answers them; the organizer's and the viewers' alike."""
     return PlacesRead(
         complete=places.complete,
         rows=[

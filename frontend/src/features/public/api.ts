@@ -2,19 +2,13 @@ import { queryOptions } from "@tanstack/react-query";
 
 import { api, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
-import { providesProvisionalRoutes } from "@/lib/demoMode";
 
 // The share-link views (FR-070–FR-072): no account, read-only. The backend
-// serves the league, a season's tournaments and a tournament (P11); the
-// standings, the knockout, the ranking and the places are still the demo's
-// contract (P8, P10). The season standings and the places only decorate a
-// page, so outside demo mode, where the backend would 404 them on every poll,
-// their queries stay off and the page shows its empty state.
-
-/** The demo's own routes answer only in demo mode; the backend 404s them. */
-function demoOnly(enabled = true): boolean {
-  return enabled && providesProvisionalRoutes();
-}
+// serves the league, a season's tournaments, a tournament, the season
+// standings, a round robin's standings and the places (P11, P10a). The
+// knockout and the Swiss and Monster DYP ranking are still the demo's
+// contract (P10b, P12); a tournament that has either cannot be started on the
+// backend yet, so the screens that call them are not reached outside demo mode.
 
 function fetchLeague(shareToken: string, signal?: AbortSignal) {
   return dataOf(
@@ -50,6 +44,11 @@ export type PublicMatch = PublicTournament["rounds"][number]["matches"][number];
 
 /** Live views refresh on their own, so a viewer sees fields change (FR-070). */
 const LIVE_MS = 15_000;
+/**
+ * The season standings change only when a tournament finishes, and each read
+ * loads every finished tournament of the season, so they refresh more slowly.
+ */
+const SEASON_MS = 60_000;
 
 export const publicQueries = {
   league: (shareToken: string) =>
@@ -76,14 +75,13 @@ export const publicQueries = {
         ),
       refetchInterval: LIVE_MS,
     }),
-  /** The season standings (FR-070); the backend serves them with P10. */
+  /** The season standings (FR-070, FR-061). */
   seasonStandings: (shareToken: string, seasonId: string) =>
     queryOptions({
-      enabled: demoOnly(),
       queryKey: ["public", shareToken, "seasons", seasonId, "standings"],
       queryFn: ({ signal }) =>
         dataOf(
-          provisionalApi.GET(
+          api.GET(
             "/api/v1/public/{share_token}/seasons/{season_id}/standings",
             {
               params: {
@@ -93,7 +91,7 @@ export const publicQueries = {
             },
           ),
         ),
-      refetchInterval: LIVE_MS,
+      refetchInterval: SEASON_MS,
     }),
   tournament: (shareToken: string, tournamentId: string) =>
     queryOptions({
@@ -102,6 +100,7 @@ export const publicQueries = {
         fetchTournament(shareToken, tournamentId, signal),
       refetchInterval: LIVE_MS,
     }),
+  /** A round robin's standings now (FR-060). */
   standings: (shareToken: string, tournamentId: string) =>
     queryOptions({
       queryKey: [
@@ -113,7 +112,7 @@ export const publicQueries = {
       ],
       queryFn: ({ signal }) =>
         dataOf(
-          provisionalApi.GET(
+          api.GET(
             "/api/v1/public/{share_token}/tournaments/{tournament_id}/standings",
             {
               params: {
@@ -169,7 +168,7 @@ export const publicQueries = {
       queryKey: ["public", shareToken, "tournaments", tournamentId, "places"],
       queryFn: ({ signal }) =>
         dataOf(
-          provisionalApi.GET(
+          api.GET(
             "/api/v1/public/{share_token}/tournaments/{tournament_id}/places",
             {
               params: {
@@ -179,7 +178,7 @@ export const publicQueries = {
             },
           ),
         ),
-      enabled: demoOnly(enabled),
+      enabled,
       refetchInterval: LIVE_MS,
     }),
 };

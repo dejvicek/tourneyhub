@@ -1,4 +1,5 @@
 import { screen, within } from "@testing-library/react";
+import { http, HttpResponse } from "msw";
 import { generatePath } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -196,7 +197,11 @@ describe("share-link views outside demo mode", () => {
     await i18n.changeLanguage("en");
   });
 
-  it("do not ask for the season standings or the places the backend does not serve", async () => {
+  afterEach(() => {
+    server.events.removeAllListeners();
+  });
+
+  it("ask for the season standings, which the backend serves (P10a)", async () => {
     const asked: string[] = [];
     server.events.on("request:start", ({ request }) => {
       asked.push(new URL(request.url).pathname);
@@ -207,11 +212,41 @@ describe("share-link views outside demo mode", () => {
       name: "Thursday Foosball",
     });
     await screen.findByRole("article", { name: "Thursday DYP" });
+    await screen.findByRole("columnheader", { name: "Wins" });
 
     expect(asked.some((path) => path.endsWith("/tournaments"))).toBe(true);
-    expect(asked.filter((path) => /\/(standings|places)$/.test(path))).toEqual(
+    expect(asked.some((path) => path.endsWith("/standings"))).toBe(true);
+  });
+
+  it("says that the standings failed to load, not that there are none", async () => {
+    server.use(
+      http.get("*/api/v1/public/:token/seasons/:season/standings", () =>
+        HttpResponse.json({ code: "internal_error" }, { status: 500 }),
+      ),
+    );
+    renderAt(league);
+
+    const section = await screen.findByRole("region", {
+      name: "Season standings",
+    });
+    expect(await within(section).findByRole("alert")).toHaveTextContent(
+      "Could not load this.",
+    );
+    expect(
+      screen.queryByText("No finished tournament in this season yet."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("do not ask for the knockout or the ranking, which only the demo serves", async () => {
+    const asked: string[] = [];
+    server.events.on("request:start", ({ request }) => {
+      asked.push(new URL(request.url).pathname);
+    });
+    renderAt(league);
+    await screen.findByRole("article", { name: "Thursday DYP" });
+
+    expect(asked.filter((path) => /\/(bracket|ranking)$/.test(path))).toEqual(
       [],
     );
-    server.events.removeAllListeners();
   });
 });

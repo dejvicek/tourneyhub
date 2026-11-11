@@ -1,11 +1,13 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
+import { delay, http, HttpResponse } from "msw";
 import { generatePath } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { provisionalApi } from "@/api/provisional";
 import { DEMO_LEAGUE_ID, demoId } from "@/demo/ids";
+import { db } from "@/demo/store";
 import { i18n } from "@/i18n";
 import { paths } from "@/lib/paths";
 import { stubViewport } from "@/test/media";
@@ -75,7 +77,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-describe("outside demo mode, where the season routes are not served yet (P10)", () => {
+describe("outside demo mode, where the backend serves the season routes (P10a)", () => {
   beforeEach(() => {
     vi.stubEnv("VITE_DEMO", "");
   });
@@ -89,40 +91,27 @@ describe("outside demo mode, where the season routes are not served yet (P10)", 
     return urls;
   }
 
-  it("shows a neutral line on the finished tournament, and asks for no season effect", async () => {
+  afterEach(() => {
+    server.events.removeAllListeners();
+  });
+
+  it("shows the season's effect on the finished tournament", async () => {
     await playFinal(DYP_EVENING);
     const calls = requested();
     renderAt(at(paths.finished, DYP_EVENING));
 
-    expect(
-      await screen.findByText("Season standings arrive in a later version."),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/Top \d+ of \d+/)).not.toBeInTheDocument();
+    expect(await screen.findByText(/Top \d+ of \d+/)).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(calls.filter((p) => p.endsWith("/season-effect"))).toEqual([]);
+    expect(calls.filter((p) => p.endsWith("/season-effect"))).toHaveLength(1);
   });
 
-  it("shows a neutral line on the season standings instead of an error", async () => {
+  it("shows the season standings, not a line that they come later", async () => {
     const calls = requested();
     renderAt(generatePath(paths.seasonStandings, { leagueId: DEMO_LEAGUE_ID }));
 
-    expect(
-      await screen.findByText("Season standings arrive in a later version."),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByText("This could not be loaded."),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByRole("table")).not.toBeInTheDocument();
-    expect(calls.filter((p) => p.endsWith("/standings"))).toEqual([]);
-  });
-
-  it("says it in Czech", async () => {
-    await i18n.changeLanguage("cs");
-    renderAt(generatePath(paths.seasonStandings, { leagueId: DEMO_LEAGUE_ID }));
-
-    expect(
-      await screen.findByText("Pořadí sezóny přibude v pozdější verzi."),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+    expect(screen.queryByText(/later version/)).not.toBeInTheDocument();
+    expect(calls.filter((p) => p.endsWith("/standings"))).not.toEqual([]);
   });
 });
 
@@ -363,6 +352,67 @@ describe("Finished (screen 10)", () => {
     expect(
       screen.getByRole("link", { name: "See the full season standings" }),
     ).toBeInTheDocument();
+  });
+
+  it("still shows the places when the season's effect fails, with a retry of its own", async () => {
+    await playFinal(DYP_EVENING);
+    server.use(
+      http.get(
+        "*/api/v1/leagues/:league/tournaments/:tournament/season-effect",
+        () => HttpResponse.json({ code: "internal_error" }, { status: 500 }),
+      ),
+    );
+    renderAt(at(paths.finished, DYP_EVENING));
+
+    expect(
+      await screen.findByRole("region", { name: "Final places" }),
+    ).toBeInTheDocument();
+    const season = await screen.findByRole("region", {
+      name: /standings$/,
+    });
+    expect(await within(season).findByRole("alert")).toBeInTheDocument();
+    expect(
+      within(season).getByRole("button", { name: "Try again" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+  });
+
+  it("still shows the places while the season's effect is loading", async () => {
+    await playFinal(DYP_EVENING);
+    server.use(
+      http.get(
+        "*/api/v1/leagues/:league/tournaments/:tournament/season-effect",
+        async () => {
+          await delay("infinite");
+          return HttpResponse.json([]);
+        },
+      ),
+    );
+    renderAt(at(paths.finished, DYP_EVENING));
+
+    expect(
+      await screen.findByRole("region", { name: "Final places" }),
+    ).toBeInTheDocument();
+    const season = screen.getByRole("region", { name: /standings$/ });
+    expect(within(season).getByRole("status")).toBeInTheDocument();
+  });
+
+  it("names a removed player on the places and in the season standings", async () => {
+    await playFinal(DYP_EVENING);
+    for (const player of db().players) {
+      player.removed_at = "2026-11-01T10:00:00Z";
+    }
+    renderAt(at(paths.finished, DYP_EVENING));
+
+    const places = await screen.findByRole("region", { name: "Final places" });
+    const season = await screen.findByRole("list", {
+      name: "Season standings after this tournament",
+    });
+    await waitFor(() => {
+      expect(places).not.toHaveTextContent("Unknown");
+    });
+    expect(season).not.toHaveTextContent("Unknown");
+    expect(places).toHaveTextContent(/[A-Z][a-z]+ [A-Z]\./);
   });
 
   it("goes back to the tournament's own screen when it is not finished (D21)", async () => {
@@ -734,6 +784,23 @@ describe("Season standings", () => {
     expect(
       screen.getByRole("link", { name: /DYP evening/ }),
     ).toBeInTheDocument();
+  });
+
+  it("names a removed player, whose results still count (BR-002)", async () => {
+    for (const player of db().players) {
+      player.removed_at = "2026-11-01T10:00:00Z";
+    }
+    renderAt(generatePath(paths.seasonStandings, { leagueId: DEMO_LEAGUE_ID }));
+
+    const table = await screen.findByRole("table", {
+      name: "Season standings",
+    });
+    const [, ...rows] = within(table).getAllByRole("row");
+    expect(rows.length).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(table).not.toHaveTextContent("Unknown");
+    });
+    expect(rows[0]).toHaveTextContent(/[A-Z][a-z]+ [A-Z]\./);
   });
 
   it("is written in Czech with Czech plurals", async () => {
