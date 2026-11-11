@@ -227,6 +227,15 @@ function Review({ data }: { data: SetupData }) {
               })}
             </p>
           )}
+          {round.byes.length > 0 && (
+            <p className="text-body-sm text-muted-foreground">
+              {t("tournaments.setup.review.byes", {
+                names: round.byes
+                  .map((ids) => entryName(t, sides(ids)))
+                  .join(", "),
+              })}
+            </p>
+          )}
         </div>
       ))}
       <div className="grid gap-1 text-body-sm text-muted-foreground">

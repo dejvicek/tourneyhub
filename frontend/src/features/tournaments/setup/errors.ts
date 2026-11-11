@@ -13,6 +13,7 @@ const CODE_TEXTS = {
   not_enough_entries: "tournaments.errors.rules.fr032Entries",
   players_without_partner: "tournaments.errors.rules.br030",
   too_many_entries_for_round_robin: "tournaments.errors.rules.fr032Max",
+  too_many_entries_for_knockout: "tournaments.errors.rules.fr032MaxKnockout",
   format_not_supported: "tournaments.errors.rules.fr035",
   tournament_has_results: "tournaments.errors.rules.fr036",
 } as const satisfies Partial<Record<ErrorCode, string>>;
