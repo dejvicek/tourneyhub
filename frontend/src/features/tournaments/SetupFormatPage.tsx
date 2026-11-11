@@ -91,7 +91,10 @@ export function SetupFormatPage() {
     type: "dyp",
     group_phase: "round_robin",
     round_robin_legs: 1,
-    sit_out_points: defaultSitOutPoints(settings.data.default_match_format),
+    sit_out_points: defaultSitOutPoints(
+      settings.data.default_match_format,
+      settings.data.draws_allowed,
+    ),
     sit_out_points_set_by_hand: false,
     group_match_format: settings.data.default_match_format,
     knockout_match_format: settings.data.default_match_format,
@@ -108,7 +111,11 @@ export function SetupFormatPage() {
       initial={
         existing.data === undefined
           ? defaults
-          : formOf(existing.data.format, settings.data.default_match_format)
+          : formOf(
+              existing.data.format,
+              settings.data.default_match_format,
+              settings.data.draws_allowed,
+            )
       }
       drawsAllowed={settings.data.draws_allowed}
     />
@@ -155,7 +162,7 @@ function FormatForm({
         type: typeLabel(t, form.type),
         date: dayAndMonth(form.date),
       });
-  const sitOutPoints = sitOutPointsOf(form);
+  const sitOutPoints = sitOutPointsOf(form, drawsAllowed);
   const shown: FormatForm = { ...form, name, sit_out_points: sitOutPoints };
   const payload = writeOf(shown);
   const noGroup = form.group_phase === "none";
@@ -425,6 +432,7 @@ function FormatForm({
             points={sitOutPoints}
             setByHand={form.sit_out_points_set_by_hand}
             matchFormat={form.group_match_format}
+            drawsAllowed={drawsAllowed}
             onPick={(points) => {
               patch({
                 sit_out_points: points,

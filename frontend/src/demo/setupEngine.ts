@@ -308,7 +308,7 @@ function resolveFormat(
   const grouped = format.group_phase !== "none";
   const fallback = league.default_match_format;
   const groupMatchFormat = format.group_match_format ?? fallback;
-  // BR-071: a number is the organizer's pick; null takes the match format's default.
+  // BR-071: a number is the organizer's pick; null takes the default.
   const picked = format.sit_out_points ?? null;
   return {
     name: format.name.trim(),
@@ -320,7 +320,7 @@ function resolveFormat(
         ? (format.round_robin_legs ?? 1)
         : null,
     sit_out_points: grouped
-      ? (picked ?? defaultSitOutPoints(groupMatchFormat))
+      ? (picked ?? defaultSitOutPoints(groupMatchFormat, league.draws_allowed))
       : null,
     sit_out_points_set_by_hand: grouped ? picked !== null : null,
     group_match_format: grouped ? groupMatchFormat : null,
@@ -1222,4 +1222,25 @@ export function deleteTournament(t: StoredTournament): SetupFailure | null {
   const state = db();
   state.tournaments = state.tournaments.filter((other) => other.id !== t.id);
   return null;
+}
+
+/**
+ * A change of the league's draw setting moves the default of every tournament
+ * still in setup that follows it (BR-071); a generated schedule keeps its value.
+ */
+export function refreshSitOutDefaults(league: StoredLeague): void {
+  for (const tournament of db().tournaments) {
+    if (tournament.league_id !== league.id || tournament.state !== "setup") {
+      continue;
+    }
+    for (const phase of tournament.phases) {
+      if (phase.kind === "group" && !phase.sit_out_points_set_by_hand) {
+        phase.sit_out_points = defaultSitOutPoints(
+          phase.match_format,
+          league.draws_allowed,
+        );
+        draftOf(tournament).format.sit_out_points = phase.sit_out_points;
+      }
+    }
+  }
 }

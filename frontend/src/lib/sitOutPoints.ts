@@ -7,11 +7,14 @@ export const SIT_OUT_POINTS = [0, 1, 2] as const;
 export type SitOutPoints = (typeof SIT_OUT_POINTS)[number];
 
 /**
- * The default points of a sit-out for a group phase's match format (BR-071):
- * a BO1 or BO2 match can end level, so a sit-out is worth a draw (1); a BO3 or
- * BO5 match cannot, so it is worth a win (2). The league's draw setting plays
- * no part. The backend computes the same default; this only shows it.
+ * The default points of a sit-out (BR-071): 1, worth a draw, only where a match
+ * can end level, that is when the league allows draws and the group phase plays
+ * BO1 or BO2. Otherwise 2, worth a win, so a sit-out never earns a result that
+ * no match can produce. The backend computes the same default; this only shows it.
  */
-export function defaultSitOutPoints(format: MatchFormat): 1 | 2 {
-  return format === "bo1" || format === "bo2" ? 1 : 2;
+export function defaultSitOutPoints(
+  format: MatchFormat,
+  drawsAllowed: boolean,
+): 1 | 2 {
+  return drawsAllowed && (format === "bo1" || format === "bo2") ? 1 : 2;
 }

@@ -178,6 +178,10 @@ export const tournamentsSetup: CsMessages<typeof english> = {
       sitOutDefault: "Výchozí pro zápasy {{format}}: {{points}}, {{like}}.",
       sitOutByHand:
         "Nastavili jste sami. Výchozí pro zápasy {{format}} je {{points}}, {{like}}.",
+      sitOutDefaultNoDraws:
+        "Výchozí je {{points}}, {{like}}: žádný zápas v této lize nemůže skončit nerozhodně.",
+      sitOutByHandNoDraws:
+        "Nastavili jste sami. Výchozí je {{points}}, {{like}}: žádný zápas v této lize nemůže skončit nerozhodně.",
       sitOutUseDefault: "Použít výchozí ({{value}})",
       knockoutLater: {
         title: "Vyřazovací fázi zvolíte později",

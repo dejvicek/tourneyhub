@@ -19,6 +19,15 @@ const at = (tournament_id: string) => ({
   params: { path: { ...league, tournament_id } },
 });
 
+async function setDraws(draws_allowed: boolean) {
+  await dataOf(
+    api.PATCH("/api/v1/leagues/{league_id}", {
+      params: { path: league },
+      body: { draws_allowed },
+    }),
+  );
+}
+
 async function failure(call: Promise<unknown>) {
   try {
     await call;
@@ -53,12 +62,17 @@ describe("the fake API for tournament setup", () => {
   });
 
   it.each([
-    ["bo1", 1],
-    ["bo3", 2],
-    ["bo5", 2],
+    ["bo1", true, 1],
+    ["bo2", true, 1],
+    ["bo3", true, 2],
+    ["bo5", true, 2],
+    ["bo1", false, 2],
+    ["bo3", false, 2],
+    ["bo5", false, 2],
   ] as const)(
-    "gives a %s group phase %i sit-out points until the organizer picks (BR-071)",
-    async (format, points) => {
+    "gives a %s group phase with draws %s %i sit-out points until the organizer picks (BR-071)",
+    async (format, draws, points) => {
+      await setDraws(draws);
       const id = await createDraft({
         group_match_format: format,
         sit_out_points: null,
@@ -72,6 +86,22 @@ describe("the fake API for tournament setup", () => {
       ]);
     },
   );
+
+  it("moves the default with the league's draw setting while setup follows it", async () => {
+    const following = await createDraft({ sit_out_points: null });
+    const byHand = await createDraft({ sit_out_points: 2 });
+    const read = async (id: string) => {
+      const { sit_out_points, sit_out_points_set_by_hand } = (await setupOf(id))
+        .format;
+      return [sit_out_points, sit_out_points_set_by_hand];
+    };
+    expect(await read(following)).toEqual([2, false]);
+
+    await setDraws(true);
+
+    expect(await read(following)).toEqual([1, false]);
+    expect(await read(byHand)).toEqual([2, true]);
+  });
 
   it("follows the format with a null pick, and keeps a number", async () => {
     const id = await createDraft({ sit_out_points: null });

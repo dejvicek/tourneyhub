@@ -16,31 +16,36 @@ interface SitOutPointsFieldProps {
   points: SitOutPoints;
   /** Whether the organizer picked the value (BR-071). */
   setByHand: boolean;
-  /** The group phase's match format, which decides the default. */
+  /** The group phase's match format, which decides the default with the next. */
   matchFormat: MatchFormat;
+  /** Whether the league allows draws, which decides the default too. */
+  drawsAllowed: boolean;
   onPick: (points: SitOutPoints) => void;
   onUseDefault: () => void;
 }
 
 /**
  * FR-039, BR-071: the points of a sit-out, 0, 1 or 2. The default follows the
- * match format until a value is picked; the field says which of the two it is
+ * league's draw setting and the match format until a value is picked; the field says which of the two it is
  * and offers the way back to the default.
  */
 export function SitOutPointsField({
   points,
   setByHand,
   matchFormat,
+  drawsAllowed,
   onPick,
   onUseDefault,
 }: SitOutPointsFieldProps) {
   const { t } = useTranslation();
-  const fallback = defaultSitOutPoints(matchFormat);
+  const fallback = defaultSitOutPoints(matchFormat, drawsAllowed);
   const like = t(
     fallback === 1
       ? "tournaments.setup.format.sitOutLikeDraw"
       : "tournaments.setup.format.sitOutLikeWin",
   );
+  // 2 is also the default where no match can end level; say why (BR-071).
+  const noDraws = !drawsAllowed && fallback === 2;
   const values = {
     format: t(`tournaments.setup.matchFormat.${matchFormat}`),
     points: sitOutLabel(t, fallback),
@@ -52,9 +57,7 @@ export function SitOutPointsField({
       <SegmentedControl
         label={t("tournaments.setup.format.sitOut")}
         hint={`${t("tournaments.setup.format.sitOutHint")} ${t(
-          setByHand
-            ? "tournaments.setup.format.sitOutByHand"
-            : "tournaments.setup.format.sitOutDefault",
+          sitOutHintKey(setByHand, noDraws),
           values,
         )}`}
         value={String(points)}
@@ -92,4 +95,15 @@ export function SitOutPointsField({
       )}
     </div>
   );
+}
+
+function sitOutHintKey(setByHand: boolean, noDraws: boolean) {
+  if (noDraws) {
+    return setByHand
+      ? "tournaments.setup.format.sitOutByHandNoDraws"
+      : "tournaments.setup.format.sitOutDefaultNoDraws";
+  }
+  return setByHand
+    ? "tournaments.setup.format.sitOutByHand"
+    : "tournaments.setup.format.sitOutDefault";
 }

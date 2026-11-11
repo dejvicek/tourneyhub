@@ -123,7 +123,29 @@ describe("setup: format (screen 2)", () => {
     ).toBeInTheDocument();
   });
 
+  describe("points for sitting out in a league without draws (BR-071)", () => {
+    it("defaults to 2, like a win, and says why", async () => {
+      renderAt(newTournament);
+      await screen.findByRole("textbox", { name: "Name" });
+
+      expect(
+        within(
+          screen.getByRole("radiogroup", { name: "Points for sitting out" }),
+        ).getByRole("radio", { name: "2 points (default)" }),
+      ).toBeChecked();
+      expect(
+        screen.getByText(
+          /The default is 2 points, like a win: no match in this league can end level\./,
+        ),
+      ).toBeVisible();
+    });
+  });
+
   describe("points for sitting out (FR-039, BR-071)", () => {
+    beforeEach(async () => {
+      await allowDraws();
+    });
+
     const sitOut = () =>
       screen.getByRole("radiogroup", { name: "Points for sitting out" });
     const matches = () =>

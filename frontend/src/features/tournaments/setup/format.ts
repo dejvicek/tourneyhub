@@ -26,29 +26,32 @@ export type FormatForm = {
   sit_out_points_set_by_hand: boolean;
 };
 
-/** The sit-out points the form stands for: the pick, or the format's default. */
+/** The sit-out points the form stands for: the pick, or the default (BR-071). */
 export function sitOutPointsOf(
   form: Pick<
     FormatForm,
     "sit_out_points" | "sit_out_points_set_by_hand" | "group_match_format"
   >,
+  drawsAllowed: boolean,
 ): FormatForm["sit_out_points"] {
   return form.sit_out_points_set_by_hand
     ? form.sit_out_points
-    : defaultSitOutPoints(form.group_match_format);
+    : defaultSitOutPoints(form.group_match_format, drawsAllowed);
 }
 
 /** The stored format with the unused settings filled in (FR-031). */
 export function formOf(
   read: FormatRead,
   defaultFormat: KnockoutMatchFormat,
+  drawsAllowed: boolean,
 ): FormatForm {
   const groupMatchFormat = read.group_match_format ?? defaultFormat;
   return {
     ...read,
     round_robin_legs: read.round_robin_legs ?? 1,
     sit_out_points:
-      read.sit_out_points ?? defaultSitOutPoints(groupMatchFormat),
+      read.sit_out_points ??
+      defaultSitOutPoints(groupMatchFormat, drawsAllowed),
     sit_out_points_set_by_hand: read.sit_out_points_set_by_hand ?? false,
     group_match_format: read.group_match_format ?? defaultFormat,
     knockout_match_format: read.knockout_match_format ?? defaultFormat,

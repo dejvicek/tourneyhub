@@ -166,6 +166,10 @@ export const tournamentsSetup = {
         "The default for {{format}} matches: {{points}}, {{like}}.",
       sitOutByHand:
         "Set by you. The default for {{format}} matches is {{points}}, {{like}}.",
+      sitOutDefaultNoDraws:
+        "The default is {{points}}, {{like}}: no match in this league can end level.",
+      sitOutByHandNoDraws:
+        "Set by you. The default is {{points}}, {{like}}: no match in this league can end level.",
       sitOutUseDefault: "Use the default ({{value}})",
       knockoutLater: {
         title: "You choose the knockout later",
