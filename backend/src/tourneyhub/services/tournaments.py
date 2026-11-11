@@ -2214,10 +2214,13 @@ class MatchResult:
 
     A `walkover_winner` is a walkover, which has no games (FR-052, BR-124).
     Neither a walkover nor games is the empty result: it clears the match.
+    `expected_sides` are the entries the screen saw on side 1 and side 2; a
+    match whose sides are derived on read needs them (BR-094, ADR-008).
     """
 
     walkover_winner: Outcome | None
     games: tuple[Game, ...]
+    expected_sides: tuple[UUID, UUID] | None = None
 
     @property
     def is_empty(self) -> bool:
@@ -2319,6 +2322,14 @@ def set_match_result(
     of another tournament, 404 `match_not_found`; a match whose sides are not
     both known, or that has a bye, 422 `match_sides_unknown` (BR-091).
 
+    The sides of a knockout match after the first round are derived from the
+    winners on read (D4), so they can change between the screen and the
+    write. Such a result names the entries the screen saw: others are 409
+    `match_sides_changed` (detail `entry_ids`, the current ones), none 422
+    `expected_sides_required` (when both sides are known). A match with stored sides never changes them,
+    so the expectation is optional there; if it is sent for two entries it
+    is checked the same way (ADR-008).
+
     The knockout (D4): a group-phase result is locked once the knockout is
     drawn, 422 `group_phase_locked` (BR-053, BR-065, detail `phase_id`, the
     knockout's); a knockout result is locked while a later match it feeds has
@@ -2338,6 +2349,7 @@ def set_match_result(
     )
     _require_open_season(league, tournament)
     phase, round_, match = _find_match(tournament, match_id)
+    _require_expected_sides(tournament, match, result.expected_sides)
     if _match_players(tournament)[match.id] is None or any(
         side.is_bye for side in match.sides
     ):
@@ -2364,6 +2376,42 @@ def set_match_result(
     return _match_view(
         match, members, None if knockout is None else knockout.played.get(match.id)
     )
+
+
+def _require_expected_sides(
+    tournament: Tournament, match: Match, expected: tuple[UUID, UUID] | None
+) -> None:
+    """Check the sides the screen saw against the match's now (ADR-008, BR-094).
+
+    Derived sides (a knockout match after round 1, the third-place match) need
+    the expectation: none is 422 `expected_sides_required` (unless a side is
+    still to come, which `match_sides_unknown` refuses), a different pair, or
+    a side still to come, 409 `match_sides_changed`. Stored sides need none;
+    a sent pair of entries is compared with them.
+    """
+    if match.sides:
+        stored = tuple(
+            side.entry_id for side in sorted(match.sides, key=lambda s: s.side)
+        )
+        if expected is not None and None not in stored and stored != expected:
+            raise ConflictError(
+                ErrorCode.MATCH_SIDES_CHANGED, entry_ids=[str(i) for i in stored]
+            )
+        return
+    knockout = knockout_bracket(tournament)
+    derived = None if knockout is None else knockout.played.get(match.id)
+    if derived is None:
+        return
+    current = (derived.side_1.entry_id, derived.side_2.entry_id)
+    if expected is None:
+        if None not in current:
+            raise RuleViolationError(ErrorCode.EXPECTED_SIDES_REQUIRED)
+        return  # a side still to come: 422 `match_sides_unknown` follows (BR-091)
+    if current != expected:
+        raise ConflictError(
+            ErrorCode.MATCH_SIDES_CHANGED,
+            entry_ids=[None if i is None else str(i) for i in current],
+        )
 
 
 def _require_unlocked(

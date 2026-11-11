@@ -542,10 +542,16 @@ class ResultWrite(RequestModel):
 
     A walkover names its winner and has no games (FR-052, BR-124). No walkover
     and no games is the empty result, which clears the match's result (FR-053).
+
+    `expected_sides` are the entries the screen saw on side 1 and side 2. The
+    sides of a knockout match after the first round are derived from the
+    winners (DATA-MODEL D4), so "side 1 wins" must name the entry it meant:
+    it is required there, and optional for a match whose sides are stored.
     """
 
     walkover_winner: Literal[Outcome.SIDE_1, Outcome.SIDE_2] | None
     games: Annotated[list[GameWrite], Field(max_length=MAX_GAMES)]
+    expected_sides: tuple[UUID, UUID] | None = None
 
     @model_validator(mode="after")
     def _walkover_has_no_games(self) -> Self:
@@ -1082,6 +1088,11 @@ def set_match_result(
     `game_no`) or `scores_required` (Swiss and Monster DYP, detail `game_no`).
     A walkover with games is 422 `validation_failed`.
 
+    A knockout match after the first round has derived sides: the body names
+    the entries the screen saw in `expected_sides`. Other entries, or a side
+    still to come, are 409 `match_sides_changed` (detail `entry_ids`, the
+    current ones); none is 422 `expected_sides_required`.
+
     The knockout: once it is drawn, a group-phase result is 422
     `group_phase_locked` (BR-053, detail `phase_id`); a knockout result that a
     later match it feeds has a result for is 422 `result_locked` (BR-094,
@@ -1096,6 +1107,7 @@ def set_match_result(
         match_id=match_id,
         user_id=user.id,
         result=MatchResult(
+            expected_sides=body.expected_sides,
             walkover_winner=body.walkover_winner,
             games=tuple(
                 Game(winner=game.winner, score_1=game.score_1, score_2=game.score_2)

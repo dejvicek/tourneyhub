@@ -65,6 +65,10 @@ class ErrorCode(StrEnum):
     # Results, standings and finishing
     MATCH_NOT_FOUND = "match_not_found"
     MATCH_SIDES_UNKNOWN = "match_sides_unknown"  # BR-091
+    MATCH_SIDES_CHANGED = (
+        "match_sides_changed"  # the derived sides are not the ones seen
+    )
+    EXPECTED_SIDES_REQUIRED = "expected_sides_required"  # a derived match needs them
     GROUP_PHASE_NOT_DONE = "group_phase_not_done"  # FR-040
     GROUP_PHASE_LOCKED = "group_phase_locked"  # the knockout is drawn (BR-053)
     RESULT_LOCKED = "result_locked"  # a later knockout match has a result (BR-094)

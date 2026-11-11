@@ -4,6 +4,7 @@ BR-053, BR-080, BR-085 to BR-087, BR-090, BR-094, BR-102, BR-103, BR-120, BR-130
 
 import threading
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid7
@@ -27,6 +28,7 @@ from tourneyhub.engine.tournaments import (
     SeedingMethod,
     TournamentType,
 )
+from tourneyhub.errors import NotFoundError
 from tourneyhub.services import knockout as knockout_service
 from tourneyhub.services import leagues as league_service
 from tourneyhub.services import players as player_service
@@ -138,6 +140,23 @@ def put_result(
     client: TestClient, league_id: UUID, headers: dict[str, str]
 ) -> Callable[[str, str, Json], tuple[int, Json]]:
     def put_result(tournament_id: str, match_id: str, body: Json) -> tuple[int, Json]:
+        """Send a result; a bracket match with both sides known names them (BR-094)."""
+        if "expected_sides" not in body:
+            shown = client.get(
+                _t_url(league_id, tournament_id, "/bracket"), headers=headers
+            )
+            if shown.status_code == 200:
+                sides = next(
+                    (
+                        [side["entry_id"] for side in m["sides"]]
+                        for r in shown.json()["rounds"]
+                        for m in r["matches"]
+                        if m["match_id"] == match_id
+                    ),
+                    None,
+                )
+                if sides is not None and None not in sides:
+                    body = {**body, "expected_sides": sides}
         response = client.put(
             _t_url(league_id, tournament_id, f"/matches/{match_id}/result"),
             json=body,
@@ -711,6 +730,82 @@ def test_br094_a_changed_winner_changes_the_later_sides(
     assert after[3, "third_place", 1]["sides"][0]["seed"] == 1
 
 
+def _entry_ids(match: Json) -> list[str]:
+    return [side["entry_id"] for side in match["sides"]]
+
+
+def test_br094_a_result_of_a_derived_match_names_the_entries_it_saw(
+    drawn: Json,
+    read: Callable[[str, str], Json],
+    put_result: Callable[[str, str, Json], tuple[int, Json]],
+) -> None:
+    bracket = _play_to_the_semifinals(drawn, read, put_result)
+    semi = bracket[2, "standard", 1]
+    seen = _entry_ids(semi)
+
+    without = put_result(
+        drawn["id"], semi["match_id"], {**win("side_1"), "expected_sides": None}
+    )
+    stale = put_result(
+        drawn["id"], semi["match_id"], {**win("side_1"), "expected_sides": seen[::-1]}
+    )
+    right = put_result(
+        drawn["id"], semi["match_id"], {**win("side_1"), "expected_sides": seen}
+    )
+
+    assert without == (422, {"code": "expected_sides_required", "detail": {}})
+    assert stale == (
+        409,
+        {"code": "match_sides_changed", "detail": {"entry_ids": seen}},
+    )
+    assert right[0] == 200
+    after = bracket_matches(read(drawn["id"], "/bracket"))
+    assert after[2, "standard", 1]["outcome"] == "side_1"
+
+
+def test_br094_a_stale_screen_cannot_decide_a_match_whose_sides_changed(
+    drawn: Json,
+    read: Callable[[str, str], Json],
+    put_result: Callable[[str, str, Json], tuple[int, Json]],
+) -> None:
+    bracket = _play_to_the_semifinals(drawn, read, put_result)
+    for position in (1, 2):
+        put_result(
+            drawn["id"], bracket[2, "standard", position]["match_id"], win("side_1")
+        )
+    final = bracket_matches(read(drawn["id"], "/bracket"))[3, "standard", 1]
+    seen = _entry_ids(final)
+    put_result(drawn["id"], bracket[2, "standard", 1]["match_id"], EMPTY)
+
+    status, body = put_result(
+        drawn["id"], final["match_id"], {**win("side_1"), "expected_sides": seen}
+    )
+
+    after = bracket_matches(read(drawn["id"], "/bracket"))[3, "standard", 1]
+    assert (status, body["code"]) == (409, "match_sides_changed")
+    assert body["detail"]["entry_ids"] == [None, seen[1]]
+    assert after["outcome"] is None
+
+
+def test_br094_the_sides_of_a_first_round_match_are_checked_when_sent(
+    drawn: Json,
+    read: Callable[[str, str], Json],
+    put_result: Callable[[str, str, Json], tuple[int, Json]],
+) -> None:
+    match = bracket_matches(read(drawn["id"], "/bracket"))[1, "standard", 2]
+    seen = _entry_ids(match)
+
+    stale = put_result(
+        drawn["id"], match["match_id"], {**win("side_1"), "expected_sides": seen[::-1]}
+    )
+    sent_none = put_result(
+        drawn["id"], match["match_id"], {**win("side_1"), "expected_sides": None}
+    )
+
+    assert stale[1]["code"] == "match_sides_changed"
+    assert sent_none[0] == 200
+
+
 def test_br130_a_final_whose_side_is_cleared_leaves_its_field(
     drawn: Json,
     read: Callable[[str, str], Json],
@@ -1167,6 +1262,23 @@ def _enter(
     now: datetime,
 ) -> None:
     owner_id, league_id, tournament_id = ids
+    try:
+        shown = knockout_service.read_bracket(
+            session, league_id=league_id, tournament_id=tournament_id, user_id=owner_id
+        )
+    except NotFoundError:  # a group-phase result: its sides are stored
+        shown = None
+    sides = next(
+        (
+            (m.sides[0].entry_id, m.sides[1].entry_id)
+            for r in (() if shown is None else shown.rounds)
+            for m in r.matches
+            if m.match_id == match_id
+        ),
+        None,
+    )
+    if sides is not None and sides[0] is not None and sides[1] is not None:
+        result = replace(result, expected_sides=(sides[0], sides[1]))
     tournament_service.set_match_result(
         session,
         league_id=league_id,
@@ -1471,20 +1583,29 @@ def test_br094_a_final_result_racing_a_semifinal_edit(
         assert body == {"code": "result_locked", "detail": {"match_ids": [str(final)]}}
         assert _bracket(committing_engine, ids)[2, "standard", 1].sides[0].seed == 1
     else:
-        status, _ = _race(
+        shown = _bracket(committing_engine, ids)[2, "standard", 1]
+        seen = [str(side.entry_id) for side in shown.sides]
+        status, body = _race(
             committing_settings,
             committing_engine,
             wait_for_a_lock_wait,
             lambda s: _enter(s, ids, semi, _WIN_2, now),
-            request(final, win("side_1")),
+            request(final, {**win("side_1"), "expected_sides": seen}),
         )
-        # The final waited for the edit and was played by the new winner.
+        # The final waited for the edit and found other pairs than the screen's:
+        # "side 1 wins" would have meant another entry (ADR-008).
         after = _bracket(committing_engine, ids)[2, "standard", 1]
-        assert status == 200
+        assert (status, body["code"]) == (409, "match_sides_changed")
+        assert body["detail"]["entry_ids"] == [
+            str(side.entry_id) for side in after.sides
+        ]
+        assert (
+            body["detail"]["entry_ids"][1] == seen[1] != body["detail"]["entry_ids"][0]
+        )
         assert after.sides[0].seed == 4
-        assert after.outcome is Outcome.SIDE_1
+        assert after.outcome is None
     with Session(committing_engine) as check:
         state = tournament_service.read_tournament(
             check, league_id=league_id, tournament_id=tournament_id, user_id=owner_id
         ).state
-    assert state.value == "finished"
+    assert state.value == ("finished" if final_first else "in_progress")
