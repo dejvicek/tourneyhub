@@ -48,6 +48,7 @@ The MVP lets an organizer run a league in seasons, play tournaments inside each 
 | Field | A place where one match is played at a time: a foosball table, a court, a board. A tournament's fields are numbered 1, 2, 3 … |
 | On a field | A match that has a field and is being played there. |
 | Waiting | A match whose two sides are known but that has no field yet. |
+| Held | A waiting match the organizer took off its field. It takes no field by itself until the organizer places or releases it (BR-136). |
 | Late player | A player — in Doubles, a pair — added after the tournament has started (BR-067). |
 | Disabled | A player or pair the organizer has taken out of new rounds for now. |
 | Top players | In Monster DYP, the players kept apart in rounds 1 and 2. |
@@ -125,7 +126,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 |---|---|
 | FR-010 | An organizer creates a league with a name. Creating it also starts Season 1. |
 | FR-011 | League settings: name; whether draws are allowed in group phases (default: not allowed); the defaults for new tournaments — number of fields (1), match format (BO1, BO3 or BO5; default BO1) and goals per game (10); and the placement points table. The default is 10, 8, 6, 4, 2 for 1st–5th, kept small so that a player who misses a few tournaments can still catch up. Points are whole numbers, and no place is worth more than the place above it. |
-| FR-012 | The organizer adds players to the league's player list by name, gives them a note, renames them, removes them and restores removed players (BR-001–BR-006). A rename and a note show everywhere, including past results. Restoring a removed player always works, within the limit of BR-006. When a removal is refused (BR-002), the app lists the tournaments that block it. |
+| FR-012 | The organizer adds players to the league's player list by name, gives them a note, renames them, removes them and restores removed players (BR-001–BR-006). When an added or renamed player's name matches another player's, the app asks for a note that tells them apart and does not save without one (BR-001, BR-004). If the other player is removed, it also offers to restore them. A rename and a note show everywhere, including past results. A removed player can always be restored (BR-001), as long as the league is under its player limit (BR-006). When a removal is refused (BR-002), the app lists the tournaments that block it. |
 | FR-013 | The organizer can delete a league after confirming. Everything in it is deleted. |
 
 ### 6.3 Seasons
@@ -140,9 +141,9 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 
 | ID | Requirement |
 |---|---|
-| FR-030 | The organizer creates a tournament in the league's active season with a name of 1 to 200 characters, a date (default: today) and a type: Singles, Doubles, DYP or Monster DYP. Setup also sets the number of fields, the match format of each phase it creates and the goals per game, starting from the league's defaults (FR-011). A knockout after a group phase gets its match format, and the final's, when it starts (FR-045), prefilled from the league's default; the organizer can change them while the knockout has no result (FR-054, BR-077). "Cancel" in the setup wizard keeps the tournament in setup; deleting it is a separate step (FR-038). |
+| FR-030 | The organizer creates a tournament in the league's active season with a name of 1 to 200 characters, a date (default: today) and a type: Singles, Doubles, DYP or Monster DYP. Setup also sets the number of fields, the match format of each phase it creates and the goals per game, starting from the league's defaults (FR-011). A knockout after a group phase gets its match format, and the final's, when it starts (FR-045), prefilled from the league's default; the organizer can change them: the knockout's format while it has no result, the final's until the final has one (FR-054). "Cancel" in the setup wizard keeps the tournament in setup; deleting it is a separate step (FR-038). |
 | FR-031 | A tournament usually has a group phase followed by a knockout, but either can be left out. Singles, Doubles and DYP choose a group phase — round robin (once or twice), Swiss or none; Monster DYP always plays its own rounds (§7.8). Without a group phase, the tournament is a knockout from the start, with or without a third-place match. After a group phase, the organizer decides whether a knockout follows (FR-040). |
-| FR-032 | The organizer picks the players from the league's player list. There must be at least 2 entries, or 4 with a third-place match; Monster DYP needs at least 4 players. There is no maximum. If a technical limit is ever needed, it must still allow 256 entries in a tournament, in a round robin too, and 20 rounds in a group phase. |
+| FR-032 | The organizer picks the players from the league's player list. There must be at least 2 entries, or 4 with a third-place match; Monster DYP needs at least 4 players. There is no maximum. If a technical limit is ever needed, it must still allow 256 entries in a tournament, in a round robin too. A Swiss or Monster DYP group phase has up to 20 rounds. A round robin of N entries has N−1 rounds, or N with an odd count; a late entry cannot take a round robin past 256 entries (FR-047). |
 | FR-033 | Doubles: the organizer puts the players into pairs. DYP: the players are split into a top and a bottom half — by the league ranking or by hand — and the pairs are drawn (BR-031–BR-033). |
 | FR-034 | The first phase of a Singles, Doubles or DYP tournament is seeded by league ranking (default) or random shuffle, and the organizer can then reorder the seeds by hand. A knockout after a group phase is seeded by the group-phase places (§7.11). |
 | FR-035 | Generating creates the bracket, the round-robin schedule, or the first round of a Swiss or Monster DYP, and starts the tournament. |
@@ -156,13 +157,13 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | ID | Requirement |
 |---|---|
 | FR-040 | Swiss and Monster DYP have no set number of rounds: once every match in the current round has a result, the organizer adds the next round, starts the knockout (FR-045) or finishes the tournament after confirming. The organizer sees a recommended minimum number of rounds (BR-068) but can stop earlier or play on. A round robin offers the same choice — knockout or finish — once all its matches have results. |
-| FR-041 | Monster DYP: the top players are the players the organizer marked, filled up from the league ranking (BR-061). The organizer can mark at most one player per match of round 1; when a later round has fewer matches, the marked players who play count in league-ranking order (BR-061). |
+| FR-041 | Monster DYP: the top players are the players the organizer marked in a step of the tournament setup, filled up from the league ranking (BR-061). The organizer can mark at most one player per match of round 1; when a later round has fewer matches, the marked players who play count in league-ranking order (BR-061). |
 | FR-042 | Each new round is drawn from the current standings (§7.7, §7.8), leaving out disabled players (BR-064). |
 | FR-043 | For a Swiss or Monster DYP, the organizer switches each tie-breaker — score difference, BH1, BH2 — on or off and puts them in order. Default: BH1, then BH2, then score difference. |
 | FR-044 | In a Swiss or Monster DYP, the organizer can disable any player — in Doubles and DYP, a pair — and re-enable them later (BR-064). |
 | FR-045 | When starting the knockout, the organizer picks how many entries qualify, whether there is a third-place match (BR-080) and the match format of the knockout and the final (FR-030). After a round robin or Swiss, the qualifying entries play as they are. After Monster DYP rounds, the knockout is formed in one of four ways: **Seeded pairs**, **Singles**, **A little mercy** or **Lord have mercy** (§7.11). |
 | FR-046 | The organizer can delete the newest round of a Swiss or Monster DYP, or a knockout that follows a group phase, with any results in it (BR-066, BR-087). Deleting round 1 takes the tournament back to setup. |
-| FR-047 | The organizer can add late players from the league's player list — in Doubles, a pair — to any group phase except DYP: between rounds of a Swiss or Monster DYP, and until a round robin is complete (BR-054, BR-067). A knockout without a group phase takes them only in place of a bye (BR-045); a knockout after a group phase takes none. |
+| FR-047 | The organizer can add late players from the league's player list — in Doubles, a pair — to any group phase except DYP: between rounds of a Swiss or Monster DYP, and until a round robin is complete (BR-054, BR-067). The organizer can add several late entries in one step (BR-054). A knockout without a group phase takes them only in place of a bye (BR-045); a knockout after a group phase takes none. |
 | FR-048 | Before a late player joins a Swiss or Monster DYP that uses BH1 or BH2, the organizer is warned that it may be unfair: the rounds the late player missed earned no points, so everyone who meets them afterwards gets a lower BH. The organizer can go ahead anyway. |
 
 ### 6.6 Results
@@ -205,19 +206,19 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 |---|---|
 | FR-090 | Every tournament has at least one field. The organizer sets how many in setup and can add or remove fields at any time while the tournament runs (BR-132). |
 | FR-091 | A field is shown as "Field" and its number. Names for fields are not in the MVP. |
-| FR-092 | Matches go onto free fields by themselves (BR-130). Matches that could be played but have no field are shown as waiting, in the order in which they will get one. |
-| FR-093 | The organizer can put a waiting match on a free field, move a match to another free field, swap the matches on two fields, or take a match off its field and back to waiting, where it is held (BR-133). |
+| FR-092 | Matches go onto free fields by themselves (BR-130). Matches that could be played but have no field are shown as waiting, in the order in which they will get one. A held match (BR-136) is listed among them, marked "held", but is skipped while it is held. |
+| FR-093 | The organizer can put a waiting match on a free field, move a match to another free field, swap the matches on two fields, or take a match off its field and back to waiting (BR-133). A match taken off its field is held, and the waiting list marks it "held". The organizer can release a held match (BR-136). |
 | FR-094 | Entering a match's result frees its field, which takes the next waiting match. The organizer can also enter a result for a waiting match, for example one played somewhere else; that match then never takes a field. |
 
 ### 6.11 Privacy
 
 | ID | Requirement |
 |---|---|
-| FR-100 | Before the pilot, the instance, its database and its backups are hosted in the EU. |
-| FR-101 | A "Privacy" page in English and Czech is linked from the footer of every page and from sign-up. It says who the data controller is, what data is stored, why, for how long, what rights people have, and that a share link makes players' names and results public. |
-| FR-102 | Before a league's share link is first shown, the organizer confirms that the league's players know the link makes their names and results public. |
-| FR-103 | The app sets only the cookie needed to stay logged in, so it shows no cookie banner. |
-| FR-104 | Until organizers can delete their own data (RM-31), the instance admin deletes an account or a league on request, by hand. |
+| FR-100 | From the pilot on, the instance, its database and its backups are hosted in the EU. This is settled before the pilot starts and holds for as long as the instance runs. |
+| FR-101 | A "Privacy" page in English and Czech is linked from the footer of every page and from sign-up. It says who the data controller is, what data is stored, why, for how long, what rights people have, and that a share link makes players' names, notes and results public. |
+| FR-102 | Before a league's share link is first shown, the organizer confirms that the league's players know the link makes their names, notes and results public. |
+| FR-103 | The app sets only the cookie needed to stay logged in. A viewer's choice of language is kept in the browser's localStorage (FR-081, ADR-003). Both are necessary for the app to work, so no consent is needed and there is no cookie banner. |
+| FR-104 | Until organizers can delete their own data (RM-31), the instance admin deletes an account or a league on request, by hand. A player's request to be erased goes to the organizer, who entered the player. The organizer can rename the player to a neutral name and clear the note (FR-012); the tournaments' results, places and points stay. Removing the player (BR-002) alone keeps the name. |
 
 ## 7. Business rules
 
@@ -225,11 +226,11 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 
 | ID | Rule |
 |---|---|
-| BR-001 | Two players of a league can have the same name. When the organizer adds a player, or renames any player, a removed one too, to a name that another player of the league has, removed ones included, ignoring upper and lower case, the app warns ("X is already in the league. Add another?") and saves only after the organizer confirms. |
+| BR-001 | A player has a name and an optional note of up to 30 characters (BR-004). Name and note together are unique within a league, ignoring upper and lower case and counting removed players. Two players can share a name when their notes differ. Adding a player whose name another player has warns: "Petr Novák is already in this league. If this is someone else, add a note to tell them apart." A rename to such a name warns: "Another player is already called Petr Novák. Add a note to tell them apart." Neither saves without a note. If the other player is removed, the app also offers to restore them. Restoring a removed player never creates a duplicate, so it needs no warning. Example: "Petr Novák" without a note is in the league; adding "petr novák" without a note is refused, and with the note "z Brna" it saves. |
 | BR-002 | A player who is in an unfinished tournament, including one still in setup, cannot be removed. A removed player keeps their past results, places and points but cannot be picked for new tournaments. |
 | BR-003 | A player is in a tournament at most once; in Doubles and DYP, in exactly one pair. |
-| BR-004 | The organizer can give a player a short note, such as "senior" or "from Brno", to tell players with the same name apart, and change or clear it at any time. The note is shown next to the name everywhere the name is: player lists, standings, brackets, schedules and the share link. |
-| BR-005 | A player's name has 1 to 100 characters. Runs of spaces count as one space, and invisible characters are refused. Names that only look alike are different names. |
+| BR-004 | The organizer can give a player a note of 1 to 30 characters, such as "senior" or "from Brno", and change or clear it at any time. The note follows the space and invisible-character rules of BR-005. It is required exactly when the player's name alone is taken by another player, removed ones included; a change or a clear that would make name and note equal to another player's is refused (BR-001). The note is shown next to the name everywhere the name is: player lists, standings, brackets, schedules and the share link. |
+| BR-005 | A player's name has 1 to 100 characters. Leading and trailing spaces are dropped, runs of spaces count as one space, and invisible characters are refused. Upper and lower case do not make names different (BR-001). Names that only look alike, such as a Latin and a Cyrillic "a", are different names; they are not merged. |
 | BR-006 | A league has at most 1000 players on its list. Removed players do not count; restoring one counts them again. |
 
 ### 7.2 Seasons and settings
@@ -238,13 +239,14 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 |---|---|
 | BR-010 | A new season cannot start while any tournament in the current season is unfinished, including one still in setup. The organizer finishes or deletes it first. |
 | BR-011 | Nothing in a closed season can change: no new tournaments, results, corrections or deletions. Renaming the league, the season or a player, and deleting the whole league, still apply. |
-| BR-012 | Changing the placement points table recalculates the active season's standings; a closed season keeps the table it was played under. Turning draws off does not change results already entered, and it is refused while the league has an unfinished tournament whose group phase plays BO2 (BR-125). A change of the draw setting, off or on, also moves the points for sitting out of every Swiss or Monster DYP phase that has no result yet, unless the organizer picked them by hand (BR-076). |
+| BR-012 | Changing the placement points table recalculates the active season's standings; a closed season keeps the table it was played under. |
+| BR-013 | Turning draws off does not change results already entered, and it is refused while the league has an unfinished tournament whose group phase plays BO2 (BR-125). A change of the draw setting, off or on, also moves the points for sitting out of every Swiss or Monster DYP phase that has no result yet, unless the organizer picked them by hand (BR-076). |
 
 ### 7.3 League ranking and seeding
 
 | ID | Rule |
 |---|---|
-| BR-020 | The league ranking orders the league's players by current season points, then tournament wins, then their final place last season (players without one come after those with one), then by lot. It reflects the standings at the moment it is used. |
+| BR-020 | The league ranking orders the league's players by current season points, then the tournaments they won this season, then their final place last season (players without one come after those with one), then by lot. It reflects the standings at the moment it is used. Removed players are left out of the ranking, so the position sums of BR-021 skip them. |
 | BR-021 | Seeding by league ranking: singles follow the ranking. Pairs are ordered by the sum of their two players' positions in the whole league ranking, not renumbered among the tournament's players, lowest first; on equal sums, the pair with the better-ranked player goes first. |
 | BR-022 | Random shuffle orders the entries by lot. |
 
@@ -276,7 +278,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | BR-051 | Matches are grouped into rounds, and no entry plays twice in a round. In the schedule made at the start, an odd number of entries means one sits out each round and every entry sits out the same number of times, and seeds 1 and 2 meet in the last round, as the last match of that round; when played twice, the same holds in each half (BR-052). After a late entry, BR-054 governs the rescheduled rounds: with 4 entries and a 5th joining after round 2, entries 1-4 sit out twice and the 5th never. |
 | BR-052 | When played twice, the second half repeats the first half's pairings, round by round. |
 | BR-053 | A round robin's results lock when the knockout is drawn. |
-| BR-054 | A late entry in a round robin plays every other entry as often as everyone else does. The matches not yet played are rescheduled to fit its matches in; results already entered stay. When played twice, BR-052 holds only for the matches before the reschedule: the matches not yet played follow BR-054, and a repeat order is kept only where BR-054 leaves it unchanged. The reschedule is chosen in this order: (1) as few rounds as possible; (2) then the longest run of rounds any entry sits out in a row, counting the rounds already played, as short as possible (rounds that already had a result when it joined are not its sit-outs); (3) then the last unplayed match of seeds 1 and 2 in as late a round as possible, as the last match of that round (BR-051); (4) then as few already scheduled matches as possible moved to a different round; (5) remaining ties are decided by lot (BR-074). With 4 entries and a 5th joining after round 2, four more rounds are needed (6 in all), and with 1 v 2 in round 6 some entry would sit out two rounds in a row, so 1 v 2 is played in round 5 of 6. |
+| BR-054 | A late entry in a round robin plays every other entry as often as everyone else does. The matches not yet played are rescheduled to fit its matches in; results already entered stay. When played twice, BR-052 holds only for the matches before the reschedule: the matches not yet played follow BR-054, and a repeat order is kept only where BR-054 leaves it unchanged. The reschedule is chosen in this order: (1) as few rounds as possible; (2) then the longest run of rounds any entry sits out in a row, counting the rounds already played, as short as possible (rounds that already had a result when it joined are not its sit-outs); (3) then the last unplayed match of seeds 1 and 2 in as late a round as possible, as the last match of that round (BR-051); (4) then as few already scheduled matches as possible moved to a different round; (5) remaining ties are decided by lot (BR-074). With 4 entries and a 5th joining after round 2, four more rounds are needed (6 in all), and with 1 v 2 in round 6 some entry would sit out two rounds in a row, so 1 v 2 is played in round 5 of 6. Entries added in one step are fitted in by one reschedule; entries added in separate steps get one reschedule each, in the order added. Entries added together are taken in league-ranking order (BR-020, and BR-021 for pairs), so the order of picking does not matter. Matches with a result or on a field do not move. |
 
 ### 7.7 Swiss
 
@@ -285,7 +287,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | BR-055 | Round 1 pairs the top half of the seeds against the bottom half: seed 1 plays seed N/2 + 1, seed 2 plays seed N/2 + 2, and so on (8 entries: 1 v 5, 2 v 6, 3 v 7, 4 v 8). |
 | BR-056 | From round 2, entries are ordered by current standing and play their neighbour: 1st v 2nd, 3rd v 4th, and so on. An entry that has already played its neighbour plays the next entry down that it has not played. |
 | BR-057 | No entry meets the same opponent twice while it can be avoided. |
-| BR-058 | With an odd number of entries in a round, one sits out. Entries that did not sit out the round before are picked to sit out first; among them, the one with the fewest sit-outs so far; among those, the one whose sitting out lets the rest pair without a repeat opponent (BR-057); and then the lowest-placed; remaining ties by lot (BR-074). A missed round counts as a sit-out here (BR-064, BR-067). In round 1, before any result, the lowest seed sits out, and the others are paired by BR-055 (7 entries: seed 7 sits out, then 1 v 4, 2 v 5, 3 v 6). Disabled entries are not picked. |
+| BR-058 | With an odd number of entries in a round, one sits out. Entries that did not sit out the round before are picked to sit out first; among them, the one with the fewest sit-outs so far; among those, the one whose sitting out leaves the fewest repeat opponents in the round (BR-057); and then the lowest-placed; remaining ties by lot (BR-074). A missed round counts as a sit-out here (BR-064, BR-067). In round 1, before any result, the lowest seed sits out, and the others are paired by BR-055 (7 entries: seed 7 sits out, then 1 v 4, 2 v 5, 3 v 6). Disabled entries are not picked. |
 
 ### 7.8 Monster DYP rounds
 
@@ -315,7 +317,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | BR-072 | Swiss and Monster DYP: entries level on points are ordered by the enabled tie-breakers, in the organizer's order (FR-043). |
 | BR-073 | BH1 is the sum of the current points of every opponent faced, counted once per match. BH2 is the sum of those opponents' BH1. Score difference is goals for minus goals against over all games. Sit-outs add nothing to BH1 or BH2, and score difference counts only entered game scores. |
 | BR-074 | Entries still level share the place. Where a strict order is needed — pairing the next round, or the knockout's cut and seeding — the lot decides. |
-| BR-075 | While the phase has no result (BR-077), its points for sitting out are the default of FR-039 for the phase's current match format and the league's current draw setting, so that the default is never worth a result no match can produce. A change of either, the format (FR-054) or the draw setting off or on (BR-012), moves them with it, unless the organizer has picked a value by hand (BR-076). |
+| BR-075 | While the phase has no result (BR-077), its points for sitting out are the default of FR-039 for the phase's current match format and the league's current draw setting, so that the default is never worth a result no match can produce. A change of either, the format (FR-054) or the draw setting off or on (BR-013), moves them with it, unless the organizer has picked a value by hand (BR-076). |
 | BR-076 | While the phase has no result (BR-077), the organizer can pick 0, 1 or 2 in setup (FR-036), or go back to the default; a pick, even of the default's value, stays until changed. A picked value replaces the default of BR-075, and a change of match format or draw setting does not move it. |
 | BR-077 | A phase has no result while none of its matches has one: until its first result is entered, and again once every result in it is cleared (FR-053) or its round 1 is deleted (FR-046). While the phase has a result, its points for sitting out are fixed, whether they came from the default or by hand. |
 | BR-078 | Sit-out points count as points in the standings (BR-072), in the running standings too, once every match of the sit-out's round has a result. |
@@ -373,7 +375,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | BR-122 | Group-phase points come from the match result, not from games: a win is 2, a draw 1, a loss 0 (BR-070), whatever the format. |
 | BR-123 | Goals per game (default 10) sets how many goals the score counter shows. It is a guide, not a rule: other whole-number scores can still be entered, and the organizer can change it at any time, also while the tournament runs. When no side of a game reached it, such as 5:3 with 10, the app warns but saves the score. |
 | BR-124 | A walkover in BO2, BO3 or BO5 gives the winner the match with no game scores. |
-| BR-125 | Draws cannot be turned off while the league has an unfinished tournament, including one still in setup, whose group phase plays BO2: without draws, BO2 has no valid result for 1:1 (BR-121). The organizer first finishes or deletes it, or changes its format while FR-054 allows it. This is an exception to BR-012. |
+| BR-125 | Draws cannot be turned off while the league has an unfinished tournament, including one still in setup, whose group phase plays BO2: without draws, BO2 has no valid result for 1:1 (BR-121). The organizer first finishes or deletes it, or changes its format while FR-054 allows it. This is an exception to BR-013. |
 
 ### 7.16 Fields
 
@@ -382,9 +384,10 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | BR-130 | A match can take a field once both its sides are known and none of its players is on another field. A free field takes the first such match in schedule order: in a round robin by round and then by match, so a later round's match can start while the current round finishes; in Swiss and Monster DYP within the current round; in a knockout by round, top of the bracket first. |
 | BR-131 | Nobody plays on two fields at once. A match whose players are still on another field waits, even when a field is free, and the next match that can be played takes the field. |
 | BR-132 | A new field takes the lowest free number and straight away takes the next waiting match. Removing a field keeps the other numbers; a match on the removed field goes back to the front of the waiting list. The last field cannot be removed. |
-| BR-133 | A field the organizer gives a match by hand overrides the automatic order until that match has a result. A match the organizer takes off its field is held, as an exception to BR-130: it stays in the waiting list, marked "held", and takes no field by itself until the organizer places it again. The freed field takes the next waiting match. Placing the match or entering its result ends the hold. |
+| BR-133 | A field the organizer gives a match by hand overrides the automatic order until that match has a result. A match the organizer takes off its field is held (BR-136), as an exception to BR-130. The freed field takes the next waiting match. |
 | BR-134 | Clearing a result does not put the match back on a field; it waits like any other match. |
 | BR-135 | Fields do not change standings, places, points or sit-outs: waiting for a field is not sitting out. |
+| BR-136 | A held match takes no field by itself (BR-130) and keeps its place in schedule order. The hold ends when the organizer places the match by hand (BR-133), releases it, or enters its result (FR-094). A released match waits like any other. A match that left its field for another reason (BR-132, BR-134) is not held. Example: one field plays M4, and M5 (held) and M6 wait. The organizer releases M5; when M4's result comes in, the field takes M5, not M6. |
 
 ## 8. Open questions
 
