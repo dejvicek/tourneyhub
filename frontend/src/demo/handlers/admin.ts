@@ -126,6 +126,9 @@ export const adminHandlers = [
       if (!target) {
         return outsideError(404, "user_not_found");
       }
+      if (target.user.is_admin) {
+        return outsideError(422, "admin_target");
+      }
       const chosen = body.temporary_password ?? null;
       if (chosen !== null) {
         const length = Array.from(chosen).length;

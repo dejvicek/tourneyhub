@@ -42,6 +42,7 @@ export const admin = {
     admin: "Admin",
     mustChange: "Must choose a new password",
     reset: "Reset password",
+    adminCli: "Reset from the command line.",
     resetFor: "Reset the password of {{name}}",
   },
   reset: {
@@ -59,6 +60,8 @@ export const admin = {
     required: "Enter a password.",
     tooShort: "Use at least {{count}} characters.",
     tooLong: "Use at most {{count}} characters.",
+    adminTarget:
+      "This account is an admin's. Admins are handled on the server with the command line.",
     notFound: "This account no longer exists.",
     failed: "That did not work. Check the connection and try again.",
     doneTitle: "Password reset",

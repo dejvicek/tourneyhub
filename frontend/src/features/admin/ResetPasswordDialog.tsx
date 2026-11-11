@@ -32,7 +32,7 @@ type Mode = "generate" | "choose";
  * Resets an account's password (FR-006, ADR-006). The dialog is the
  * confirmation: it says what the reset does, then asks for the button. A
  * generated password is shown once, in the dialog's second step, and is
- * gone when the dialog closes.
+ * gone when the dialog closes. It cannot close while the request is out.
  */
 export function ResetPasswordDialog({
   userId,
@@ -77,21 +77,35 @@ export function ResetPasswordDialog({
   const errorText =
     code === "user_not_found"
       ? t("admin.reset.notFound")
-      : reset.isError && serverField === undefined
-        ? t("admin.reset.failed")
-        : undefined;
+      : code === "admin_target"
+        ? t("admin.reset.adminTarget")
+        : reset.isError && serverField === undefined
+          ? t("admin.reset.failed")
+          : undefined;
   const generated = reset.data?.temporary_password ?? null;
+
+  // The one way out: Cancel, Done, the corner button, Escape and a click outside
+  // all end here, so a generated or chosen password never outlives the dialog.
+  // While the request is out the dialog stays: closing then would lose a
+  // password that is already set on the server.
+  function close() {
+    if (reset.isPending) {
+      return;
+    }
+    setOpen(false);
+    reset.reset();
+    setMode("generate");
+    setLocal(undefined);
+  }
 
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) {
-          // The generated password leaves the page with the dialog.
-          reset.reset();
-          setMode("generate");
-          setLocal(undefined);
+        if (next) {
+          setOpen(true);
+        } else {
+          close();
         }
       }}
     >
@@ -105,7 +119,7 @@ export function ResetPasswordDialog({
           {t("admin.organizers.reset")}
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent showCloseButton={!reset.isPending}>
         {reset.isSuccess ? (
           <div className="space-y-4">
             <DialogHeader>
@@ -133,14 +147,7 @@ export function ResetPasswordDialog({
               </div>
             )}
             <DialogFooter>
-              <Button
-                type="button"
-                size="lg"
-                onClick={() => {
-                  setOpen(false);
-                  reset.reset();
-                }}
-              >
+              <Button type="button" size="lg" onClick={close}>
                 {t("admin.reset.done")}
               </Button>
             </DialogFooter>
@@ -196,9 +203,8 @@ export function ResetPasswordDialog({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => {
-                  setOpen(false);
-                }}
+                disabled={reset.isPending}
+                onClick={close}
               >
                 {t("admin.reset.cancel")}
               </Button>

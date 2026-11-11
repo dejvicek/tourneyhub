@@ -1,3 +1,4 @@
+import { QueryClient } from "@tanstack/react-query";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
@@ -218,6 +219,201 @@ describe("the admin area", () => {
       outsideDb().accounts.find((a) => a.user.display_name === "Tomáš Černý")
         ?.user.must_change_password,
     ).toBe(false);
+  });
+
+  it("FR-006: a chosen password is not kept after Cancel", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const user = userEvent.setup();
+    renderAt(paths.admin, queryClient);
+    await screen.findByText("Tomáš Černý");
+    const opener = screen.getByRole("button", {
+      name: "Reset the password of Tomáš Černý",
+    });
+    await user.click(opener);
+    let dialog = await screen.findByRole("dialog");
+    await user.click(
+      within(dialog).getByRole("radio", {
+        name: "Choose a temporary password",
+      }),
+    );
+    await user.type(
+      within(dialog).getByLabelText("Temporary password"),
+      "table football night",
+    );
+
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await user.click(opener);
+    dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).getByRole("radio", { name: "Generate a password" }),
+    ).toBeChecked();
+    await user.click(
+      within(dialog).getByRole("radio", {
+        name: "Choose a temporary password",
+      }),
+    );
+    expect(within(dialog).getByLabelText("Temporary password")).toHaveValue("");
+    expect(queryClient.getMutationCache().getAll()).toHaveLength(0);
+  });
+
+  it("FR-006: a failed reset, then Cancel, leaves a clean dialog behind", async () => {
+    server.use(
+      http.post(
+        "/api/v1/admin/organizers/:id/password-reset",
+        () => new HttpResponse(null, { status: 500 }),
+      ),
+    );
+    const user = await openAdmin();
+    const opener = screen.getByRole("button", {
+      name: "Reset the password of Tomáš Černý",
+    });
+    await user.click(opener);
+    let dialog = await screen.findByRole("dialog");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Reset password" }),
+    );
+    expect(
+      await within(dialog).findByText(/That did not work/),
+    ).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await user.click(opener);
+
+    dialog = await screen.findByRole("dialog");
+    expect(within(dialog).queryByText(/That did not work/)).toBeNull();
+    expect(
+      within(dialog).getByRole("button", { name: "Reset password" }),
+    ).toBeEnabled();
+  });
+
+  it("FR-006: the dialog cannot be closed while the request is out", async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    server.use(
+      http.post("/api/v1/admin/organizers/:id/password-reset", async () => {
+        await gate;
+        return HttpResponse.json({ temporary_password: "generated-once-1" });
+      }),
+    );
+    const user = await openAdmin();
+    await user.click(
+      screen.getByRole("button", { name: "Reset the password of Tomáš Černý" }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Reset password" }),
+    );
+    expect(
+      await within(dialog).findByRole("button", { name: "Resetting…" }),
+    ).toBeDisabled();
+
+    await user.keyboard("{Escape}");
+    // Radix makes the page behind the dialog inert; a click there is "outside".
+    await userEvent
+      .setup({ pointerEventsCheck: 0 })
+      .pointer({ target: document.body, keys: "[MouseLeft]" });
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("button", { name: "Cancel" }),
+    ).toBeDisabled();
+    expect(within(dialog).queryByRole("button", { name: "Close" })).toBeNull();
+
+    release();
+    expect(
+      await within(dialog).findByTestId("temporary-password"),
+    ).toHaveTextContent("generated-once-1");
+  });
+
+  it("FR-006: the mutation cache holds no password once the dialog is closed", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const user = userEvent.setup();
+    renderAt(paths.admin, queryClient);
+    await screen.findByText("Tomáš Černý");
+    await user.click(
+      screen.getByRole("button", { name: "Reset the password of Tomáš Černý" }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Reset password" }),
+    );
+    const password = (await within(dialog).findByTestId("temporary-password"))
+      .textContent;
+    expect(
+      JSON.stringify(
+        queryClient
+          .getMutationCache()
+          .getAll()
+          .map((m) => m.state),
+      ),
+    ).toContain(password);
+
+    await user.click(within(dialog).getByRole("button", { name: "Done" }));
+
+    await waitFor(() => {
+      expect(queryClient.getMutationCache().getAll()).toHaveLength(0);
+    });
+  });
+
+  it("ADR-007: another admin has no reset button, and a refusal is explained", async () => {
+    server.use(
+      http.get("/api/v1/admin/organizers", () =>
+        HttpResponse.json([
+          {
+            id: "11111111-1111-7111-8111-111111111111",
+            email: "second@demo.tourneyhub.test",
+            display_name: "Second Admin",
+            is_admin: true,
+            must_change_password: false,
+            created_at: "2026-09-01T10:00:00Z",
+          },
+          {
+            id: "22222222-2222-7222-8222-222222222222",
+            email: "late@demo.tourneyhub.test",
+            display_name: "Late Admin",
+            is_admin: false,
+            must_change_password: false,
+            created_at: "2026-09-02T10:00:00Z",
+          },
+        ]),
+      ),
+      http.post("/api/v1/admin/organizers/:id/password-reset", () =>
+        HttpResponse.json(
+          { code: "admin_target", detail: {} },
+          { status: 422 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderAt(paths.admin);
+    await screen.findByText("Second Admin");
+    expect(
+      row("Second Admin").queryByRole("button", { name: /Reset/ }),
+    ).toBeNull();
+    expect(
+      row("Second Admin").getByText("Reset from the command line."),
+    ).toBeInTheDocument();
+
+    // an account made an admin after the list was loaded
+    await user.click(
+      screen.getByRole("button", { name: "Reset the password of Late Admin" }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Reset password" }),
+    );
+
+    expect(
+      await within(dialog).findByText(/Admins are handled on the server/),
+    ).toBeInTheDocument();
   });
 
   it("ADR-007: an account that is not an admin sees no admin area", async () => {

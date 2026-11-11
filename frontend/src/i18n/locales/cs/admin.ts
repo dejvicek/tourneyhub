@@ -42,6 +42,7 @@ export const admin: CsMessages<Messages["admin"]> = {
     admin: "Správce",
     mustChange: "Musí zvolit nové heslo",
     reset: "Obnovit heslo",
+    adminCli: "Obnova z příkazové řádky.",
     resetFor: "Obnovit heslo uživatele {{name}}",
   },
   reset: {
@@ -59,6 +60,8 @@ export const admin: CsMessages<Messages["admin"]> = {
     required: "Zadejte heslo.",
     tooShort: "Použijte aspoň {{count}} znaků.",
     tooLong: "Použijte nejvýš {{count}} znaků.",
+    adminTarget:
+      "Tento účet patří správci. Správci se spravují na serveru příkazovou řádkou.",
     notFound: "Tento účet už neexistuje.",
     failed: "Nepovedlo se. Zkontrolujte připojení a zkuste to znovu.",
     doneTitle: "Heslo je obnovené",

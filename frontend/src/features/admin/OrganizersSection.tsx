@@ -11,7 +11,8 @@ import { ResetPasswordDialog } from "./ResetPasswordDialog";
 
 /**
  * The accounts of this instance (FR-006, ADR-007) with "Reset password" for
- * each but the admin's own, which would end the admin's own login.
+ * each organizer. The admin's own account would end the admin's own login, and
+ * another admin's is left to the command line, so the server refuses both.
  */
 export function OrganizersSection({ myId }: { myId: string | undefined }) {
   const { t } = useTranslation();
@@ -72,12 +73,17 @@ export function OrganizersSection({ myId }: { myId: string | undefined }) {
                   )}
                 </div>
               </div>
-              {organizer.id !== myId && (
-                <ResetPasswordDialog
-                  userId={organizer.id}
-                  name={organizer.display_name}
-                />
-              )}
+              {organizer.id !== myId &&
+                (organizer.is_admin ? (
+                  <p className="text-body-sm text-muted-foreground">
+                    {t("admin.organizers.adminCli")}
+                  </p>
+                ) : (
+                  <ResetPasswordDialog
+                    userId={organizer.id}
+                    name={organizer.display_name}
+                  />
+                ))}
             </li>
           ))}
         </ul>
