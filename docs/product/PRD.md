@@ -95,7 +95,7 @@ Each of these is on the roadmap (`ROADMAP.md`).
 
 ### 5.2 A Monster DYP night
 
-1. 14 players come. The organizer creates a Monster DYP and is shown a recommendation of at least 4 rounds. Points for sitting out stay at their default, 1, because the rounds are BO1.
+1. 14 players come. The organizer creates a Monster DYP and is shown a recommendation of at least 4 rounds. Points for sitting out stay at their default, 1, because the league allows draws and the rounds are BO1 (FR-039).
 2. Round 1: 12 players play in 3 matches and 2 sit out. The 3 best-ranked of the 12 who play are in different matches.
 3. After round 1 a late player arrives. The organizer adds them, and they play from round 2, starting on 0 points.
 4. Whenever every match of a round has a result, the organizer adds the next round. A win is worth 2 points, a draw 1.
@@ -149,7 +149,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | FR-036 | Until the first result is entered, the organizer can go back to setup, change anything — including a new DYP draw — and generate again. |
 | FR-037 | A tournament with a knockout finishes automatically when every knockout match has a result. A tournament without one finishes when the organizer finishes it after the group phase (FR-040). |
 | FR-038 | The organizer can delete a tournament after confirming, unless its season is closed. |
-| FR-039 | Round robin, Swiss and Monster DYP have a setup setting, **points for sitting out**: 0, 1 or 2. The default is 1 when the league allows draws and the group phase plays BO1 or BO2, otherwise 2 (BR-071). |
+| FR-039 | Round robin, Swiss and Monster DYP have a setup setting, **points for sitting out**: 0, 1 or 2. The default is 1 when a group-phase match can be drawn (BR-090), otherwise 2 (BR-071). |
 
 ### 6.5 Group phase and knockout
 
@@ -297,7 +297,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | ID | Rule |
 |---|---|
 | BR-070 | In round robin, Swiss and Monster DYP rounds, a win is worth 2 points, a draw 1 and a loss 0. In Monster DYP, both players of a team get the points. |
-| BR-071 | A sit-out is worth the tournament's points for sitting out: 0, 1 or 2 (FR-039). The default is 1 when the league allows draws and the group phase plays BO1 or BO2, whose matches can end level (a BO1 game with equal scores, a BO2 match won 1:1). In every other case it is 2: a sit-out should never be worth a result that no match can produce. In setup, the default follows the phase's match format and the league's draw setting, also when either changes, until the organizer picks a value by hand; their value then stays. Generating the tournament fixes the value. Sit-out points count as points in the standings (BR-072, BR-101). In Monster DYP, each player who sits out gets them. Match points stay as in BR-070. |
+| BR-071 | A sit-out is worth the tournament's points for sitting out: 0, 1 or 2, with the default of FR-039, so that the default is never worth a result no match can produce. Until the phase's first result is entered, the same boundary as FR-054, the default follows the phase's match format and the league's draw setting, also when either changes, unless the organizer has picked a value by hand; their value then stays. From the phase's first result, the value is fixed. Sit-out points count as points in the standings (BR-072, BR-101). In Monster DYP, each player who sits out gets them. Match points stay as in BR-070. |
 | BR-072 | Swiss and Monster DYP: entries level on points are ordered by the enabled tie-breakers, in the organizer's order (FR-043). |
 | BR-073 | BH1 is the sum of the current points of every opponent faced, counted once per match. BH2 is the sum of those opponents' BH1. Score difference is goals for minus goals against over all games. Sit-outs add nothing to BH1 or BH2, and score difference counts only entered game scores. |
 | BR-074 | Entries still level share the place. Where a strict order is needed — pairing the next round, or the knockout's cut and seeding — the lot decides. |
