@@ -31,14 +31,259 @@
         "title": "BackToSetupWrite",
         "type": "object"
       },
-      "BracketRoundName": {
-        "enum": [
-          "round_of_16",
-          "quarterfinal",
-          "semifinal",
-          "final"
+      "BracketMatchRead": {
+        "description": "A bracket match with its sides derived from the results (D4).\n\n`number` counts the tournament's matches, the group phase's first; a bye\nhas none (BR-041). `state`: `bye`; `played`; `on_field`; `ready` (both\nsides known, no field); `waiting` (a side still to come). `score` is\nside 1's: a BO1 game's goals, else the games won; null before a result\nor for a walkover. `next_number` is the match the winner plays next.\n`result_locked` says a later match it feeds has a result, so this one\ncannot change until that is cleared (BR-094).",
+        "properties": {
+          "field_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field Number"
+          },
+          "is_walkover": {
+            "title": "Is Walkover",
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MatchKind"
+          },
+          "match_format": {
+            "$ref": "#/components/schemas/MatchFormat"
+          },
+          "match_id": {
+            "format": "uuid",
+            "title": "Match Id",
+            "type": "string"
+          },
+          "next_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Number"
+          },
+          "number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Outcome"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "result_locked": {
+            "title": "Result Locked",
+            "type": "boolean"
+          },
+          "round_no": {
+            "title": "Round No",
+            "type": "integer"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "sides": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "$ref": "#/components/schemas/BracketSideRead"
+              },
+              {
+                "$ref": "#/components/schemas/BracketSideRead"
+              }
+            ],
+            "title": "Sides",
+            "type": "array"
+          },
+          "state": {
+            "$ref": "#/components/schemas/MatchState"
+          }
+        },
+        "required": [
+          "match_id",
+          "number",
+          "round_no",
+          "position",
+          "kind",
+          "state",
+          "sides",
+          "outcome",
+          "is_walkover",
+          "score",
+          "match_format",
+          "field_number",
+          "next_number",
+          "result_locked"
         ],
-        "type": "string"
+        "title": "BracketMatchRead",
+        "type": "object"
+      },
+      "BracketRead": {
+        "description": "The knockout, computed on read (D4, screens 9 and 10).\n\n`size` is the smallest power of two that fits the entries (BR-040). The\nfinal plays `final_match_format`, or `match_format` when it is null\n(BR-120).",
+        "properties": {
+          "final_match_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KnockoutMatchFormat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "has_group_phase": {
+            "title": "Has Group Phase",
+            "type": "boolean"
+          },
+          "match_format": {
+            "$ref": "#/components/schemas/MatchFormat"
+          },
+          "phase_id": {
+            "format": "uuid",
+            "title": "Phase Id",
+            "type": "string"
+          },
+          "rounds": {
+            "items": {
+              "$ref": "#/components/schemas/BracketRoundRead"
+            },
+            "title": "Rounds",
+            "type": "array"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          },
+          "third_place_match": {
+            "title": "Third Place Match",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "phase_id",
+          "size",
+          "third_place_match",
+          "has_group_phase",
+          "match_format",
+          "final_match_format",
+          "rounds"
+        ],
+        "title": "BracketRead",
+        "type": "object"
+      },
+      "BracketRoundRead": {
+        "description": "A round of the bracket; the last holds the final and the third-place match.",
+        "properties": {
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/BracketMatchRead"
+            },
+            "title": "Matches",
+            "type": "array"
+          },
+          "name": {
+            "$ref": "#/components/schemas/RoundName"
+          },
+          "round_no": {
+            "title": "Round No",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "round_no",
+          "name",
+          "matches"
+        ],
+        "title": "BracketRoundRead",
+        "type": "object"
+      },
+      "BracketSideRead": {
+        "description": "A side: the entry and its knockout seed, a bye, or null while to come.\n\n`decided_by_lot` says a lot placed the entry among those level with it in\nthe group phase, or took it through the cut (BR-074, ADR-009).",
+        "properties": {
+          "decided_by_lot": {
+            "title": "Decided By Lot",
+            "type": "boolean"
+          },
+          "entry_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Id"
+          },
+          "is_bye": {
+            "title": "Is Bye",
+            "type": "boolean"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          }
+        },
+        "required": [
+          "entry_id",
+          "seed",
+          "is_bye",
+          "decided_by_lot"
+        ],
+        "title": "BracketSideRead",
+        "type": "object"
       },
       "BusyFieldRead": {
         "description": "A field holding players of a waiting match: why it waits (BR-131).",
@@ -291,7 +536,18 @@
           "too_many_entries_for_round_robin",
           "match_not_found",
           "match_sides_unknown",
+          "match_sides_changed",
+          "expected_sides_required",
           "group_phase_not_done",
+          "group_phase_locked",
+          "result_locked",
+          "current_phase_changed",
+          "qualifiers_out_of_range",
+          "qualifiers_changed",
+          "phase_not_found",
+          "phase_not_deletable",
+          "knockout_not_found",
+          "knockout_mode_not_applicable",
           "field_not_found",
           "field_number_changed",
           "field_not_free",
@@ -555,6 +811,248 @@
         ],
         "title": "KnockoutMatchFormat",
         "type": "string"
+      },
+      "KnockoutPreviewEntryRead": {
+        "description": "A knockout entry by seed; `decided_by_lot` marks a lot's work (BR-074).",
+        "properties": {
+          "decided_by_lot": {
+            "title": "Decided By Lot",
+            "type": "boolean"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/KnockoutPreviewMemberRead"
+            },
+            "title": "Members",
+            "type": "array"
+          },
+          "seed": {
+            "title": "Seed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "seed",
+          "members",
+          "decided_by_lot"
+        ],
+        "title": "KnockoutPreviewEntryRead",
+        "type": "object"
+      },
+      "KnockoutPreviewMemberRead": {
+        "description": "A group-phase entry behind a knockout entry, with its group-phase place.",
+        "properties": {
+          "entry_id": {
+            "format": "uuid",
+            "title": "Entry Id",
+            "type": "string"
+          },
+          "place": {
+            "title": "Place",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "entry_id",
+          "place"
+        ],
+        "title": "KnockoutPreviewMemberRead",
+        "type": "object"
+      },
+      "KnockoutPreviewRead": {
+        "description": "What starting the knockout would draw, writing nothing (FR-045, BR-080).\n\n`can_start` is false exactly when `problem` is set: the code and detail\nof the error `PUT \u2026/knockout` would answer. `qualifiers` is the number\nasked for, kept between the fewest a knockout takes (2, or 4 with a\nthird-place match) and `max_qualifiers`, the entries that can go through;\nwhen fewer than the fewest can, `entries` is empty. `first_round` pairs\nthe seeds of each first-round match, null for a bye (BR-041), top of the\nbracket first. `locks_round_no` is the last group round, whose results\nthe draw locks (BR-053). `is_cut_by_lot` says the cut fell inside a\nshared place, so the lot chose who goes through (BR-074).",
+        "properties": {
+          "bracket_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bracket Size"
+          },
+          "can_start": {
+            "title": "Can Start",
+            "type": "boolean"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/KnockoutPreviewEntryRead"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "first_round": {
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              ],
+              "type": "array"
+            },
+            "title": "First Round",
+            "type": "array"
+          },
+          "is_cut_by_lot": {
+            "title": "Is Cut By Lot",
+            "type": "boolean"
+          },
+          "locks_round_no": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locks Round No"
+          },
+          "max_qualifiers": {
+            "title": "Max Qualifiers",
+            "type": "integer"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KnockoutProblemRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "qualifiers": {
+            "title": "Qualifiers",
+            "type": "integer"
+          },
+          "skipped_entry_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Skipped Entry Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "can_start",
+          "problem",
+          "max_qualifiers",
+          "qualifiers",
+          "entries",
+          "first_round",
+          "bracket_size",
+          "locks_round_no",
+          "skipped_entry_ids",
+          "is_cut_by_lot"
+        ],
+        "title": "KnockoutPreviewRead",
+        "type": "object"
+      },
+      "KnockoutProblemRead": {
+        "description": "Why starting the knockout would be refused: the error's code and detail.",
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode"
+          },
+          "detail": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "title": "Detail",
+            "type": "object"
+          }
+        },
+        "required": [
+          "code",
+          "detail"
+        ],
+        "title": "KnockoutProblemRead",
+        "type": "object"
+      },
+      "KnockoutWrite": {
+        "additionalProperties": false,
+        "description": "Draw the knockout and start it (FR-045, BR-080, BR-120).\n\n`expected_current_phase_id` is the phase the screen saw as current, the\ngroup phase (ADR-008). `expected_qualifier_ids` are the group-phase\nentries the preview showed going through, in seed order (`entries` of the\npreview, by their members' `entry_id`): a group result that changed the cut\nor the seeds since is 409 `qualifiers_changed`. `match_format` null takes\nthe league's default; `final_match_format` null lets the final play\n`match_format` (BR-120).\nBO2 is never a knockout's (BR-121). `mode` is how the teams are formed\nafter Monster DYP rounds (BR-081 to BR-084) and null after any other\ngroup phase; a mode after a round robin is 422\n`knockout_mode_not_applicable`.",
+        "properties": {
+          "expected_current_phase_id": {
+            "format": "uuid",
+            "title": "Expected Current Phase Id",
+            "type": "string"
+          },
+          "expected_qualifier_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 256,
+            "title": "Expected Qualifier Ids",
+            "type": "array"
+          },
+          "final_match_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KnockoutMatchFormat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "match_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KnockoutMatchFormat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MonsterKnockoutMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "qualifiers": {
+            "$ref": "#/components/schemas/Qualifiers"
+          },
+          "third_place_match": {
+            "title": "Third Place Match",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "expected_current_phase_id",
+          "expected_qualifier_ids",
+          "qualifiers",
+          "third_place_match",
+          "match_format",
+          "final_match_format",
+          "mode"
+        ],
+        "title": "KnockoutWrite",
+        "type": "object"
       },
       "Language": {
         "description": "The UI language an account remembers (FR-081, DATA-MODEL \u00a74.1).",
@@ -907,6 +1405,16 @@
         ],
         "title": "MatchSideRead",
         "type": "object"
+      },
+      "MatchState": {
+        "enum": [
+          "bye",
+          "played",
+          "on_field",
+          "ready",
+          "waiting"
+        ],
+        "type": "string"
       },
       "MonsterKnockoutMode": {
         "description": "How the knockout after Monster DYP rounds is formed (FR-045, BR-081 to BR-084).",
@@ -1282,7 +1790,7 @@
         "type": "string"
       },
       "PlaceReasonRead": {
-        "description": "Why an entry has its place (\u00a77.13).\n\nAfter a group phase without a knockout it is `group_place`, with the\nentry's place in the standings and the phase's format (BR-103). The\nknockout's kinds, `round`, `score` (the entry's first) and the opponent\ncome with the knockout and are null until then.",
+        "description": "Why an entry has its place (\u00a77.13).\n\nAn entry that did not go through to the knockout, or every entry of a\ngroup phase without one, has `group_place`: its place in the standings\nand the phase's format (BR-103). A knockout entry has the final, the\nthird-place match or `lost_in_round` with the `round` it went out in, the\n`score` of that match (the entry's first: a BO1 game's goals, else the\ngames won; null for a walkover or a game without a score) and the\nopponent (BR-102); its `group_place` is that of the entry it continues.",
         "properties": {
           "group_format": {
             "anyOf": [
@@ -1323,7 +1831,7 @@
           "round": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/BracketRoundName"
+                "$ref": "#/components/schemas/RoundName"
               },
               {
                 "type": "null"
@@ -1796,6 +2304,254 @@
         "title": "ProfileUpdate",
         "type": "object"
       },
+      "PublicBracketMatchRead": {
+        "description": "A bracket match for viewers (FR-072); `result_locked` is the organizer's.",
+        "properties": {
+          "field_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field Number"
+          },
+          "is_walkover": {
+            "title": "Is Walkover",
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MatchKind"
+          },
+          "match_format": {
+            "$ref": "#/components/schemas/MatchFormat"
+          },
+          "match_id": {
+            "format": "uuid",
+            "title": "Match Id",
+            "type": "string"
+          },
+          "next_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Number"
+          },
+          "number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Outcome"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "round_no": {
+            "title": "Round No",
+            "type": "integer"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "sides": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "$ref": "#/components/schemas/PublicBracketSideRead"
+              },
+              {
+                "$ref": "#/components/schemas/PublicBracketSideRead"
+              }
+            ],
+            "title": "Sides",
+            "type": "array"
+          },
+          "state": {
+            "$ref": "#/components/schemas/MatchState"
+          }
+        },
+        "required": [
+          "match_id",
+          "number",
+          "round_no",
+          "position",
+          "kind",
+          "state",
+          "sides",
+          "outcome",
+          "is_walkover",
+          "score",
+          "match_format",
+          "field_number",
+          "next_number"
+        ],
+        "title": "PublicBracketMatchRead",
+        "type": "object"
+      },
+      "PublicBracketRead": {
+        "description": "The knockout through the share link (FR-070).\n\nA separate allowlist of fields, not a copy of the organizer's bracket: a\nfield added there must not reach viewers until it is added here on\npurpose. Today it holds the same fields, all of which the share link's\ntournament already shows or derives from what it shows.",
+        "properties": {
+          "final_match_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KnockoutMatchFormat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "has_group_phase": {
+            "title": "Has Group Phase",
+            "type": "boolean"
+          },
+          "match_format": {
+            "$ref": "#/components/schemas/MatchFormat"
+          },
+          "phase_id": {
+            "format": "uuid",
+            "title": "Phase Id",
+            "type": "string"
+          },
+          "rounds": {
+            "items": {
+              "$ref": "#/components/schemas/PublicBracketRoundRead"
+            },
+            "title": "Rounds",
+            "type": "array"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          },
+          "third_place_match": {
+            "title": "Third Place Match",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "phase_id",
+          "size",
+          "third_place_match",
+          "has_group_phase",
+          "match_format",
+          "final_match_format",
+          "rounds"
+        ],
+        "title": "PublicBracketRead",
+        "type": "object"
+      },
+      "PublicBracketRoundRead": {
+        "properties": {
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/PublicBracketMatchRead"
+            },
+            "title": "Matches",
+            "type": "array"
+          },
+          "name": {
+            "$ref": "#/components/schemas/RoundName"
+          },
+          "round_no": {
+            "title": "Round No",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "round_no",
+          "name",
+          "matches"
+        ],
+        "title": "PublicBracketRoundRead",
+        "type": "object"
+      },
+      "PublicBracketSideRead": {
+        "description": "A side for viewers: the entry, its seed and whether a lot decided it, or a bye.",
+        "properties": {
+          "decided_by_lot": {
+            "title": "Decided By Lot",
+            "type": "boolean"
+          },
+          "entry_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Id"
+          },
+          "is_bye": {
+            "title": "Is Bye",
+            "type": "boolean"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          }
+        },
+        "required": [
+          "entry_id",
+          "seed",
+          "is_bye",
+          "decided_by_lot"
+        ],
+        "title": "PublicBracketSideRead",
+        "type": "object"
+      },
       "PublicLeagueRead": {
         "description": "A league through its share link: name, seasons oldest first, players.\n\nPlayers come in the order they were added; names sort in the UI's language.",
         "properties": {
@@ -1897,7 +2653,7 @@
           "round": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/BracketRoundName"
+                "$ref": "#/components/schemas/RoundName"
               },
               {
                 "type": "null"
@@ -2173,6 +2929,11 @@
         "title": "PublicTournamentRead",
         "type": "object"
       },
+      "Qualifiers": {
+        "maximum": 256.0,
+        "minimum": 2.0,
+        "type": "integer"
+      },
       "RankingRow": {
         "description": "A player's place in the league ranking this tournament uses (BR-020).",
         "properties": {
@@ -2200,8 +2961,31 @@
       },
       "ResultWrite": {
         "additionalProperties": false,
-        "description": "A whole result, the target state (ADR-008): every game played, or a walkover.\n\nA walkover names its winner and has no games (FR-052, BR-124). No walkover\nand no games is the empty result, which clears the match's result (FR-053).",
+        "description": "A whole result, the target state (ADR-008): every game played, or a walkover.\n\nA walkover names its winner and has no games (FR-052, BR-124). No walkover\nand no games is the empty result, which clears the match's result (FR-053).\n\n`expected_sides` are the entries the screen saw on side 1 and side 2. The\nsides of a knockout match after the first round are derived from the\nwinners (DATA-MODEL D4), so \"side 1 wins\" must name the entry it meant:\nit is required there, and optional for a match whose sides are stored.",
         "properties": {
+          "expected_sides": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Sides"
+          },
           "games": {
             "items": {
               "$ref": "#/components/schemas/GameWrite"
@@ -2232,6 +3016,21 @@
         ],
         "title": "ResultWrite",
         "type": "object"
+      },
+      "RoundName": {
+        "description": "What a bracket round is called, by the entries still in it.",
+        "enum": [
+          "final",
+          "semifinal",
+          "quarterfinal",
+          "round_of_16",
+          "round_of_32",
+          "round_of_64",
+          "round_of_128",
+          "round_of_256"
+        ],
+        "title": "RoundName",
+        "type": "string"
       },
       "RoundRead": {
         "description": "A round in play order, with the entries that sit it out (BR-051).",
@@ -5634,6 +6433,85 @@
         ]
       }
     },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/bracket": {
+      "get": {
+        "description": "Return the knockout with its sides derived from the results (D4).\n\nA tournament without a knockout is 404 `knockout_not_found`.",
+        "operationId": "read_bracket",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BracketRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Read Bracket",
+        "tags": [
+          "knockout"
+        ]
+      }
+    },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/fields": {
       "post": {
         "description": "Add a field while the tournament runs (FR-090, BR-132).\n\nThe body carries the number the field expects to get, the lowest free\none. The new field takes the next waiting match at once; `match_id` is\nnull when no waiting match can be played.\n\nA tournament in setup or finished is 409 `tournament_not_in_progress`\n(detail `state`); setup sets the number of fields with the format. Any\nother number, a repeat included, is 409 `field_number_changed` with the\n`number` a new field would get now, null when all 32 are taken.",
@@ -6122,9 +7000,223 @@
         ]
       }
     },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout": {
+      "put": {
+        "description": "Draw the knockout after the round robin and start it (FR-045).\n\nThe best entries of the standings go through as they are, seeded by their\nplace; entries still level are ordered by lot (BR-074, BR-080, BR-085).\nThe byes go to the top seeds (BR-040 to BR-042); the first matches take\nthe free fields, and the round robin's results lock (BR-053).\n\n409: `tournament_not_in_progress` (detail `state`), `current_phase_changed`\n(the knockout already exists, detail `current_phase_id`),\n`qualifiers_changed` (the cut or the seeds are not the previewed ones,\ndetail `entry_ids`, the current ones) or `season_closed`. 422:\n`format_not_supported` (Swiss, Monster DYP, or no group phase; detail\n`format`), `group_phase_not_done` (detail `matches_left`),\n`qualifiers_out_of_range` (detail `minimum`, `maximum`, `given`) or\n`knockout_mode_not_applicable` (detail `format`).",
+        "operationId": "start_knockout",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnockoutWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TournamentRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Start Knockout",
+        "tags": [
+          "knockout"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout/preview": {
+      "get": {
+        "description": "Return the cut, the seeds and the byes the knockout would get (FR-045).\n\nWrites nothing. A knockout that cannot start is still 200, with the\n`problem` its start would answer: `tournament_not_in_progress`,\n`current_phase_changed` (the knockout exists), `season_closed`,\n`format_not_supported` (Swiss, Monster DYP, no group phase),\n`group_phase_not_done` or `knockout_mode_not_applicable` (a `mode` after a\nround robin).",
+        "operationId": "read_knockout_preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "qualifiers",
+            "required": true,
+            "schema": {
+              "maximum": 256,
+              "minimum": 2,
+              "title": "Qualifiers",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "third_place_match",
+            "required": true,
+            "schema": {
+              "title": "Third Place Match",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/MonsterKnockoutMode"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mode"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnockoutPreviewRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Read Knockout Preview",
+        "tags": [
+          "knockout"
+        ]
+      }
+    },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/matches/{match_id}/result": {
       "put": {
-        "description": "Enter, replace or clear a match's result (FR-050 to FR-053, FR-094).\n\nThe body is the whole result, so a repeat changes nothing (ADR-008).\nEntering one frees the match's field, which takes the next waiting match\n(BR-130, BR-131). The empty result clears it: the match waits again, not\nput back on its old field (BR-134), and a finished tournament is back in\nprogress (BR-095). The free fields are then filled, so the first match that\ncan be played takes one, the cleared match included.\n\nA closed season is 409 `season_closed`. An unknown match is 404\n`match_not_found`. A match whose sides are not both known is 422\n`match_sides_unknown` (BR-091). A result that breaks a rule is 422:\n`result_does_not_fit_format` (BR-121, detail `format` and `games`),\n`draws_not_allowed` (BR-090), `game_score_mismatch` (BR-092, detail\n`game_no`) or `scores_required` (Swiss and Monster DYP, detail `game_no`).\nA walkover with games is 422 `validation_failed`.",
+        "description": "Enter, replace or clear a match's result (FR-050 to FR-053, FR-094).\n\nThe body is the whole result, so a repeat changes nothing (ADR-008).\nEntering one frees the match's field, which takes the next waiting match\n(BR-130, BR-131). The empty result clears it: the match waits again, not\nput back on its old field (BR-134), and a finished tournament is back in\nprogress (BR-095). The free fields are then filled, so the first match that\ncan be played takes one, the cleared match included.\n\nA closed season is 409 `season_closed`. An unknown match is 404\n`match_not_found`. A match whose sides are not both known is 422\n`match_sides_unknown` (BR-091). A result that breaks a rule is 422:\n`result_does_not_fit_format` (BR-121, detail `format` and `games`),\n`draws_not_allowed` (BR-090), `game_score_mismatch` (BR-092, detail\n`game_no`) or `scores_required` (Swiss and Monster DYP, detail `game_no`).\nA walkover with games is 422 `validation_failed`.\n\nA knockout match after the first round has derived sides: the body names\nthe entries the screen saw in `expected_sides`. Other entries, or a side\nstill to come, are 409 `match_sides_changed` (detail `entry_ids`, the\ncurrent ones); none is 422 `expected_sides_required`.\n\nThe knockout: once it is drawn, a group-phase result is 422\n`group_phase_locked` (BR-053, detail `phase_id`); a knockout result that a\nlater match it feeds has a result for is 422 `result_locked` (BR-094,\ndetail `match_ids`), and a knockout has no draws (BR-090). A new winner\nchanges the later matches' sides. The result that completes the\nknockout finishes the tournament (FR-037).",
         "operationId": "set_match_result",
         "parameters": [
           {
@@ -6231,9 +7323,101 @@
         ]
       }
     },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/phases/{phase_id}": {
+      "delete": {
+        "description": "Delete the knockout that follows the group phase, with its results (FR-046).\n\nThe group phase's results unlock and the organizer chooses again what\ncomes next (BR-087); a finished tournament is back in progress. The\nphase is named by its id: a repeat is 404 `phase_not_found` (ADR-008).\n409 `season_closed`. 422 `phase_not_deletable` for a group phase or a\nknockout without a group phase (detail `kind`).",
+        "operationId": "delete_knockout",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "phase_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Phase Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Knockout",
+        "tags": [
+          "knockout"
+        ]
+      }
+    },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/places": {
       "get": {
-        "description": "Return the places and the season points of a finished tournament (\u00a77.13, \u00a77.14).\n\nComputed on read. Before the tournament finishes, `complete` is false and\nthere are no rows. A finished tournament with a knockout is 422\n`format_not_supported` until the knockout is served.",
+        "description": "Return the places and the season points of a finished tournament (\u00a77.13, \u00a77.14).\n\nComputed on read. Before the tournament finishes, `complete` is false and\nthere are no rows. With a knockout, its entries take the top places and\nthe others follow in their group-phase order (BR-102, BR-103). A Swiss or\na Monster DYP is 422 `format_not_supported` until they are played.",
         "operationId": "read_places",
         "parameters": [
           {
@@ -7680,6 +8864,69 @@
           }
         },
         "summary": "Read Public Tournament",
+        "tags": [
+          "public"
+        ]
+      }
+    },
+    "/api/v1/public/{share_token}/tournaments/{tournament_id}/bracket": {
+      "get": {
+        "description": "Return a tournament's knockout through the share link (FR-070).\n\nA tournament without a knockout is 404 `knockout_not_found`; one in setup\nis 404 `tournament_not_found`, like an unknown one or one of another\nleague.",
+        "operationId": "read_public_bracket",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "share_token",
+            "required": true,
+            "schema": {
+              "title": "Share Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicBracketRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "summary": "Read Public Bracket",
         "tags": [
           "public"
         ]
