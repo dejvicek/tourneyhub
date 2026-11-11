@@ -366,6 +366,23 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | BR-134 | Clearing a result does not put the match back on a field; it waits like any other match. |
 | BR-135 | Fields do not change standings, places, points or sit-outs: waiting for a field is not sitting out. |
 
+### 7.17 Lord have mercy re-mix
+
+In a **Lord have mercy** knockout (BR-084) the pairs do not stay together: the players still in are paired again before every later round. Where a rule assumes fixed knockout pairs, these rules apply instead.
+
+| ID | Rule |
+|---|---|
+| BR-140 | The first knockout round is drawn when the knockout starts (BR-084). Once every match of a knockout round has a result, the organizer draws the next round. |
+| BR-141 | The next round mixes the players of every pair still in: the winners of the round before and, after round 1, the pairs that had a bye. They are paired completely at random, ignoring the standings, and the new pairs are placed in the round by lot. |
+| BR-142 | The final is re-mixed too: the four players of the two winning semifinal pairs are paired again at random. |
+| BR-143 | A player can get a partner they have had before. The draw does not avoid repeat partners. |
+| BR-144 | With a third-place match, the four players of the two losing semifinal pairs are paired again completely at random for it. It is drawn together with the final. |
+| BR-145 | Places are per player. Each player takes the place of the pair they were knocked out with, or of the pair that won the final. Places are numbered and shared as if those pairs were entries (BR-102, BR-104), and placement points are split the same way (BR-111). With 4 pairs in the knockout and a third-place match, the final's winners are 1st, its losers 2nd, the third-place match's winners 3rd and its losers 4th; without one, the four semifinal losers share 3rd. Either way, the best non-qualifier is 5th (BR-103). |
+| BR-146 | Drawing the next round locks the results of the round before, as in Monster DYP rounds (BR-065, BR-066). To correct a locked result, the organizer deletes the newest knockout round with its matches and results, which unlocks the round before, fixes the result and draws the next round again. The final and the third-place match count as one round. Deleting the first knockout round deletes the knockout (BR-087). A round is never drawn again by itself: only the organizer draws again. |
+| BR-147 | A player who leaves between knockout rounds is disabled by the organizer before the next draw (FR-044). A replacement takes their place in the draw, so the number of players stays even: the best-placed player who has been knocked out and is not disabled. Best-placed means knocked out in a later round first, then the better group-phase standing, then the lot (BR-074). If no knocked-out player is available, the best non-qualifier from the group phase who is not disabled comes in, as in BR-080. With a third-place match, a semifinal loser who moves up to the final leaves a gap in the third-place draw, which is filled the same way. The player who leaves takes the place the replacement would have had, so every place keeps its number of players. A player who leaves after the next round is drawn loses by walkover (BR-093), unless the organizer deletes that round while it has no result and draws it again. |
+
+Consequences: the next round's pairs are not known until the round's last match ends, so fields stand idle between knockout rounds (BR-130). The organizer's screen and the share link (FR-070) show a re-mixed knockout round by round, because it is not a bracket tree.
+
 ## 8. Open questions
 
 1. **More marked top players than matches (BR-061, FR-041).** Round 2 can have fewer matches than round 1, for example after a player is disabled, so more players can be marked than the round has matches. Which marked players count then: the best by league ranking, as BR-061 now says, or the best by current standing?
