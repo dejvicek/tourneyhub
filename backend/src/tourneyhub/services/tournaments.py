@@ -666,7 +666,9 @@ def _resolve_format(request: FormatRequest, league: League) -> TournamentFormat:
             else None,
             sit_out_points=request.sit_out_points
             if request.sit_out_points is not None
-            else default_sit_out_points(group_match_format),
+            else default_sit_out_points(
+                group_match_format, draws_allowed=league.draws_allowed
+            ),
             sit_out_points_set_by_hand=by_hand,
             group_match_format=group_match_format,
         )

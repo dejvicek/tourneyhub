@@ -414,9 +414,19 @@ def test_owasp_api1_a_tournament_of_another_league_does_not_start(
 # ---------------------------------------------------------------- the read
 
 
+def _set_draws(
+    client: TestClient, league: League, headers: dict[str, str], *, allowed: bool
+) -> None:
+    response = client.patch(
+        _url(league), json={"draws_allowed": allowed}, headers=headers
+    )
+    assert response.status_code == 200, response.text
+
+
 def test_br071_generating_fixes_the_sit_out_points(
     client: TestClient, league: League, headers: dict[str, str], players: list[str]
 ) -> None:
+    _set_draws(client, league, headers, allowed=True)
     setup = _setup(client, league, headers, players[:3], sit_out_points=None)
     assert setup["format"]["sit_out_points"] == 1
     started = _started(client, league, setup, headers)
@@ -426,6 +436,7 @@ def test_br071_generating_fixes_the_sit_out_points(
         json={**ROUND_ROBIN, "group_match_format": "bo3", "sit_out_points": None},
         headers=headers,
     )
+    _set_draws(client, league, headers, allowed=False)
 
     [phase] = started["phases"]
     assert (phase["sit_out_points"], phase["sit_out_points_set_by_hand"]) == (1, False)

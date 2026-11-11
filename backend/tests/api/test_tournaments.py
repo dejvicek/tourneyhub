@@ -97,6 +97,14 @@ def league(make_league: Callable[..., League]) -> League:
 
 
 @pytest.fixture
+def draws_league(league: League, session: Session) -> League:
+    """The league with draws allowed: a sit-out can default to a draw (BR-071)."""
+    league.draws_allowed = True
+    session.flush()
+    return league
+
+
+@pytest.fixture
 def season_id(league: League) -> UUID:
     """The active season's id, read before a request expires the league."""
     return league.seasons[0].id
@@ -180,6 +188,7 @@ def test_fr011_a_create_without_settings_takes_the_league_defaults(
     }
 
 
+@pytest.mark.usefixtures("draws_league")
 def test_fr030_a_group_phase_takes_the_league_format_and_one_leg(
     client: TestClient, league: League, headers: dict[str, str]
 ) -> None:
@@ -561,24 +570,29 @@ def _put_format(
 
 
 @pytest.mark.parametrize(
-    ("match_format", "expected"),
+    ("draws_allowed", "match_format"),
+    # BO2 needs a league with draws (BR-121), so that pair is not creatable.
     [
-        pytest.param("bo1", 1, id="bo1"),
-        pytest.param("bo2", 1, id="bo2"),
-        pytest.param("bo3", 2, id="bo3"),
-        pytest.param("bo5", 2, id="bo5"),
+        (True, "bo1"),
+        (True, "bo2"),
+        (True, "bo3"),
+        (True, "bo5"),
+        (False, "bo1"),
+        (False, "bo3"),
+        (False, "bo5"),
     ],
 )
-def test_br071_a_create_without_sit_out_points_takes_the_default_of_the_format(
+def test_br071_a_create_without_sit_out_points_takes_the_default(
     client: TestClient,
     league: League,
     headers: dict[str, str],
     session: Session,
+    draws_allowed: bool,
     match_format: str,
-    expected: int,
 ) -> None:
-    league.draws_allowed = True  # the default does not depend on it (BR-071)
+    league.draws_allowed = draws_allowed
     session.flush()
+    expected = 1 if draws_allowed and match_format in {"bo1", "bo2"} else 2
 
     created = _create(
         client,
@@ -592,18 +606,62 @@ def test_br071_a_create_without_sit_out_points_takes_the_default_of_the_format(
     assert created["format"]["sit_out_points_set_by_hand"] is False
 
 
-def test_br071_the_league_draw_setting_does_not_change_the_default(
-    client: TestClient, league: League, headers: dict[str, str], session: Session
+def _set_draws(
+    client: TestClient, league: League, headers: dict[str, str], *, allowed: bool
 ) -> None:
-    league.draws_allowed = True
-    session.flush()
-
-    created = _create(client, league, headers, sit_out_points=None)
-
-    assert created["format"]["group_match_format"] == "bo1"
-    assert created["format"]["sit_out_points"] == 1
+    response = client.patch(
+        _url(league), json={"draws_allowed": allowed}, headers=headers
+    )
+    assert response.status_code == 200, response.text
 
 
+def _format_read(
+    client: TestClient, league: League, headers: dict[str, str], tid: str
+) -> tuple[int, bool]:
+    response = client.get(_tournament_url(league, tid, "/setup"), headers=headers)
+    assert response.status_code == 200, response.text
+    fmt = response.json()["format"]
+    return fmt["sit_out_points"], fmt["sit_out_points_set_by_hand"]
+
+
+def test_br071_the_league_draw_setting_moves_the_default_during_setup(
+    client: TestClient, league: League, headers: dict[str, str]
+) -> None:
+    following = _create(client, league, headers, sit_out_points=None)["tournament_id"]
+    by_hand = _create(client, league, headers, sit_out_points=2)["tournament_id"]
+    bo3 = _create(
+        client, league, headers, sit_out_points=None, group_match_format="bo3"
+    )["tournament_id"]
+    assert _format_read(client, league, headers, following) == (2, False)
+
+    _set_draws(client, league, headers, allowed=True)
+
+    assert _format_read(client, league, headers, following) == (1, False)
+    assert _format_read(client, league, headers, by_hand) == (2, True)
+    assert _format_read(client, league, headers, bo3) == (2, False)
+
+    _set_draws(client, league, headers, allowed=False)
+
+    assert _format_read(client, league, headers, following) == (2, False)
+
+
+def test_br071_the_league_draw_setting_leaves_other_leagues_alone(
+    client: TestClient,
+    league: League,
+    headers: dict[str, str],
+    make_league: Callable[..., League],
+    auth_header: Callable[..., dict[str, str]],
+) -> None:
+    other = make_league()
+    other_headers = auth_header(other.owner_user_id)
+    kept = _create(client, other, other_headers, sit_out_points=None)["tournament_id"]
+
+    _set_draws(client, league, headers, allowed=True)
+
+    assert _format_read(client, other, other_headers, kept) == (2, False)
+
+
+@pytest.mark.usefixtures("draws_league")
 def test_br071_the_default_follows_a_format_change_until_the_organizer_picks(
     client: TestClient, league: League, headers: dict[str, str]
 ) -> None:
@@ -665,6 +723,7 @@ def test_br071_a_pick_equal_to_the_default_still_counts_as_picked(
     assert (picked["sit_out_points"], picked["sit_out_points_set_by_hand"]) == (2, True)
 
 
+@pytest.mark.usefixtures("draws_league")
 def test_br071_sending_the_read_value_back_pins_it_and_null_keeps_following(
     client: TestClient, league: League, headers: dict[str, str]
 ) -> None:
@@ -710,6 +769,7 @@ def test_br071_null_takes_the_default_back_after_a_pick(
     assert (reset["sit_out_points"], reset["sit_out_points_set_by_hand"]) == (2, False)
 
 
+@pytest.mark.usefixtures("draws_league")
 def test_br071_changing_to_no_group_phase_forgets_the_pick(
     client: TestClient, league: League, headers: dict[str, str]
 ) -> None:

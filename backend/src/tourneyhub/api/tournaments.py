@@ -151,8 +151,11 @@ class TournamentFormatWrite(_FormatChecks):
     `setting_not_applicable`; one that applies and is missing, `setting_missing`.
 
     `sit_out_points` is 0, 1 or 2 (FR-039, BR-071). A number is the organizer's
-    own choice and stays; null takes the default of the group phase's match
-    format and follows it (`sit_out_points_set_by_hand` false in the read).
+    own choice and stays; null takes the default and follows it
+    (`sit_out_points_set_by_hand` false in the read). The default is 1 when the
+    league allows draws and the group phase plays BO1 or BO2, otherwise 2; a
+    change of the league's draw setting during setup moves it too. Generating the
+    schedule fixes the value.
     Any number counts as a manual pick, even one equal to the default, so a
     client that read the format must send null, not the read value, while
     `sit_out_points_set_by_hand` is false to keep following the default.
@@ -178,8 +181,7 @@ class TournamentCreate(_FormatChecks):
     `id` is a UUIDv7 made by the client; a repeat gets the same tournament back
     (ADR-008). A setting left out or null takes the league's default: goals per
     game, the number of fields and the match format of the phase (FR-011); one
-    round robin leg, the default sit-out points of the match format (FR-039,
-    BR-071) and no third-place match. `sit_out_points` null follows the default;
+    round robin leg, the default sit-out points (FR-039, BR-071) and no third-place match. `sit_out_points` null follows the default;
     any number counts as a manual pick.
     """
 
@@ -270,7 +272,8 @@ class TournamentFormatRead(ResponseModel):
     """The format as stored; settings that do not apply are null (FR-031).
 
     `sit_out_points_set_by_hand` tells whether the organizer chose the
-    sit-out points (true) or they are the default of the match format (false).
+    sit-out points (true) or they are the default (false): it follows the
+    league's draw setting and the group phase's match format until generating.
     """
 
     name: str

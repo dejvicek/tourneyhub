@@ -7,13 +7,17 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from tourneyhub.db.models.leagues import League, Season
-from tourneyhub.db.models.tournaments import Tournament
+from tourneyhub.db.models.tournaments import Tournament, TournamentPhase
 from tourneyhub.engine.leagues import (
     DEFAULT_PLACEMENT_POINTS,
     DefaultMatchFormat,
     SeasonState,
 )
-from tourneyhub.engine.tournaments import TournamentState
+from tourneyhub.engine.tournaments import (
+    PhaseKind,
+    TournamentState,
+    default_sit_out_points,
+)
 from tourneyhub.errors import (
     ConflictError,
     ErrorCode,
@@ -142,7 +146,34 @@ def update_league(
     if changed:
         league.updated_at = now
     session.flush()
+    if draws_allowed is not None:
+        _refresh_sit_out_defaults(session, league)
     return league
+
+
+def _refresh_sit_out_defaults(session: Session, league: League) -> None:
+    """Move the sit-out default of tournaments still in setup (FR-039, BR-071).
+
+    The default depends on the league's draw setting, so a group phase that
+    follows it (not set by hand) is recomputed in the same transaction. Once the
+    schedule is generated the tournament leaves setup and the value stays.
+    """
+    phases = session.scalars(
+        select(TournamentPhase)
+        .join(Tournament, TournamentPhase.tournament_id == Tournament.id)
+        .join(Season, Tournament.season_id == Season.id)
+        .where(
+            Season.league_id == league.id,
+            Tournament.state == TournamentState.SETUP,
+            TournamentPhase.kind == PhaseKind.GROUP,
+            TournamentPhase.sit_out_points_set_by_hand.is_(False),
+        )
+    ).all()
+    for phase in phases:
+        phase.sit_out_points = default_sit_out_points(
+            phase.match_format, draws_allowed=league.draws_allowed
+        )
+    session.flush()
 
 
 def delete_league(session: Session, *, league_id: UUID, user_id: UUID) -> None:
