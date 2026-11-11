@@ -259,7 +259,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | ID | Rule |
 |---|---|
 | BR-050 | Every entry plays every other entry once, or twice if the organizer chose twice. |
-| BR-051 | Matches are grouped into rounds, and no entry plays twice in a round. With an odd number of entries, one sits out each round, and every entry sits out the same number of times. Seeds 1 and 2 meet in the last round; when played twice, in the last round of each half (BR-052). Rescheduling for a late entry (BR-054) keeps this while it can. |
+| BR-051 | Matches are grouped into rounds, and no entry plays twice in a round. With an odd number of entries, one sits out each round, and every entry sits out the same number of times. Seeds 1 and 2 meet in the last round, as the last match of that round; when played twice, the same holds in each half (BR-052). Rescheduling for a late entry (BR-054) keeps this while it can. |
 | BR-052 | When played twice, the second half repeats the first half's pairings, round by round. |
 | BR-053 | A round robin's results lock when the knockout is drawn. |
 | BR-054 | A late entry in a round robin plays every other entry as often as everyone else does. The matches not yet played are rescheduled to fit its matches in, keeping sit-outs as even as possible; results already entered stay. |
