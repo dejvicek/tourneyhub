@@ -133,7 +133,7 @@ def round_robin_standings(
             follows this order.
         sit_outs: One item per round an entry sat out (BR-051); the caller
             decides which rounds count.
-        sit_out_points: The points of a sit-out: 0, or 1 with the setting on
+        sit_out_points: The points of a sit-out: 0, 1 or 2
             (FR-039, BR-071).
 
     Returns:

@@ -54,7 +54,7 @@ def test_br093_a_walkover_side_2_win_counts_as_a_normal_win() -> None:
     assert (rows[B].won, rows[B].points, rows[A].lost) == (1, 2, 1)
 
 
-@pytest.mark.parametrize("sit_out_points", [0, 1])
+@pytest.mark.parametrize("sit_out_points", [0, 1, 2])
 def test_br071_a_sit_out_is_worth_the_settings_points(sit_out_points: int) -> None:
     rows = by_entry(
         round_robin_standings(

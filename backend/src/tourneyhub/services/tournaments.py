@@ -85,6 +85,7 @@ from tourneyhub.engine.tournaments import (
     Tiebreaker,
     TournamentState,
     TournamentType,
+    default_sit_out_points,
     group_phase_format,
     is_seeded,
 )
@@ -125,6 +126,7 @@ class TournamentFormat:
     group_phase: GroupPhase
     round_robin_legs: int | None
     sit_out_points: int | None
+    sit_out_points_set_by_hand: bool | None
     group_match_format: MatchFormat | None
     knockout_match_format: KnockoutMatchFormat | None
     final_match_format: KnockoutMatchFormat | None
@@ -138,8 +140,10 @@ class FormatRequest:
     """A format as a request gives it: None takes the league's default on create.
 
     `goals_per_game`, `field_count` and the applicable match format copy the
-    league's defaults (FR-030, DATA-MODEL §4.2); `round_robin_legs` is 1,
-    `sit_out_points` 0 (FR-039) and `third_place_match` false.
+    league's defaults (FR-030, DATA-MODEL §4.2); `round_robin_legs` is 1 and
+    `third_place_match` false. A `sit_out_points` of None takes the default of
+    the group phase's match format (FR-039, BR-071) and follows it; a number
+    is the organizer's own choice and stays.
     """
 
     name: str
@@ -371,6 +375,9 @@ def _format_of(tournament: Tournament) -> TournamentFormat:
         group_phase=GroupPhase.NONE if group is None else GroupPhase(group.format),
         round_robin_legs=None if group is None else group.round_robin_legs,
         sit_out_points=None if group is None else group.sit_out_points,
+        sit_out_points_set_by_hand=(
+            None if group is None else group.sit_out_points_set_by_hand
+        ),
         group_match_format=None if group is None else group.match_format,
         knockout_match_format=(
             None if knockout is None else KnockoutMatchFormat(knockout.match_format)
@@ -591,6 +598,7 @@ def _resolve_format(request: FormatRequest, league: League) -> TournamentFormat:
         group_phase=request.group_phase,
         round_robin_legs=None,
         sit_out_points=None,
+        sit_out_points_set_by_hand=None,
         group_match_format=None,
         knockout_match_format=None,
         final_match_format=None,
@@ -607,14 +615,18 @@ def _resolve_format(request: FormatRequest, league: League) -> TournamentFormat:
             third_place_match=bool(request.third_place_match),
         )
     else:
+        group_match_format = request.group_match_format or MatchFormat(default_format)
+        by_hand = request.sit_out_points is not None
         resolved = replace(
             base,
             round_robin_legs=(request.round_robin_legs or 1)
             if request.group_phase is GroupPhase.ROUND_ROBIN
             else None,
-            sit_out_points=request.sit_out_points or 0,
-            group_match_format=request.group_match_format
-            or MatchFormat(default_format),
+            sit_out_points=request.sit_out_points
+            if request.sit_out_points is not None
+            else default_sit_out_points(group_match_format),
+            sit_out_points_set_by_hand=by_hand,
+            group_match_format=group_match_format,
         )
     if resolved.group_match_format is MatchFormat.BO2 and not league.draws_allowed:
         raise RuleViolationError(ErrorCode.DRAWS_NOT_ALLOWED)
@@ -630,6 +642,7 @@ def _phase_settings(fmt: TournamentFormat) -> dict[str, object]:
             "format": PhaseFormat.SINGLE_ELIMINATION,
             "round_robin_legs": None,
             "sit_out_points": None,
+            "sit_out_points_set_by_hand": False,
             "third_place_match": fmt.third_place_match,
             "match_format": MatchFormat(fmt.knockout_match_format or MatchFormat.BO1),
             "final_match_format": fmt.final_match_format,
@@ -639,6 +652,7 @@ def _phase_settings(fmt: TournamentFormat) -> dict[str, object]:
         "format": group_format,
         "round_robin_legs": fmt.round_robin_legs,
         "sit_out_points": fmt.sit_out_points,
+        "sit_out_points_set_by_hand": fmt.sit_out_points_set_by_hand,
         "third_place_match": None,
         "match_format": fmt.group_match_format,
         "final_match_format": None,
@@ -1350,6 +1364,7 @@ class PhaseView:
     format: PhaseFormat
     round_robin_legs: int | None
     sit_out_points: int | None
+    sit_out_points_set_by_hand: bool
     tiebreakers: tuple[Tiebreaker, ...] | None
     qualifiers: int | None
     third_place_match: bool | None
@@ -1439,6 +1454,7 @@ def _phase_view(phase: TournamentPhase) -> PhaseView:
         format=phase.format,
         round_robin_legs=phase.round_robin_legs,
         sit_out_points=phase.sit_out_points,
+        sit_out_points_set_by_hand=phase.sit_out_points_set_by_hand,
         tiebreakers=None
         if phase.tiebreakers is None
         else tuple(Tiebreaker(t) for t in phase.tiebreakers),

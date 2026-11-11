@@ -83,6 +83,9 @@ type PlayerIds = Annotated[
     list[UUID], Field(max_length=MAX_PLAYERS_PER_LEAGUE), AfterValidator(_distinct)
 ]
 
+type SitOutPoints = Literal[0, 1, 2]
+"""The points of a sit-out (FR-039, BR-071)."""
+
 _GROUP_SETTINGS = ("round_robin_legs", "sit_out_points", "group_match_format")
 _KNOCKOUT_SETTINGS = (
     "knockout_match_format",
@@ -103,7 +106,8 @@ class _FormatChecks(RequestModel):
         Monster DYP always plays its own rounds, and no other type does. With a
         group phase, its settings apply; without one, the knockout's. With
         `complete`, every setting that applies must be given (`final_match_format`
-        may be null: the final plays the knockout's format).
+        may be null: the final plays the knockout's format; `sit_out_points` may
+        be null: the default of the match format, FR-039).
         """
         if (self.type is TournamentType.MONSTER_DYP) != (
             self.group_phase is GroupPhase.MONSTER_DYP
@@ -121,7 +125,11 @@ class _FormatChecks(RequestModel):
                 raise PydanticCustomError(
                     "setting_not_applicable", "a setting does not fit the phases"
                 )
-            if complete and name in applies - {"final_match_format"} and value is None:
+            if (
+                complete
+                and name in applies - {"final_match_format", "sit_out_points"}
+                and value is None
+            ):
                 raise PydanticCustomError("setting_missing", "a setting is missing")
         return self
 
@@ -135,10 +143,14 @@ class TournamentFormatWrite(_FormatChecks):
     the group phase's are null. `round_robin_legs` is only for a round robin.
     A setting that does not apply is 422 `validation_failed` with
     `setting_not_applicable`; one that applies and is missing, `setting_missing`.
+
+    `sit_out_points` is 0, 1 or 2 (FR-039, BR-071). A number is the organizer's
+    own choice and stays; null takes the default of the group phase's match
+    format and follows it (`sit_out_points_set_by_hand` false in the read).
     """
 
     round_robin_legs: Literal[1, 2] | None
-    sit_out_points: Literal[0, 1] | None
+    sit_out_points: SitOutPoints | None
     group_match_format: MatchFormat | None
     knockout_match_format: KnockoutMatchFormat | None
     final_match_format: KnockoutMatchFormat | None
@@ -157,12 +169,13 @@ class TournamentCreate(_FormatChecks):
     `id` is a UUIDv7 made by the client; a repeat gets the same tournament back
     (ADR-008). A setting left out or null takes the league's default: goals per
     game, the number of fields and the match format of the phase (FR-011); one
-    round robin leg, no sit-out points (FR-039) and no third-place match.
+    round robin leg, the default sit-out points of the match format (FR-039,
+    BR-071) and no third-place match.
     """
 
     id: UUID7
     round_robin_legs: Literal[1, 2] | None = None
-    sit_out_points: Literal[0, 1] | None = None
+    sit_out_points: SitOutPoints | None = None
     group_match_format: MatchFormat | None = None
     knockout_match_format: KnockoutMatchFormat | None = None
     final_match_format: KnockoutMatchFormat | None = None
@@ -244,14 +257,19 @@ class DrawWrite(RequestModel):
 
 
 class TournamentFormatRead(ResponseModel):
-    """The format as stored; settings that do not apply are null (FR-031)."""
+    """The format as stored; settings that do not apply are null (FR-031).
+
+    `sit_out_points_set_by_hand` tells whether the organizer chose the
+    sit-out points (true) or they are the default of the match format (false).
+    """
 
     name: str
     date: date
     type: TournamentType
     group_phase: GroupPhase
     round_robin_legs: Literal[1, 2] | None
-    sit_out_points: Literal[0, 1] | None
+    sit_out_points: SitOutPoints | None
+    sit_out_points_set_by_hand: bool | None
     group_match_format: MatchFormat | None
     knockout_match_format: KnockoutMatchFormat | None
     final_match_format: KnockoutMatchFormat | None
@@ -356,7 +374,8 @@ class PhaseRead(ResponseModel):
     kind: PhaseKind
     format: PhaseFormat
     round_robin_legs: Literal[1, 2] | None
-    sit_out_points: Literal[0, 1] | None
+    sit_out_points: SitOutPoints | None
+    sit_out_points_set_by_hand: bool
     tiebreakers: list[Tiebreaker] | None
     qualifiers: int | None
     third_place_match: bool | None

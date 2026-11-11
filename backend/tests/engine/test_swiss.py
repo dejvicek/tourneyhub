@@ -144,7 +144,7 @@ def test_br070_a_win_earns_2_a_draw_1_and_a_loss_0() -> None:
     ]
 
 
-@pytest.mark.parametrize("sit_out_points", [0, 1])
+@pytest.mark.parametrize("sit_out_points", [0, 1, 2])
 def test_br071_a_sit_out_earns_the_sit_out_points(sit_out_points: int) -> None:
     rounds = [round_(1, match(1, 2, WIN), sat_out=3)]
 
@@ -187,6 +187,20 @@ def test_br073_sit_outs_add_nothing_to_bh() -> None:
     assert lines[3].bh1 == lines[1].points
     assert lines[2].bh1 == lines[1].points
     assert lines[1].bh1 == lines[2].points + lines[3].points
+
+
+def test_br071_sit_out_points_count_in_the_points_that_bh1_and_bh2_sum() -> None:
+    rounds = [
+        round_(1, match(1, 2, WIN), sat_out=3),
+        round_(2, match(3, 1, WIN), sat_out=2),
+    ]
+
+    lines = standings(ids(1, 2, 3), rounds, sit_out_points=2)
+
+    # 1 won once and lost once: 2; 2 lost, then sat out: 2; 3 sat out, then won: 4
+    assert {n: s.points for n, s in lines.items()} == {1: 2, 2: 2, 3: 4}
+    assert {n: s.bh1 for n, s in lines.items()} == {1: 6, 2: 2, 3: 2}
+    assert {n: s.bh2 for n, s in lines.items()} == {1: 4, 2: 6, 3: 6}
 
 
 def test_br073_score_difference_counts_both_sides() -> None:
@@ -311,7 +325,7 @@ def test_br074_the_tie_lot_is_named_after_the_completed_rounds() -> None:
         pytest.param(
             ids(1), [], (Tiebreaker.BH1,) * 2, 0, "name one twice", id="tiebreaker"
         ),
-        pytest.param(ids(1), [], (), 2, "0 or 1", id="sit-out-points"),
+        pytest.param(ids(1), [], (), 3, "0, 1 or 2", id="sit-out-points"),
         pytest.param(
             ids(1, 2), [round_(2, match(1, 2))], (), 0, "1 to n", id="round-gap"
         ),
@@ -709,7 +723,7 @@ def draws(
             entries,
             rounds,
             tiebreakers=draw(tiebreaker_orders),
-            sit_out_points=draw(st.sampled_from((0, 1))),
+            sit_out_points=draw(st.sampled_from((0, 1, 2))),
             rng_seed=draw(seeds),
         )
     )

@@ -674,6 +674,45 @@ def test_br071_a_sit_out_counts_once_its_round_is_complete(
     assert (after[sitter]["sat_out"], after[sitter]["points"]) == (1, 1)
 
 
+def test_br101_a_sit_out_earns_the_picked_points_in_the_standings(
+    start: Callable[..., Json],
+    put_result: Callable[..., tuple[int, Json]],
+    read: Callable[[Json, str], Json],
+    players: list[str],
+) -> None:
+    tournament = start(players[:3], sit_out_points=2)
+    first = tournament["rounds"][0]
+    sitter = first["sitting_out"][0]
+
+    put_result(tournament, first["matches"][0]["id"], S1_WINS)
+
+    rows = {row["entry_id"]: row for row in read(tournament, "/play")["standings"]}
+    assert (rows[sitter]["sat_out"], rows[sitter]["points"]) == (1, 2)
+    winner = next(r for r in rows.values() if r["won"] == 1)
+    assert winner["points"] == 2  # BR-070 stays: a win is 2 points
+
+
+def test_br071_a_default_sit_out_in_a_best_of_3_phase_is_worth_a_win(
+    start: Callable[..., Json],
+    put_result: Callable[..., tuple[int, Json]],
+    read: Callable[[Json, str], Json],
+    players: list[str],
+) -> None:
+    tournament = start(players[:3], sit_out_points=None, group_match_format="bo3")
+    first = tournament["rounds"][0]
+    sitter = first["sitting_out"][0]
+    assert tournament["phases"][0]["sit_out_points"] == 2
+
+    put_result(
+        tournament,
+        first["matches"][0]["id"],
+        games(game("side_1", 10, 7), game("side_1", 10, 8)),
+    )
+
+    rows = {row["entry_id"]: row for row in read(tournament, "/play")["standings"]}
+    assert rows[sitter]["points"] == 2
+
+
 def test_br131_a_waiting_match_names_the_field_its_players_are_on(
     start: Callable[..., Json],
     read: Callable[[Json, str], Json],
