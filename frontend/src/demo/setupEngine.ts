@@ -11,14 +11,7 @@
 // keyed on the store's current state so that resetDemoStore() drops it too.
 import type { components } from "@/api/schema";
 
-import type {
-  EntryRead,
-  MatchRead,
-  PhaseRead,
-  PreviewRound,
-  RoundRead,
-  SchedulePreview,
-} from "./contract";
+import type { EntryRead, MatchRead, PhaseRead, RoundRead } from "./contract";
 import {
   createRng,
   fillFields,
@@ -37,6 +30,8 @@ type DypHalfRead = Schemas["DypHalfRead"];
 type RankingRow = Schemas["RankingRow"];
 type SeedingMethod = Schemas["SeedingMethod"];
 type ErrorCode = Schemas["ErrorCode"];
+type SchedulePreview = Schemas["SchedulePreviewRead"];
+type PreviewRound = Schemas["PreviewRoundRead"];
 
 /** A UUIDv7: the time in the first 48 bits, the rest random. */
 export function newId(): string {
@@ -1035,8 +1030,28 @@ function plan(t: StoredTournament, draft: SetupDraft): Plan {
   }
 }
 
+/**
+ * What "Generate and start" would create, or why it would not: the backend's
+ * `GET …/setup/preview` (FR-035). Like the backend it names the refusal the
+ * start would give instead of a schedule, and it writes nothing.
+ */
 export function preview(t: StoredTournament): SchedulePreview {
   const draft = draftOf(t);
+  const problem =
+    t.state === "setup"
+      ? startProblem(t)
+      : fail(409, "tournament_not_in_setup", { state: t.state });
+  if (problem) {
+    return {
+      draw_counter: draft.drawCounter,
+      can_start: false,
+      problem: { code: problem.code, detail: problem.detail },
+      rounds: [],
+      match_count: null,
+      round_count: null,
+      bracket_size: null,
+    };
+  }
   const made = plan(t, draft);
   const shown: PreviewRound[] =
     made.bracketSize === null
@@ -1055,6 +1070,9 @@ export function preview(t: StoredTournament): SchedulePreview {
           sitting_out: [],
         }));
   return {
+    draw_counter: draft.drawCounter,
+    can_start: true,
+    problem: null,
     rounds: shown,
     match_count: made.matchCount,
     round_count: made.roundCount,
@@ -1062,26 +1080,38 @@ export function preview(t: StoredTournament): SchedulePreview {
   };
 }
 
-/** The reason the tournament cannot start (FR-032, BR-031); null when it can. */
-/** A refusal of the provisional start and "back to setup", which name their rule. */
-const invalid = (
-  rule: string,
-  extra: Record<string, number> = {},
-): SetupFailure => fail(422, "validation_failed", { rule, ...extra });
+/** The most entries a round robin is generated for; the backend's limit (FR-032). */
+export const MAX_ROUND_ROBIN_ENTRIES = 64;
 
+/**
+ * The reason the tournament cannot start, with the backend's codes (FR-032,
+ * FR-033); null when it can. Unlike the backend, which generates only the
+ * round robin so far, the demo starts every format.
+ */
 export function startProblem(t: StoredTournament): SetupFailure | null {
   const draft = draftOf(t);
   const entries = t.entries.filter((entry) => entry.stage === "main");
+  if (t.type === "doubles") {
+    const paired = new Set(entries.flatMap((entry) => entry.player_ids));
+    const unpaired = draft.playerIds.filter((id) => !paired.has(id)).length;
+    if (unpaired > 0) {
+      return fail(422, "players_without_partner", { unpaired });
+    }
+  }
   const minimum =
     t.type === "monster_dyp"
       ? 4
       : draft.format.group_phase === "none" && draft.format.third_place_match
         ? 4
         : 2;
-  const count =
-    t.type === "monster_dyp" ? draft.playerIds.length : entries.length;
-  return count < minimum
-    ? invalid("FR-032", { min: minimum, given: count })
+  if (entries.length < minimum) {
+    return fail(422, "not_enough_entries", { minimum, given: entries.length });
+  }
+  return draft.format.group_phase === "round_robin" &&
+    entries.length > MAX_ROUND_ROBIN_ENTRIES
+    ? fail(422, "too_many_entries_for_round_robin", {
+        limit: MAX_ROUND_ROBIN_ENTRIES,
+      })
     : null;
 }
 
@@ -1104,7 +1134,7 @@ export function start(
   }
   const phase = t.phases[0];
   if (!phase) {
-    return invalid("FR-035");
+    return fail(422, "format_not_supported");
   }
   const made = plan(t, draft);
   t.rounds = made.rounds.map((round, index): RoundRead => {
@@ -1153,18 +1183,15 @@ export function start(
 }
 
 /** FR-036: back to setup is possible until the first result is entered. */
-export function backToSetup(
-  t: StoredTournament,
-  expectedState: string,
-): SetupFailure | null {
-  if (t.state !== expectedState) {
-    return fail(409, "tournament_not_in_setup", { state: t.state });
-  }
+export function backToSetup(t: StoredTournament): SetupFailure | null {
   if (t.state !== "in_progress") {
-    return invalid("FR-036");
+    return fail(409, "tournament_not_in_progress", { state: t.state });
   }
-  if (t.rounds.some((round) => round.matches.some((m) => m.outcome !== null))) {
-    return invalid("FR-036");
+  const results = t.rounds
+    .flatMap((round) => round.matches)
+    .filter((match) => match.outcome !== null).length;
+  if (results > 0) {
+    return fail(422, "tournament_has_results", { results });
   }
   draftOf(t);
   t.rounds = [];

@@ -1,6 +1,7 @@
 from tourneyhub.engine.errors import (
     DypHalvesUnequalError,
     EngineError,
+    NotEnoughEntriesError,
     NotEnoughPlayersError,
     TooManyLeftOutError,
 )
@@ -13,6 +14,10 @@ def to_app_error(error: EngineError) -> RuleViolationError:
         case NotEnoughPlayersError(minimum=minimum, given=given):
             return RuleViolationError(
                 ErrorCode.NOT_ENOUGH_PLAYERS, minimum=minimum, given=given
+            )
+        case NotEnoughEntriesError(minimum=minimum, given=given):
+            return RuleViolationError(
+                ErrorCode.NOT_ENOUGH_ENTRIES, minimum=minimum, given=given
             )
         case DypHalvesUnequalError(top=top, bottom=bottom):
             return RuleViolationError(

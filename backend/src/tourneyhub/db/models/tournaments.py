@@ -16,6 +16,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from tourneyhub.db.base import Base, str_enum
 from tourneyhub.db.models.entries import Entry, PlayerHalf
+from tourneyhub.db.models.matches import Round
 from tourneyhub.engine.leagues import MAX_FIELD_COUNT, MAX_GOALS_PER_GAME
 from tourneyhub.engine.lots import RNG_SEED_SIZE
 from tourneyhub.engine.tournaments import (
@@ -195,11 +196,19 @@ class TournamentPhase(Base):
     created_at: Mapped[datetime]
     updated_at: Mapped[datetime | None]
 
+    rounds: Mapped[list[Round]] = relationship(
+        lazy="raise",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="Round.round_no",
+    )
+
 
 class Field(Base):
     """A field of a tournament, shown as "Field" and its number (DATA-MODEL §4.6).
 
-    The match being played on it (`match_id`) arrives with the matches.
+    `match_id` is the match being played on it, stored (D10); deleting the match
+    frees the field.
     """
 
     __tablename__ = "fields"
@@ -213,6 +222,9 @@ class Field(Base):
         ForeignKey("tournaments.id", ondelete="CASCADE")
     )
     number: Mapped[int]
+    match_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("matches.id", ondelete="SET NULL"), unique=True
+    )
     created_at: Mapped[datetime]
     updated_at: Mapped[datetime | None]
 

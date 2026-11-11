@@ -1,4 +1,3 @@
-from tourneyhub.db.models import matches  # noqa: F401  (no models yet; Alembic will see them, §3)
 from tourneyhub.db.models.accounts import (
     AuthAttempt,
     InstanceSettings,
@@ -7,6 +6,14 @@ from tourneyhub.db.models.accounts import (
 )
 from tourneyhub.db.models.entries import Entry, EntryMember, PlayerHalf
 from tourneyhub.db.models.leagues import League, Player, Season
+from tourneyhub.db.models.matches import (
+    Match,
+    MatchGame,
+    MatchSide,
+    MatchSidePlayer,
+    Round,
+    RoundParticipation,
+)
 from tourneyhub.db.models.tournaments import (
     Field,
     Tournament,
@@ -21,9 +28,15 @@ __all__ = [
     "Field",
     "InstanceSettings",
     "League",
+    "Match",
+    "MatchGame",
+    "MatchSide",
+    "MatchSidePlayer",
     "Player",
     "PlayerHalf",
     "RefreshToken",
+    "Round",
+    "RoundParticipation",
     "Season",
     "Tournament",
     "TournamentPhase",
