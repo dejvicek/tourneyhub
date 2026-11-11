@@ -11,8 +11,13 @@ from sqlalchemy.orm import Session
 
 from tourneyhub.app import create_app
 from tourneyhub.db.models.accounts import User
+from tourneyhub.db.models.entries import EntryMember
 from tourneyhub.db.models.leagues import League, Player, Season
-from tourneyhub.db.models.tournaments import Tournament, TournamentPhase
+from tourneyhub.db.models.tournaments import (
+    Tournament,
+    TournamentPhase,
+    TournamentPlayer,
+)
 from tourneyhub.engine.accounts import Language
 from tourneyhub.engine.leagues import SeasonState
 from tourneyhub.engine.tournaments import (
@@ -1678,6 +1683,187 @@ def test_adr008_one_client_id_sent_to_two_leagues_at_once_is_a_conflict(
     assert outcome == [(409, {"code": "tournament_id_taken", "detail": {}})]
     with Session(committing_engine) as check:
         assert check.scalars(select(Tournament.id)).all() == [tournament_id]
+
+
+def _commit_tournament(
+    engine: Engine, now: datetime, owner_id: UUID, league_id: UUID
+) -> UUID:
+    tournament_id = uuid7()
+    with Session(engine) as setup:
+        tournament_service.create_tournament(
+            setup,
+            league_id=league_id,
+            user_id=owner_id,
+            tournament_id=tournament_id,
+            request=tournament_service.FormatRequest(
+                name="Race",
+                date=now.date(),
+                type=TournamentType.SINGLES,
+                group_phase=GroupPhase.NONE,
+            ),
+            clock=lambda: now,
+        )
+        setup.commit()
+    return tournament_id
+
+
+@pytest.mark.concurrency
+def test_br010_a_season_start_racing_a_create_is_refused_after_the_create(
+    committing_settings: Settings,
+    committing_engine: Engine,
+    now: datetime,
+    auth_header: Callable[..., dict[str, str]],
+    wait_for_a_lock_wait: Callable[[], None],
+) -> None:
+    owner_id, league_id, _ = _commit_league_with_players(
+        committing_engine, now, "create-first@example.test", 0
+    )
+    tournament_id = uuid7()
+    outcome: list[tuple[int, object]] = []
+
+    with (
+        Session(committing_engine) as first,
+        TestClient(create_app(committing_settings)) as client,
+    ):
+        tournament_service.create_tournament(
+            first,
+            league_id=league_id,
+            user_id=owner_id,
+            tournament_id=tournament_id,
+            request=tournament_service.FormatRequest(
+                name="Race",
+                date=now.date(),
+                type=TournamentType.SINGLES,
+                group_phase=GroupPhase.NONE,
+            ),
+            clock=lambda: now,
+        )
+
+        def start_second() -> None:
+            response = client.post(
+                _url(league_id, "/seasons"),
+                json={"expected_current_number": 1},
+                headers=auth_header(owner_id, issued_at=datetime.now(UTC)),
+            )
+            outcome.append((response.status_code, response.json()))
+
+        second = threading.Thread(target=start_second)
+        second.start()
+        wait_for_a_lock_wait()  # it waits for the league lock the create holds
+        first.commit()
+        second.join()
+
+    assert outcome == [
+        (
+            422,
+            {
+                "code": "season_has_unfinished_tournaments",
+                "detail": {"tournament_ids": [str(tournament_id)]},
+            },
+        )
+    ]
+    with Session(committing_engine) as check:
+        assert check.scalars(select(Season.number)).all() == [1]
+
+
+@pytest.mark.concurrency
+def test_br010_a_create_racing_a_season_start_lands_in_the_new_season(
+    committing_settings: Settings,
+    committing_engine: Engine,
+    now: datetime,
+    auth_header: Callable[..., dict[str, str]],
+    wait_for_a_lock_wait: Callable[[], None],
+) -> None:
+    owner_id, league_id, _ = _commit_league_with_players(
+        committing_engine, now, "season-first@example.test", 0
+    )
+    tournament_id = uuid7()
+    outcome: list[tuple[int, object]] = []
+
+    with (
+        Session(committing_engine) as first,
+        TestClient(create_app(committing_settings)) as client,
+    ):
+        league_service.start_season(
+            first,
+            league_id=league_id,
+            user_id=owner_id,
+            expected_current_number=1,
+            now=now,
+        )
+
+        def create_second() -> None:
+            response = client.post(
+                _url(league_id, "/tournaments"),
+                json={"id": str(tournament_id), **SINGLES_ROUND_ROBIN},
+                headers=auth_header(owner_id, issued_at=datetime.now(UTC)),
+            )
+            outcome.append((response.status_code, response.json()))
+
+        second = threading.Thread(target=create_second)
+        second.start()
+        wait_for_a_lock_wait()  # it waits for the league lock the start holds
+        first.commit()
+        second.join()
+
+    assert [status for status, _ in outcome] == [201]
+    with Session(committing_engine) as check:
+        season_number = check.scalar(
+            select(Season.number)
+            .join(Tournament, Tournament.season_id == Season.id)
+            .where(Tournament.id == tournament_id)
+        )
+        assert season_number == 2
+
+
+@pytest.mark.concurrency
+def test_adr008_two_pick_writes_on_one_tournament_apply_one_after_the_other(
+    committing_settings: Settings,
+    committing_engine: Engine,
+    now: datetime,
+    auth_header: Callable[..., dict[str, str]],
+    wait_for_a_lock_wait: Callable[[], None],
+) -> None:
+    owner_id, league_id, player_ids = _commit_league_with_players(
+        committing_engine, now, "picks@example.test", 3
+    )
+    tournament_id = _commit_tournament(committing_engine, now, owner_id, league_id)
+    outcome: list[tuple[int, object]] = []
+
+    with (
+        Session(committing_engine) as first,
+        TestClient(create_app(committing_settings)) as client,
+    ):
+        tournament_service.set_tournament_players(
+            first,
+            league_id=league_id,
+            tournament_id=tournament_id,
+            user_id=owner_id,
+            player_ids=player_ids[:2],
+            clock=lambda: now,
+        )
+
+        def pick_second() -> None:
+            response = client.put(
+                _tournament_url(league_id, str(tournament_id), "/setup/players"),
+                json={"player_ids": [str(p) for p in player_ids[1:]]},
+                headers=auth_header(owner_id, issued_at=datetime.now(UTC)),
+            )
+            outcome.append((response.status_code, response.json()))
+
+        second = threading.Thread(target=pick_second)
+        second.start()
+        wait_for_a_lock_wait()  # it waits for the league lock the first one holds
+        first.commit()
+        second.join()
+
+    assert [status for status, _ in outcome] == [200]
+    with Session(committing_engine) as check:
+        picked = set(check.scalars(select(TournamentPlayer.player_id)))
+        members = set(check.scalars(select(EntryMember.player_id)))
+        counter = check.scalar(select(Tournament.draw_counter))
+    assert picked == members == set(player_ids[1:])  # the later write is the target
+    assert counter == 2  # each write drew once
 
 
 @pytest.mark.concurrency
