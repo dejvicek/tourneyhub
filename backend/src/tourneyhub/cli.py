@@ -1,7 +1,7 @@
 import argparse
 import getpass
 import logging.config
-import secrets
+import re
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -11,7 +11,11 @@ from alembic.config import Config
 from sqlalchemy.orm import Session
 
 from tourneyhub.db.session import create_db_engine, create_session_factory
+from tourneyhub.engine.accounts import Language
+from tourneyhub.engine.admin import AdminActionSource
 from tourneyhub.logging_config import LOGGING_CONFIG
+from tourneyhub.services import accounts as account_service
+from tourneyhub.services import admin as admin_service
 from tourneyhub.services import instance as instance_service
 from tourneyhub.services import maintenance
 from tourneyhub.settings import Settings
@@ -36,6 +40,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="make a random code and print it, as the only output, once",
     )
+    new_admin = commands.add_parser(
+        "create-admin",
+        help="create an account with admin rights, the password read from a prompt",
+    )
+    new_admin.add_argument("--email", required=True)
+    new_admin.add_argument(
+        "--display-name", help="default: the part of the email before the @"
+    )
+    for name, help_ in (
+        ("grant-admin", "give an existing account admin rights"),
+        ("revoke-admin", "take admin rights from an account"),
+    ):
+        commands.add_parser(name, help=help_).add_argument("--email", required=True)
     commands.add_parser(
         "cleanup", help="delete expired refresh tokens and old sign-in attempts"
     )
@@ -44,6 +61,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         migrate()
     elif args.command == "set-signup-code":
         return set_signup_code(clear=args.clear, generate=args.generate)
+    elif args.command == "create-admin":
+        return create_admin(email=args.email, display_name=args.display_name)
+    elif args.command in {"grant-admin", "revoke-admin"}:
+        return set_admin_flag(email=args.email, is_admin=args.command == "grant-admin")
     else:
         cleanup()
     return 0
@@ -77,7 +98,7 @@ def set_signup_code(*, clear: bool, generate: bool = False) -> int:
     """
     code = None
     if generate:
-        code = secrets.token_urlsafe(16)  # 22 characters, 128 bits
+        code = instance_service.generate_signup_code()
     elif not clear:
         code = getpass.getpass("Sign-up code: ").strip()
         shortest = instance_service.SIGNUP_CODE_MIN_LENGTH
@@ -89,11 +110,75 @@ def set_signup_code(*, clear: bool, generate: bool = False) -> int:
             )
             return 1
     with _transaction() as session:
-        instance_service.set_signup_code(session, code=code, now=datetime.now(UTC))
+        admin_service.set_signup_code(
+            session,
+            source=AdminActionSource.CLI,
+            admin_user_id=None,
+            code=code,
+            now=datetime.now(UTC),
+        )
     if generate:
         print(code)
     else:
         print("Sign-up is closed." if code is None else "The sign-up code is set.")
+    return 0
+
+
+def create_admin(*, email: str, display_name: str | None) -> int:
+    """Create an account with admin rights; the only way to make a first admin.
+
+    No web route can create an admin (ADR-007). The password is read with
+    `getpass` twice and never printed. Recorded as `create_admin`, source `cli`.
+    """
+    email = email.strip()
+    if not (
+        len(email) <= account_service.EMAIL_MAX_LENGTH
+        and re.fullmatch(account_service.EMAIL_PATTERN, email)
+    ):
+        print("That is not an email address.")
+        return 1
+    password = getpass.getpass("Password: ")
+    shortest = account_service.MIN_PASSWORD_LENGTH
+    longest = account_service.MAX_PASSWORD_LENGTH
+    if not shortest <= len(password) <= longest:
+        print(f"The password needs {shortest} to {longest} characters.")
+        return 1
+    if getpass.getpass("Password again: ") != password:
+        print("The passwords differ.")
+        return 1
+    name = (display_name or email.partition("@")[0]).strip()[:100]
+    with _transaction() as session:
+        user = admin_service.create_admin(
+            session,
+            email=email,
+            display_name=name,
+            password=password,
+            language=Language.EN,
+            now=datetime.now(UTC),
+        )
+    if user is None:
+        print("An account with that email exists; use grant-admin.")
+        return 1
+    print("The admin account is created.")
+    return 0
+
+
+def set_admin_flag(*, email: str, is_admin: bool) -> int:
+    """Give an existing account admin rights, or take them away (ADR-007).
+
+    A change is recorded as `grant_admin` or `revoke_admin`, source `cli`. It
+    takes effect on the account's next request, because the flag is read from
+    the row (ADR-006).
+    """
+    with _transaction() as session:
+        changed = admin_service.set_admin_flag(
+            session, email=email.strip(), is_admin=is_admin, now=datetime.now(UTC)
+        )
+    if changed is None:
+        print("No account has that email.")
+        return 1
+    wanted = "admin" if is_admin else "not an admin"
+    print(f"The account is {'now ' if changed else 'already '}{wanted}.")
     return 0
 
 

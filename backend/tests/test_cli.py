@@ -3,7 +3,7 @@ import io
 from collections.abc import Iterator
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import UTC, datetime, timedelta
-from uuid import uuid7
+from uuid import UUID, uuid7
 
 import pytest
 from sqlalchemy import Engine, func, select, text
@@ -11,12 +11,14 @@ from sqlalchemy.orm import Session
 
 from tourneyhub.cli import main
 from tourneyhub.db.models.accounts import (
+    AdminAction,
     AuthAttempt,
     InstanceSettings,
     RefreshToken,
     User,
 )
 from tourneyhub.engine.accounts import Language
+from tourneyhub.engine.admin import AdminActionKind, AdminActionSource
 from tourneyhub.engine.auth import AuthAttemptKind
 from tourneyhub.services import auth as auth_service
 from tourneyhub.services.instance import (
@@ -265,5 +267,252 @@ def test_adr006_cleanup_deletes_what_no_longer_matters_and_reports_the_counts(
 def test_adr006_cleanup_takes_no_arguments() -> None:
     with redirect_stderr(io.StringIO()), pytest.raises(SystemExit) as raised:
         main(["cleanup", "--all"])
+
+    assert raised.value.code == 2
+
+
+def _actions(engine: Engine) -> list[AdminAction]:
+    with Session(engine) as reader:
+        return list(reader.scalars(select(AdminAction).order_by(AdminAction.id)))
+
+
+def _answer_prompts(monkeypatch: pytest.MonkeyPatch, *answers: str) -> list[str]:
+    """Answer the prompts one after the other; returns the prompts asked."""
+    remaining = list(answers)
+    prompts: list[str] = []
+
+    def fake(prompt: str = "") -> str:
+        prompts.append(prompt)
+        return remaining.pop(0)
+
+    monkeypatch.setattr(getpass, "getpass", fake)
+    return prompts
+
+
+def _user(engine: Engine, email: str) -> User | None:
+    with Session(engine) as reader:
+        return reader.scalars(
+            select(User).where(func.lower(User.email) == email.lower())
+        ).one_or_none()
+
+
+def _make_account(engine: Engine, email: str, *, is_admin: bool = False) -> UUID:
+    with Session(engine) as setup:
+        user = User(
+            email=email,
+            display_name="Ola",
+            password_hash="!",
+            is_admin=is_admin,
+            language=Language.EN,
+            created_at=datetime.now(UTC),
+        )
+        setup.add(user)
+        setup.commit()
+        return user.id
+
+
+PASSWORD = "a long enough passphrase"
+
+
+@pytest.mark.concurrency
+def test_adr007_set_signup_code_records_a_cli_action_without_the_code(
+    cli_environment: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _answer_prompt(monkeypatch, "very-secret-code")
+
+    _run("set-signup-code")
+    _run("set-signup-code", "--generate")
+    _run("set-signup-code", "--clear")
+
+    actions = _actions(cli_environment)
+    assert [
+        (a.source, a.action, a.admin_user_id, a.target_user_id) for a in actions
+    ] == [(AdminActionSource.CLI, AdminActionKind.SET_SIGNUP_CODE, None, None)] * 3
+    assert "very-secret-code" not in repr([vars(a) for a in actions])
+
+
+@pytest.mark.concurrency
+def test_adr007_a_refused_code_records_nothing(
+    cli_environment: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _answer_prompt(monkeypatch, "short")
+
+    code, _, _ = _run("set-signup-code")
+
+    assert code == 1
+    assert _actions(cli_environment) == []
+
+
+@pytest.mark.concurrency
+def test_adr007_create_admin_makes_an_admin_and_records_it(
+    cli_environment: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prompts = _answer_prompts(monkeypatch, PASSWORD, PASSWORD)
+
+    code, stdout, stderr = _run("create-admin", "--email", "boss@example.test")
+
+    assert code == 0
+    assert stdout == "The admin account is created.\n"
+    assert prompts == ["Password: ", "Password again: "]
+    assert PASSWORD not in stdout + stderr
+    user = _user(cli_environment, "boss@example.test")
+    assert user is not None
+    assert (user.is_admin, user.must_change_password, user.display_name) == (
+        True,
+        False,
+        "boss",
+    )
+    assert auth_service.verify_password(user.password_hash, PASSWORD)
+    [action] = _actions(cli_environment)
+    assert (
+        action.source,
+        action.action,
+        action.admin_user_id,
+        action.target_user_id,
+    ) == (AdminActionSource.CLI, AdminActionKind.CREATE_ADMIN, None, user.id)
+
+
+@pytest.mark.concurrency
+def test_adr007_create_admin_takes_a_display_name(
+    cli_environment: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _answer_prompts(monkeypatch, PASSWORD, PASSWORD)
+
+    _run("create-admin", "--email", "boss@example.test", "--display-name", " Šéf ")
+
+    user = _user(cli_environment, "boss@example.test")
+    assert user is not None
+    assert user.display_name == "Šéf"
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize(
+    ("email", "answers", "message"),
+    [
+        pytest.param("not-an-email", [], "not an email", id="bad-email"),
+        pytest.param("a@example.test", ["x" * 14], "15 to 1024", id="short"),
+        pytest.param("a@example.test", ["x" * 1025], "15 to 1024", id="long"),
+        pytest.param(
+            "a@example.test", [PASSWORD, PASSWORD + "!"], "differ", id="mismatch"
+        ),
+    ],
+)
+def test_adr007_create_admin_refuses_bad_input_and_creates_nothing(
+    cli_environment: Engine,
+    monkeypatch: pytest.MonkeyPatch,
+    email: str,
+    answers: list[str],
+    message: str,
+) -> None:
+    _answer_prompts(monkeypatch, *answers)
+
+    code, stdout, _ = _run("create-admin", "--email", email)
+
+    assert code == 1
+    assert message in stdout
+    assert PASSWORD not in stdout
+    assert _user(cli_environment, email) is None
+    assert _actions(cli_environment) == []
+
+
+@pytest.mark.concurrency
+def test_adr007_create_admin_with_a_taken_email_points_to_grant_admin(
+    cli_environment: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _make_account(cli_environment, "Boss@Example.test")
+    _answer_prompts(monkeypatch, PASSWORD, PASSWORD)
+
+    code, stdout, _ = _run("create-admin", "--email", "boss@example.test")
+
+    assert code == 1
+    assert "grant-admin" in stdout
+    user = _user(cli_environment, "boss@example.test")
+    assert user is not None
+    assert user.is_admin is False  # untouched
+    assert _actions(cli_environment) == []
+
+
+@pytest.mark.concurrency
+def test_adr007_grant_admin_sets_the_flag_and_records_it(
+    cli_environment: Engine,
+) -> None:
+    ola = _make_account(cli_environment, "ola@example.test")
+
+    code, stdout, _ = _run("grant-admin", "--email", " OLA@example.test ")
+
+    assert (code, stdout) == (0, "The account is now admin.\n")
+    user = _user(cli_environment, "ola@example.test")
+    assert user is not None
+    assert user.is_admin is True
+    assert user.updated_at is not None
+    [action] = _actions(cli_environment)
+    assert (
+        action.source,
+        action.action,
+        action.admin_user_id,
+        action.target_user_id,
+    ) == (AdminActionSource.CLI, AdminActionKind.GRANT_ADMIN, None, ola)
+
+
+@pytest.mark.concurrency
+def test_adr007_granting_an_admin_again_changes_and_records_nothing(
+    cli_environment: Engine,
+) -> None:
+    _make_account(cli_environment, "ola@example.test", is_admin=True)
+
+    code, stdout, _ = _run("grant-admin", "--email", "ola@example.test")
+
+    assert (code, stdout) == (0, "The account is already admin.\n")
+    assert _actions(cli_environment) == []
+
+
+@pytest.mark.concurrency
+def test_adr007_revoke_admin_clears_the_flag_and_records_it(
+    cli_environment: Engine,
+) -> None:
+    ola = _make_account(cli_environment, "ola@example.test", is_admin=True)
+
+    code, stdout, _ = _run("revoke-admin", "--email", "ola@example.test")
+
+    assert (code, stdout) == (0, "The account is now not an admin.\n")
+    user = _user(cli_environment, "ola@example.test")
+    assert user is not None
+    assert user.is_admin is False
+    [action] = _actions(cli_environment)
+    assert (action.source, action.action, action.admin_user_id) == (
+        AdminActionSource.CLI,
+        AdminActionKind.REVOKE_ADMIN,
+        None,
+    )
+    assert action.target_user_id == ola
+
+
+@pytest.mark.concurrency
+def test_adr007_revoking_a_non_admin_changes_and_records_nothing(
+    cli_environment: Engine,
+) -> None:
+    _make_account(cli_environment, "ola@example.test")
+
+    code, stdout, _ = _run("revoke-admin", "--email", "ola@example.test")
+
+    assert (code, stdout) == (0, "The account is already not an admin.\n")
+    assert _actions(cli_environment) == []
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize("command", ["grant-admin", "revoke-admin"])
+def test_adr007_an_unknown_email_is_refused(
+    cli_environment: Engine, command: str
+) -> None:
+    code, stdout, _ = _run(command, "--email", "nobody@example.test")
+
+    assert (code, stdout) == (1, "No account has that email.\n")
+    assert _actions(cli_environment) == []
+
+
+@pytest.mark.parametrize("command", ["create-admin", "grant-admin", "revoke-admin"])
+def test_adr007_the_admin_commands_need_an_email(command: str) -> None:
+    with redirect_stderr(io.StringIO()), pytest.raises(SystemExit) as raised:
+        main([command])
 
     assert raised.value.code == 2
