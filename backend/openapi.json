@@ -3684,7 +3684,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/players": {
       "put": {
-        "description": "Pick the tournament's players (FR-032).\n\nAn id that is not a player of the league is 404 `player_not_found`; a\nremoved player is 422 `player_removed` (BR-002). A change makes the entries\nand draws again, and increments the draw counter (ADR-010).",
+        "description": "Pick the tournament's players (FR-032).\n\nAn id that is not a player of the league is 404 `player_not_found`; a\nremoved player is 409 `player_removed` (BR-002): reload. A change makes the entries\nand draws again, and increments the draw counter (ADR-010).",
         "operationId": "set_tournament_players",
         "parameters": [
           {

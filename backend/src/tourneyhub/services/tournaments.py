@@ -512,7 +512,8 @@ def _apply_phases(
 
     A knockout after a group phase is created when it starts (FR-045), so setup
     keeps exactly one phase at position 1. The tie-breakers of a Swiss or
-    Monster DYP phase start at FR-043's default and stay while its format does.
+    Monster DYP phase start at FR-043's default and stay only while its format
+    does: a change between the two, or from another format, starts again.
     """
     settings = _phase_settings(fmt)
     phase = next(iter(tournament.phases), None)
@@ -520,6 +521,7 @@ def _apply_phases(
         tournament.phases.remove(phase)
         session.flush()  # free position 1 before the new phase takes it
         phase = None
+    old_format = None if phase is None else phase.format  # before it is overwritten
     if phase is None:
         phase = TournamentPhase(id=uuid7(), position=1, created_at=now)
         tournament.phases.append(phase)
@@ -529,16 +531,11 @@ def _apply_phases(
         phase.updated_at = now
     for column, value in settings.items():
         setattr(phase, column, value)
-    keeps_tiebreakers = phase.tiebreakers is not None and settings["format"] in {
-        PhaseFormat.SWISS,
-        PhaseFormat.MONSTER_DYP,
-    }
-    if not keeps_tiebreakers:
-        phase.tiebreakers = (
-            list(DEFAULT_TIEBREAKERS)
-            if settings["format"] in {PhaseFormat.SWISS, PhaseFormat.MONSTER_DYP}
-            else None
-        )
+    if settings["format"] not in {PhaseFormat.SWISS, PhaseFormat.MONSTER_DYP}:
+        phase.tiebreakers = None
+    elif old_format is not settings["format"]:
+        # A new phase, or another format: Swiss and Monster DYP do not share an order.
+        phase.tiebreakers = list(DEFAULT_TIEBREAKERS)
     return True
 
 
@@ -867,8 +864,7 @@ def _league_players(
         )
     )
     if len(players) != len(ids):
-        missing = min(ids - {player.id for player in players})
-        raise NotFoundError(ErrorCode.PLAYER_NOT_FOUND, player_id=str(missing))
+        raise NotFoundError(ErrorCode.PLAYER_NOT_FOUND)
     return players
 
 
@@ -883,7 +879,8 @@ def set_tournament_players(
 ) -> TournamentSetup:
     """Set the players picked for a tournament in setup, the target state (FR-032).
 
-    A removed player cannot be picked (BR-002): 422 `player_removed`. A changed
+    A removed player cannot be picked (BR-002): 409 `player_removed`, because only a
+    screen that was not reloaded after the removal offers one (ADR-008). A changed
     pick makes the entries again and increments the draw counter (ADR-010); a
     repeat changes nothing. The minimum number of entries is checked when the
     tournament is generated (FR-032, FR-035).
@@ -894,7 +891,7 @@ def set_tournament_players(
     players = _league_players(session, league=league, player_ids=player_ids)
     removed = sorted(player.id for player in players if player.removed_at is not None)
     if removed:
-        raise RuleViolationError(ErrorCode.PLAYER_REMOVED, player_id=str(removed[0]))
+        raise ConflictError(ErrorCode.PLAYER_REMOVED, player_id=str(removed[0]))
     ranking = _ranking(session, league=league, tournament=tournament)
     wanted = set(player_ids)
     have = {row.player_id for row in tournament.players}

@@ -438,7 +438,7 @@ def set_tournament_players(
     """Pick the tournament's players (FR-032).
 
     An id that is not a player of the league is 404 `player_not_found`; a
-    removed player is 422 `player_removed` (BR-002). A change makes the entries
+    removed player is 409 `player_removed` (BR-002): reload. A change makes the entries
     and draws again, and increments the draw counter (ADR-010).
     """
     setup = tournament_service.set_tournament_players(

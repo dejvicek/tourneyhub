@@ -540,6 +540,32 @@ def test_fr043_a_swiss_phase_keeps_its_tiebreakers_while_it_stays_swiss(
     assert phase.sit_out_points == 1
 
 
+def test_fr043_the_tiebreakers_start_again_when_swiss_becomes_monster_dyp(
+    client: TestClient, league: League, headers: dict[str, str], session: Session
+) -> None:
+    created = _create(
+        client, league, headers, group_phase="swiss", round_robin_legs=None
+    )
+    tid = created["tournament_id"]
+    phase = session.scalars(
+        select(TournamentPhase).where(TournamentPhase.tournament_id == UUID(tid))
+    ).one()
+    phase.tiebreakers = ["bh2"]  # what a later screen will let the organizer choose
+    session.flush()
+    monster = {
+        **SINGLES_ROUND_ROBIN,
+        "type": "monster_dyp",
+        "group_phase": "monster_dyp",
+        "round_robin_legs": None,
+    }
+
+    _ok(_write(client, league, tid, "/format", monster, headers))
+    session.refresh(phase)
+
+    assert phase.format.value == "monster_dyp"
+    assert phase.tiebreakers == ["bh1", "bh2", "score_difference"]
+
+
 def test_adr008_a_repeated_format_changes_nothing(
     client: TestClient,
     league: League,
@@ -708,7 +734,7 @@ def test_br002_a_removed_player_cannot_be_picked(
         headers,
     )
 
-    assert status == 422
+    assert status == 409
     assert body == {"code": "player_removed", "detail": {"player_id": players[1]}}
 
 
@@ -732,10 +758,7 @@ def test_owasp_api1_a_player_of_another_league_cannot_be_picked(
     )
 
     assert status == 404
-    assert body == {
-        "code": "player_not_found",
-        "detail": {"player_id": str(stranger.id)},
-    }
+    assert body == {"code": "player_not_found", "detail": {}}
 
 
 def test_br003_a_player_given_twice_is_refused(
@@ -902,6 +925,9 @@ def test_fr033_the_rest_of_doubles_is_paired_by_lot(
             headers,
         )
     )
+    [by_hand] = [
+        e for e in paired["entries"] if set(e["player_ids"]) == set(players[:2])
+    ]
 
     body = _ok(
         _write(
