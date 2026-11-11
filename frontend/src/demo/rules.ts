@@ -69,10 +69,9 @@ export const rules: Readonly<Rules> = {
    * The PRD (BR-058, BR-063 as reviewed in #46) picks first those who did not
    * sit out the round before, then the fewest sit-outs; this demo still orders
    * by the fewest sit-outs only, and does not count a missed round as a sit-out
-   * for the order (BR-064, BR-067). Sit-out points follow BR-075 (the default is
-   * 1 when a group-phase match can be drawn, BR-090, otherwise 2, and it moves
-   * with the format and the draw setting while the phase has no result,
-   * BR-077). The behaviour change is tracked in issues #59 and #60.
+   * for the order (BR-064, BR-067). The default points for sitting out are 0
+   * (FR-039), picked by the organizer as 0, 1 or 2 (BR-075). The behaviour
+   * change is tracked in PR #65 and issue #60.
    */
   sitOuts: "fewest_sit_outs",
 

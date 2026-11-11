@@ -188,7 +188,7 @@ export const setupMutations = {
       ),
     ),
   /**
-   * FR-036: possible while no match in the tournament has a result (BR-077);
+   * FR-036: possible while no match in the tournament has a result (BR-096);
    * also used by the running screens.
    */
   backToSetup: (leagueId: string, tournamentId: string) =>

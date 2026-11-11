@@ -495,7 +495,7 @@ export function rankingOf(t: StoredTournament): RankingRead {
       },
     ]),
   );
-  // BR-071, BR-078: a Swiss or Monster DYP sit-out is worth the phase's points
+  // BR-071, BR-076: a Swiss or Monster DYP sit-out is worth the phase's points
   // for sitting out, which count as points in the standings. A round robin has
   // none (not even 0); this demo still gives it a value, which PR #65
   // (closes #59) removes. A missed round is no sit-out here and earns nothing (BR-064,

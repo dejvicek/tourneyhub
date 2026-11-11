@@ -3,7 +3,7 @@ import type { components } from "@/api/schema";
 type MatchFormat = components["schemas"]["MatchFormat"];
 
 /**
- * The points of a sit-out the organizer can pick (FR-039, BR-071, BR-076).
+ * The points of a sit-out the organizer can pick (FR-039, BR-071, BR-075).
  * Only a Swiss or Monster DYP phase has them; a round robin has none, not even
  * 0 (BR-071). The code still offers them for a round robin; PR #65 (closes #59)
  * changes that.
@@ -17,12 +17,9 @@ export type SitOutPoints = (typeof SIT_OUT_POINTS)[number];
  * match cannot, so it is worth a win (2). The backend computes the same
  * default; this only shows it.
  *
- * This does NOT yet follow the PRD. BR-075 and FR-039 make the default 1 when
- * a group-phase match can be drawn (BR-090, so the league must allow draws),
- * otherwise 2, so the league's draw setting does play a part, and the default
- * moves with the match format (FR-054) and the draw setting (BR-013) for as
- * long as the phase has no result (BR-077), unless the organizer picked a value
- * (BR-076). PR #65 (closes #59) changes the behaviour (a round robin without
+ * This does NOT yet follow the PRD. FR-039 makes the default 0, with nothing
+ * following the match format or the league's draw setting; the organizer picks
+ * 0, 1 or 2 (BR-075). PR #65 changes the behaviour (and a round robin without
  * any value).
  */
 export function defaultSitOutPoints(format: MatchFormat): 1 | 2 {
