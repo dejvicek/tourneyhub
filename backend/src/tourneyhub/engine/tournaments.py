@@ -95,6 +95,14 @@ DEFAULT_TIEBREAKERS: tuple[Tiebreaker, ...] = (
 """The tie-breakers of a new Swiss or Monster DYP phase, in order (FR-043)."""
 
 
+class MatchOutcome(StrEnum):
+    """A match's result: a side won, or a draw (DATA-MODEL `matches.outcome`, D11)."""
+
+    SIDE_1 = "side_1"
+    SIDE_2 = "side_2"
+    DRAW = "draw"
+
+
 class MonsterKnockoutMode(StrEnum):
     """How the knockout after Monster DYP rounds is formed (FR-045, BR-081 to BR-084)."""
 
@@ -116,6 +124,30 @@ class EntryKind(StrEnum):
 
     PLAYER = "player"
     PAIR = "pair"
+
+
+class MatchKind(StrEnum):
+    """A bracket has one third-place match; every other match is standard (BR-044)."""
+
+    STANDARD = "standard"
+    THIRD_PLACE = "third_place"
+
+
+class Outcome(StrEnum):
+    """A match's result, or a game's winner: one side, or a draw (BR-090, D11)."""
+
+    SIDE_1 = "side_1"
+    SIDE_2 = "side_2"
+    DRAW = "draw"
+
+
+class Participation(StrEnum):
+    """Why an entry did or did not play a group-phase round (D5, BR-064, BR-067)."""
+
+    PLAYED = "played"
+    SAT_OUT = "sat_out"
+    DISABLED = "disabled"
+    NOT_JOINED = "not_joined"
 
 
 def group_phase_format(choice: GroupPhase) -> PhaseFormat | None:

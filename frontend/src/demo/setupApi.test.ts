@@ -4,6 +4,7 @@ import { api, ApiError, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
 
 import { DEMO_LEAGUE_ID, DEMO_SEASON_ID } from "./ids";
+import { newId } from "./setupEngine";
 import {
   createDraft,
   dypFormat,
@@ -123,14 +124,14 @@ describe("the fake API for tournament setup", () => {
     const setup = await pickPlayers(id, 12);
     const start = (expected: number) =>
       dataOf(
-        provisionalApi.POST(
+        api.POST(
           "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/start",
           { ...at(id), body: { expected_draw_counter: expected } },
         ),
       );
     const back = () =>
       dataOf(
-        provisionalApi.POST(
+        api.POST(
           "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/back-to-setup",
           { ...at(id), body: { expected_state: "in_progress" } },
         ),
@@ -163,7 +164,153 @@ describe("the fake API for tournament setup", () => {
       ),
     );
     const refused = await failure(back());
-    expect([refused.status, refused.detail.rule]).toEqual([422, "FR-036"]);
+    expect([refused.status, refused.code, refused.detail]).toEqual([
+      422,
+      "tournament_has_results",
+      { results: 1 },
+    ]);
+  });
+
+  it("previews the schedule that the start creates, and writes nothing (FR-035)", async () => {
+    const id = await createDraft({ type: "singles", round_robin_legs: 2 });
+    const setup = await pickPlayers(id, 5);
+    const previewOf = () =>
+      dataOf(
+        api.GET(
+          "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/preview",
+          at(id),
+        ),
+      );
+
+    const shown = await previewOf();
+    const untouched = await tournamentOf(id);
+    const started = await dataOf(
+      api.POST(
+        "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/start",
+        {
+          ...at(id),
+          body: { expected_draw_counter: shown.draw_counter },
+        },
+      ),
+    );
+
+    expect(untouched.state).toBe("setup");
+    expect(untouched.rounds).toEqual([]);
+    expect(shown).toMatchObject({
+      can_start: true,
+      problem: null,
+      draw_counter: setup.draw_counter,
+      round_count: 10,
+      match_count: 20,
+      bracket_size: null,
+    });
+    expect(shown.rounds.map((round) => round.round_no)).toEqual(
+      started.rounds.map((round) => round.round_no),
+    );
+    expect(shown.rounds.map((round) => round.matches.length)).toEqual(
+      started.rounds.map((round) => round.matches.length),
+    );
+    expect(shown.rounds.map((round) => round.sitting_out.length)).toEqual(
+      started.rounds.map((round) => round.sitting_out.length),
+    );
+  });
+
+  it("previews the refusal the start gives, and a started tournament as not in setup", async () => {
+    const few = await createDraft({ type: "singles" });
+    await pickPlayers(few, 1);
+    const unpaired = await createDraft({ type: "doubles" });
+    await pickPlayers(unpaired, 3);
+    const started = await createDraft();
+    const counter = (await pickPlayers(started, 4)).draw_counter;
+    const preview = (id: string) =>
+      dataOf(
+        api.GET(
+          "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/preview",
+          at(id),
+        ),
+      );
+    const start = (id: string, expected: number) =>
+      dataOf(
+        api.POST(
+          "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/start",
+          { ...at(id), body: { expected_draw_counter: expected } },
+        ),
+      );
+    await start(started, counter);
+
+    const refused = await Promise.all(
+      [few, unpaired].map(async (id) => ({
+        preview: await preview(id),
+        start: await failure(start(id, (await setupOf(id)).draw_counter)),
+      })),
+    );
+    const after = await preview(started);
+
+    for (const { preview: shown, start: refusal } of refused) {
+      expect(shown.can_start).toBe(false);
+      expect(shown.problem).toEqual({
+        code: refusal.code,
+        detail: refusal.detail,
+      });
+      expect(shown.rounds).toEqual([]);
+      expect([shown.match_count, shown.round_count]).toEqual([null, null]);
+    }
+    expect(refused.map(({ preview: shown }) => shown.problem?.code)).toEqual([
+      "not_enough_entries",
+      "players_without_partner",
+    ]);
+    expect(after.problem).toEqual({
+      code: "tournament_not_in_setup",
+      detail: { state: "in_progress" },
+    });
+  });
+
+  it("answers 404 for a preview of an unknown tournament", async () => {
+    const missing = await failure(
+      dataOf(
+        api.GET(
+          "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/preview",
+          at(newId()),
+        ),
+      ),
+    );
+
+    expect([missing.status, missing.code]).toEqual([
+      404,
+      "tournament_not_found",
+    ]);
+  });
+
+  it("starts a round robin of 64 entries and refuses one of 65 (FR-032)", async () => {
+    const existing = (await setupOf(await createDraft())).ranking.length;
+    for (let n = existing; n < 65; n += 1) {
+      await dataOf(
+        api.POST("/api/v1/leagues/{league_id}/players", {
+          params: { path: league },
+          body: { name: `Extra ${String(n)}` },
+        }),
+      );
+    }
+    const startWith = async (count: number) => {
+      const id = await createDraft({ type: "singles" });
+      const setup = await pickPlayers(id, count);
+      return dataOf(
+        api.POST(
+          "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/start",
+          { ...at(id), body: { expected_draw_counter: setup.draw_counter } },
+        ),
+      );
+    };
+
+    const refused = await failure(startWith(65));
+    const started = await startWith(64);
+
+    expect([refused.status, refused.code, refused.detail]).toEqual([
+      422,
+      "too_many_entries_for_round_robin",
+      { limit: 64 },
+    ]);
+    expect(started.rounds).toHaveLength(63);
   });
 
   it("generates the first round of a Monster DYP and a knockout bracket with byes", async () => {
@@ -179,7 +326,7 @@ describe("the fake API for tournament setup", () => {
     await pickPlayers(knockout, 6);
     const run = (id: string, expected: number) =>
       dataOf(
-        provisionalApi.POST(
+        api.POST(
           "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/start",
           { ...at(id), body: { expected_draw_counter: expected } },
         ),

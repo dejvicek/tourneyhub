@@ -135,10 +135,13 @@ forbidden_modules = ["tourneyhub.*"]
 [tool.pytest]
 minversion = "9.2"
 testpaths = ["tests"]
-addopts = ["--import-mode=importlib", "-ra"]
+addopts = ["--import-mode=importlib", "-ra", "-m", "not benchmark"]
 strict = true                       # strict config, markers, xfail and parametrize ids
 filterwarnings = ["error"]
-markers = ["concurrency: commits real transactions (§9)"]
+markers = [
+  "concurrency: commits real transactions (§9)",
+  "benchmark: a timing bound from an ADR, skipped by default; run with -m benchmark (ADR-011)",
+]
 
 [tool.coverage.run]
 branch = true

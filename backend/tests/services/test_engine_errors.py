@@ -3,6 +3,7 @@ import pytest
 from tourneyhub.engine.errors import (
     DypHalvesUnequalError,
     EngineError,
+    NotEnoughEntriesError,
     NotEnoughPlayersError,
     TooManyLeftOutError,
 )
@@ -18,6 +19,12 @@ from tourneyhub.services.engine_errors import to_app_error
             ErrorCode.NOT_ENOUGH_PLAYERS,
             {"minimum": 4, "given": 3},
             id="BR-031",
+        ),
+        pytest.param(
+            NotEnoughEntriesError(minimum=2, given=1),
+            ErrorCode.NOT_ENOUGH_ENTRIES,
+            {"minimum": 2, "given": 1},
+            id="FR-032",
         ),
         pytest.param(
             DypHalvesUnequalError(top=3, bottom=2),

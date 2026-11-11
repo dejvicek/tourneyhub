@@ -52,9 +52,7 @@ export const tournamentHandlers = [
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}",
     ({ params }) => {
       const t = findTournament(params.league_id, params.tournament_id);
-      return t
-        ? tournamentRead(t)
-        : apiError(404, "not_found", { tournament_id: params.tournament_id });
+      return t ? tournamentRead(t) : notFound(params);
     },
   ),
 
@@ -196,12 +194,13 @@ export const tournamentHandlers = [
   route(
     "post",
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/back-to-setup",
-    ({ params, body }) => {
+    ({ params }) => {
+      // The body can only expect "in_progress" (BackToSetupWrite).
       const t = findTournament(params.league_id, params.tournament_id);
       if (!t) {
         return notFound(params);
       }
-      return failure(backToSetup(t, body.expected_state)) ?? tournamentRead(t);
+      return failure(backToSetup(t)) ?? tournamentRead(t);
     },
   ),
 ];

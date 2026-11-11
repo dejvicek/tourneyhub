@@ -171,7 +171,7 @@ model {
         link https://github.com/dejvicek/tourneyhub/blob/docs/data-model-mvp/DATA-MODEL.md#44-entries "DATA-MODEL §4.4"
       }
       play = tableGroup "Rounds and matches" {
-        description "rounds, round_participation, matches, match_sides, match_side_players"
+        description "rounds, round_participation, matches, match_games, match_sides, match_side_players; a field's match"
         link https://github.com/dejvicek/tourneyhub/blob/docs/data-model-mvp/DATA-MODEL.md#45-rounds-matches-and-results "DATA-MODEL §4.5"
       }
 

@@ -34,3 +34,12 @@ class TooManyLeftOutError(EngineError):
         super().__init__(maximum, given)
         self.maximum = maximum
         self.given = given
+
+
+class NotEnoughEntriesError(EngineError):
+    """Too few entries to start a tournament or play a new round (FR-032, FR-044)."""
+
+    def __init__(self, *, minimum: int, given: int) -> None:
+        super().__init__(minimum, given)
+        self.minimum = minimum
+        self.given = given

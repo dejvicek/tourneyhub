@@ -10,16 +10,37 @@ const CODE_TEXTS = {
   dyp_halves_unequal: "tournaments.errors.rules.br032Unequal",
   too_many_left_out: "tournaments.errors.rules.br032LeftOut",
   dyp_halves_incomplete: "tournaments.errors.rules.br032Incomplete",
+  not_enough_entries: "tournaments.errors.rules.fr032Entries",
+  players_without_partner: "tournaments.errors.rules.br030",
+  too_many_entries_for_round_robin: "tournaments.errors.rules.fr032Max",
+  format_not_supported: "tournaments.errors.rules.fr035",
+  tournament_has_results: "tournaments.errors.rules.fr036",
 } as const satisfies Partial<Record<ErrorCode, string>>;
-
-/** The rules the demo's provisional start and "back to setup" name in `detail.rule`. */
-const RULE_TEXTS = {
-  "FR-032": "tournaments.errors.rules.fr032",
-  "FR-036": "tournaments.errors.rules.fr036",
-} as const satisfies Record<string, string>;
 
 function hasText<T extends object>(texts: T, key: unknown): key is keyof T {
   return typeof key === "string" && key in texts;
+}
+
+/**
+ * The text for a refusal of the API: the 422 that names the rule, as an error
+ * or as the preview's `problem` (ADR-008). Any other code has the generic text.
+ */
+export function describeRefusal(
+  code: ErrorCode | undefined,
+  detail: Record<string, unknown>,
+  t: TFunction,
+): string {
+  const values = {
+    min: Number(detail.minimum),
+    limit: Number(detail.limit),
+    count: Number(detail.unpaired),
+    top: Number(detail.top),
+    bottom: Number(detail.bottom),
+  };
+  if (hasText(CODE_TEXTS, code)) {
+    return t(CODE_TEXTS[code], values);
+  }
+  return t("tournaments.errors.generic");
 }
 
 /**
@@ -34,19 +55,7 @@ export function describeError(error: unknown, t: TFunction): string {
   if (isChanged(error)) {
     return t("tournaments.errors.changed");
   }
-  const { detail } = error;
-  const values = {
-    min: Number(detail.minimum ?? detail.min),
-    top: Number(detail.top),
-    bottom: Number(detail.bottom),
-  };
-  if (hasText(CODE_TEXTS, error.code)) {
-    return t(CODE_TEXTS[error.code], values);
-  }
-  if (error.code === "validation_failed" && hasText(RULE_TEXTS, detail.rule)) {
-    return t(RULE_TEXTS[detail.rule], values);
-  }
-  return t("tournaments.errors.generic");
+  return describeRefusal(error.code, error.detail, t);
 }
 
 /** True for the 409 and 404 that mean "this changed elsewhere; reloaded". */

@@ -152,6 +152,105 @@ _TOURNAMENT_INVARIANTS = {
         JOIN tournaments t ON t.id = h.tournament_id
         WHERE t.type <> 'dyp'
     """,
+    "participation or sides with an entry of another tournament or stage": """
+        SELECT x.round_id, x.entry_id FROM (
+            SELECT p.round_id, p.entry_id FROM round_participation p
+            UNION ALL
+            SELECT m.round_id, s.entry_id FROM match_sides s
+            JOIN matches m ON m.id = s.match_id
+            WHERE s.entry_id IS NOT NULL
+        ) AS x
+        JOIN rounds r ON r.id = x.round_id
+        JOIN tournament_phases ph ON ph.id = r.phase_id
+        JOIN entries e ON e.id = x.entry_id
+        WHERE e.tournament_id <> ph.tournament_id
+            OR e.stage <> CASE
+                WHEN ph.kind = 'knockout' AND ph.position = 2 THEN 'knockout'
+                ELSE 'main'
+            END
+    """,
+    "side players of another league": """
+        SELECT sp.match_id, sp.player_id FROM match_side_players sp
+        JOIN matches m ON m.id = sp.match_id
+        JOIN rounds r ON r.id = m.round_id
+        JOIN tournament_phases ph ON ph.id = r.phase_id
+        JOIN tournaments t ON t.id = ph.tournament_id
+        JOIN seasons s ON s.id = t.season_id
+        JOIN players p ON p.id = sp.player_id
+        WHERE p.league_id <> s.league_id
+    """,
+    "side players that differ from the side's entry (D2)": """
+        SELECT s.match_id, s.side FROM match_sides s
+        WHERE s.entry_id IS NOT NULL AND ARRAY(
+            SELECT sp.player_id FROM match_side_players sp
+            WHERE sp.match_id = s.match_id AND sp.side = s.side
+            ORDER BY sp.player_id
+        ) <> ARRAY(
+            SELECT em.player_id FROM entry_members em
+            WHERE em.entry_id = s.entry_id ORDER BY em.player_id
+        )
+    """,
+    "a bye side with players, or a match without two sides (BR-041)": """
+        SELECT s.match_id FROM match_sides s
+        WHERE s.is_bye AND EXISTS (
+            SELECT FROM match_side_players sp
+            WHERE sp.match_id = s.match_id AND sp.side = s.side
+        )
+        UNION ALL
+        SELECT m.id FROM matches m
+        JOIN rounds r ON r.id = m.round_id
+        JOIN tournament_phases ph ON ph.id = r.phase_id
+        WHERE (ph.kind = 'group' OR r.round_no = 1)
+            AND (SELECT count(*) FROM match_sides s WHERE s.match_id = m.id) <> 2
+    """,
+    "a group round without one participation row per main entry (D5)": """
+        SELECT r.id FROM rounds r
+        JOIN tournament_phases ph ON ph.id = r.phase_id
+        WHERE ph.kind = 'group' AND (
+            SELECT count(*) FROM round_participation p WHERE p.round_id = r.id
+        ) <> (
+            SELECT count(*) FROM entries e
+            WHERE e.tournament_id = ph.tournament_id AND e.stage = 'main'
+        )
+    """,
+    "a group round whose participation disagrees with its matches (D5)": """
+        SELECT p.round_id, p.entry_id FROM round_participation p
+        WHERE (p.status = 'played') <> EXISTS (
+            SELECT FROM match_sides s JOIN matches m ON m.id = s.match_id
+            WHERE m.round_id = p.round_id AND s.entry_id = p.entry_id
+        )
+    """,
+    "games without a result, a result without games, or a gap (D11)": """
+        SELECT g.match_id FROM match_games g
+        JOIN matches m ON m.id = g.match_id
+        WHERE m.outcome IS NULL OR m.is_walkover
+        UNION ALL
+        SELECT m.id FROM matches m
+        WHERE m.outcome IS NOT NULL AND NOT m.is_walkover
+            AND NOT EXISTS (SELECT FROM match_games g WHERE g.match_id = m.id)
+        UNION ALL
+        SELECT g.match_id FROM match_games g
+        GROUP BY g.match_id HAVING max(g.game_no) <> count(*)
+    """,
+    "a field with a match of another tournament, with a result or requeued": """
+        SELECT f.id FROM fields f
+        JOIN matches m ON m.id = f.match_id
+        JOIN rounds r ON r.id = m.round_id
+        JOIN tournament_phases ph ON ph.id = r.phase_id
+        WHERE ph.tournament_id <> f.tournament_id
+            OR m.outcome IS NOT NULL OR m.requeued_at IS NOT NULL
+    """,
+    "an entry in two matches of one round (BR-051)": """
+        SELECT m.round_id, s.entry_id
+        FROM match_sides s JOIN matches m ON m.id = s.match_id
+        WHERE s.entry_id IS NOT NULL
+        GROUP BY 1, 2 HAVING count(*) > 1
+    """,
+    "a player on two fields at once (BR-131)": """
+        SELECT f.tournament_id, sp.player_id FROM fields f
+        JOIN match_side_players sp ON sp.match_id = f.match_id
+        GROUP BY f.tournament_id, sp.player_id HAVING count(*) > 1
+    """,
 }
 
 
