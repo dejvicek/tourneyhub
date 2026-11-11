@@ -1,3 +1,4 @@
+from dataclasses import replace
 from uuid import UUID
 
 import pytest
@@ -208,3 +209,55 @@ def test_br101_the_standings_are_ordered_and_balanced(
     assert sum(row.score_difference for row in rows) == 0
     for index, row in enumerate(rows):
         assert row.place in {index + 1, rows[index - 1].place}
+
+
+@given(results())
+def test_br101_head_to_head_decides_exactly_two_entries_level_on_points(
+    matches: list[PlayedMatch],
+) -> None:
+    rows = round_robin_standings(ENTRIES, matches=matches)
+
+    decided = set()
+    for points in {row.points for row in rows}:
+        level = [row for row in rows if row.points == points]
+        if len(level) != 2:
+            continue
+        ids = {row.entry_id for row in level}
+        meeting = next((m for m in matches if {m.side_1, m.side_2} == ids), None)
+        if meeting is None or meeting.outcome is Outcome.DRAW:
+            continue
+        winner, loser = (
+            (meeting.side_1, meeting.side_2)
+            if meeting.outcome is S1
+            else (meeting.side_2, meeting.side_1)
+        )
+        decided.add(winner)
+        winner_row = next(row for row in level if row.entry_id == winner)
+        loser_row = next(row for row in level if row.entry_id == loser)
+        assert winner_row.place < loser_row.place
+        assert rows.index(winner_row) + 1 == rows.index(loser_row)
+
+    head_to_head = {
+        row.entry_id
+        for row in rows
+        if row.ahead_by is RoundRobinTiebreaker.HEAD_TO_HEAD
+    }
+    assert head_to_head == decided
+
+
+@given(
+    results().flatmap(
+        lambda played: st.tuples(st.just(played), st.permutations(played))
+    )
+)
+def test_br101_the_ranking_does_not_depend_on_the_order_the_matches_arrive(
+    played_and_shuffled: tuple[list[PlayedMatch], list[PlayedMatch]],
+) -> None:
+    played, shuffled = played_and_shuffled
+
+    in_order = round_robin_standings(ENTRIES, matches=played)
+    other_order = round_robin_standings(ENTRIES, matches=shuffled)
+
+    assert [replace(row, form=()) for row in other_order] == [
+        replace(row, form=()) for row in in_order
+    ]
