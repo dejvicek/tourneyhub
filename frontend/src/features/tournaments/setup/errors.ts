@@ -47,11 +47,15 @@ export function describeRefusal(
 /**
  * The text for a failed setup call. A 409 is not an error to the organizer:
  * the screen reloaded and shows what changed (ADR-008), so it has its own
- * message; a 422 names the rule that refused the request.
+ * message, the seeds' own when the order of the seeds changed since the screen
+ * showed it; a 422 names the rule that refused the request.
  */
 export function describeError(error: unknown, t: TFunction): string {
   if (!(error instanceof ApiError)) {
     return t("tournaments.errors.generic");
+  }
+  if (error.code === "seed_order_changed") {
+    return t("tournaments.errors.seedOrderChanged");
   }
   if (isChanged(error)) {
     return t("tournaments.errors.changed");

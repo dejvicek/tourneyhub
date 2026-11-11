@@ -368,6 +368,8 @@ export const tournamentsSetup: CsMessages<typeof english> = {
     generic: "Něco se nepovedlo. Zkuste to znovu.",
     changed:
       "Tohle se změnilo na jiném zařízení. Obrazovka ukazuje aktuální stav.",
+    seedOrderChanged:
+      "Nasazení se změnilo na jiném zařízení. Zkontrolujte první kolo a spusťte turnaj znovu.",
     load: "Turnaj se nepodařilo načíst.",
     rules: {
       name_required: "Zadejte název turnaje.",

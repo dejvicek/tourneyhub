@@ -329,6 +329,8 @@ export const tournamentsSetup = {
     generic: "Something went wrong. Try again.",
     changed:
       "This changed on another device. The screen shows the current state.",
+    seedOrderChanged:
+      "The seeds changed on another device. Check the first round and start again.",
     load: "The tournament could not be loaded.",
     rules: {
       name_required: "Give the tournament a name.",

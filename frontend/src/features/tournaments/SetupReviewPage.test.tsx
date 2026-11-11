@@ -10,6 +10,7 @@ import {
   drawElsewhere,
   pickPlayers,
   startTournament,
+  swapSeedsElsewhere,
   tournamentOf,
 } from "@/demo/setupTestHelpers";
 import { i18n } from "@/i18n";
@@ -87,6 +88,24 @@ describe("setup: review and start (screen 5)", () => {
 
     expect(
       await screen.findByText(/changed on another device/),
+    ).toBeInTheDocument();
+    expect((await tournamentOf(id)).state).toBe("setup");
+  });
+
+  it("does not start from seeds that were reordered on another device", async () => {
+    const user = userEvent.setup();
+    const id = await dypWith(6, { type: "singles", group_phase: "none" });
+    renderAt(reviewPage(id));
+    const start = await screen.findByRole("button", {
+      name: "Generate and start",
+    });
+    await screen.findByRole("heading", { name: "First round" });
+    await swapSeedsElsewhere(id);
+
+    await user.click(start);
+
+    expect(
+      await screen.findByText(/The seeds changed on another device/),
     ).toBeInTheDocument();
     expect((await tournamentOf(id)).state).toBe("setup");
   });

@@ -48,7 +48,7 @@ function Review({ data }: { data: SetupData }) {
   // reload, then opens the tournament on the screen for its state.
   const start = useMutation({
     ...setupMutations.start(leagueId, tournamentId),
-    onSuccess: async (_data, _counter, _result, context) => {
+    onSuccess: async (_data, _body, _result, context) => {
       await context.client.invalidateQueries({
         queryKey: ["leagues", leagueId],
       });
@@ -303,7 +303,10 @@ function Review({ data }: { data: SetupData }) {
           className="md:min-w-60"
           onClick={() => {
             if (preview.data !== undefined) {
-              start.mutate(preview.data.draw_counter);
+              start.mutate({
+                expected_draw_counter: preview.data.draw_counter,
+                expected_seed_order: preview.data.seed_order,
+              });
             }
           }}
         >
