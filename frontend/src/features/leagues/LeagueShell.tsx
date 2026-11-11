@@ -46,7 +46,10 @@ export function LeagueShell({ account }: { account?: ReactNode }) {
       <div className="flex min-h-dvh">
         <header className="sticky top-0 flex h-dvh w-72 shrink-0 flex-col gap-6 border-r border-sidebar-border bg-sidebar p-4 text-sidebar-foreground">
           <div className="flex items-center justify-between gap-2">
-            <Link to={paths.home} className="font-display text-display-section">
+            <Link
+              to={paths.home}
+              className="inline-flex min-h-11 items-center font-display text-display-section"
+            >
               {t("app.name")}
             </Link>
             <LanguageSwitch />
