@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import type { PlayRead } from "@/demo/contract";
+import { finalsQueries } from "@/features/finals/api";
 import { leagueQueries } from "@/features/leagues/api";
 import { resultMutations } from "@/features/results/api";
 import { type PlayModel, sidesOf } from "@/features/tournaments/play/model";
@@ -40,6 +41,9 @@ function useResultError(error: ApiError | null): string | null {
   const { t } = useTranslation();
   if (error === null) {
     return null;
+  }
+  if (error.detail.rule === "BR-094") {
+    return t("results.errors.lockedKnockout");
   }
   switch (error.detail.reason) {
     case "draw_not_allowed":
@@ -75,6 +79,16 @@ export function ResultEntry({
   );
   const errorText = useResultError(save.error);
   const info = model.matches.get(matchId);
+  // A knockout match's bracket gives its seeds and whether a later match
+  // locks it (BR-094); the group phase needs neither.
+  const inKnockout = info?.phase.kind === "knockout";
+  const bracket = useQuery({
+    ...finalsQueries.bracket(leagueId, model.tournament.id),
+    enabled: inKnockout,
+  });
+  const bracketMatch = bracket.data?.rounds
+    .flatMap((round) => round.matches)
+    .find((m) => m.match_id === matchId);
   const [walkover, setWalkover] = useState(info?.match.is_walkover ?? false);
 
   if (!info) {
@@ -86,55 +100,27 @@ export function ResultEntry({
   if (!known) {
     return <p>{t("results.unknownSides")}</p>;
   }
-  // BR-053: the round robin's results lock once the knockout is drawn.
-  const locked = phase.kind === "group" && model.knockout !== undefined;
+  // BR-053: the round robin's results lock once the knockout is drawn;
+  // BR-094: a knockout result locks once a later match has one.
+  const lock =
+    phase.kind === "group" && model.knockout !== undefined
+      ? "group"
+      : bracketMatch?.result_locked === true
+        ? "knockout"
+        : null;
+  const locked = lock !== null;
   const onSave: ResultFormContext["onSave"] = (body) => {
     save.mutate(body, { onSuccess: onDone });
   };
-  const seedOf = (entryId: string | null) =>
-    entryId === null ? null : (model.entries.get(entryId)?.seed ?? null);
-  const context: ResultFormContext = {
-    info,
-    names: [names.side(sideA), names.side(sideB)],
-    firstNames: [names.sideFirst(sideA), names.sideFirst(sideB)],
-    seeds: [seedOf(sideA.entry_id), seedOf(sideB.entry_id)],
-    goalsPerGame: model.tournament.goals_per_game,
-    required: scoresRequired(phase),
-    drawAllowed: drawsAllowed(phase, league.data?.draws_allowed ?? false),
-    locked,
-    pending: save.isPending,
-    standings: play?.standings,
-    onSave,
-  };
-
-  return (
-    <div className="space-y-4">
-      {locked && (
-        <Notice variant="warning" title={t("results.locked.title")}>
-          {t("results.locked.body")}
-        </Notice>
-      )}
-      {walkover ? (
-        <WalkoverForm
-          names={context.names}
-          initial={
-            match.is_walkover
-              ? match.outcome === "side_2"
-                ? "side_2"
-                : "side_1"
-              : null
-          }
-          pending={save.isPending || locked}
-          onSave={onSave}
-          onCancel={() => {
-            setWalkover(false);
-          }}
-        />
-      ) : info.format === "bo1" ? (
-        <SimpleResultForm context={context} />
-      ) : (
-        <BestOfResultPage context={context} />
-      )}
+  // The bracket's seeds, as the bracket shows them (BR-042), not the setup's.
+  const seedOf = (entryId: string | null, index: 0 | 1) =>
+    bracketMatch !== undefined
+      ? (bracketMatch.sides[index]?.seed ?? null)
+      : entryId === null || inKnockout
+        ? null
+        : (model.entries.get(entryId)?.seed ?? null);
+  const actions = (
+    <>
       {errorText !== null && (
         <p role="alert" className="text-body-md font-bold text-destructive">
           {errorText}
@@ -188,6 +174,53 @@ export function ResultEntry({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+      )}
+    </>
+  );
+  const context: ResultFormContext = {
+    info,
+    names: [names.side(sideA), names.side(sideB)],
+    firstNames: [names.sideFirst(sideA), names.sideFirst(sideB)],
+    seeds: [seedOf(sideA.entry_id, 0), seedOf(sideB.entry_id, 1)],
+    goalsPerGame: model.tournament.goals_per_game,
+    required: scoresRequired(phase),
+    drawAllowed: drawsAllowed(phase, league.data?.draws_allowed ?? false),
+    locked,
+    pending: save.isPending,
+    standings: play?.standings,
+    onSave,
+    actions,
+  };
+
+  return (
+    <div className="space-y-4">
+      {lock !== null && (
+        <Notice variant="warning" title={t(`results.locked.${lock}.title`)}>
+          {t(`results.locked.${lock}.body`)}
+        </Notice>
+      )}
+      {walkover ? (
+        <WalkoverForm
+          names={context.names}
+          initial={
+            match.is_walkover
+              ? match.outcome === "side_2"
+                ? "side_2"
+                : "side_1"
+              : null
+          }
+          pending={save.isPending || locked}
+          onSave={onSave}
+          onCancel={() => {
+            setWalkover(false);
+          }}
+        >
+          {actions}
+        </WalkoverForm>
+      ) : info.format === "bo1" ? (
+        <SimpleResultForm context={context} />
+      ) : (
+        <BestOfResultPage context={context} />
       )}
     </div>
   );

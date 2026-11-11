@@ -38,6 +38,7 @@ import { scoreOf } from "./finals/score";
 import { ScreenHeader } from "./finals/ScreenHeader";
 import { LoadError, Loading } from "./finals/StateMessage";
 import { TiebreakerSheet } from "./finals/TiebreakerSheet";
+import { useEntryCount } from "./play/useEntryNoun";
 
 /** BR-068: log2 of the entries, rounded up (the demo's engine has the same rule). */
 function recommendedRounds(count: number): number {
@@ -64,6 +65,7 @@ export function BetweenRoundsPage() {
 
 function RoundsContent() {
   const { t, i18n } = useTranslation();
+  const entryCount = useEntryCount();
   const layout = useLayout();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -417,7 +419,7 @@ function RoundsContent() {
       <p className="text-body-md text-muted-foreground">
         {t("finals.rounds.summary", {
           date: localDate(data.date),
-          count: mainEntries.length,
+          entries: entryCount(data.type, mainEntries.length),
         })}
       </p>
       {layout === "desktop" ? (

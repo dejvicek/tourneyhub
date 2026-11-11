@@ -6,7 +6,10 @@ import { generatePath, Link, NavLink, Outlet, useParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import { tournamentQueries } from "@/features/tournaments/api";
+import { ShareLinkButton } from "@/features/tournaments/ShareLinkButton";
+import { TournamentMenu } from "@/features/tournaments/TournamentMenu";
 import { tournamentTabs } from "@/features/tournaments/tournamentViews";
+import { useLayout } from "@/hooks/useLayout";
 import { useRouteParam } from "@/hooks/useRouteParam";
 import { paths } from "@/lib/paths";
 
@@ -40,7 +43,12 @@ function ExistingTournamentHeader({ tournamentId }: { tournamentId: string }) {
     tournament.data === undefined ? [] : tournamentTabs(tournament.data);
 
   return (
-    <TournamentHeader name={tournament.data?.name}>
+    <TournamentHeader
+      name={tournament.data?.name}
+      actions={
+        <ShareLinkButton leagueId={leagueId} tournamentId={tournamentId} />
+      }
+    >
       {tabs.length > 0 && (
         <nav
           aria-label={t("tournaments.header.tabs")}
@@ -66,12 +74,16 @@ function ExistingTournamentHeader({ tournamentId }: { tournamentId: string }) {
 
 function TournamentHeader({
   name,
+  actions,
   children,
 }: {
   name: string | undefined;
+  /** The icons at the right of the name, before the phone's overflow menu. */
+  actions?: ReactNode;
   children?: ReactNode;
 }) {
   const { t } = useTranslation();
+  const layout = useLayout();
   const leagueId = useRouteParam("leagueId");
 
   return (
@@ -85,9 +97,12 @@ function TournamentHeader({
             <ChevronDownIcon className="rotate-90" />
           </Link>
         </Button>
-        <p className="min-w-0 font-display text-display-name break-words">
+        <p className="min-w-0 flex-1 font-display text-display-name break-words">
           {name}
         </p>
+        {actions}
+        {/* The phone has no league header here, so no language switch or account. */}
+        {layout === "phone" && <TournamentMenu />}
       </div>
       {children}
     </div>

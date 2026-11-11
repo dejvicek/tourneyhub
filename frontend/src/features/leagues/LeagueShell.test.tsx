@@ -142,7 +142,7 @@ describe("LeagueShell", () => {
       within(tabs)
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Schedule", "Fields", "Standings"]);
+    ).toEqual(["Fields", "Schedule", "Standings"]);
     expect(
       within(tabs).getByRole("link", { name: "Schedule" }),
     ).toHaveAttribute("aria-current", "page");

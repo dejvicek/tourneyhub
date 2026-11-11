@@ -36,11 +36,7 @@ function useReasonText() {
         case "lost_third_place":
           return t("finals.finished.reason.lost_third_place");
         case "lost_in_round":
-          return t("finals.finished.reason.lost_in_round", {
-            round: t(
-              `finals.roundName.${reason.round ?? "final"}`,
-            ).toLowerCase(),
-          });
+          return t(`finals.finished.reason.lostIn.${reason.round ?? "final"}`);
         case "group_place":
           return reason.group_format === "round_robin"
             ? t("finals.finished.reason.group_round_robin", {

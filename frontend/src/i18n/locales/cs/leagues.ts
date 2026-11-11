@@ -31,7 +31,7 @@ export const leagues: CsMessages<Messages["leagues"]> = {
       drawsHint: "Vypnutí remíz platí jen pro výsledky zadané potom.",
       defaultsHeading: "Výchozí hodnoty nových turnajů",
       fields: "Hřiště",
-      fieldsHint: "Stoly, na kterých se hraje zároveň.",
+      fieldsHint: "Hřiště, na kterých se hraje zároveň.",
       format: "Formát zápasu",
       goals: "Gólů na hru",
       decrease: "Méně: {{label}}",

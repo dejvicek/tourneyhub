@@ -54,7 +54,6 @@ export const finals = {
     noKnockout: "This tournament has no knockout.",
     finishedTitle: "The knockout is finished",
     seePlaces: "See the final places",
-    match: "Match {{number}}",
     played: "Played",
     ready: "Ready to play",
     waiting: "Waiting",
@@ -63,9 +62,13 @@ export const finals = {
     byeFor: "{{name}}, bye",
     tbd: "To be decided",
     winner: "Winner",
-    winnerPlays: "Winner plays in match {{number}}",
+    winnerPlays: "Winner plays in {{match}}",
     enterResult: "Enter result",
     enterResultFor: "Enter result, {{match}}",
+    changeResult: "Change result",
+    changeResultFor: "Change result, {{match}}",
+    locked:
+      "Locked: a later match already has a result. Clear that result first to change this one.",
     walkover: "Walkover",
     formatAndField: "{{format}}, Field {{field}}",
     placesSoFar: "Places so far",
@@ -99,7 +102,12 @@ export const finals = {
       lost_final: "Lost the final",
       won_third_place: "Won the third-place match",
       lost_third_place: "Lost the third-place match",
-      lost_in_round: "Lost in the {{round}}",
+      lostIn: {
+        round_of_16: "Lost in the round of 16",
+        quarterfinal: "Lost in the quarterfinals",
+        semifinal: "Lost in the semifinals",
+        final: "Lost in the final",
+      },
       group_round_robin: "{{place}} in the round robin",
       group_standings: "{{place}} in the standings",
       shared: "Shared. {{reason}}.",
@@ -124,14 +132,7 @@ export const finals = {
   },
   rounds: {
     title: "Rounds",
-    summary_one:
-      "{{date, datetime(day: numeric; month: long)}}, {{count}} player",
-    summary_few:
-      "{{date, datetime(day: numeric; month: long)}}, {{count}} players",
-    summary_many:
-      "{{date, datetime(day: numeric; month: long)}}, {{count}} players",
-    summary_other:
-      "{{date, datetime(day: numeric; month: long)}}, {{count}} players",
+    summary: "{{date, datetime(day: numeric; month: long)}}, {{entries}}",
     roundChips: "Round",
     chip: "{{round}}",
     matches: "Matches of round {{round}}",

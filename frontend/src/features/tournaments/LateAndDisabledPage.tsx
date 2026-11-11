@@ -15,6 +15,7 @@ import { localDate, shortName, useRoster } from "./finals/names";
 import { Notice } from "./finals/Notice";
 import { ScreenHeader } from "./finals/ScreenHeader";
 import { LoadError, Loading } from "./finals/StateMessage";
+import { useEntryCount } from "./play/useEntryNoun";
 
 /**
  * Screen 12: the players of a running Swiss or Monster DYP (FR-044, FR-047,
@@ -33,6 +34,7 @@ export function LateAndDisabledPage() {
 
 function PlayersContent() {
   const { t } = useTranslation();
+  const entryCount = useEntryCount();
   const queryClient = useQueryClient();
   const leagueId = useRouteParam("leagueId");
   const tournamentId = useRouteParam("tournamentId");
@@ -121,7 +123,7 @@ function PlayersContent() {
       <p className="text-body-sm text-muted-foreground">
         {t("finals.rounds.summary", {
           date: localDate(data.date),
-          count: rows.length,
+          entries: entryCount(data.type, rows.length),
         })}
       </p>
       {takesLate ? (

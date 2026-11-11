@@ -490,14 +490,15 @@ interface SwitchRowProps {
 
 /** The design's Toggle row: label and help on the left, the switch on the right. */
 function SwitchRow({ label, hint, checked, onCheckedChange }: SwitchRowProps) {
-  const labelId = useId();
+  const switchId = useId();
   const hintId = useId();
   return (
     <div className="flex items-center justify-between gap-4">
       <div className="grid gap-1">
-        <span id={labelId} className="text-body-sm font-bold">
+        {/* A real label: tapping it toggles the switch. */}
+        <Label htmlFor={switchId} className="min-h-11 text-body-sm">
           {label}
-        </span>
+        </Label>
         <p id={hintId} className="text-body-sm text-muted-foreground">
           {hint}
         </p>
@@ -505,7 +506,7 @@ function SwitchRow({ label, hint, checked, onCheckedChange }: SwitchRowProps) {
       <Switch
         checked={checked}
         onCheckedChange={onCheckedChange}
-        aria-labelledby={labelId}
+        id={switchId}
         aria-describedby={hintId}
       />
     </div>

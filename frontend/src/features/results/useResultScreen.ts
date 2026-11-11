@@ -16,24 +16,14 @@ export function useMatchTitle() {
       .sort((a, b) => a.round_no - b.round_no);
     const fromEnd =
       rounds.length - rounds.findIndex((r) => r.id === info.round.id);
+    // The same names as the bracket's (finals.matchTitle), on every screen.
     if (info.match.kind === "third_place") {
-      return t("results.titles.thirdPlace");
+      return t("finals.matchTitle.third_place");
     }
-    switch (fromEnd) {
-      case 1:
-        return t("results.titles.final");
-      case 2:
-        return t("results.titles.semifinal", { number: info.match.position });
-      case 3:
-        return t("results.titles.quarterfinal", {
-          number: info.match.position,
-        });
-      default:
-        return t("results.titles.knockoutRound", {
-          round: info.round.round_no,
-          number: info.match.position,
-        });
-    }
+    const name = (["final", "semifinal", "quarterfinal"] as const)[fromEnd - 1];
+    return t(`finals.matchTitle.${name ?? "round_of_16"}`, {
+      n: info.match.position,
+    });
   };
 }
 

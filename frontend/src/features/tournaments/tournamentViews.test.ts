@@ -107,10 +107,10 @@ describe("tournamentTabs", () => {
     );
   });
 
-  it("shows Schedule, Fields and Standings for a running round robin", () => {
+  it("shows Fields, Schedule and Standings for a running round robin, as the design orders them", () => {
     expect(
       labels(tournament("in_progress", [group("round_robin")], "group")),
-    ).toEqual(["schedule", "fields", "standings"]);
+    ).toEqual(["fields", "schedule", "standings"]);
   });
 
   it("shows Rounds, Fields, Players and Standings for Swiss and Monster DYP", () => {

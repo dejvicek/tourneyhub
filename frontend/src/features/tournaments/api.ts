@@ -204,14 +204,27 @@ export const setupMutations = {
     ),
   /** FR-038; a repeated delete answers 404, which also ends in the reload. */
   remove: (leagueId: string, tournamentId: string) =>
-    leagueWrite(leagueId, () =>
-      dataOf(
-        api.DELETE(
-          "/api/v1/leagues/{league_id}/tournaments/{tournament_id}",
-          tournamentPath(leagueId, tournamentId),
+    mutationOptions({
+      scope: { id: `league:${leagueId}` },
+      mutationFn: () =>
+        dataOf(
+          api.DELETE(
+            "/api/v1/leagues/{league_id}/tournaments/{tournament_id}",
+            tournamentPath(leagueId, tournamentId),
+          ),
         ),
-      ),
-    ),
+      // Reloads the league without the deleted tournament's own queries,
+      // which would only answer 404, then forgets them.
+      onSettled: async (_data, _error, _variables, _result, { client }) => {
+        const own = ["leagues", leagueId, "tournaments", tournamentId];
+        await client.invalidateQueries({
+          queryKey: ["leagues", leagueId],
+          predicate: (query) =>
+            !own.every((part, index) => query.queryKey[index] === part),
+        });
+        client.removeQueries({ queryKey: own });
+      },
+    }),
 };
 
 export const tournamentQueries = {

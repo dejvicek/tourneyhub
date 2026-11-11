@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { useNavigate } from "react-router";
 
 import {
@@ -29,6 +29,34 @@ export interface ResponsiveSheetProps {
 }
 
 /**
+ * The control that was focused when the overlay opened, as the overlay's
+ * route mounts. Closing returns focus to it, or to the same link if the
+ * screen behind has drawn it again; Radix would drop it on the page.
+ */
+function useOpener() {
+  const [opener] = useState(() => {
+    const active = document.activeElement;
+    return active instanceof HTMLElement && active !== document.body
+      ? { element: active, href: active.getAttribute("href") }
+      : null;
+  });
+  return (event: Event) => {
+    event.preventDefault();
+    if (opener === null) {
+      return;
+    }
+    const target = opener.element.isConnected
+      ? opener.element
+      : opener.href === null
+        ? null
+        : document.querySelector<HTMLElement>(
+            `a[href="${CSS.escape(opener.href)}"]`,
+          );
+    target?.focus();
+  };
+}
+
+/**
  * An overlay over its parent screen (Figma 6c, 6d, 7 and 7b): a bottom sheet
  * on a phone, a centred dialog from `md` and a side panel on the right from
  * `lg`, which leaves the screen behind it usable. It is the page of a nested
@@ -42,6 +70,7 @@ export function ResponsiveSheet({
 }: ResponsiveSheetProps) {
   const layout = useLayout();
   const navigate = useNavigate();
+  const returnFocus = useOpener();
   const onOpenChange = (open: boolean) => {
     if (!open) {
       void navigate("..");
@@ -55,7 +84,7 @@ export function ResponsiveSheet({
   if (layout === "tablet") {
     return (
       <Dialog open onOpenChange={onOpenChange}>
-        <DialogContent {...describedBy}>
+        <DialogContent {...describedBy} onCloseAutoFocus={returnFocus}>
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
             {description !== undefined && (
@@ -75,6 +104,7 @@ export function ResponsiveSheet({
       <SheetContent
         side={desktop ? "right" : "bottom"}
         {...describedBy}
+        onCloseAutoFocus={returnFocus}
         // The side panel stays open while the organizer works beside it;
         // only its close button or Escape closes it.
         onInteractOutside={

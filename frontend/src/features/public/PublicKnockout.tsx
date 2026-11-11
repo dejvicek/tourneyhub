@@ -1,12 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
-import type {
-  BracketMatchData as BracketMatch,
-  BracketRoundData as BracketRound,
-  BracketSideData as BracketSide,
-} from "@/features/finals/api";
-import type { BracketContext } from "@/features/tournaments/finals/bracketContext";
+import type { BracketSideData as BracketSide } from "@/features/finals/api";
+import {
+  type BracketContext,
+  bracketTitles,
+} from "@/features/tournaments/finals/bracketContext";
 import {
   BracketView,
   CompactBracket,
@@ -53,11 +52,9 @@ export function PublicKnockout({
         : side.entry_id === null
           ? t("finals.knockout.tbd")
           : names.ofEntry(side.entry_id),
+    canChange: false,
     resultHref: () => null,
-    matchTitle: (round: BracketRound, match: BracketMatch) =>
-      match.kind === "third_place"
-        ? t("finals.matchTitle.third_place")
-        : t(`finals.matchTitle.${round.name}`, { n: match.position }),
+    ...bracketTitles(t, bracket.data),
   };
   const shape = bracket.data;
 

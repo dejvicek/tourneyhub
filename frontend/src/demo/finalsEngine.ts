@@ -340,6 +340,33 @@ function roundName(index: number, count: number): BracketRoundName {
   }
 }
 
+/**
+ * BR-094: a knockout result is locked once a later match it feeds has one,
+ * the next match for the winner and, for a semifinal, the third-place match
+ * for the loser. That result has to be cleared first.
+ */
+export function knockoutLocked(t: StoredTournament, match: MatchRead): boolean {
+  const phase = knockoutPhase(t);
+  if (!phase || match.kind !== "standard") {
+    return false;
+  }
+  const rounds = roundsOf(t, phase);
+  const index = rounds.findIndex((round) =>
+    round.matches.some((m) => m.id === match.id),
+  );
+  const next = rounds[index + 1];
+  if (index < 0 || !next) {
+    return false;
+  }
+  const fed = [
+    next.matches.filter((m) => m.kind === "standard")[
+      Math.floor((match.position - 1) / 2)
+    ],
+    ...next.matches.filter((m) => m.kind === "third_place"),
+  ];
+  return fed.some((m) => m !== undefined && m.outcome !== null);
+}
+
 /** The knockout as the bracket screen shows it; null without a knockout. */
 export function bracketOf(t: StoredTournament): BracketRead | null {
   const phase = knockoutPhase(t);
@@ -420,6 +447,7 @@ export function bracketOf(t: StoredTournament): BracketRead | null {
         match_format: format,
         field_number: fieldNumber,
         next_number: feeds ? (numbers.get(feeds.id) ?? null) : null,
+        result_locked: knockoutLocked(t, match),
       };
     }),
   }));
