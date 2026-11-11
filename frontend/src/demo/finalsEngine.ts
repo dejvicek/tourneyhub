@@ -495,6 +495,7 @@ export function rankingOf(t: StoredTournament): RankingRead {
       },
     ]),
   );
+  // BR-076, BR-077: each entry or player who sits out gets them, as points.
   const sitOutPoints = group?.sit_out_points ?? 0;
   const opponents = new Map<string, string[]>();
   const membersOf = (side: MatchSideRead): string[] => [
