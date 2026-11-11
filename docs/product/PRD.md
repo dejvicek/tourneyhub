@@ -52,7 +52,7 @@ The MVP lets an organizer run a league in seasons, play tournaments inside each 
 | Disabled | A player or pair the organizer has taken out of new rounds for now. |
 | Top players | In Monster DYP, the players kept apart in rounds 1 and 2. |
 | BH1, BH2 | Buchholz tie-breakers. BH1 sums the points of an entry's opponents; BH2 sums those opponents' BH1. |
-| Game difference | Games won minus games lost, over every match with a result. A drawn BO1 game counts as neither, and a walkover counts no games. |
+| Game difference | Games won minus games lost, over every match with a result. A drawn BO1 game counts as neither, and a walkover counts the games needed to win the match format: BO1 1:0, BO2 2:0, BO3 2:0, BO5 3:0. |
 | Score difference | Goals for minus goals against, over every game with an entered score. |
 | Place | An entry's finishing position in a tournament. Several entries can share a place. |
 | Placement points | Season points a player earns for their place in a finished tournament. |
@@ -149,7 +149,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | FR-036 | Until the first result is entered, the organizer can go back to setup, change anything — including a new DYP draw — and generate again. |
 | FR-037 | A tournament with a knockout finishes automatically when every knockout match has a result. A tournament without one finishes when the organizer finishes it after the group phase (FR-040). |
 | FR-038 | The organizer can delete a tournament after confirming, unless its season is closed. |
-| FR-039 | Round robin, Swiss and Monster DYP have a setup setting, **points for sitting out**: 0, 1 or 2. The default is 1 when the group phase plays BO1 or BO2, otherwise 2 (BR-071). |
+| FR-039 | Round robin, Swiss and Monster DYP have a setup setting, **points for sitting out**: 0, 1 or 2. The default is 1 when the league allows draws and the group phase plays BO1 or BO2, otherwise 2 (BR-071). |
 
 ### 6.5 Group phase and knockout
 
@@ -297,7 +297,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | ID | Rule |
 |---|---|
 | BR-070 | In round robin, Swiss and Monster DYP rounds, a win is worth 2 points, a draw 1 and a loss 0. In Monster DYP, both players of a team get the points. |
-| BR-071 | A sit-out is worth the tournament's points for sitting out: 0, 1 or 2 (FR-039). The default depends only on the group phase's match format: 1 for BO1 and BO2, whose matches can end level (a BO1 game with equal scores, a BO2 match won 1:1), and 2 for BO3 and BO5, whose matches cannot. The league's draw setting does not change it. In setup, the default follows the phase's match format until the organizer picks a value by hand; their value then stays. Generating the tournament fixes the value. Sit-out points count as points in the standings (BR-072, BR-101). In Monster DYP, each player who sits out gets them. Match points stay as in BR-070. |
+| BR-071 | A sit-out is worth the tournament's points for sitting out: 0, 1 or 2 (FR-039). The default is 1 when the league allows draws and the group phase plays BO1 or BO2, whose matches can end level (a BO1 game with equal scores, a BO2 match won 1:1). In every other case it is 2: a sit-out should never be worth a result that no match can produce. In setup, the default follows the phase's match format and the league's draw setting, also when either changes, until the organizer picks a value by hand; their value then stays. Generating the tournament fixes the value. Sit-out points count as points in the standings (BR-072, BR-101). In Monster DYP, each player who sits out gets them. Match points stay as in BR-070. |
 | BR-072 | Swiss and Monster DYP: entries level on points are ordered by the enabled tie-breakers, in the organizer's order (FR-043). |
 | BR-073 | BH1 is the sum of the current points of every opponent faced, counted once per match. BH2 is the sum of those opponents' BH1. Score difference is goals for minus goals against over all games. Sit-outs add nothing to BH1 or BH2, and score difference counts only entered game scores. |
 | BR-074 | Entries still level share the place. Where a strict order is needed — pairing the next round, or the knockout's cut and seeding — the lot decides. |
@@ -314,7 +314,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | BR-085 | After a round robin or Swiss, the qualifying entries play on as they are — players in Singles, pairs in Doubles and DYP — seeded by their place. |
 | BR-086 | Knockout pairs stay together until the end, except in Lord have mercy (BR-088). The knockout follows §7.5, including the optional third-place match, but takes no late entries. |
 | BR-087 | Deleting the knockout unlocks the group phase — all of a round robin's results, or the newest round of a Swiss or Monster DYP — and the organizer chooses again what comes next (FR-040). |
-| BR-088 | **Lord have mercy** re-mix: once every match of a knockout round has a result, the players of the pairs still in — the winners, and after round 1 also the pairs with a bye — are paired again completely at random and placed in the next round by lot. This happens before every later round, including the final. A player can get a partner they had before. The two semifinal-losing pairs play the third-place match as they were. Each player takes the place of the pair they were knocked out with, or of the pair that wins the final (BR-102). A round's results can change until a match of the next round has a result; a change draws the next round again. |
+| BR-088 | **Lord have mercy** re-mix: once every match of a knockout round has a result, the players of the pairs still in — the winners, and after round 1 also the pairs with a bye — are paired again completely at random and placed in the next round by lot. This happens before every later round, including the final. A player can get a partner they had before. The third-place match is re-mixed too: the four players from the two losing semifinal pairs are paired again completely at random, like the other rounds. Places follow the matches: the winners of the final are 1st and the losers 2nd, the winners of the third-place match 3rd and its losers 4th, and a player knocked out earlier takes the place of the round they were knocked out in (BR-102). A round's results can change until a match of the next round has a result; a change draws the next round again. |
 
 ### 7.12 Results
 
@@ -332,7 +332,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | ID | Rule |
 |---|---|
 | BR-100 | Places belong to entries. Every player in an entry gets the entry's place. |
-| BR-101 | Round robin: entries are ranked by points (BR-070, BR-071), with played, won, drawn, lost, sat out, game difference, score difference and points shown. When exactly two entries are level, the one with more points from the matches between them ranks higher. Entries still level are ordered by game difference, then by score difference, counting only entered scores, and after that share the place (BR-074). |
+| BR-101 | Round robin: entries are ranked by points (BR-070, BR-071), with played, won, drawn, lost, sat out, game difference, score difference and points shown. When exactly two entries are level, the one with more points from the matches between them ranks higher. Entries still level are ordered by game difference (a walkover counts the games needed to win the format, as in the glossary), then by score difference, counting only entered scores, and after that share the place (BR-074). |
 | BR-102 | Knockout: the winner is 1st and the final's loser 2nd. With a third-place match, its winner is 3rd and its loser 4th; without one, the two semifinal losers share 3rd. Entries knocked out in the same earlier round share a place: quarterfinal losers share 5th, round-of-16 losers share 9th, and so on. |
 | BR-103 | With a group phase but no knockout, the group-phase standings are the places. With both, the knockout entries take the top places by BR-102, and the other entries follow in their group-phase order, numbered after the knockout entries: after 8 knockout pairs, the best non-qualifier is 9th. |
 | BR-104 | After a shared place, numbering skips accordingly: two entries sharing 3rd are followed by 5th. |
