@@ -146,7 +146,13 @@ Standalone tables: `instance_settings` (one row) and `auth_attempts` (rate limit
 
 The CHECK constraints work in one direction only, because `SET NULL` must be able to clear a reference when an account is deleted (§2): `source = 'web' OR admin_user_id IS NULL` (a CLI action has no admin) and `action <> 'set_signup_code' OR target_user_id IS NULL` (setting the code has no target). A web action cannot be recorded without a logged-in admin, so `source` tells a deleted account from a CLI action.
 
-The sign-up code itself is never written to `admin_actions`.
+The sign-up code itself is never written to `admin_actions`, and neither is a password: the row says who did what to whom, and when.
+
+- `source` and `action` are `varchar` columns with a named CHECK of the allowed values (§2), like every enumeration. Setting, changing and clearing the code are one action, `set_signup_code`; the row does not tell them apart. The code is never read from this table.
+- Reading the sign-up code or the list of accounts is not recorded; only changes are.
+- A CLI command that changes nothing (`grant-admin` for an account that is an admin already, `revoke-admin` for one that is not) records nothing. `create-admin` records one row for the new account, `target_user_id` set.
+- A row is inserted in the transaction of the action it records, so both commit or both roll back.
+- The table has no index besides its primary key: the MVP never queries it, and a foreign key's index would only speed up deleting an account, which the MVP has no screen for.
 
 ### 4.2 Leagues, players and seasons
 

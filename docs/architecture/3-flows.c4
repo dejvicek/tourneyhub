@@ -157,11 +157,11 @@ views "III. Flows" {
     variant sequence
     title "13a. Forgotten password: admin reset"
     order 15
-    description "FR-006, ADR-006 and ADR-007: the admin sets a new password for the organizer. The reset sets must_change_password and revokes all of the organizer's logins, so old refresh tokens get 401. Continues in view 13b."
-    admin -> tourneyhub.spa.adminUi "sets a new password for the organizer"
-    tourneyhub.spa.adminUi -> tourneyhub.api.adminApi "POST reset (Bearer JWT, is_admin from the database)"
-    tourneyhub.api.adminApi -> tourneyhub.db.accounts "new password, must_change_password, revokes all refresh token families, records reset_password in admin_actions"
-    tourneyhub.spa.adminUi <- tourneyhub.api.adminApi "done; the admin hands the password to the organizer"
+    description "FR-006, ADR-006 and ADR-007: the admin confirms, then gives the organizer a temporary password, chosen or generated with secrets and shown once. The reset sets must_change_password and revokes all of the organizer's logins, so old refresh tokens get 401. An admin cannot reset their own account. Continues in view 13b."
+    admin -> tourneyhub.spa.adminUi "confirms the reset and chooses a temporary password, or has one generated"
+    tourneyhub.spa.adminUi -> tourneyhub.api.adminApi "POST /api/v1/admin/organizers/{id}/password-reset (Bearer JWT, is_admin from the database)"
+    tourneyhub.api.adminApi -> tourneyhub.db.accounts "new password hash, must_change_password, revokes all refresh token families, records reset_password with source web, the admin and the target in admin_actions"
+    tourneyhub.spa.adminUi <- tourneyhub.api.adminApi "200 with the generated password (not stored, not cached); the admin hands it to the organizer"
     opt "the organizer still has the app open" {
       tourneyhub.spa.authClient -> tourneyhub.api.authApi "on page load or after 401: POST /api/v1/auth/refresh with the old token"
       tourneyhub.api.authApi -> tourneyhub.db.accounts "token is revoked, nothing changes"
@@ -187,7 +187,7 @@ views "III. Flows" {
     tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "403 password_change_required" {
       notes "must_change_password is read from the users row on every request (ADR-006)."
     }
-    tourneyhub.spa.organizerUi -> tourneyhub.spa.authClient "opens the new-password screen"
+    tourneyhub.spa.organizerUi -> tourneyhub.spa.authClient "opens the new-password screen; any other organizer or admin screen goes back to it, and a 403 password_change_required reads the account again"
     organizer -> tourneyhub.spa.organizerUi "enters a new password"
     tourneyhub.spa.authClient -> tourneyhub.api.authApi "POST /api/v1/auth/password (FR-004)" {
       navigateTo passwordChange
@@ -196,9 +196,24 @@ views "III. Flows" {
     tourneyhub.spa.authClient <- tourneyhub.api.authApi "done; other devices are logged out"
   }
 
+  dynamic view adminSignupCode {
+    variant sequence
+    title "13c. Admin: sign-up code"
+    order 17
+    description "FR-005 and ADR-007: the admin sees, sets, generates or clears the sign-up code. Changing it does not affect existing accounts. Every change is recorded in admin_actions as set_signup_code, without the code; the CLI command set-signup-code records the same action with source cli."
+    admin -> tourneyhub.spa.adminUi "opens the admin screen"
+    tourneyhub.spa.adminUi -> tourneyhub.api.adminApi "GET /api/v1/admin/signup-code (Bearer JWT, is_admin from the database)"
+    tourneyhub.api.adminApi -> tourneyhub.db.accounts "reads instance_settings"
+    tourneyhub.spa.adminUi <- tourneyhub.api.adminApi "the code, or null while sign-up is closed (Cache-Control: no-store)"
+    admin -> tourneyhub.spa.adminUi "types a code, generates one or closes sign-up"
+    tourneyhub.spa.adminUi -> tourneyhub.api.adminApi "PUT /api/v1/admin/signup-code, or POST /api/v1/admin/signup-code/generate"
+    tourneyhub.api.adminApi -> tourneyhub.db.accounts "updates instance_settings, records set_signup_code with source web and the admin in admin_actions"
+    tourneyhub.spa.adminUi <- tourneyhub.api.adminApi "the new state"
+  }
+
   dynamic view release {
     title "14. From PR to VPS"
-    order 17
+    order 18
     description "ADR-012 and ADR-014: the VPS runs exactly the images that passed the tests. CI holds no SSH key to the VPS; the admin triggers the update."
     developer -> github.repo "merges the PR after review with passing checks"
     github.repo -> github.actions "push to main"
@@ -211,7 +226,7 @@ views "III. Flows" {
   dynamic view dypEvening {
     variant sequence
     title "15a. DYP evening: setup (PRD §5.1)"
-    order 18
+    order 19
     description "PRD §5.1, steps 1 to 5: sign-up with the code from the admin, the league Thursday Foosball and its players, a DYP tournament for 12 players with a round robin, and the generated schedule. Continues in view 15b."
     organizer -> tourneyhub.spa.organizerUi "signs up with the code from the admin"
     tourneyhub.spa.organizerUi -> tourneyhub.spa.authClient "sign-up"
@@ -235,7 +250,7 @@ views "III. Flows" {
   dynamic view dypEveningPlay {
     variant sequence
     title "15b. DYP evening: play and viewers (PRD §5.1)"
-    order 19
+    order 20
     description "PRD §5.1, steps 6 to 8: results during the evening, a knockout for the top 4 pairs without a third-place match, the final and season points, a viewer through the share link. Follows view 15a."
     loop "15 round-robin matches, as they finish" {
       organizer -> tourneyhub.spa.organizerUi "enters the result on the phone"
@@ -259,7 +274,7 @@ views "III. Flows" {
   dynamic view leagueSeasons {
     variant sequence
     title "16. League and seasons"
-    order 20
+    order 21
     description "FR-010, FR-011, FR-021 and ADR-008: a league comes with Season 1. The placement points table lives on the season. A new season carries the current season's number, so a repeat or a second device gets 409."
     organizer -> tourneyhub.spa.organizerUi "creates a league"
     tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "POST league with a client id"
@@ -286,7 +301,7 @@ views "III. Flows" {
   dynamic view leaguePlayers {
     variant sequence
     title "17. Players of a league"
-    order 21
+    order 22
     description "FR-012, BR-001, BR-002 and ADR-002: names are unique in a league ignoring case, and a removed player keeps their name. Adding a removed player's name is refused with the holder, so the UI can ask whether it is the same person and restore that player. Removing and restoring send the target state."
     organizer -> tourneyhub.spa.organizerUi "adds a player"
     tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "POST player"
@@ -324,7 +339,7 @@ views "III. Flows" {
   dynamic view tournamentSetup {
     variant sequence
     title "18. Tournament setup"
-    order 22
+    order 23
     description "FR-030 to FR-034, FR-038, ADR-008 and ADR-010: a tournament is created with a client id in the active season, takes the league's defaults, and is set up by target states. Every write locks the league, then the tournament. A change to the picks draws again with the engine and increments the draw counter; draw again carries the counter the screen showed."
     organizer -> tourneyhub.spa.organizerUi "new tournament: DYP, round robin"
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "POST tournament with a client id"

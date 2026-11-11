@@ -48,7 +48,7 @@ model {
         link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#64-tournaments "PRD §6.4 Tournaments"
       }
       adminUi = component "Admin screens" {
-        description "Sign-up code, list of organizers, password reset. The server checks every action against is_admin in the database."
+        description "Sign-up code (see, set, generate, clear), list of accounts, password reset with a confirmation and a one-time display of a generated password. The server checks every action against is_admin in the database."
         link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-007--instance-admin-admin-flag-admin-screens-cli-bootstrap "ADR-007"
       }
       publicUi = component "Viewer pages" {
@@ -103,7 +103,7 @@ model {
         link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#61-accounts "PRD §6.1 Accounts (FR-001 to FR-004)"
       }
       adminApi = component "API: instance admin" {
-        description "Sign-up code and password reset. A reset sets must_change_password and revokes all of the organizer's logins. Every action is recorded in admin_actions."
+        description "/api/v1/admin: read, set, generate and clear the sign-up code; list accounts; password reset. Every route checks is_admin in the database. A reset sets must_change_password and revokes all of the organizer's logins. Every action is recorded in admin_actions with its source and without the code."
         link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-007--instance-admin-admin-flag-admin-screens-cli-bootstrap "ADR-007"
         link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#61-accounts "PRD §6.1 Accounts (FR-005, FR-006)"
       }
@@ -144,8 +144,8 @@ model {
     cli = tool "tourneyhub CLI" {
       technology "Python, runs in the api container"
       icon tech:python
-      summary "migrate, run as the api container starts; set-signup-code, cleanup; create-admin, grant-admin, revoke-admin. No web route can create an admin."
-      description "migrate, which the api container runs on start; set-signup-code (a prompt, or --clear to close sign-up); cleanup (deletes expired and revoked refresh tokens and old auth_attempts); create-admin, grant-admin, revoke-admin. No web route can create an admin, so a stranger cannot claim the instance on first start."
+      summary "migrate, run as the api container starts; set-signup-code, cleanup; create-admin, grant-admin, revoke-admin (each recorded in admin_actions with source cli). No web route can create an admin."
+      description "migrate, which the api container runs on start; set-signup-code (a prompt, or --clear to close sign-up); cleanup (deletes expired and revoked refresh tokens and old auth_attempts); create-admin, grant-admin, revoke-admin; set-signup-code and the three admin commands are recorded in admin_actions with source cli and no admin user. No web route can create an admin, so a stranger cannot claim the instance on first start."
       link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-004--repository-layout-and-local-development-in-docker "ADR-004"
       link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-007--instance-admin-admin-flag-admin-screens-cli-bootstrap "ADR-007"
     }
