@@ -74,6 +74,7 @@ class ErrorCode(StrEnum):
     RESULT_LOCKED = "result_locked"  # a later knockout match has a result (BR-094)
     CURRENT_PHASE_CHANGED = "current_phase_changed"  # the knockout was drawn (FR-045)
     QUALIFIERS_OUT_OF_RANGE = "qualifiers_out_of_range"  # BR-080
+    QUALIFIERS_CHANGED = "qualifiers_changed"  # the cut is not the one previewed
     PHASE_NOT_FOUND = "phase_not_found"
     PHASE_NOT_DELETABLE = "phase_not_deletable"  # only a knockout after a group phase
     KNOCKOUT_NOT_FOUND = "knockout_not_found"  # the tournament has no knockout

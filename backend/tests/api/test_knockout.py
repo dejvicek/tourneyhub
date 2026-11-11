@@ -17,9 +17,10 @@ from sqlalchemy.orm import Session
 from tourneyhub.app import create_app
 from tourneyhub.db.models.accounts import User
 from tourneyhub.db.models.entries import Entry
-from tourneyhub.db.models.leagues import League, Player
+from tourneyhub.db.models.leagues import League, Player, Season
 from tourneyhub.db.models.tournaments import TournamentPhase
 from tourneyhub.engine.accounts import Language
+from tourneyhub.engine.leagues import SeasonState
 from tourneyhub.engine.results import Game
 from tourneyhub.engine.tournaments import (
     GroupPhase,
@@ -228,8 +229,22 @@ def start_knockout(
     client: TestClient, league_id: UUID, headers: dict[str, str]
 ) -> Callable[..., tuple[int, Json]]:
     def start_knockout(tournament: Json, **values: object) -> tuple[int, Json]:
+        """Start as the screen does: it names the qualifiers its preview showed."""
+        qualifiers = values.get("qualifiers", 6)
+        third = str(values.get("third_place_match", True)).lower()
+        shown = client.get(
+            _t_url(
+                league_id,
+                tournament["id"],
+                f"/knockout/preview?qualifiers={qualifiers}&third_place_match={third}",
+            ),
+            headers=headers,
+        ).json()
         body = {
             "expected_current_phase_id": tournament["current_phase_id"],
+            "expected_qualifier_ids": [
+                e["members"][0]["entry_id"] for e in shown["entries"]
+            ],
             "qualifiers": 6,
             "third_place_match": True,
             "match_format": None,
@@ -441,6 +456,95 @@ def test_br080_a_qualifier_count_out_of_range_is_422(
 
     assert status == 422
     assert body == {"code": "qualifiers_out_of_range", "detail": detail}
+
+
+def test_fr045_a_group_result_changed_since_the_preview_is_409(
+    played_group: Callable[..., Json],
+    start_knockout: Callable[..., tuple[int, Json]],
+    read: Callable[[str, str], Json],
+    put_result: Callable[[str, str, Json], tuple[int, Json]],
+) -> None:
+    tournament = played_group(4)
+    query = "/knockout/preview?qualifiers=4&third_place_match=false"
+    previewed = [
+        e["members"][0]["entry_id"] for e in read(tournament["id"], query)["entries"]
+    ]
+    seed = seeds_of(tournament)
+    top_two = {previewed[0], previewed[1]}
+    match = next(
+        m
+        for m in matches_of(tournament, group_of(tournament))
+        if {side["entry_id"] for side in m["sides"]} == top_two
+    )
+    second_wins = (
+        "side_1" if match["sides"][0]["entry_id"] == previewed[1] else "side_2"
+    )
+    assert put_result(tournament["id"], match["id"], win(second_wins))[0] == 200
+    current = [
+        e["members"][0]["entry_id"] for e in read(tournament["id"], query)["entries"]
+    ]
+    assert current != previewed
+    assert seed[previewed[0]] == 1
+
+    status, body = start_knockout(
+        tournament,
+        qualifiers=4,
+        third_place_match=False,
+        expected_qualifier_ids=previewed,
+    )
+
+    assert (status, body) == (
+        409,
+        {"code": "qualifiers_changed", "detail": {"entry_ids": current}},
+    )
+    assert (
+        read(tournament["id"], "")["current_phase_id"] == tournament["current_phase_id"]
+    )
+
+
+def test_fr045_the_previewed_qualifiers_start_the_knockout(
+    played_group: Callable[..., Json],
+    start_knockout: Callable[..., tuple[int, Json]],
+) -> None:
+    status, started = start_knockout(
+        played_group(4), qualifiers=4, third_place_match=False
+    )
+
+    assert status == 200
+    assert len(started["phases"]) == 2
+
+
+def test_br011_a_closed_season_is_the_previews_problem_and_the_starts_409(
+    played_group: Callable[..., Json],
+    start_knockout: Callable[..., tuple[int, Json]],
+    read: Callable[[str, str], Json],
+    session: Session,
+    now: datetime,
+) -> None:
+    tournament = played_group(4)
+    season = session.get_one(Season, UUID(tournament["season_id"]))
+    season.state, season.closed_at = SeasonState.CLOSED, now
+    session.flush()  # season 1 closes before season 2 becomes the active one
+    session.add(
+        Season(
+            league_id=season.league_id,
+            number=2,
+            state=SeasonState.ACTIVE,
+            placement_points=season.placement_points,
+            started_at=now,
+            created_at=now,
+        )
+    )
+    session.flush()
+
+    preview = read(
+        tournament["id"], "/knockout/preview?qualifiers=4&third_place_match=false"
+    )
+    status, body = start_knockout(tournament, qualifiers=4, third_place_match=False)
+
+    assert preview["can_start"] is False
+    assert preview["problem"] == {"code": "season_closed", "detail": {}}
+    assert (status, body) == (409, {"code": "season_closed", "detail": {}})
 
 
 def test_fr045_a_knockout_after_swiss_is_not_supported_yet(
@@ -1059,6 +1163,7 @@ def test_api1_another_organizers_knockout_is_not_found(
     url = _t_url(league_id, drawn["id"], rest.format(phase=knockout_of(drawn)["id"]))
     payload = {
         "expected_current_phase_id": drawn["current_phase_id"],
+        "expected_qualifier_ids": [],
         "qualifiers": 2,
         "third_place_match": False,
         "match_format": None,
@@ -1235,6 +1340,9 @@ def _commit_knockout(
             user_id=owner.id,
             start=knockout_service.KnockoutStart(
                 expected_current_phase_id=started.phases[0].id,
+                expected_qualifier_ids=_previewed(
+                    setup, ids, qualifiers=player_count, third_place=third_place
+                ),
                 qualifiers=player_count,
                 third_place_match=third_place,
                 match_format=None,
@@ -1244,6 +1352,26 @@ def _commit_knockout(
         )
         setup.commit()
         return ids
+
+
+def _previewed(
+    session: Session,
+    ids: tuple[UUID, UUID, UUID],
+    *,
+    qualifiers: int,
+    third_place: bool,
+) -> tuple[UUID, ...]:
+    """The group-phase entries the preview shows going through, by seed."""
+    owner_id, league_id, tournament_id = ids
+    preview = knockout_service.preview_knockout(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=owner_id,
+        qualifiers=qualifiers,
+        third_place_match=third_place,
+    )
+    return tuple(entry.members[0].entry_id for entry in preview.entries)
 
 
 _WIN = tournament_service.MatchResult(
@@ -1305,6 +1433,35 @@ def _bracket(
     }
 
 
+def _back_to_the_group_phase(
+    engine: Engine, now: datetime, ids: tuple[UUID, UUID, UUID]
+) -> tuple[UUID, UUID, tuple[UUID, ...]]:
+    """Delete the committed knockout; return the group phase, a match and the preview."""
+    owner_id, league_id, tournament_id = ids
+    with Session(engine) as undo:
+        phase = undo.scalars(
+            select(TournamentPhase).where(
+                TournamentPhase.tournament_id == tournament_id,
+                TournamentPhase.position == 2,
+            )
+        ).one()
+        knockout_service.delete_knockout(
+            undo,
+            league_id=league_id,
+            tournament_id=tournament_id,
+            phase_id=phase.id,
+            user_id=owner_id,
+            clock=lambda: now,
+        )
+        undo.commit()
+    with Session(engine) as check:
+        view = tournament_service.read_tournament(
+            check, league_id=league_id, tournament_id=tournament_id, user_id=owner_id
+        )
+        previewed = _previewed(check, ids, qualifiers=2, third_place=False)
+    return view.phases[0].id, view.rounds[0].matches[0].id, previewed
+
+
 def _race(
     settings: Settings,
     engine: Engine,
@@ -1340,30 +1497,12 @@ def test_br053_a_result_racing_the_knockout_start(
 ) -> None:
     ids = _commit_knockout(committing_engine, now, player_count=4, third_place=False)
     owner_id, league_id, tournament_id = ids
-    with Session(committing_engine) as undo:
-        phase = undo.scalars(
-            select(TournamentPhase).where(
-                TournamentPhase.tournament_id == tournament_id,
-                TournamentPhase.position == 2,
-            )
-        ).one()
-        knockout_service.delete_knockout(
-            undo,
-            league_id=league_id,
-            tournament_id=tournament_id,
-            phase_id=phase.id,
-            user_id=owner_id,
-            clock=lambda: now,
-        )
-        undo.commit()
-    with Session(committing_engine) as check:
-        view = tournament_service.read_tournament(
-            check, league_id=league_id, tournament_id=tournament_id, user_id=owner_id
-        )
-    group_id = view.phases[0].id
-    match_id = view.rounds[0].matches[0].id
+    group_id, match_id, previewed = _back_to_the_group_phase(
+        committing_engine, now, ids
+    )
     start = knockout_service.KnockoutStart(
         expected_current_phase_id=group_id,
+        expected_qualifier_ids=previewed,
         qualifiers=2,
         third_place_match=False,
         match_format=None,
@@ -1384,6 +1523,7 @@ def test_br053_a_result_racing_the_knockout_start(
             _t_url(league_id, str(tournament_id), "/knockout"),
             json={
                 "expected_current_phase_id": str(group_id),
+                "expected_qualifier_ids": [str(i) for i in previewed],
                 "qualifiers": 2,
                 "third_place_match": False,
                 "match_format": None,
@@ -1419,9 +1559,85 @@ def test_br053_a_result_racing_the_knockout_start(
             lambda s: _enter(s, ids, match_id, _WIN_2, now),
             put_start,
         )
-        # The start waited for the result and drew from the standings after it.
-        assert status == 200
-        assert len(body["phases"]) == 2
+        # The start waited for the result; the standings after it seed the
+        # entries otherwise than the preview did, so nothing is drawn (ADR-008).
+        with Session(committing_engine) as check:
+            current = _previewed(check, ids, qualifiers=2, third_place=False)
+        assert current != previewed
+        assert (status, body["code"]) == (409, "qualifiers_changed")
+        assert body["detail"] == {"entry_ids": [str(i) for i in current]}
+
+
+@pytest.mark.concurrency
+def test_fr045_two_starts_at_once_draw_one_knockout(
+    committing_settings: Settings,
+    committing_engine: Engine,
+    now: datetime,
+    committed_auth_header: Callable[..., dict[str, str]],
+    wait_for_a_lock_wait: Callable[[], None],
+) -> None:
+    ids = _commit_knockout(committing_engine, now, player_count=4, third_place=False)
+    owner_id, league_id, tournament_id = ids
+    group_id, _, previewed = _back_to_the_group_phase(committing_engine, now, ids)
+    start = knockout_service.KnockoutStart(
+        expected_current_phase_id=group_id,
+        expected_qualifier_ids=previewed,
+        qualifiers=2,
+        third_place_match=False,
+        match_format=None,
+        final_match_format=None,
+    )
+    headers = committed_auth_header(owner_id, issued_at=datetime.now(UTC))
+
+    def put_start(client: TestClient) -> tuple[int, Json]:
+        response = client.put(
+            _t_url(league_id, str(tournament_id), "/knockout"),
+            json={
+                "expected_current_phase_id": str(group_id),
+                "expected_qualifier_ids": [str(i) for i in previewed],
+                "qualifiers": 2,
+                "third_place_match": False,
+                "match_format": None,
+                "final_match_format": None,
+                "mode": None,
+            },
+            headers=headers,
+        )
+        return response.status_code, response.json()
+
+    status, body = _race(
+        committing_settings,
+        committing_engine,
+        wait_for_a_lock_wait,
+        lambda s: knockout_service.start_knockout(
+            s,
+            league_id=league_id,
+            tournament_id=tournament_id,
+            user_id=owner_id,
+            start=start,
+            clock=lambda: now,
+        ),
+        put_start,
+    )
+
+    # The second start waited, then found the knockout and drew nothing (ADR-008).
+    assert status == 409
+    assert body["code"] == "current_phase_changed"
+    with Session(committing_engine) as check:
+        phases = check.scalars(
+            select(TournamentPhase).where(
+                TournamentPhase.tournament_id == tournament_id
+            )
+        ).all()
+        knockout_entries = check.scalar(
+            select(func.count())
+            .select_from(Entry)
+            .where(Entry.tournament_id == tournament_id, Entry.stage == "knockout")
+        )
+    knockout = next(p for p in phases if p.position == 2)
+    assert body["detail"] == {"current_phase_id": str(knockout.id)}
+    assert len(phases) == 2
+    assert knockout_entries == 2
 
 
 @pytest.mark.concurrency

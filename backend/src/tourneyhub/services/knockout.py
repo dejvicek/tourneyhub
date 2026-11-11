@@ -203,7 +203,7 @@ def preview_knockout(
     """
     league = get_league(session, league_id=league_id, user_id=user_id)
     tournament = _load_tournament(session, league=league, tournament_id=tournament_id)
-    problem = _start_problem(tournament, mode=mode)
+    problem = _start_problem(league, tournament, mode=mode)
     group = _group_phase(tournament)
     if group is None or group.format is not PhaseFormat.ROUND_ROBIN:
         return KnockoutPreview(
@@ -277,9 +277,13 @@ def _seed_pair(
 
 
 def _start_problem(
-    tournament: Tournament, *, mode: MonsterKnockoutMode | None
+    league: League, tournament: Tournament, *, mode: MonsterKnockoutMode | None
 ) -> KnockoutProblem | None:
-    """The refusal `start_knockout` would answer, its expected phase aside."""
+    """The refusal `start_knockout` would answer, its expectations aside."""
+    try:
+        _require_open_season(league, tournament)
+    except ConflictError as err:
+        return KnockoutProblem(code=err.code, detail=err.detail)
     if tournament.state is not TournamentState.IN_PROGRESS:
         return KnockoutProblem(
             code=ErrorCode.TOURNAMENT_NOT_IN_PROGRESS,
@@ -308,11 +312,14 @@ class KnockoutStart:
     """The organizer's choices for the knockout (FR-045, BR-080, BR-120).
 
     `match_format` None takes the league's default; `final_match_format`
-    None lets the final play `match_format` (BR-120). `mode` is for a
+    None lets the final play `match_format` (BR-120). `expected_qualifier_ids`
+    are the group-phase entries the preview showed going through, in seed
+    order (the cut and the seeding, which fix the bracket). `mode` is for a
     knockout after Monster DYP rounds (BR-081 to BR-084), which comes later.
     """
 
     expected_current_phase_id: UUID
+    expected_qualifier_ids: tuple[UUID, ...]
     qualifiers: int
     third_place_match: bool
     match_format: KnockoutMatchFormat | None
@@ -339,7 +346,10 @@ def start_knockout(
     without a group phase is 422 `format_not_supported`, a group-phase match
     without a result 422 `group_phase_not_done`, and a number of qualifiers
     out of range 422 `qualifiers_out_of_range` (detail `minimum`, `maximum`,
-    `given`; BR-080).
+    `given`; BR-080). The request also carries the qualifying entries in seed
+    order that the preview showed; a group result that changed the cut or the
+    seeds since is 409 `qualifiers_changed` (detail `entry_ids`, the current
+    ones), so the organizer sees the new draw before it is written (ADR-008).
 
     The best entries of the standings go through as they are and are seeded
     by their place; entries still level are ordered by the lot
@@ -378,6 +388,10 @@ def start_knockout(
         qualifiers=start.qualifiers,
         third_place_match=start.third_place_match,
     )
+    if tuple(cut.seeds) != start.expected_qualifier_ids:
+        raise ConflictError(
+            ErrorCode.QUALIFIERS_CHANGED, entry_ids=[str(i) for i in cut.seeds]
+        )
     now = clock()
     phase = TournamentPhase(
         id=uuid7(),

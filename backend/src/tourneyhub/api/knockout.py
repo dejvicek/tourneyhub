@@ -106,8 +106,12 @@ class KnockoutWrite(RequestModel):
     """Draw the knockout and start it (FR-045, BR-080, BR-120).
 
     `expected_current_phase_id` is the phase the screen saw as current, the
-    group phase (ADR-008). `match_format` null takes the league's default;
-    `final_match_format` null lets the final play `match_format` (BR-120).
+    group phase (ADR-008). `expected_qualifier_ids` are the group-phase
+    entries the preview showed going through, in seed order (`entries` of the
+    preview, by their members' `entry_id`): a group result that changed the cut
+    or the seeds since is 409 `qualifiers_changed`. `match_format` null takes
+    the league's default; `final_match_format` null lets the final play
+    `match_format` (BR-120).
     BO2 is never a knockout's (BR-121). `mode` is how the teams are formed
     after Monster DYP rounds (BR-081 to BR-084) and null after any other
     group phase; a mode after a round robin is 422
@@ -115,6 +119,7 @@ class KnockoutWrite(RequestModel):
     """
 
     expected_current_phase_id: UUID
+    expected_qualifier_ids: Annotated[list[UUID], Field(max_length=MAX_QUALIFIERS)]
     qualifiers: Qualifiers
     third_place_match: bool
     match_format: KnockoutMatchFormat | None
@@ -251,9 +256,10 @@ def read_knockout_preview(
 
     Writes nothing. A knockout that cannot start is still 200, with the
     `problem` its start would answer: `tournament_not_in_progress`,
-    `current_phase_changed` (the knockout exists), `format_not_supported`
-    (Swiss, Monster DYP, no group phase), `group_phase_not_done` or
-    `knockout_mode_not_applicable` (a `mode` after a round robin).
+    `current_phase_changed` (the knockout exists), `season_closed`,
+    `format_not_supported` (Swiss, Monster DYP, no group phase),
+    `group_phase_not_done` or `knockout_mode_not_applicable` (a `mode` after a
+    round robin).
     """
     preview = knockout_service.preview_knockout(
         session,
@@ -297,11 +303,13 @@ def start_knockout(
     the free fields, and the round robin's results lock (BR-053).
 
     409: `tournament_not_in_progress` (detail `state`), `current_phase_changed`
-    (the knockout already exists, detail `current_phase_id`) or
-    `season_closed`. 422: `format_not_supported` (Swiss, Monster DYP, or no
-    group phase; detail `format`), `group_phase_not_done` (detail
-    `matches_left`), `qualifiers_out_of_range` (detail `minimum`,
-    `maximum`, `given`) or `knockout_mode_not_applicable` (detail `format`).
+    (the knockout already exists, detail `current_phase_id`),
+    `qualifiers_changed` (the cut or the seeds are not the previewed ones,
+    detail `entry_ids`, the current ones) or `season_closed`. 422:
+    `format_not_supported` (Swiss, Monster DYP, or no group phase; detail
+    `format`), `group_phase_not_done` (detail `matches_left`),
+    `qualifiers_out_of_range` (detail `minimum`, `maximum`, `given`) or
+    `knockout_mode_not_applicable` (detail `format`).
     """
     tournament = knockout_service.start_knockout(
         session,
@@ -310,6 +318,7 @@ def start_knockout(
         user_id=user.id,
         start=KnockoutStart(
             expected_current_phase_id=body.expected_current_phase_id,
+            expected_qualifier_ids=tuple(body.expected_qualifier_ids),
             qualifiers=body.qualifiers,
             third_place_match=body.third_place_match,
             match_format=body.match_format,
