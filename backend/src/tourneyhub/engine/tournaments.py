@@ -95,6 +95,14 @@ DEFAULT_TIEBREAKERS: tuple[Tiebreaker, ...] = (
 """The tie-breakers of a new Swiss or Monster DYP phase, in order (FR-043)."""
 
 
+class MatchOutcome(StrEnum):
+    """A match's result: a side won, or a draw (DATA-MODEL `matches.outcome`, D11)."""
+
+    SIDE_1 = "side_1"
+    SIDE_2 = "side_2"
+    DRAW = "draw"
+
+
 class MonsterKnockoutMode(StrEnum):
     """How the knockout after Monster DYP rounds is formed (FR-045, BR-081 to BR-084)."""
 
