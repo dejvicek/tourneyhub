@@ -1,6 +1,6 @@
 import { screen, within } from "@testing-library/react";
 import { generatePath } from "react-router";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { rankingOf } from "@/demo/finalsEngine";
 import { DEMO_SHARE_TOKEN, demoId } from "@/demo/ids";
@@ -10,6 +10,7 @@ import { i18n } from "@/i18n";
 import { paths } from "@/lib/paths";
 import { stubViewport } from "@/test/media";
 import { renderAt } from "@/test/renderApp";
+import { server } from "@/test/server";
 
 const league = generatePath(paths.publicLeague, {
   shareToken: DEMO_SHARE_TOKEN,
@@ -49,7 +50,13 @@ function addSetupTournament(): string {
 
 describe("share-link views", () => {
   beforeEach(async () => {
+    // The season standings and the places are the demo's routes only.
+    vi.stubEnv("VITE_DEMO", "true");
     await i18n.changeLanguage("en");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("FR-070: shows the league, the live fields and the standings, without setup tournaments", async () => {
@@ -181,5 +188,30 @@ describe("share-link views", () => {
     expect(
       screen.getByRole("heading", { name: "Standings" }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("share-link views outside demo mode", () => {
+  beforeEach(async () => {
+    await i18n.changeLanguage("en");
+  });
+
+  it("do not ask for the season standings or the places the backend does not serve", async () => {
+    const asked: string[] = [];
+    server.events.on("request:start", ({ request }) => {
+      asked.push(new URL(request.url).pathname);
+    });
+    renderAt(league);
+    await screen.findByRole("heading", {
+      level: 1,
+      name: "Thursday Foosball",
+    });
+    await screen.findByRole("article", { name: "Thursday DYP" });
+
+    expect(asked.some((path) => path.endsWith("/tournaments"))).toBe(true);
+    expect(asked.filter((path) => /\/(standings|places)$/.test(path))).toEqual(
+      [],
+    );
+    server.events.removeAllListeners();
   });
 });

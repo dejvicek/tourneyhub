@@ -2,11 +2,19 @@ import { queryOptions } from "@tanstack/react-query";
 
 import { api, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
+import { isDemoMode } from "@/lib/demoMode";
 
 // The share-link views (FR-070–FR-072): no account, read-only. The backend
 // serves the league, a season's tournaments and a tournament (P11); the
 // standings, the knockout, the ranking and the places are still the demo's
-// contract (P8, P10).
+// contract (P8, P10). The season standings and the places only decorate a
+// page, so outside demo mode, where the backend would 404 them on every poll,
+// their queries stay off and the page shows its empty state.
+
+/** The demo's own routes answer only in demo mode; the backend 404s them. */
+function demoOnly(enabled = true): boolean {
+  return enabled && isDemoMode(import.meta.env);
+}
 
 function fetchLeague(shareToken: string, signal?: AbortSignal) {
   return dataOf(
@@ -71,6 +79,7 @@ export const publicQueries = {
   /** The season standings (FR-070); the backend serves them with P10. */
   seasonStandings: (shareToken: string, seasonId: string) =>
     queryOptions({
+      enabled: demoOnly(),
       queryKey: ["public", shareToken, "seasons", seasonId, "standings"],
       queryFn: ({ signal }) =>
         dataOf(
@@ -170,7 +179,7 @@ export const publicQueries = {
             },
           ),
         ),
-      enabled,
+      enabled: demoOnly(enabled),
       refetchInterval: LIVE_MS,
     }),
 };
