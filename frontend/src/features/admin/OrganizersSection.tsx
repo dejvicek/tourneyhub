@@ -53,7 +53,7 @@ export function OrganizersSection({ myId }: { myId: string | undefined }) {
                 <p className="font-display text-display-name break-words">
                   {organizer.display_name}
                 </p>
-                <p className="text-body-sm break-all text-muted-foreground">
+                <p className="text-body-sm break-words text-muted-foreground">
                   {organizer.email}
                 </p>
                 <div className="flex flex-wrap gap-1.5">

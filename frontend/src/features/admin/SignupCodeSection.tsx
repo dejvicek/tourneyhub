@@ -154,11 +154,10 @@ export function SignupCodeSection() {
               {save.isPending ? t("admin.code.saving") : t("admin.code.save")}
             </Button>
           </form>
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex flex-col gap-2">
             <Button
               type="button"
               variant="outline"
-              className="sm:flex-1"
               disabled={busy}
               onClick={() => {
                 setDone(null);
@@ -179,7 +178,6 @@ export function SignupCodeSection() {
               <Button
                 type="button"
                 variant="outline"
-                className="sm:flex-1"
                 disabled={busy}
                 onClick={() => {
                   setDone(null);
