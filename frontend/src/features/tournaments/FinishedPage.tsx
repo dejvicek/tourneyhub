@@ -43,19 +43,20 @@ function FinishedContent() {
   const seasonName = useSeasonName();
   const roster = useRoster(leagueId, tournament.data?.entries);
 
-  if (tournament.isError || places.isError) {
+  if (tournament.isError || places.isError || effect.isError) {
     return (
       <LoadError
         onRetry={() => {
           void tournament.refetch();
           void places.refetch();
+          void effect.refetch();
         }}
       />
     );
   }
   const data = tournament.data;
   const result = places.data;
-  if (data === undefined || result === undefined) {
+  if (data === undefined || result === undefined || effect.data === undefined) {
     return <Loading />;
   }
   if (!result.complete) {
@@ -84,9 +85,9 @@ function FinishedContent() {
     type: "unit",
   });
   const players = new Map(
-    (effect.data ?? []).map((row) => [row.player_id, row] as const),
+    effect.data.map((row) => [row.player_id, row] as const),
   );
-  const standings = effect.data ?? [];
+  const standings = effect.data;
   const shown = standings.slice(0, 6);
   const playerNames = roster.player;
 
@@ -127,21 +128,7 @@ function FinishedContent() {
     </section>
   );
 
-  // The season's effect is served with P10; until then there is none to show.
-  const seasonLater =
-    effect.data === undefined && effect.fetchStatus === "idle";
-  const seasonSection = seasonLater ? (
-    <section aria-labelledby="season-after" className="space-y-3">
-      <h2 id="season-after" className="font-display text-display-section">
-        {t("finals.finished.seasonTitle", {
-          season: season === undefined ? "" : seasonName(season),
-        })}
-      </h2>
-      <p className="text-body-md text-muted-foreground">
-        {t("finals.finished.seasonLater")}
-      </p>
-    </section>
-  ) : (
+  const seasonSection = (
     <section aria-labelledby="season-after" className="space-y-3">
       <div>
         <h2 id="season-after" className="font-display text-display-section">

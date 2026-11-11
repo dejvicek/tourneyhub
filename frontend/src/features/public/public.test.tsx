@@ -196,7 +196,11 @@ describe("share-link views outside demo mode", () => {
     await i18n.changeLanguage("en");
   });
 
-  it("do not ask for the season standings or the places the backend does not serve", async () => {
+  afterEach(() => {
+    server.events.removeAllListeners();
+  });
+
+  it("ask for the season standings, which the backend serves (P10a)", async () => {
     const asked: string[] = [];
     server.events.on("request:start", ({ request }) => {
       asked.push(new URL(request.url).pathname);
@@ -207,11 +211,22 @@ describe("share-link views outside demo mode", () => {
       name: "Thursday Foosball",
     });
     await screen.findByRole("article", { name: "Thursday DYP" });
+    await screen.findByRole("columnheader", { name: "Wins" });
 
     expect(asked.some((path) => path.endsWith("/tournaments"))).toBe(true);
-    expect(asked.filter((path) => /\/(standings|places)$/.test(path))).toEqual(
+    expect(asked.some((path) => path.endsWith("/standings"))).toBe(true);
+  });
+
+  it("do not ask for the knockout or the ranking, which only the demo serves", async () => {
+    const asked: string[] = [];
+    server.events.on("request:start", ({ request }) => {
+      asked.push(new URL(request.url).pathname);
+    });
+    renderAt(league);
+    await screen.findByRole("article", { name: "Thursday DYP" });
+
+    expect(asked.filter((path) => /\/(bracket|ranking)$/.test(path))).toEqual(
       [],
     );
-    server.events.removeAllListeners();
   });
 });

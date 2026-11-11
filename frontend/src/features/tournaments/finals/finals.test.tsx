@@ -75,7 +75,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-describe("outside demo mode, where the season routes are not served yet (P10)", () => {
+describe("outside demo mode, where the backend serves the season routes (P10a)", () => {
   beforeEach(() => {
     vi.stubEnv("VITE_DEMO", "");
   });
@@ -89,40 +89,27 @@ describe("outside demo mode, where the season routes are not served yet (P10)", 
     return urls;
   }
 
-  it("shows a neutral line on the finished tournament, and asks for no season effect", async () => {
+  afterEach(() => {
+    server.events.removeAllListeners();
+  });
+
+  it("shows the season's effect on the finished tournament", async () => {
     await playFinal(DYP_EVENING);
     const calls = requested();
     renderAt(at(paths.finished, DYP_EVENING));
 
-    expect(
-      await screen.findByText("Season standings arrive in a later version."),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/Top \d+ of \d+/)).not.toBeInTheDocument();
+    expect(await screen.findByText(/Top \d+ of \d+/)).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(calls.filter((p) => p.endsWith("/season-effect"))).toEqual([]);
+    expect(calls.filter((p) => p.endsWith("/season-effect"))).toHaveLength(1);
   });
 
-  it("shows a neutral line on the season standings instead of an error", async () => {
+  it("shows the season standings, not a line that they come later", async () => {
     const calls = requested();
     renderAt(generatePath(paths.seasonStandings, { leagueId: DEMO_LEAGUE_ID }));
 
-    expect(
-      await screen.findByText("Season standings arrive in a later version."),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByText("This could not be loaded."),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByRole("table")).not.toBeInTheDocument();
-    expect(calls.filter((p) => p.endsWith("/standings"))).toEqual([]);
-  });
-
-  it("says it in Czech", async () => {
-    await i18n.changeLanguage("cs");
-    renderAt(generatePath(paths.seasonStandings, { leagueId: DEMO_LEAGUE_ID }));
-
-    expect(
-      await screen.findByText("Pořadí sezóny přibude v pozdější verzi."),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+    expect(screen.queryByText(/later version/)).not.toBeInTheDocument();
+    expect(calls.filter((p) => p.endsWith("/standings"))).not.toEqual([]);
   });
 });
 

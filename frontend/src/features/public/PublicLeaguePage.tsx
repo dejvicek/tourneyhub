@@ -147,7 +147,11 @@ function SeasonView({
         <h2 id="standings" className="font-display text-display-section">
           {t("publicView.league.standingsHeading")}
         </h2>
-        {standings.data === undefined || standings.data.length === 0 ? (
+        {standings.isPending ? (
+          <p role="status" className="text-body-md text-muted-foreground">
+            {t("loading")}
+          </p>
+        ) : standings.data === undefined || standings.data.length === 0 ? (
           <EmptyState title={t("publicView.league.noStandings")} />
         ) : (
           <SeasonStandings rows={standings.data} players={players} />
