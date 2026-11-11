@@ -5,12 +5,11 @@ import { generatePath, Link } from "react-router";
 import { DocumentTitle } from "@/components/DocumentTitle";
 import { PageFallback } from "@/components/PageFallback";
 import { Badge } from "@/components/ui/badge";
-import type { PlayerRead } from "@/demo/contract";
 import { RankingTable } from "@/features/tournaments/finals/RankingTable";
 import { useRouteParam } from "@/hooks/useRouteParam";
 import { paths } from "@/lib/paths";
 
-import { publicQueries, type PublicTournament } from "./api";
+import { type PublicPlayer, publicQueries, type PublicTournament } from "./api";
 import { LiveFields } from "./LiveFields";
 import { PublicKnockout } from "./PublicKnockout";
 import { useNames } from "./useNames";
@@ -87,7 +86,7 @@ function TournamentView({
 }: {
   shareToken: string;
   leagueName: string;
-  players: PlayerRead[];
+  players: PublicPlayer[];
   tournament: PublicTournament;
 }) {
   const { t, i18n } = useTranslation();
@@ -128,8 +127,12 @@ function TournamentView({
           />
         </section>
       )}
-      {tournament.places !== null && (
-        <Places tournament={tournament} players={players} />
+      {tournament.state === "finished" && (
+        <Places
+          shareToken={shareToken}
+          tournament={tournament}
+          players={players}
+        />
       )}
       {tournament.phases.some((phase) => phase.kind === "knockout") && (
         <PublicKnockout
@@ -152,21 +155,31 @@ function TournamentView({
 
 /** The design's place rows (screen 10): place, names, points each. */
 function Places({
+  shareToken,
   tournament,
   players,
 }: {
+  shareToken: string;
   tournament: PublicTournament;
-  players: PlayerRead[];
+  players: PublicPlayer[];
 }) {
   const { t } = useTranslation();
   const names = useNames(players, tournament);
+  // The backend serves the places with P10; until then a finished
+  // tournament shows none.
+  const places = useQuery(
+    publicQueries.places(shareToken, tournament.id, true),
+  );
+  if (places.data === undefined || places.data.rows.length === 0) {
+    return null;
+  }
   return (
     <section aria-labelledby="places" className="space-y-3">
       <h2 id="places" className="font-display text-display-section">
         {t("publicView.tournament.placesHeading")}
       </h2>
       <ol className="rounded-lg border border-border-surface bg-card px-4 text-card-foreground">
-        {(tournament.places ?? []).map((row) => (
+        {places.data.rows.map((row) => (
           <li
             key={row.entry_id}
             className="flex items-center gap-3 border-t border-border py-3 first:border-t-0"
@@ -207,7 +220,7 @@ function Standings({
 }: {
   shareToken: string;
   tournament: PublicTournament;
-  players: PlayerRead[];
+  players: PublicPlayer[];
 }) {
   const { t } = useTranslation();
   const format = tournament.phases.find(
@@ -245,7 +258,7 @@ function RankingStandings({
 }: {
   shareToken: string;
   tournament: PublicTournament;
-  players: PlayerRead[];
+  players: PublicPlayer[];
 }) {
   const { t } = useTranslation();
   const names = useNames(players, tournament);
@@ -278,7 +291,7 @@ function TableStandings({
 }: {
   shareToken: string;
   tournament: PublicTournament;
-  players: PlayerRead[];
+  players: PublicPlayer[];
 }) {
   const { t, i18n } = useTranslation();
   const names = useNames(players, tournament);
@@ -361,7 +374,7 @@ function Results({
   players,
 }: {
   tournament: PublicTournament;
-  players: PlayerRead[];
+  players: PublicPlayer[];
 }) {
   const { t } = useTranslation();
   const names = useNames(players, tournament);

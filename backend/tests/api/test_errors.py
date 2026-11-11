@@ -43,6 +43,10 @@ def app(settings: Settings) -> FastAPI:
     app.add_api_route("/refused", _refused)
     app.add_api_route("/unknown-constraint", _unknown_constraint)
     app.add_api_route("/plain", _plain_app_error)
+    app.add_api_route("/api/v1/public/some-token/boom", _boom)
+    app.add_api_route(
+        "/api/v1/public/some-token/unknown-constraint", _unknown_constraint
+    )
     return app
 
 
@@ -98,3 +102,26 @@ def test_a_bare_app_error_is_a_500(lenient_client: TestClient) -> None:
 
     assert response.status_code == 500
     assert response.json()["code"] == "bad_request"
+
+
+@pytest.mark.parametrize("route", ["boom", "unknown-constraint"])
+def test_adr005_a_500_under_public_keeps_the_public_headers(
+    lenient_client: TestClient, route: str
+) -> None:
+    # Starlette sends the Exception handler's response outside every middleware.
+    response = lenient_client.get(f"/api/v1/public/some-token/{route}")
+
+    assert response.status_code == 500
+    assert response.headers["Cache-Control"] == "no-store"
+    assert response.headers["Referrer-Policy"] == "no-referrer"
+
+
+@pytest.mark.parametrize("route", ["boom", "unknown-constraint"])
+def test_a_500_elsewhere_has_no_public_headers(
+    lenient_client: TestClient, route: str
+) -> None:
+    response = lenient_client.get(f"/{route}")
+
+    assert response.status_code == 500
+    assert "Cache-Control" not in response.headers
+    assert "Referrer-Policy" not in response.headers

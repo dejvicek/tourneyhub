@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
-import type { PlayerRead } from "@/demo/contract";
 import type { BracketSideData as BracketSide } from "@/features/finals/api";
 import {
   type BracketContext,
@@ -15,7 +14,7 @@ import {
 import { PlacesSoFar } from "@/features/tournaments/finals/PlacesSoFar";
 import { useLayout } from "@/hooks/useLayout";
 
-import { publicQueries, type PublicTournament } from "./api";
+import { type PublicPlayer, publicQueries, type PublicTournament } from "./api";
 import { useNames } from "./useNames";
 
 /**
@@ -30,7 +29,7 @@ export function PublicKnockout({
 }: {
   shareToken: string;
   tournament: PublicTournament;
-  players: PlayerRead[];
+  players: PublicPlayer[];
 }) {
   const { t } = useTranslation();
   const layout = useLayout();
@@ -39,7 +38,11 @@ export function PublicKnockout({
     publicQueries.bracket(shareToken, tournament.id, true),
   );
   const places = useQuery(
-    publicQueries.places(shareToken, tournament.id, tournament.places === null),
+    publicQueries.places(
+      shareToken,
+      tournament.id,
+      tournament.state !== "finished",
+    ),
   );
 
   const ctx: BracketContext = {
@@ -79,7 +82,7 @@ export function PublicKnockout({
       ) : (
         <BracketView bracket={shape} ctx={ctx} />
       )}
-      {tournament.places === null && places.data !== undefined && (
+      {tournament.state !== "finished" && places.data !== undefined && (
         <PlacesSoFar
           rows={places.data.rows}
           entryName={(entryId) => names.ofEntry(entryId)}

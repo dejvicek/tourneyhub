@@ -34,8 +34,16 @@ async function tournament(id: string) {
 /** The share link's read, which carries the places (PublicTournamentRead). */
 async function publicTournament(id: string) {
   return dataOf(
+    api.GET("/api/v1/public/{share_token}/tournaments/{tournament_id}", {
+      params: { path: { share_token: DEMO_SHARE_TOKEN, tournament_id: id } },
+    }),
+  );
+}
+
+async function publicPlaces(id: string) {
+  return dataOf(
     provisionalApi.GET(
-      "/api/v1/public/{share_token}/tournaments/{tournament_id}",
+      "/api/v1/public/{share_token}/tournaments/{tournament_id}/places",
       {
         params: { path: { share_token: DEMO_SHARE_TOKEN, tournament_id: id } },
       },
@@ -187,22 +195,23 @@ describe("the demo's fake API", () => {
     ]);
 
     const [singles, autumn, running] = await Promise.all(
-      summaries.map((t) => publicTournament(t.id)),
+      summaries.map((t) => publicPlaces(t.id)),
     );
-    expect(singles?.places?.map((row) => row.place)).toHaveLength(6);
+    expect(singles?.rows.map((row) => row.place)).toHaveLength(6);
     // §5.1: the semifinal losers share 3rd and split 6 + 4 points.
     expect(
-      autumn?.places
-        ?.filter((row) => row.place === 3)
+      autumn?.rows
+        .filter((row) => row.place === 3)
         .map((row) => row.points_per_player),
     ).toEqual([5, 5]);
-    expect(running?.places).toBeNull();
-    expect(running?.entries).toHaveLength(6);
-    expect(running?.rounds).toHaveLength(5);
-    expect(running?.fields.every((field) => field.match_id !== null)).toBe(
+    expect(running?.complete).toBe(false);
+    const runningRead = await publicTournament(summaries[2]?.id ?? "");
+    expect(runningRead.entries).toHaveLength(6);
+    expect(runningRead.rounds).toHaveLength(5);
+    expect(runningRead.fields.every((field) => field.match_id !== null)).toBe(
       true,
     );
-    expect(running?.waiting.length).toBeGreaterThan(0);
+    expect(runningRead.waiting.length).toBeGreaterThan(0);
   });
 
   it("frees a field and fills it with the next waiting match on a result (FR-094)", async () => {
@@ -234,14 +243,43 @@ describe("the demo's fake API", () => {
 
   it("serves the share link without tournaments in setup (FR-070)", async () => {
     const shared = await dataOf(
-      provisionalApi.GET("/api/v1/public/{share_token}", {
+      api.GET("/api/v1/public/{share_token}", {
         params: { path: { share_token: DEMO_SHARE_TOKEN } },
       }),
     );
+    const path = { share_token: DEMO_SHARE_TOKEN, season_id: DEMO_SEASON_ID };
+    const tournaments = await dataOf(
+      api.GET("/api/v1/public/{share_token}/seasons/{season_id}/tournaments", {
+        params: { path },
+      }),
+    );
+    const standings = await dataOf(
+      provisionalApi.GET(
+        "/api/v1/public/{share_token}/seasons/{season_id}/standings",
+        { params: { path } },
+      ),
+    );
 
     expect(shared.name).toBe("Thursday Foosball");
-    expect(shared.tournaments.every((t) => t.state !== "setup")).toBe(true);
-    expect(shared.standings[0]?.place).toBe(1);
+    expect(shared.seasons.map((season) => season.id)).toContain(DEMO_SEASON_ID);
+    expect(shared.players).toHaveLength(16);
+    expect(tournaments).not.toHaveLength(0);
+    expect(tournaments.every((t) => t.state !== "setup")).toBe(true);
+    expect(standings[0]?.place).toBe(1);
+  });
+
+  it("answers an unknown share token with 404 share_link_not_found (FR-071)", async () => {
+    await expect(
+      dataOf(
+        api.GET("/api/v1/public/{share_token}", {
+          params: { path: { share_token: "no-such-token" } },
+        }),
+      ),
+    ).rejects.toMatchObject({
+      status: 404,
+      code: "share_link_not_found",
+      detail: {},
+    });
   });
 
   it("keeps each area's seed ids in its own range", () => {

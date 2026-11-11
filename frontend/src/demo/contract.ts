@@ -75,14 +75,6 @@ export interface PlaceRow {
   points_per_player: number;
 }
 
-/**
- * The tournament as the share link shows it: the organizer's read plus the
- * places once it is finished (§7.13). The places wait for P10.
- */
-export interface PublicTournamentRead extends TournamentRead {
-  places: PlaceRow[] | null;
-}
-
 export interface TournamentStandingRow {
   place: number;
   entry_id: Uuid;
@@ -107,17 +99,6 @@ export interface GameWrite {
 export interface ResultWrite {
   walkover_winner: Side | null;
   games: GameWrite[];
-}
-
-// ---------------------------------------------------------------- public
-
-export interface PublicLeague {
-  name: string;
-  seasons: SeasonRead[];
-  players: PlayerRead[];
-  /** Tournaments of the active season, without those in setup (FR-070). */
-  tournaments: TournamentSummary[];
-  standings: SeasonStandingRow[];
 }
 
 // ---------------------------------------------------------------- paths
@@ -183,14 +164,12 @@ export interface ProvisionalPaths {
     put: Put<Match, ResultWrite, MatchRead>;
   };
 
-  // public
-  "/api/v1/public/{share_token}": {
-    get: Get<Params<{ share_token: string }>, PublicLeague>;
-  };
-  "/api/v1/public/{share_token}/tournaments/{tournament_id}": {
+  // public: the league, a season's tournaments and a tournament are
+  // generated (P11); the standings wait for the results (P8, P10)
+  "/api/v1/public/{share_token}/seasons/{season_id}/standings": {
     get: Get<
-      Params<{ share_token: string; tournament_id: Uuid }>,
-      PublicTournamentRead
+      Params<{ share_token: string; season_id: Uuid }>,
+      SeasonStandingRow[]
     >;
   };
   "/api/v1/public/{share_token}/tournaments/{tournament_id}/standings": {

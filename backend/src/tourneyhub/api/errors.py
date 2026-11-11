@@ -10,6 +10,7 @@ from pydantic import JsonValue
 from sqlalchemy.exc import IntegrityError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from tourneyhub.api.public_headers import PUBLIC_HEADERS, is_public_path
 from tourneyhub.errors import (
     AppError,
     ConflictError,
@@ -116,7 +117,20 @@ async def handle_http_exception(_request: Request, exc: Exception) -> JSONRespon
     )
 
 
-async def handle_integrity_error(_request: Request, exc: Exception) -> JSONResponse:
+def _server_error_response(request: Request) -> JSONResponse:
+    """The 500 answer, with a public path's headers (ADR-005).
+
+    The `Exception` handler's answer leaves Starlette's ServerErrorMiddleware,
+    outside every user middleware, so the headers are set here.
+    """
+    return error_response(
+        HTTPStatus.INTERNAL_SERVER_ERROR,
+        ErrorCode.INTERNAL_ERROR,
+        headers=PUBLIC_HEADERS if is_public_path(request.url.path) else None,
+    )
+
+
+async def handle_integrity_error(request: Request, exc: Exception) -> JSONResponse:
     # cast: see handle_app_error.
     error = cast("IntegrityError", exc)
     constraint = None
@@ -129,16 +143,14 @@ async def handle_integrity_error(_request: Request, exc: Exception) -> JSONRespo
             extra={"constraint": constraint},
             exc_info=error,
         )
-        return error_response(
-            HTTPStatus.INTERNAL_SERVER_ERROR, ErrorCode.INTERNAL_ERROR
-        )
+        return _server_error_response(request)
     return error_response(HTTPStatus.CONFLICT, code)
 
 
-async def handle_unexpected_error(_request: Request, _exc: Exception) -> JSONResponse:
+async def handle_unexpected_error(request: Request, _exc: Exception) -> JSONResponse:
     # Not logged here: Starlette re-raises the exception after this response, and
     # uvicorn logs it with its traceback (§4.4).
-    return error_response(HTTPStatus.INTERNAL_SERVER_ERROR, ErrorCode.INTERNAL_ERROR)
+    return _server_error_response(request)
 
 
 def install_error_handlers(app: FastAPI) -> None:

@@ -2,12 +2,7 @@
 // come with the league (handlers/leagues.ts).
 import { seasonStandings } from "../engine";
 import { apiError, route } from "../route";
-import {
-  db,
-  findTournament,
-  publicTournamentRead,
-  seasonStandingsOf,
-} from "../store";
+import { db, finalPlaces, findTournament, seasonStandingsOf } from "../store";
 
 export const standingsHandlers = [
   route(
@@ -37,7 +32,7 @@ export const standingsHandlers = [
         });
       }
       const earnedBy = new Map<string, number>();
-      const places = publicTournamentRead(t).places ?? [];
+      const places = finalPlaces(t);
       for (const row of places) {
         const entry = t.entries.find((e) => e.id === row.entry_id);
         for (const player of entry?.player_ids ?? []) {
@@ -53,7 +48,7 @@ export const standingsHandlers = [
       const before = new Map(
         seasonStandings(
           others.map((other) => ({
-            places: publicTournamentRead(other).places ?? [],
+            places: finalPlaces(other),
             members: new Map(other.entries.map((e) => [e.id, e.player_ids])),
           })),
         ).map((row) => [row.player_id, row.place]),

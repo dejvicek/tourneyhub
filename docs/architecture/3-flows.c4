@@ -143,14 +143,17 @@ views "III. Flows" {
     variant sequence
     title "12. Viewer through the share link"
     order 14
-    description "FR-070 to FR-072: no account, read-only. Standings are computed on every read (ADR-009)."
+    description "FR-070 to FR-072: no account, read-only. The league, a season's tournaments and a tournament (P11); standings, places and the bracket follow with P8 and P10, computed on every read (ADR-009). Every answer carries Cache-Control: no-store and Referrer-Policy: no-referrer, and the api logs the path as /public/***."
     viewer -> tourneyhub.spa.publicUi "opens the link from the organizer"
-    tourneyhub.spa.publicUi -> tourneyhub.api.publicApi "GET /api/v1/public/{share_token}/…"
-    tourneyhub.api.publicApi -> tourneyhub.db.leagues "finds the league by share token"
-    tourneyhub.api.publicApi -> tourneyhub.db.tournaments "tournaments past setup"
-    tourneyhub.api.publicApi -> tourneyhub.db.play "rounds and results"
-    tourneyhub.api.publicApi -> tourneyhub.api.engine "computes standings, places and season points"
-    tourneyhub.spa.publicUi <- tourneyhub.api.publicApi "schedule, bracket, standings"
+    tourneyhub.spa.publicUi -> tourneyhub.api.publicApi "GET /api/v1/public/{share_token}, …/seasons/{season_id}/tournaments, …/tournaments/{tournament_id}"
+    tourneyhub.api.publicApi -> tourneyhub.db.leagues "finds the league by share token: one lookup on the unique index"
+    opt "an unknown token" {
+      tourneyhub.spa.publicUi <- tourneyhub.api.publicApi "404 share_link_not_found, empty detail, on every route"
+    }
+    tourneyhub.api.publicApi -> tourneyhub.db.tournaments "tournaments past setup; one in setup is 404 tournament_not_found"
+    tourneyhub.api.publicApi -> tourneyhub.db.play "rounds, results and fields"
+    tourneyhub.api.publicApi -> tourneyhub.api.engine "waiting order now; standings, places and season points later"
+    tourneyhub.spa.publicUi <- tourneyhub.api.publicApi "league, schedule, fields and waiting matches"
   }
 
   dynamic view adminReset {
