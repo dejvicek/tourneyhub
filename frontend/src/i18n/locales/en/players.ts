@@ -32,6 +32,8 @@ export const players = {
     confirm: "Remove",
     cancel: "Keep",
     removed: "{{name}} is removed.",
+    blocked:
+      "{{name}} cannot be removed yet. These tournaments are not finished and include them: {{tournaments}}. Finish or delete them first.",
     inTournament:
       "{{name}} plays in a tournament that is not finished, so they cannot be removed yet.",
   },

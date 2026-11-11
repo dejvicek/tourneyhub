@@ -5,6 +5,7 @@ import {
 } from "@tanstack/react-query";
 
 import { api, dataOf } from "@/api/client";
+import { provisionalApi } from "@/api/provisional";
 
 export const playerQueries = {
   list: (leagueId: string) =>
@@ -21,6 +22,35 @@ export const playerQueries = {
             signal,
           }),
         ),
+    }),
+  /**
+   * BR-002: the unfinished tournaments a player is in, which block removing
+   * them. Asked when the remove dialog opens, so it can say so up front.
+   */
+  unfinishedTournaments: (
+    leagueId: string,
+    playerId: string,
+    enabled: boolean,
+  ) =>
+    queryOptions({
+      queryKey: [
+        "leagues",
+        leagueId,
+        "players",
+        playerId,
+        "unfinished-tournaments",
+      ],
+      queryFn: ({ signal }) =>
+        dataOf(
+          provisionalApi.GET(
+            "/api/v1/leagues/{league_id}/players/{player_id}/tournaments",
+            {
+              params: { path: { league_id: leagueId, player_id: playerId } },
+              signal,
+            },
+          ),
+        ),
+      enabled,
     }),
 };
 

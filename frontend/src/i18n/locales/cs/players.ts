@@ -35,6 +35,8 @@ export const players: CsMessages<Messages["players"]> = {
     confirm: "Odebrat",
     cancel: "Ponechat",
     removed: "Hráč {{name}} je odebraný.",
+    blocked:
+      "Hráče {{name}} zatím nejde odebrat. Tyto turnaje nejsou dokončené a hrají v nich: {{tournaments}}. Nejdřív je dokončete nebo smažte.",
     inTournament:
       "Hráč {{name}} hraje v nedokončeném turnaji, takže zatím nejde odebrat.",
   },

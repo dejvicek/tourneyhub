@@ -255,6 +255,11 @@ export interface ProvisionalPaths {
     get: Get<Season, SeasonStandingRow[]>;
   };
 
+  // players: the unfinished tournaments a player is in, which block a removal (BR-002)
+  "/api/v1/leagues/{league_id}/players/{player_id}/tournaments": {
+    get: Get<Params<{ league_id: Uuid; player_id: Uuid }>, TournamentSummary[]>;
+  };
+
   // tournaments
   "/api/v1/leagues/{league_id}/seasons/{season_id}/tournaments": {
     get: Get<Season, TournamentSummary[]>;

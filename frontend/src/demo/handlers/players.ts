@@ -6,7 +6,7 @@ import { newId } from "@/lib/newId";
 
 import { nameProblem, type Problem, validationFailed } from "../outsideErrors";
 import { apiError, route } from "../route";
-import { db, findLeague } from "../store";
+import { db, findLeague, tournamentSummary } from "../store";
 
 type PlayerRead = components["schemas"]["PlayerRead"];
 
@@ -34,14 +34,12 @@ function nameValidation(name: string): Problem | undefined {
 }
 
 /** BR-002: the unfinished tournaments the player is entered in. */
-function unfinishedTournaments(playerId: string): string[] {
-  return db()
-    .tournaments.filter(
-      (t) =>
-        t.state !== "finished" &&
-        t.entries.some((entry) => entry.player_ids.includes(playerId)),
-    )
-    .map((t) => t.id);
+function unfinishedTournaments(playerId: string) {
+  return db().tournaments.filter(
+    (t) =>
+      t.state !== "finished" &&
+      t.entries.some((entry) => entry.player_ids.includes(playerId)),
+  );
 }
 
 function toRead({ id, name, removed_at }: PlayerRead): PlayerRead {
@@ -91,6 +89,22 @@ export const playerHandlers = [
       )
       .map(toRead);
   }),
+
+  // The reason a removal would be refused (BR-002), so the screen can say it
+  // before the organizer confirms.
+  route(
+    "get",
+    "/api/v1/leagues/{league_id}/players/{player_id}/tournaments",
+    ({ params }) => {
+      if (!findLeague(params.league_id)) {
+        return leagueNotFound(params.league_id);
+      }
+      const player = findPlayer(params.league_id, params.player_id);
+      return player
+        ? unfinishedTournaments(player.id).map(tournamentSummary)
+        : apiError(404, "player_not_found", { player_id: params.player_id });
+    },
+  ),
 
   route(
     "post",
@@ -178,7 +192,7 @@ export const playerHandlers = [
       }
       // BR-002: not in the backend yet; P7 adds it with its own code.
       if (removed) {
-        const tournamentIds = unfinishedTournaments(player.id);
+        const tournamentIds = unfinishedTournaments(player.id).map((t) => t.id);
         if (tournamentIds.length > 0) {
           return apiError(422, "validation_failed", {
             rule: "BR-002",

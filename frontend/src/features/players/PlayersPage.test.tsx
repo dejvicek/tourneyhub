@@ -122,21 +122,88 @@ describe("PlayersPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("BR-002: a player in an unfinished tournament cannot be removed", async () => {
+  it("D13, BR-002: a player in an unfinished tournament gets the block explained before any confirm", async () => {
     const user = userEvent.setup();
     renderAt(players);
 
     await user.click(
       await screen.findByRole("button", { name: "Remove Anna Nováková" }),
     );
-    const confirm = await screen.findByRole("alertdialog");
-    await user.click(within(confirm).getByRole("button", { name: "Remove" }));
+    const dialog = await screen.findByRole("alertdialog");
 
     expect(
-      await screen.findByText(
-        "Anna Nováková plays in a tournament that is not finished, so they cannot be removed yet.",
+      await within(dialog).findByText(
+        /Anna Nováková cannot be removed yet\. These tournaments are not finished and include them: .*Thursday DYP/,
       ),
     ).toBeInTheDocument();
+    // Nothing to confirm: only the way back.
+    expect(
+      within(dialog).queryByRole("button", { name: "Remove" }),
+    ).not.toBeInTheDocument();
+    expect(
+      db().players.find((p) => p.name === "Anna Nováková")?.removed_at,
+    ).toBeNull();
+  });
+
+  it("D11: the last action's news clears when a new action starts", async () => {
+    const user = userEvent.setup();
+    renderAt(players);
+
+    await user.click(
+      await screen.findByRole("button", { name: "Remove Filip Šimek" }),
+    );
+    const confirm = await screen.findByRole("alertdialog");
+    await user.click(within(confirm).getByRole("button", { name: "Remove" }));
+    await waitFor(() => {
+      expect(status()).toHaveTextContent("Filip Šimek is removed.");
+    });
+
+    // A new add that fails: the old news must not stay beside the error.
+    const name = screen.getByLabelText("Name");
+    await user.type(name, "jana dvořáková");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() => {
+      expect(name).toHaveAccessibleDescription(
+        "Jana Dvořáková is already on the list.",
+      );
+    });
+    expect(status()).toBeEmptyDOMElement();
+  });
+
+  it("D12: Escape closes the inline rename without saving", async () => {
+    const user = userEvent.setup();
+    renderAt(players);
+
+    await user.click(
+      await screen.findByRole("button", { name: "Rename Anna Nováková" }),
+    );
+    const field = screen.getByLabelText("New name for Anna Nováková");
+    await user.type(field, " X");
+    await user.keyboard("{Escape}");
+
+    expect(
+      screen.queryByLabelText("New name for Anna Nováková"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Rename Anna Nováková" }),
+    ).toBeInTheDocument();
+    expect(db().players.find((p) => p.name === "Anna Nováková")).toBeDefined();
+  });
+
+  it("D06: a name over 100 characters is refused at the field without a request", async () => {
+    const user = userEvent.setup();
+    renderAt(players);
+
+    const name = await screen.findByLabelText("Name");
+    expect(name).toHaveAttribute("maxlength", "100");
+    // A paste or a script can pass maxLength, so the check does not rely on it.
+    name.removeAttribute("maxlength");
+    await user.type(name, "x".repeat(101));
+    await user.click(screen.getByRole("button", { name: "Add" }));
+
+    expect(name).toHaveAccessibleDescription("Use at most 100 characters.");
+    expect(db().players.some((p) => p.name.startsWith("xxxx"))).toBe(false);
   });
 
   it("BR-001: a removed player's name is refused with an offer to restore them", async () => {

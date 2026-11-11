@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type SubmitEvent, useState } from "react";
+import { type KeyboardEvent, type SubmitEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ApiError } from "@/api/client";
@@ -28,6 +28,9 @@ import { useRouteParam } from "@/hooks/useRouteParam";
 import { playerMutations, playerQueries } from "./api";
 
 type PlayerRead = components["schemas"]["PlayerRead"];
+
+/** The API's longest name, in characters (PlayerName). */
+const MAX_NAME_LENGTH = 100;
 
 /**
  * The league's player list (FR-012): add, rename, remove and restore, with
@@ -58,7 +61,10 @@ export function PlayersPage() {
         </p>
       </header>
       <AddPlayer leagueId={leagueId} onDone={setAnnouncement} />
-      <p role="status" className="text-body-md font-bold text-primary">
+      <p
+        role="status"
+        className="text-body-md font-bold break-words text-primary"
+      >
         {announcement}
       </p>
       {players.isPending ? (
@@ -152,9 +158,19 @@ function AddPlayer({
   );
   const nameTaken = useNameTaken();
   const [name, setName] = useState("");
+  const [tooLong, setTooLong] = useState(false);
 
   function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
+    // A new action: the last one's news is old (it clears even on failure).
+    onDone("");
+    restore.reset();
+    if (name.trim().length > MAX_NAME_LENGTH) {
+      setTooLong(true);
+      add.reset();
+      return;
+    }
+    setTooLong(false);
     add.mutate(name, {
       onSuccess: (player) => {
         setName("");
@@ -173,6 +189,9 @@ function AddPlayer({
       ? { id: add.error.detail.player_id, name: add.error.detail.name }
       : undefined;
   const error =
+    (tooLong
+      ? t("auth.errors.nameTooLong", { count: MAX_NAME_LENGTH })
+      : undefined) ??
     nameTaken(add.error) ??
     (errorCodeOf(add.error) === "player_limit_reached"
       ? t("players.errors.limit")
@@ -196,12 +215,13 @@ function AddPlayer({
           name="name"
           autoComplete="off"
           required
-          maxLength={100}
+          maxLength={MAX_NAME_LENGTH}
           value={name}
           error={error}
           className="flex-1"
           onChange={(event) => {
             setName(event.target.value);
+            setTooLong(false);
           }}
         />
         <Button type="submit" className="sm:mt-7" disabled={add.isPending}>
@@ -214,6 +234,7 @@ function AddPlayer({
           variant="outline"
           disabled={restore.isPending}
           onClick={() => {
+            onDone("");
             restore.mutate(
               { playerId: removedHolder.id, removed: false },
               {
@@ -244,16 +265,47 @@ function PlayerRow({
   player: PlayerRead;
   onDone: (message: string) => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const rename = useMutation(playerMutations.rename(queryClient, leagueId));
   const remove = useMutation(playerMutations.setRemoved(queryClient, leagueId));
   const nameTaken = useNameTaken();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(player.name);
+  const [tooLong, setTooLong] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const list = new Intl.ListFormat(i18n.resolvedLanguage);
+  // BR-002: asked when the dialog opens, so the block is explained before
+  // the organizer confirms rather than after.
+  const unfinished = useQuery(
+    playerQueries.unfinishedTournaments(leagueId, player.id, confirming),
+  );
+  const blockedBy = unfinished.data ?? [];
+
+  function stopEditing() {
+    setEditing(false);
+    setName(player.name);
+    setTooLong(false);
+    rename.reset();
+  }
+
+  function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      stopEditing();
+    }
+  }
 
   function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
+    onDone("");
+    remove.reset();
+    if (name.trim().length > MAX_NAME_LENGTH) {
+      setTooLong(true);
+      rename.reset();
+      return;
+    }
+    setTooLong(false);
     rename.mutate(
       { playerId: player.id, name },
       {
@@ -266,6 +318,9 @@ function PlayerRow({
   }
 
   const renameError =
+    (tooLong
+      ? t("auth.errors.nameTooLong", { count: MAX_NAME_LENGTH })
+      : undefined) ??
     nameTaken(rename.error) ??
     fieldErrors(t, rename.error).name ??
     (rename.isError ? t("players.errors.generic") : undefined);
@@ -293,17 +348,19 @@ function PlayerRow({
               // eslint-disable-next-line jsx-a11y-x/no-autofocus -- focus moves into the field the user asked to edit
               autoFocus
               autoComplete="off"
-              maxLength={100}
+              maxLength={MAX_NAME_LENGTH}
               value={name}
               className="text-base"
+              onKeyDown={onKeyDown}
               onChange={(event) => {
                 setName(event.target.value);
+                setTooLong(false);
               }}
             />
             {renameError !== undefined && (
               <p
                 id={`${player.id}-error`}
-                className="text-body-sm font-bold text-destructive"
+                className="text-body-sm font-bold break-words text-destructive"
               >
                 {renameError}
               </p>
@@ -321,11 +378,7 @@ function PlayerRow({
               type="button"
               variant="outline"
               className="flex-1 sm:flex-none"
-              onClick={() => {
-                setEditing(false);
-                setName(player.name);
-                rename.reset();
-              }}
+              onClick={stopEditing}
             >
               {t("players.rename.cancel")}
             </Button>
@@ -343,13 +396,15 @@ function PlayerRow({
               aria-label={t("players.rename.label", { name: player.name })}
               className="px-3"
               onClick={() => {
+                onDone("");
+                remove.reset();
                 setName(player.name);
                 setEditing(true);
               }}
             >
               {t("players.rename.action")}
             </Button>
-            <AlertDialog>
+            <AlertDialog open={confirming} onOpenChange={setConfirming}>
               <AlertDialogTrigger asChild>
                 <Button
                   type="button"
@@ -367,34 +422,44 @@ function PlayerRow({
                     {t("players.remove.title", { name: player.name })}
                   </AlertDialogTitle>
                   <AlertDialogDescription>
-                    {t("players.remove.body", { name: player.name })}
+                    {blockedBy.length > 0
+                      ? t("players.remove.blocked", {
+                          name: player.name,
+                          tournaments: list.format(
+                            blockedBy.map((tournament) => tournament.name),
+                          ),
+                        })
+                      : t("players.remove.body", { name: player.name })}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>
                     {t("players.remove.cancel")}
                   </AlertDialogCancel>
-                  <AlertDialogAction
-                    className={buttonVariants({ variant: "destructive" })}
-                    onClick={() => {
-                      // mutateAsync, not mutate's callbacks: the reload drops
-                      // this row before they would run, and the news is lost.
-                      remove
-                        .mutateAsync({ playerId: player.id, removed: true })
-                        .then(
-                          () => {
-                            onDone(
-                              t("players.remove.removed", {
-                                name: player.name,
-                              }),
-                            );
-                          },
-                          () => undefined, // shown by remove.error
-                        );
-                    }}
-                  >
-                    {t("players.remove.confirm")}
-                  </AlertDialogAction>
+                  {blockedBy.length === 0 && (
+                    <AlertDialogAction
+                      className={buttonVariants({ variant: "destructive" })}
+                      onClick={() => {
+                        onDone("");
+                        // mutateAsync, not mutate's callbacks: the reload drops
+                        // this row before they would run, and the news is lost.
+                        remove
+                          .mutateAsync({ playerId: player.id, removed: true })
+                          .then(
+                            () => {
+                              onDone(
+                                t("players.remove.removed", {
+                                  name: player.name,
+                                }),
+                              );
+                            },
+                            () => undefined, // shown by remove.error
+                          );
+                      }}
+                    >
+                      {t("players.remove.confirm")}
+                    </AlertDialogAction>
+                  )}
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -402,7 +467,10 @@ function PlayerRow({
         </div>
       )}
       {removeError !== undefined && (
-        <p role="alert" className="text-body-sm font-bold text-destructive">
+        <p
+          role="alert"
+          className="text-body-sm font-bold break-words text-destructive"
+        >
           {removeError}
         </p>
       )}
@@ -436,6 +504,7 @@ function RemovedRow({
         aria-label={t("players.removed.restoreLabel", { name: player.name })}
         disabled={restore.isPending}
         onClick={() => {
+          onDone("");
           // mutateAsync, not mutate's callbacks: the reload drops this row
           // before they would run, and the news is lost.
           restore.mutateAsync({ playerId: player.id, removed: false }).then(
