@@ -29,6 +29,8 @@ class ErrorCode(StrEnum):
     # Leagues
     LEAGUE_NOT_FOUND = "league_not_found"
     LEAGUE_ID_TAKEN = "league_id_taken"
+    # Share link: an unknown token, the same for every public route (FR-071)
+    SHARE_LINK_NOT_FOUND = "share_link_not_found"
     # Seasons
     SEASON_NOT_FOUND = "season_not_found"
     SEASON_CLOSED = "season_closed"
