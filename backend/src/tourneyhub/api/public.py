@@ -15,18 +15,18 @@ from tourneyhub.api.deps import SessionDep
 from tourneyhub.api.leagues import SeasonRead
 from tourneyhub.api.public_headers import PUBLIC_PREFIX
 from tourneyhub.api.schemas import ErrorResponse, ResponseModel
-from tourneyhub.api.standings import SeasonStandingRead
 from tourneyhub.api.tournaments import (
+    BracketRoundName,
     EntryRead,
     FieldRead,
     PhaseRead,
-    PlacesRead,
+    PlaceReasonKind,
     RoundRead,
     TournamentSummary,
-    places_read,
 )
-from tourneyhub.engine.tournaments import TournamentState, TournamentType
+from tourneyhub.engine.tournaments import PhaseFormat, TournamentState, TournamentType
 from tourneyhub.services import public as public_service
+from tourneyhub.services.tournaments import PlacesView
 
 router = APIRouter(
     prefix=PUBLIC_PREFIX + "/{share_token}",
@@ -98,6 +98,73 @@ class PublicStandingRow(ResponseModel):
     score_difference: int
 
 
+class PublicSeasonStandingRow(ResponseModel):
+    """One player's line in the season standings, for viewers (FR-061, BR-113).
+
+    `place` is shared by players level on points and wins, and the next place
+    skips (BR-104). Removed players stay, with their points (BR-002).
+    """
+
+    place: int
+    player_id: UUID
+    points: int
+    tournaments_played: int
+    tournament_wins: int
+
+
+class PublicPlaceReasonRead(ResponseModel):
+    """Why an entry has its place, for viewers (§7.13): the organizer's reason."""
+
+    kind: PlaceReasonKind
+    round: BracketRoundName | None
+    score: tuple[int, int] | None
+    opponent_entry_id: UUID | None
+    group_place: int | None
+    group_format: PhaseFormat | None
+
+
+class PublicPlaceRead(ResponseModel):
+    """An entry's final place and the season points each of its players earns."""
+
+    place: int
+    entry_id: UUID
+    points_per_player: int
+    reason: PublicPlaceReasonRead
+
+
+class PublicPlacesRead(ResponseModel):
+    """The places of a tournament for viewers (FR-070), best place first.
+
+    `complete` is true once the tournament is finished; before that `rows` is
+    empty.
+    """
+
+    complete: bool
+    rows: list[PublicPlaceRead]
+
+
+def _public_places(places: PlacesView) -> PublicPlacesRead:
+    return PublicPlacesRead(
+        complete=places.complete,
+        rows=[
+            PublicPlaceRead(
+                place=row.place,
+                entry_id=row.entry_id,
+                points_per_player=row.points_per_player,
+                reason=PublicPlaceReasonRead(
+                    kind="group_place",
+                    round=None,
+                    score=None,
+                    opponent_entry_id=None,
+                    group_place=row.group_place,
+                    group_format=places.group_format,
+                ),
+            )
+            for row in places.rows
+        ],
+    )
+
+
 @router.get("")
 def read_public_league(share_token: str, session: SessionDep) -> PublicLeagueRead:
     """Return the league of a share link (FR-070).
@@ -140,7 +207,7 @@ def read_public_tournament(
 @router.get("/seasons/{season_id}/standings")
 def read_public_season_standings(
     share_token: str, season_id: UUID, session: SessionDep
-) -> list[SeasonStandingRead]:
+) -> list[PublicSeasonStandingRow]:
     """Return a season's standings from its finished tournaments (FR-070, FR-061).
 
     The same table as the organizer's, with removed players, whose points stay
@@ -149,7 +216,7 @@ def read_public_season_standings(
     rows = public_service.read_shared_season_standings(
         session, share_token=share_token, season_id=season_id
     )
-    return [SeasonStandingRead.model_validate(row) for row in rows]
+    return [PublicSeasonStandingRow.model_validate(row) for row in rows]
 
 
 @router.get("/tournaments/{tournament_id}/standings")
@@ -174,7 +241,7 @@ def read_public_standings(
 )
 def read_public_places(
     share_token: str, tournament_id: UUID, session: SessionDep
-) -> PlacesRead:
+) -> PublicPlacesRead:
     """Return the places and the season points of a finished tournament (FR-070).
 
     Before the tournament finishes, `complete` is false and there are no rows.
@@ -184,4 +251,4 @@ def read_public_places(
     places = public_service.read_shared_places(
         session, share_token=share_token, tournament_id=tournament_id
     )
-    return places_read(places)
+    return _public_places(places)

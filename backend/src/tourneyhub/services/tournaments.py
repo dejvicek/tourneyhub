@@ -2719,6 +2719,10 @@ def _placed(tournament: Tournament, placement_points: Sequence[int]) -> _Placed:
     the average of the places they cover, rounded down (BR-110, BR-111). One
     with a knockout is 422 `format_not_supported` until the knockout is played.
     """
+    # P10b: this is also what `finished_season_points` runs for every finished
+    # tournament of a season. Once a knockout tournament can finish, this 422
+    # would fail the whole season's standings, not just that tournament's
+    # places. P10b must place knockout tournaments here (BR-100, BR-102).
     group = _require_group_only(tournament)
     standings = _standings_of(tournament, group)
     entries = [
