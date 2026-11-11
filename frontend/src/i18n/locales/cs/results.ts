@@ -90,9 +90,9 @@ export const results: CsMessages<Messages["results"]> = {
   clear: {
     open: "Smazat výsledek",
     title: "Smazat tento výsledek?",
-    body: "{{match}} se vrátí mezi čekající. Na hřiště půjde, až se nějaké uvolní.",
+    body: "{{match}} se vrátí mezi čekající. Hned půjde na volné hřiště, pokud jeho hráči nehrají jinde.",
     bodyFinished:
-      "{{match}} se vrátí mezi čekající a ukončený turnaj se znovu otevře.",
+      "{{match}} se vrátí mezi čekající a hned půjde na volné hřiště. Ukončený turnaj se znovu otevře.",
     cancel: "Ponechat",
     confirm: "Smazat výsledek",
   },

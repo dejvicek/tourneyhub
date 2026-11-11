@@ -369,19 +369,63 @@ export function checkResult(
   }
 }
 
+type Outcome = NonNullable<MatchRead["outcome"]>;
+
+/** The outcome a checked result makes: the walkover's winner, else the games' majority. */
+function outcomeOf(body: ResultWrite): Outcome {
+  if (body.walkover_winner !== null) {
+    return body.walkover_winner;
+  }
+  const wins = { side_1: 0, side_2: 0, draw: 0 };
+  for (const game of body.games) {
+    wins[game.winner] += 1;
+  }
+  return wins.side_1 > wins.side_2
+    ? "side_1"
+    : wins.side_2 > wins.side_1
+      ? "side_2"
+      : "draw";
+}
+
+/** The backend's `_same_result`: the stored outcome, walkover and games equal the sent ones. */
+function sameResult(
+  match: MatchRead,
+  body: ResultWrite,
+  outcome: Outcome,
+): boolean {
+  return (
+    match.outcome === outcome &&
+    match.is_walkover === (body.walkover_winner !== null) &&
+    match.games.length === body.games.length &&
+    match.games.every((stored, i) => {
+      const sent = body.games[i];
+      return (
+        stored.winner === sent?.winner &&
+        stored.score_1 === sent.score_1 &&
+        stored.score_2 === sent.score_2
+      );
+    })
+  );
+}
+
 /**
- * Writes a checked result, or clears it when the body is empty (FR-053).
- * A result frees the match's field, which takes the next match (FR-094); a
- * cleared match waits like any other and is not placed again (BR-134). A
- * cleared result reopens a finished tournament (BR-095).
+ * Writes a checked result, or clears it when the body is empty (FR-053), as
+ * the backend does. A result equal to the stored one changes nothing, the time
+ * included. A new one frees the match's field, which takes the next match
+ * (FR-094). Clearing a match without a result changes nothing; clearing one
+ * with a result leaves it waiting in schedule order, not put back on its
+ * field, and the free fields are filled (BR-134, BR-130). It reopens a
+ * finished tournament (BR-095).
  */
 export function writeResult(
   t: StoredTournament,
   match: MatchRead,
   body: ResultWrite,
 ): void {
-  requeuedAt.delete(match);
   if (body.walkover_winner === null && body.games.length === 0) {
+    if (match.outcome === null) {
+      return;
+    }
     match.outcome = null;
     match.is_walkover = false;
     match.games = [];
@@ -389,21 +433,17 @@ export function writeResult(
     if (t.state === "finished") {
       t.state = "in_progress";
     }
+    fill(t);
     return;
   }
-  const wins = { side_1: 0, side_2: 0, draw: 0 };
-  for (const game of body.games) {
-    wins[game.winner] += 1;
+  const outcome = outcomeOf(body);
+  if (sameResult(match, body, outcome)) {
+    return;
   }
+  requeuedAt.delete(match);
   match.is_walkover = body.walkover_winner !== null;
   match.games = body.games.map((game, i) => ({ game_no: i + 1, ...game }));
-  match.outcome =
-    body.walkover_winner ??
-    (wins.side_1 > wins.side_2
-      ? "side_1"
-      : wins.side_2 > wins.side_1
-        ? "side_2"
-        : "draw");
+  match.outcome = outcome;
   match.result_entered_at = new Date().toISOString();
   t.fields = t.fields.map((field) =>
     field.match_id === match.id ? { ...field, match_id: null } : field,

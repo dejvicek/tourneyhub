@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, ApiError, dataOf } from "@/api/client";
 import type { components } from "@/api/schema";
-import { onField, runningDyp } from "@/test/play";
+import { onField, playEverything, runningDyp } from "@/test/play";
 
 import { DEMO_LEAGUE_ID } from "./ids";
 
@@ -102,5 +102,68 @@ describe("the fake API for results and finishing (the backend's codes, P8)", () 
       "group_phase_not_done",
     ]);
     expect(refused.detail.matches_left).toBeGreaterThan(0);
+  });
+
+  describe("a repeated and a cleared result (ADR-008, BR-134)", () => {
+    const won: ResultWrite = {
+      walkover_winner: null,
+      games: [{ winner: "side_1", score_1: 10, score_2: 4 }],
+    };
+    const empty: ResultWrite = { walkover_winner: null, games: [] };
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("keeps the result time when the same result is sent again", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      const { match } = onField(1);
+      vi.setSystemTime(new Date("2026-11-12T18:00:00Z"));
+      const first = await putResult(match.id, won);
+      vi.setSystemTime(new Date("2026-11-12T18:30:00Z"));
+
+      const again = await putResult(match.id, won);
+      const changed = await putResult(match.id, {
+        ...won,
+        games: [{ winner: "side_1", score_1: 10, score_2: 5 }],
+      });
+
+      expect(first.result_entered_at).toBe("2026-11-12T18:00:00.000Z");
+      expect(again.result_entered_at).toBe(first.result_entered_at);
+      expect(changed.result_entered_at).toBe("2026-11-12T18:30:00.000Z");
+    });
+
+    it("changes nothing when a match without a result is cleared", async () => {
+      const { match, field } = onField(1);
+
+      await putResult(match.id, empty);
+
+      expect(runningDyp().fields.find((f) => f.id === field.id)?.match_id).toBe(
+        match.id,
+      );
+    });
+
+    it("puts a cleared match on a free field when it can be played", async () => {
+      playEverything();
+      const t = runningDyp();
+      const played = t.rounds[0]?.matches[0];
+
+      await putResult(played?.id ?? "", empty);
+
+      expect(played?.outcome).toBeNull();
+      expect(t.fields.map((f) => f.match_id)).toContain(played?.id);
+    });
+
+    it("reopens a finished tournament and fills the free fields", async () => {
+      playEverything();
+      const t = runningDyp();
+      t.state = "finished";
+      const played = t.rounds[0]?.matches[0];
+
+      await putResult(played?.id ?? "", empty);
+
+      expect(t.state).toBe("in_progress");
+      expect(t.fields.map((f) => f.match_id)).toContain(played?.id);
+    });
   });
 });

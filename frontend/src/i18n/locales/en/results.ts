@@ -74,9 +74,9 @@ export const results = {
   clear: {
     open: "Clear result",
     title: "Clear this result?",
-    body: "{{match}} goes back to waiting. It takes a field again when one frees up.",
+    body: "{{match}} goes back to waiting. It takes a free field at once if its players are not on another field.",
     bodyFinished:
-      "{{match}} goes back to waiting, and the finished tournament is back in progress.",
+      "{{match}} goes back to waiting and takes a free field at once. The finished tournament is back in progress.",
     cancel: "Keep it",
     confirm: "Clear result",
   },
