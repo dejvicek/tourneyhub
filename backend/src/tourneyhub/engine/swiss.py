@@ -393,10 +393,10 @@ def draw_next_swiss_round(
     if len(active) % 2:
         # BR-058 picks, in this order: entries that did not sit out the round
         # before; the fewest sit-outs (a missed round counts as one, BR-064,
-        # BR-067); the entry whose sitting out lets the rest pair without a
-        # repeat opponent (BR-057); the lowest place; then a lot (BR-074). This
-        # takes the fewest sit-outs and then the lowest place only. Issue #60
-        # changes it.
+        # BR-067); the entry whose sitting out leaves the fewest repeat
+        # opponents in the round (BR-057); the lowest place; then a lot
+        # (BR-074). This takes the fewest sit-outs and then the lowest place
+        # only. Issue #60 changes it.
         fewest = min(line.sat_out for line in active)
         candidates = [line for line in active if line.sat_out == fewest]
         sitting = candidates[-1]

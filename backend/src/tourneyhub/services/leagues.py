@@ -123,7 +123,7 @@ def update_league(
 
     Each value is a target state, so a repeated request changes nothing
     (ADR-008). Turning draws off affects only results entered afterwards
-    (BR-012). A changed default never changes an existing tournament, which
+    (BR-013). A changed default never changes an existing tournament, which
     copied it (DATA-MODEL §4.2).
     """
     league = lock_league(session, league_id=league_id, user_id=user_id)
