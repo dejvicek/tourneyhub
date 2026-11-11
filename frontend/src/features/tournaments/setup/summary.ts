@@ -1,7 +1,5 @@
 import type { TFunction } from "i18next";
 
-import { rules } from "@/demo/rules";
-
 import { longDate } from "./dates";
 import type {
   FormatForm,
@@ -44,11 +42,9 @@ export function groupPhaseLabel(
   }
 }
 
-/** The "points for sitting out" value; the value when on comes from rules.ts. */
-export function sitOutLabel(t: TFunction, on: boolean): string {
-  return on
-    ? t("tournaments.setup.sitOut.on", { count: rules.sitOutPointsWhenOn })
-    : t("tournaments.setup.sitOut.off");
+/** The "points for sitting out" value: "2 points" (FR-039, BR-071). */
+export function sitOutLabel(t: TFunction, points: number | null): string {
+  return t("tournaments.setup.sitOut.points", { count: points ?? 0 });
 }
 
 export function dateLabel(isoDate: string): string {

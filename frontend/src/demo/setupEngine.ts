@@ -10,6 +10,7 @@
 // players, the halves, the doubles pairs) lives in a draft per tournament,
 // keyed on the store's current state so that resetDemoStore() drops it too.
 import type { components } from "@/api/schema";
+import { defaultSitOutPoints } from "@/lib/sitOutPoints";
 
 import type { EntryRead, MatchRead, PhaseRead, RoundRead } from "./contract";
 import {
@@ -80,6 +81,7 @@ function formatOf(t: StoredTournament): FormatRead {
           : group.format,
     round_robin_legs: group?.round_robin_legs ?? null,
     sit_out_points: group?.sit_out_points ?? null,
+    sit_out_points_set_by_hand: group?.sit_out_points_set_by_hand ?? null,
     group_match_format: group?.match_format ?? null,
     knockout_match_format:
       knockout === undefined || knockout.match_format === "bo2"
@@ -285,6 +287,7 @@ function formatProblem(
       complete &&
       applies.has(name) &&
       name !== "final_match_format" &&
+      name !== "sit_out_points" &&
       value === null
     ) {
       return invalidBody("setting_missing");
@@ -304,6 +307,9 @@ function resolveFormat(
 ): FormatRead {
   const grouped = format.group_phase !== "none";
   const fallback = league.default_match_format;
+  const groupMatchFormat = format.group_match_format ?? fallback;
+  // BR-071: a number is the organizer's pick; null takes the match format's default.
+  const picked = format.sit_out_points ?? null;
   return {
     name: format.name.trim(),
     date: format.date,
@@ -313,10 +319,11 @@ function resolveFormat(
       format.group_phase === "round_robin"
         ? (format.round_robin_legs ?? 1)
         : null,
-    sit_out_points: grouped ? (format.sit_out_points ?? 0) : null,
-    group_match_format: grouped
-      ? (format.group_match_format ?? fallback)
+    sit_out_points: grouped
+      ? (picked ?? defaultSitOutPoints(groupMatchFormat))
       : null,
+    sit_out_points_set_by_hand: grouped ? picked !== null : null,
+    group_match_format: grouped ? groupMatchFormat : null,
     knockout_match_format: grouped
       ? null
       : (format.knockout_match_format ?? fallback),
@@ -342,6 +349,7 @@ function buildPhases(
         format: format.group_phase,
         round_robin_legs: format.round_robin_legs,
         sit_out_points: format.sit_out_points,
+        sit_out_points_set_by_hand: format.sit_out_points_set_by_hand ?? false,
         tiebreakers:
           format.group_phase === "round_robin"
             ? null
@@ -362,6 +370,7 @@ function buildPhases(
       format: "single_elimination",
       round_robin_legs: null,
       sit_out_points: null,
+      sit_out_points_set_by_hand: false,
       tiebreakers: null,
       qualifiers: null,
       third_place_match: format.third_place_match ?? false,

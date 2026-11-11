@@ -296,7 +296,8 @@ def test_br073_bh1_sums_both_opponents_and_bh2_their_bh1() -> None:
     assert (by_player[1].bh2, by_player[2].bh2) == (0, 8)
 
 
-def test_br071_a_sit_out_earns_the_sit_out_points() -> None:
+@pytest.mark.parametrize("sit_out_points", [0, 1, 2])
+def test_br071_a_sit_out_earns_the_sit_out_points(sit_out_points: int) -> None:
     rounds = [
         MonsterRound(
             round_no=1,
@@ -306,11 +307,66 @@ def test_br071_a_sit_out_earns_the_sit_out_points() -> None:
     ]
 
     result = monster_standings(
-        players(5), rounds, tiebreakers=(), sit_out_points=1, rng_seed=SEED
+        players(5),
+        rounds,
+        tiebreakers=(),
+        sit_out_points=sit_out_points,
+        rng_seed=SEED,
     )
 
     five = next(line for line in result if line.player_id == pid(5))
-    assert (five.points, five.sat_out, five.played, five.bh1) == (1, 1, 0, 0)
+    assert (five.points, five.sat_out, five.played, five.bh1) == (
+        sit_out_points,
+        1,
+        0,
+        0,
+    )
+
+
+def test_br071_each_player_who_sits_out_gets_2_points_that_bh1_and_bh2_sum() -> None:
+    rounds = [
+        MonsterRound(
+            round_no=1,
+            matches=(game((1, 4), (2, 3), MatchOutcome.SIDE_1),),
+            sat_out=(pid(5),),
+        ),
+        MonsterRound(
+            round_no=2,
+            matches=(game((5, 2), (1, 3), MatchOutcome.SIDE_1),),
+            sat_out=(pid(4),),
+        ),
+    ]
+
+    result = monster_standings(
+        players(5),
+        rounds,
+        tiebreakers=DEFAULT_TIEBREAKERS,
+        sit_out_points=2,
+        rng_seed=SEED,
+    )
+
+    by_player = {line.player_id: line for line in result}
+    assert {p.int: by_player[p].points for p in by_player} == {
+        1: 2,
+        2: 2,
+        3: 0,
+        4: 4,
+        5: 4,
+    }
+    assert {p.int: by_player[p].bh1 for p in by_player} == {
+        1: 8,
+        2: 8,
+        3: 12,
+        4: 2,
+        5: 2,
+    }
+    assert {p.int: by_player[p].bh2 for p in by_player} == {
+        1: 30,
+        2: 30,
+        3: 20,
+        4: 20,
+        5: 20,
+    }
 
 
 def test_br073_a_match_without_a_result_counts_for_nothing() -> None:
@@ -370,7 +426,7 @@ def test_br074_level_players_share_the_place_and_the_lot_orders_them() -> None:
     ("rounds", "tiebreakers", "sit_out_points"),
     [
         pytest.param(rounds_of([]), (Tiebreaker.BH1, Tiebreaker.BH1), 0, id="tb-twice"),
-        pytest.param(rounds_of([]), (), 2, id="sit-out-points"),
+        pytest.param(rounds_of([]), (), 3, id="sit-out-points"),
         pytest.param([MonsterRound(round_no=2, matches=())], (), 0, id="round-numbers"),
         pytest.param(rounds_of([((1, 2), (1, 3))]), (), 0, id="player-twice"),
         pytest.param(rounds_of([((1, 2), (3, 9))]), (), 0, id="unknown-player"),
@@ -1099,7 +1155,7 @@ def test_br070_to_br074_standings_are_consistent(
     count, *_, seed = tournament
     *_, (_, rounds, _) = play(*tournament, data)
     tiebreakers = data.draw(st.permutations(DEFAULT_TIEBREAKERS))
-    sit_out_points = data.draw(st.sampled_from((0, 1)))
+    sit_out_points = data.draw(st.sampled_from((0, 1, 2)))
 
     result = monster_standings(
         players(count),

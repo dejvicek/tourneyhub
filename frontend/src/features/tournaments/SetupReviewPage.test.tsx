@@ -53,7 +53,7 @@ describe("setup: review and start (screen 5)", () => {
     expect(row("Matches")).toHaveTextContent("15 in 5 rounds, all BO1");
     expect(row("Final")).toHaveTextContent("Same as knockout");
     expect(row("Draws")).toHaveTextContent("Not allowed in this league");
-    expect(row("Sit-out points")).toHaveTextContent("Off");
+    expect(row("Sit-out points")).toHaveTextContent("0 points");
     expect(row("Knockout")).toHaveTextContent("Decide after the group phase");
     expect(screen.getAllByText("VS")).toHaveLength(3);
     expect(screen.getByText("Rounds 2 to 5 follow.")).toBeInTheDocument();

@@ -1134,17 +1134,16 @@
           "sit_out_points": {
             "anyOf": [
               {
-                "enum": [
-                  0,
-                  1
-                ],
-                "type": "integer"
+                "$ref": "#/components/schemas/SitOutPoints"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Sit Out Points"
+            ]
+          },
+          "sit_out_points_set_by_hand": {
+            "title": "Sit Out Points Set By Hand",
+            "type": "boolean"
           },
           "third_place_match": {
             "anyOf": [
@@ -1179,6 +1178,7 @@
           "format",
           "round_robin_legs",
           "sit_out_points",
+          "sit_out_points_set_by_hand",
           "tiebreakers",
           "qualifiers",
           "third_place_match",
@@ -2293,6 +2293,14 @@
         "title": "SignupCodeUpdate",
         "type": "object"
       },
+      "SitOutPoints": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer"
+      },
       "StartProblemRead": {
         "description": "The refusal \"Generate and start\" would answer: the 422's code and detail.",
         "properties": {
@@ -2343,7 +2351,7 @@
       },
       "TournamentCreate": {
         "additionalProperties": false,
-        "description": "A new tournament in the league's active season (FR-030).\n\n`id` is a UUIDv7 made by the client; a repeat gets the same tournament back\n(ADR-008). A setting left out or null takes the league's default: goals per\ngame, the number of fields and the match format of the phase (FR-011); one\nround robin leg, no sit-out points (FR-039) and no third-place match.",
+        "description": "A new tournament in the league's active season (FR-030).\n\n`id` is a UUIDv7 made by the client; a repeat gets the same tournament back\n(ADR-008). A setting left out or null takes the league's default: goals per\ngame, the number of fields and the match format of the phase (FR-011); one\nround robin leg, the default sit-out points of the match format (FR-039,\nBR-071) and no third-place match. `sit_out_points` null follows the default;\nany number counts as a manual pick.",
         "properties": {
           "date": {
             "format": "date",
@@ -2429,17 +2437,12 @@
           "sit_out_points": {
             "anyOf": [
               {
-                "enum": [
-                  0,
-                  1
-                ],
-                "type": "integer"
+                "$ref": "#/components/schemas/SitOutPoints"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Sit Out Points"
+            ]
           },
           "third_place_match": {
             "anyOf": [
@@ -2467,7 +2470,7 @@
         "type": "object"
       },
       "TournamentFormatRead": {
-        "description": "The format as stored; settings that do not apply are null (FR-031).",
+        "description": "The format as stored; settings that do not apply are null (FR-031).\n\n`sit_out_points_set_by_hand` tells whether the organizer chose the\nsit-out points (true) or they are the default of the match format (false).",
         "properties": {
           "date": {
             "format": "date",
@@ -2537,17 +2540,23 @@
           "sit_out_points": {
             "anyOf": [
               {
-                "enum": [
-                  0,
-                  1
-                ],
-                "type": "integer"
+                "$ref": "#/components/schemas/SitOutPoints"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sit_out_points_set_by_hand": {
+            "anyOf": [
+              {
+                "type": "boolean"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Sit Out Points"
+            "title": "Sit Out Points Set By Hand"
           },
           "third_place_match": {
             "anyOf": [
@@ -2571,6 +2580,7 @@
           "group_phase",
           "round_robin_legs",
           "sit_out_points",
+          "sit_out_points_set_by_hand",
           "group_match_format",
           "knockout_match_format",
           "final_match_format",
@@ -2583,7 +2593,7 @@
       },
       "TournamentFormatWrite": {
         "additionalProperties": false,
-        "description": "The whole format of a tournament in setup, the target state (FR-030, FR-031).\n\nWith a group phase (`round_robin`, `swiss`, `monster_dyp`) its settings are\ngiven and the knockout's are null: a knockout after a group phase is set up\nwhen it starts (FR-045). With `none` the knockout's settings are given and\nthe group phase's are null. `round_robin_legs` is only for a round robin.\nA setting that does not apply is 422 `validation_failed` with\n`setting_not_applicable`; one that applies and is missing, `setting_missing`.",
+        "description": "The whole format of a tournament in setup, the target state (FR-030, FR-031).\n\nWith a group phase (`round_robin`, `swiss`, `monster_dyp`) its settings are\ngiven and the knockout's are null: a knockout after a group phase is set up\nwhen it starts (FR-045). With `none` the knockout's settings are given and\nthe group phase's are null. `round_robin_legs` is only for a round robin.\nA setting that does not apply is 422 `validation_failed` with\n`setting_not_applicable`; one that applies and is missing, `setting_missing`.\n\n`sit_out_points` is 0, 1 or 2 (FR-039, BR-071). A number is the organizer's\nown choice and stays; null takes the default of the group phase's match\nformat and follows it (`sit_out_points_set_by_hand` false in the read).\nAny number counts as a manual pick, even one equal to the default, so a\nclient that read the format must send null, not the read value, while\n`sit_out_points_set_by_hand` is false to keep following the default.",
         "properties": {
           "date": {
             "format": "date",
@@ -2650,17 +2660,12 @@
           "sit_out_points": {
             "anyOf": [
               {
-                "enum": [
-                  0,
-                  1
-                ],
-                "type": "integer"
+                "$ref": "#/components/schemas/SitOutPoints"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Sit Out Points"
+            ]
           },
           "third_place_match": {
             "anyOf": [
