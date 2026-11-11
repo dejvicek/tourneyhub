@@ -69,3 +69,36 @@ class NotEnoughEntriesError(EngineError):
         super().__init__(minimum, given)
         self.minimum = minimum
         self.given = given
+
+
+class GameScoreMismatchError(EngineError):
+    """A game has one score without the other, or its winner lost on score (BR-092)."""
+
+    def __init__(self, *, game_no: int) -> None:
+        super().__init__(game_no)
+        self.game_no = game_no
+
+
+class ScoresRequiredError(EngineError):
+    """A game of a Swiss or Monster DYP round has no score (BR-092)."""
+
+    def __init__(self, *, game_no: int) -> None:
+        super().__init__(game_no)
+        self.game_no = game_no
+
+
+class DrawNotAllowedError(EngineError):
+    """A draw in a knockout, or in a league without draws (BR-090)."""
+
+
+class ResultDoesNotFitFormatError(EngineError):
+    """The games do not make a result in the match's format (BR-121).
+
+    Too few or too many games, a drawn game where only BO1 can draw, a game
+    after the series is decided, or a series nobody won.
+    """
+
+    def __init__(self, *, match_format: str, games: int) -> None:
+        super().__init__(match_format, games)
+        self.match_format = match_format
+        self.games = games
