@@ -88,6 +88,16 @@ describe("share-link views", () => {
     ).toBeInTheDocument();
   });
 
+  it("FR-071: an unknown share link says that it does not work", async () => {
+    renderAt(generatePath(paths.publicLeague, { shareToken: "no-such-token" }));
+
+    expect(
+      await screen.findByText(
+        "This share link does not work. Ask the organizer for a new one.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("FR-070, FR-072: a running tournament shows fields, queue, standings and results, and no organizer controls", async () => {
     renderAt(running);
 

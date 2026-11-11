@@ -1,12 +1,12 @@
 // The demo's in-memory store. It lives as long as the page: a reload starts
 // again from the seed. Handlers read and change it through the functions
 // here, which also compute what the backend computes on read (ADR-009).
+import type { components } from "@/api/schema";
+
 import type {
   LeagueRead,
   PlaceRow,
   PlacesRead,
-  PublicLeague,
-  PublicTournamentRead,
   SeasonStandingRow,
   TournamentRead,
   TournamentStandingRow,
@@ -252,11 +252,9 @@ export function tournamentRead(t: StoredTournament): TournamentRead {
   };
 }
 
-/** The tournament as the share link shows it, with its places once finished. */
-export function publicTournamentRead(
-  t: StoredTournament,
-): PublicTournamentRead {
-  return { ...tournamentRead(t), places: places(t) };
+/** A finished tournament's places; none before it finishes. */
+export function finalPlaces(t: StoredTournament): PlaceRow[] {
+  return places(t) ?? [];
 }
 
 export function seasonStandingsOf(seasonId: string): SeasonStandingRow[] {
@@ -270,27 +268,29 @@ export function seasonStandingsOf(seasonId: string): SeasonStandingRow[] {
   );
 }
 
-export function publicLeague(shareToken: string): PublicLeague | undefined {
-  const row = state.leagues.find((league) => league.share_token === shareToken);
-  if (!row) {
-    return undefined;
-  }
-  const leagueId = row.id;
-  const season = activeSeason(leagueId);
+/** The league of a share token (FR-070), without anything only its organizer sees. */
+export function sharedLeague(shareToken: string): StoredLeague | undefined {
+  return state.leagues.find((league) => league.share_token === shareToken);
+}
+
+export function publicLeague(
+  row: StoredLeague,
+): components["schemas"]["PublicLeagueRead"] {
   return {
     name: row.name,
-    seasons: state.seasons
-      .filter((s) => s.league_id === leagueId)
-      .map(withoutLeague),
+    seasons: seasonsOf(row.id).map(withoutLeague),
     players: state.players
-      .filter((player) => player.league_id === leagueId)
-      .map(withoutLeague),
-    // FR-070: tournaments in setup are visible only to the organizer.
-    tournaments: state.tournaments
-      .filter((t) => t.season_id === season?.id && t.state !== "setup")
-      .map(tournamentSummary),
-    standings: season ? seasonStandingsOf(season.id) : [],
+      .filter((player) => player.league_id === row.id)
+      .map(({ id, name }) => ({ id, name })),
   };
+}
+
+/** A season's tournaments for viewers: those in setup only the organizer sees. */
+export function publicTournaments(seasonId: string): TournamentSummary[] {
+  return state.tournaments
+    .filter((t) => t.season_id === seasonId && t.state !== "setup")
+    .toSorted((a, b) => b.date.localeCompare(a.date))
+    .map(tournamentSummary);
 }
 
 // ---------------------------------------------------------------- outside (auth)
