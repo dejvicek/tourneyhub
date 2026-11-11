@@ -4,17 +4,17 @@ model {
 
   organizer = actor "Organizer" {
     description "Creates leagues, runs tournament evenings on a phone and enters results. The only kind of user with an account."
-    link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#2-users "PRD §2 Users"
-    link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#51-a-dyp-evening "PRD §5.1 A DYP evening"
+    link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#2-users "PRD §2 Users"
+    link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#51-a-dyp-evening "PRD §5.1 A DYP evening"
   }
   viewer = actor "Player or viewer" {
     description "No account. Follows the schedule, the bracket and the standings through the share link; changes nothing."
-    link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#68-sharing "PRD §6.8 Sharing (FR-070 to FR-072)"
+    link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#68-sharing "PRD §6.8 Sharing (FR-070 to FR-072)"
   }
   admin = actor "Instance admin" {
     description "Runs the VPS, sets the sign-up code and resets forgotten passwords. An ordinary account with the is_admin flag."
     link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-007--instance-admin-admin-flag-admin-screens-cli-bootstrap "ADR-007"
-    link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#61-accounts "PRD §6.1 Accounts (FR-005, FR-006)"
+    link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#61-accounts "PRD §6.1 Accounts (FR-005, FR-006)"
   }
   developer = actor "Developer" {
     description "Martin and dejvicek. Code and documents change only through a reviewed PR with passing checks."
@@ -28,7 +28,7 @@ model {
       Leagues and tournaments for game nights (board games, foosball, racket sports, e-sports): Singles, Doubles, DYP and Monster DYP, season standings and a share link for viewers.
       One instance for groups the owner knows. All ADRs are still Proposed (orange stripe).
     "
-    link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md "PRD"
+    link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md "PRD"
     link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md "ADR"
 
     spa = webapp "Web application (SPA)" {
@@ -41,11 +41,11 @@ model {
         Runs in the user's browser; served by the Vite dev server (development) or Caddy (production), and /api goes through the same origin.
       "
       link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-003--frontend-react-vite-typescript-tailwind-shadcnui "ADR-003"
-      link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#69-language-and-devices "PRD §6.9 Language and devices (FR-080 to FR-082)"
+      link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#69-language-and-devices "PRD §6.9 Language and devices (FR-080 to FR-082)"
 
       organizerUi = component "Organizer screens" {
         description "Leagues, players, seasons, tournament setup, draws, rounds, results and the knockout."
-        link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#64-tournaments "PRD §6.4 Tournaments"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#64-tournaments "PRD §6.4 Tournaments"
       }
       adminUi = component "Admin screens" {
         description "Sign-up code (see, set, generate, clear), list of accounts, password reset with a confirmation and a one-time display of a generated password. The server checks every action against is_admin in the database."
@@ -53,7 +53,7 @@ model {
       }
       publicUi = component "Viewer pages" {
         description "League, seasons, schedule, bracket and standings through the share token. Tournaments still in setup are not shown."
-        link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#68-sharing "PRD §6.8 Sharing"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#68-sharing "PRD §6.8 Sharing"
       }
       authClient = component "Client-side auth" {
         technology "Bearer JWT in memory, refresh cookie"
@@ -100,17 +100,17 @@ model {
           is_admin and must_change_password are read from the users row on every request, not from the token.
         "
         link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-006--authentication-jwt-access-token-and-rotating-refresh-token "ADR-006"
-        link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#61-accounts "PRD §6.1 Accounts (FR-001 to FR-004)"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#61-accounts "PRD §6.1 Accounts (FR-001 to FR-004)"
       }
       adminApi = component "API: instance admin" {
         description "/api/v1/admin: read, set, generate and clear the sign-up code; list accounts; password reset. Every route checks is_admin in the database. A reset sets must_change_password and revokes all of the organizer's logins. Every action is recorded in admin_actions with its source and without the code."
         link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-007--instance-admin-admin-flag-admin-screens-cli-bootstrap "ADR-007"
-        link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#61-accounts "PRD §6.1 Accounts (FR-005, FR-006)"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#61-accounts "PRD §6.1 Accounts (FR-005, FR-006)"
       }
       leaguesApi = component "API: leagues, players, seasons" {
         summary "Create a league with Season 1, settings, player list, new season, closed seasons read-only (FR-010 to FR-022)."
         description "FR-010 to FR-022. The client sends the new league's id (UUIDv7); Season 1 is created with it. Starting a new season carries the current season's number, otherwise 409. The placement points table is edited on the active season; a closed season's table is 409. Player names are unique in a league ignoring case, removed players included: a taken name is 422 player_name_taken, and a removed player is restored explicitly. Players belong to the league, so closed seasons change nothing for them."
-        link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#62-leagues-and-players "PRD §6.2 and §6.3"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#62-leagues-and-players "PRD §6.2 and §6.3"
       }
       tournamentsApi = component "API: tournaments" {
         summary "Setup, draws, generating, rounds, results, fields, knockout, late players, disabling."
@@ -118,12 +118,12 @@ model {
           Setup, draws, generating, rounds, results, fields, knockout, late players, disabling.
           A round is deleted by its id, adding a round carries the expected round_no, “shuffle again” carries the expected draw counter, adding a field carries the number it expects; a mismatch returns 409 and the client reloads the state.
         "
-        link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#64-tournaments "PRD §6.4 to §6.7"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#64-tournaments "PRD §6.4 to §6.7"
         link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-008--api-conventions-and-generated-client-types "ADR-008"
       }
       publicApi = component "API: viewers" {
         description "/api/v1/public/{share_token}: read-only, no login. The share token has at least 128 bits of randomness."
-        link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#68-sharing "PRD §6.8 Sharing (FR-070 to FR-072)"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#68-sharing "PRD §6.8 Sharing (FR-070 to FR-072)"
       }
       engine = component "Engine" {
         technology "tourneyhub.engine, pure functions"

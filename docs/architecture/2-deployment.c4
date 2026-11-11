@@ -48,7 +48,7 @@ deployment {
 
     phone = device "Phone on the same Wi-Fi" {
       description "Trying the app on a real phone through the machine's LAN address (FR-082). Hence the cookie without Secure: browsers do not keep it over HTTP, Safari not even on localhost."
-      link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#69-language-and-devices "PRD §6.9 (FR-082)"
+      link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#69-language-and-devices "PRD §6.9 (FR-082)"
       browser = instanceOf tourneyhub.spa {
         technology "React 19"
         summary "Browser on the phone."
