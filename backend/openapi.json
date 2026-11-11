@@ -209,6 +209,8 @@
           "email_taken",
           "wrong_password",
           "password_unchanged",
+          "user_not_found",
+          "own_account",
           "league_not_found",
           "league_id_taken",
           "season_not_found",
@@ -555,6 +557,47 @@
         "type": "string",
         "writeOnly": true
       },
+      "OrganizerRead": {
+        "description": "An account in the admin's list.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_admin": {
+            "title": "Is Admin",
+            "type": "boolean"
+          },
+          "must_change_password": {
+            "title": "Must Change Password",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "display_name",
+          "is_admin",
+          "must_change_password",
+          "created_at"
+        ],
+        "title": "OrganizerRead",
+        "type": "object"
+      },
       "PairsWrite": {
         "additionalProperties": false,
         "description": "A Doubles tournament's pairs, the target state (FR-033, BR-003, BR-030).\n\nNo player twice (`given_twice`); picked players left out have no partner yet.",
@@ -606,6 +649,45 @@
           "new_password"
         ],
         "title": "PasswordChange",
+        "type": "object"
+      },
+      "PasswordReset": {
+        "additionalProperties": false,
+        "description": "A temporary password the admin chose, or null to have one generated.",
+        "properties": {
+          "temporary_password": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NewPassword"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "PasswordReset",
+        "type": "object"
+      },
+      "PasswordResetRead": {
+        "description": "The generated temporary password, shown once; null if the admin chose one.",
+        "properties": {
+          "temporary_password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temporary Password"
+          }
+        },
+        "required": [
+          "temporary_password"
+        ],
+        "title": "PasswordResetRead",
         "type": "object"
       },
       "PhaseFormat": {
@@ -1019,6 +1101,64 @@
           "password"
         ],
         "title": "SignUpRequest",
+        "type": "object"
+      },
+      "SignupCodeRead": {
+        "description": "The sign-up code, which the admin may see and share; null: sign-up is closed.",
+        "properties": {
+          "signup_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signup Code"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "signup_code",
+          "updated_at"
+        ],
+        "title": "SignupCodeRead",
+        "type": "object"
+      },
+      "SignupCodeUpdate": {
+        "additionalProperties": false,
+        "description": "The new code, or null to close sign-up (FR-005).",
+        "properties": {
+          "signup_code": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 12,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signup Code"
+          }
+        },
+        "required": [
+          "signup_code"
+        ],
+        "title": "SignupCodeUpdate",
         "type": "object"
       },
       "TournamentCreate": {
@@ -1663,6 +1803,335 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/admin/organizers": {
+      "get": {
+        "description": "Every account by email, admins included (ADR-007).",
+        "operationId": "list_organizers",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OrganizerRead"
+                  },
+                  "title": "Response List Organizers",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Organizers",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/organizers/{user_id}/password-reset": {
+      "post": {
+        "description": "Give an organizer a temporary password (FR-006, ADR-006).\n\nEvery login of the account is revoked and its next login must choose a new\npassword. With no `temporary_password` a random one is generated and returned\nonce. 422 `own_account` for the admin's own account; 404 `user_not_found`.",
+        "operationId": "reset_password",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordReset"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordResetRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Reset Password",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/signup-code": {
+      "get": {
+        "description": "The current sign-up code, or null while sign-up is closed (FR-005).",
+        "operationId": "read_signup_code",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignupCodeRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Read Signup Code",
+        "tags": [
+          "admin"
+        ]
+      },
+      "put": {
+        "description": "Set or change the code, or close sign-up with null (FR-005).\n\nExisting accounts are not affected. The action is recorded without the code.",
+        "operationId": "set_signup_code",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupCodeUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignupCodeRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Signup Code",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/v1/admin/signup-code/generate": {
+      "post": {
+        "description": "Make a random code, store it and return it (FR-005).",
+        "operationId": "generate_signup_code",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignupCodeRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Generate Signup Code",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "description": "Log in with email and password and start a login on this device.\n\nA wrong password and an unknown email get the same 401. After repeated\nfailures, an attempt within a growing waiting period gets 429 with\n`Retry-After`; nothing is locked.",

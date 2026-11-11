@@ -12,6 +12,17 @@ from tourneyhub.engine.accounts import Language
 from tourneyhub.errors import ErrorCode, NotAuthenticatedError, RuleViolationError
 from tourneyhub.services import auth as auth_service
 
+# NIST SP 800-63B-4 asks 15 characters for a password used alone (ADR-006). FR-002
+# says 12; the PRD team decides, and this is the only place that changes. The
+# maximum bounds the Argon2 input; ADR-006's 64 is an open question. Sign-up,
+# password change, an admin's temporary password and `create-admin` share them.
+MIN_PASSWORD_LENGTH = 15
+MAX_PASSWORD_LENGTH = 1024
+
+# No email-validator dependency: one @, no spaces, a dot in the domain.
+EMAIL_MAX_LENGTH = 320
+EMAIL_PATTERN = r"^[^@\s]+@[^@\s.]+(\.[^@\s.]+)+$"
+
 
 def load_user(session: Session, *, user_id: UUID) -> User:
     """Load the caller's row, which authorization reads on every request (ADR-006).

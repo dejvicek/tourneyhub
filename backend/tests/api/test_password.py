@@ -9,12 +9,12 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
-from tourneyhub.api.schemas import MIN_PASSWORD_LENGTH
 from tourneyhub.app import create_app
 from tourneyhub.db.models.accounts import AuthAttempt, RefreshToken, User
 from tourneyhub.engine.accounts import Language
 from tourneyhub.services import accounts as account_service
 from tourneyhub.services import auth as auth_service
+from tourneyhub.services.accounts import MIN_PASSWORD_LENGTH
 from tourneyhub.settings import Settings
 
 PASSWORD = "correct horse battery staple"
