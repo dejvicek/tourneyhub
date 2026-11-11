@@ -225,7 +225,9 @@ views "III. Flows" {
       navigateTo tournamentSetup
     }
     tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "league ranking and partner draw from the tournament's seed"
-    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "generate the schedule"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "generate the schedule" {
+      navigateTo tournamentStart
+    }
     tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "round robin: 6 pairs, 5 rounds, 15 matches"
     tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "schedule stored, tournament in progress" {
       navigateTo dypEveningPlay
@@ -352,5 +354,37 @@ views "III. Flows" {
     organizer -> tourneyhub.spa.organizerUi "deletes a tournament after confirming"
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "DELETE; a closed season: 409, a repeat: 404"
     tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "everything under it by cascade; the players stay"
+  }
+
+  dynamic view tournamentStart {
+    variant sequence
+    title "19. Generate and start, back to setup"
+    order 23
+    description "FR-035, FR-036, BR-050 to BR-052, BR-130, ADR-008 and ADR-010: starting carries the draw counter the review showed. The engine makes the round robin from the seeds and fills the fields; the schedule is stored in one transaction. Back to setup deletes the schedule until the first result and keeps the draws. Only the round robin is generated so far."
+    organizer -> tourneyhub.spa.organizerUi "Generate and start"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "POST start with the expected draw counter"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.leagues "locks the league"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the tournament: started 409, stale counter 409"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "setup complete? pairs, halves, FR-032 minimum: else 422"
+    tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "round robin by seed: circle method, one sit-out per round with an odd count"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.play "rounds, matches, sides with their players, participation"
+    tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "free fields take the first matches whose players are free"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "fields hold their matches; state in_progress"
+    tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: the whole tournament with the waiting list"
+    organizer -> tourneyhub.spa.organizerUi "Back to setup"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "POST back-to-setup expecting in_progress"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the league, then the tournament"
+    alt {
+      when "no result yet" {
+        tourneyhub.api.tournamentsApi -> tourneyhub.db.play "frees the fields, deletes the rounds; entries, seeds and draws stay"
+        tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: the tournament in setup"
+      }
+      when "a match has a result" {
+        tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "422 tournament_has_results"
+      }
+      when "not in progress (a repeat)" {
+        tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "409 tournament_not_in_progress: reload"
+      }
+    }
   }
 }

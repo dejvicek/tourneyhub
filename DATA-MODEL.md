@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Status | Proposed — awaiting review by another developer |
-| Date | 2026-10-17, revised 2026-10-20 after the first review, 2026-11-05 (§2, §5: decisions of the style-guide review), 2026-11-10 (D9–D11: ordered phases, fields, games, match formats and league defaults, decided while the lead reviewer is away) and 2026-11-11 (§4.3, §4.4: the tournament tables of P7a, with the picked players in `tournament_players` and the halves method on the tournament; §2, §4.3, §4.4, §5 after the independent review: entry members reference the picks, a partial index on `source_entry_id`, two same-row CHECKs, and `dyp_halves` loses its own reference to `players`) |
+| Date | 2026-10-17, revised 2026-10-20 after the first review, 2026-11-05 (§2, §5: decisions of the style-guide review), 2026-11-10 (D9–D11: ordered phases, fields, games, match formats and league defaults, decided while the lead reviewer is away) and 2026-11-11 (§4.3, §4.4: the tournament tables of P7a, with the picked players in `tournament_players` and the halves method on the tournament; §2, §4.3, §4.4, §5 after the independent review: entry members reference the picks, a partial index on `source_entry_id`, two same-row CHECKs, and `dyp_halves` loses its own reference to `players`), 2026-11-11 (§2, §4.5, §4.6, §5: the round and match tables of P7b, starting with the expected draw counter, going back to setup with the expected state, the result-time CHECK, the indexes on the references and two more invariant queries) |
 | Scope | PostgreSQL schema for the MVP in `PRD.md`: the tables, their relationships and the key decisions behind them. Column lists show what matters for review; exact types, names and the first Alembic migration are settled during implementation within these rules. |
 
 The schema follows the proposed ADRs in `ADR.md`, in particular ADR-002 (PostgreSQL), ADR-006 (authentication), ADR-007 (instance admin), ADR-008 (API conventions and locking), ADR-009 (pure engine, derived data computed on read), ADR-010 (lots) and ADR-011 (pairing). Requirement IDs (FR-, BR-) refer to `PRD.md`.
@@ -46,7 +46,8 @@ The schema follows the proposed ADRs in `ADR.md`, in particular ADR-002 (Postgre
   - a round is deleted by `rounds.id`, never as "the newest round" (FR-046);
   - adding a round carries the expected `round_no`, and the unique `(phase_id, round_no)` also catches a duplicate (FR-040);
   - starting a season carries the current season's `number` (FR-021);
-  - "shuffle again" and "new DYP draw" carry the expected `draw_counter`;
+  - "shuffle again", "new DYP draw" and "generate and start" (FR-035) carry the expected `draw_counter`; a tournament already started gets 409 `tournament_not_in_setup`;
+  - "back to setup" (FR-036) carries the state it expects, `in_progress`; any other gets 409 `tournament_not_in_progress`, so a repeat changes nothing;
   - creating a league or a tournament uses a client-supplied id (see Primary keys);
   - adding a field carries the number the client expects it to get, the lowest free one (BR-132); the unique `(tournament_id, number)` also catches a duplicate.
 
@@ -301,7 +302,7 @@ The drawn pairs are stored as `pair` entries. The left-out player has no entry a
 |---|---|
 | `id` | |
 | `phase_id` | FK `tournament_phases`, `ON DELETE CASCADE`. |
-| `round_no` | 1, 2, …; unique on `(phase_id, round_no)`. A double round robin continues the numbering in its second half. |
+| `round_no` | 1, 2, …; unique on `(phase_id, round_no)`, CHECK `>= 1`. A double round robin continues the numbering in its second half. |
 | `created_at` | |
 
 **`round_participation`** — group phases only (D5).
@@ -311,8 +312,12 @@ The drawn pairs are stored as `pair` entries. The left-out player has no entry a
 | `round_id` | FK `rounds`, `ON DELETE CASCADE`. |
 | `entry_id` | FK `entries`, `ON DELETE CASCADE`. Primary key `(round_id, entry_id)`. A `main` entry of the round's tournament; the application ensures this (§5). |
 | `status` | `played`, `sat_out`, `disabled`, `not_joined`. |
+| `created_at` | |
+
+Indexed on `entry_id`, for the cascade from `entries`.
 
 - Every round of a group phase has exactly one row for every `main` entry that exists. Generating a round writes a row per entry. In a Swiss or Monster DYP, adding a late entry writes `not_joined` rows for every round that already exists, so the rows alone tell which rounds it missed.
+- Generating a round robin (FR-035) writes every round at once, from the seeds (BR-050 to BR-052): each main entry has `played` in a round where it has a match and `sat_out` in the round it sits out. Going back to setup (FR-036) is refused once a match has a result (422 `tournament_has_results`); otherwise it frees the fields, deletes every round with its rows, and keeps the entries, seeds and draws.
 - A round robin has its whole schedule from the start, so a late entry (BR-054) is added together with the reschedule, in one transaction. The reschedule moves only matches without a result, keeps every match that has a result in its round, and can add rounds. Rows of entries whose match in a round already has a result stay. All other rows of the rewritten rounds, the late entry's rows (`not_joined` where it cannot play any more) and every row of a new round are written to match the new schedule.
 - Deleting the newest round (FR-046, BR-066) deletes its rows with it. A late entry added before that round keeps its entry and plays from the next round generated. Deleting round 1 takes the tournament back to setup (FR-046): all rounds and their rows are gone, entries added late become ordinary entries of the setup, so the seeding and draws are made again (ADR-010), and every entry's disabled flag is cleared.
 
@@ -330,7 +335,7 @@ The drawn pairs are stored as `pair` entries. The left-out player has no entry a
 | `requeued_at` | `timestamptz`, nullable. Set when the field this match was on is removed; a requeued match waits ahead of the schedule order, earliest first (BR-132). Cleared when the match takes a field or gets a result. |
 | `created_at` | |
 
-CHECK constraints keep a result consistent within the row (BR-093, BR-124): no result → not a walkover; a walkover has a winner (`side_1` or `side_2`); a match with a result is not requeued. The scores are in `match_games`. Whether draws are allowed (BR-090) and whether the games fit the format (BR-121) depend on the league and the phase, so the application checks them.
+CHECK constraints keep a result consistent within the row (BR-093, BR-124): no result → not a walkover; a walkover has a winner (`side_1` or `side_2`); `result_entered_at` is set exactly when `outcome` is; a match with a result is not requeued; `position >= 1`. In a round, the standard matches come before the third-place match, each in `position` order (BR-130). The scores are in `match_games`. Whether draws are allowed (BR-090) and whether the games fit the format (BR-121) depend on the league and the phase, so the application checks them.
 
 **`match_games`** — the games of a result (D11; FR-050, FR-051, BR-120–BR-124).
 
@@ -340,6 +345,7 @@ CHECK constraints keep a result consistent within the row (BR-093, BR-124): no r
 | `game_no` | `1`–`5`. Primary key `(match_id, game_no)`. Numbers run from 1 without gaps (application). |
 | `winner` | `side_1`, `side_2` or `draw`. Picked by the organizer when there are no scores (FR-051). |
 | `score_1`, `score_2` | `int`, nullable, `>= 0`: the goals of each side (FR-051). |
+| `created_at` | |
 
 CHECK constraints keep a game consistent within the row (BR-092): both scores or neither; `side_1` wins → `score_1 > score_2` when scores are present, and the reverse for `side_2`; a drawn game has equal scores if any and is game 1, because only a BO1 game can be drawn (BR-090, BR-121).
 
@@ -363,13 +369,17 @@ Scores are optional per game, except that every game of a Swiss or Monster DYP r
 | `side` | `1` or `2`. Primary key `(match_id, side)`. |
 | `entry_id` | FK `entries`, nullable, `NO ACTION DEFERRABLE INITIALLY DEFERRED` (§2). `NULL` for a Monster DYP group-round team and for a bye. The entry belongs to the match's tournament and has the stage the phase plays: `knockout` in a knockout after a group phase, `main` otherwise. The application ensures this (§5). |
 | `is_bye` | `bool`. A bye side has no entry and no players (BR-041). CHECK `NOT is_bye OR entry_id IS NULL`; "no players" spans two tables and is checked by the application. |
+| `created_at` | |
+
+CHECK `side IN (1, 2)`. Indexed on `entry_id`, for the deferred check when an entry is deleted.
 
 **`match_side_players`** — the players on a side.
 
 | Column | Notes |
 |---|---|
 | `match_id`, `side` | FK → `match_sides`, `ON DELETE CASCADE`. |
-| `player_id` | FK `players`, deferred (§2). Primary key `(match_id, side, player_id)`. Unique on `(match_id, player_id)`: nobody plays on both sides. |
+| `player_id` | FK `players`, deferred (§2). Primary key `(match_id, side, player_id)`. Unique on `(match_id, player_id)`: nobody plays on both sides. Indexed on `player_id`. |
+| `created_at` | |
 
 Players are listed for every stored side, including sides that have an entry, so that group-phase statistics such as BH1 and BH2 (BR-073), which Monster DYP needs per player, read the same way for every format. They are written together with the side and change later in two cases: when a late entry replaces a bye (BR-045), the side gets its entry and its players are inserted; when a round robin is rescheduled for a late entry (BR-054), the matches without a result are rewritten together with their sides. An invariant query in the integration tests checks that the players of every side with an entry equal that entry's members (§5). Knockout sides after round 1 are not stored, so anything listing a player's knockout matches goes through the engine.
 
@@ -386,13 +396,14 @@ Players are listed for every stored side, including sides that have an entry, so
 | `id` | A field is removed by its id (§2). |
 | `tournament_id` | FK `tournaments`, `ON DELETE CASCADE`. |
 | `number` | `int`, CHECK `>= 1 AND <= 32` (the league default's cap); unique on `(tournament_id, number)`. Shown as "Field" and its number (FR-091). A new field takes the lowest free number; removing a field keeps the other numbers (BR-132). |
-| `match_id` | FK `matches`, nullable, unique, `ON DELETE SET NULL` (§2). Added with the `matches` table; the P7a migration creates the fields without it. The match being played on this field (D10); `NULL` while the field is free. The unique index keeps a match on at most one field. |
+| `match_id` | FK `matches`, nullable, unique, `ON DELETE SET NULL` (§2). Added with the `matches` table (P7b); the P7a migration creates the fields without it. The match being played on this field (D10); `NULL` while the field is free. The unique index keeps a match on at most one field. |
 | `created_at`, `updated_at` | |
 
 Creating a tournament creates its fields from the league's default (§4.2). In setup the organizer sends the number of fields, and the rows are rewritten as fields 1 to n; no match exists yet. While the tournament runs, the organizer adds and removes single fields (FR-090). Only the current placement is stored: no history, no flag for a placement made by hand, no stored waiting list.
 
 The application changes placements under the tournament lock, in the same transaction as the write that causes them:
 
+- **Starting.** Generating a round robin fills every field at once: field 1 takes the first match of round 1, and so on, skipping a match whose players are already on a field (BR-131); a field stays free when no match can be played.
 - **Filling.** After every write that frees a field or makes a match playable (a result entered, a field added or removed, a match moved or taken off by hand, a round or knockout generated, a knockout side becoming known), a pure engine function gets the free fields, the waiting matches in waiting order and the players on fields. It returns the placements of BR-130 and BR-131: each free field, lowest number first, takes the first waiting match whose sides are known and whose players are on no field. The application writes them.
 - **Waiting order** is computed on read (FR-092): requeued matches first, earliest `requeued_at` first, then the schedule order of BR-130. Waiting matches are those without a result, not on a field and without a bye side (BR-041); a later knockout match counts once the engine derives both its sides (D4).
 - **By hand** (FR-093, BR-133): placing, moving and swapping write `match_id` as the request states (§2). The filling never moves a match that is on a field, so a placement made by hand holds until the match has a result without being marked. A placement is refused with 422 if a side is unknown (BR-091) or a player is on another field (BR-131). Taking a match off its field makes it wait in schedule order; the field it left is filled in the same request without that match.
@@ -447,8 +458,9 @@ Loading every id through the locked league and tournament also stops an organize
 - a Monster DYP without a `monster_dyp` group phase, another type with one, and DYP halves in a tournament of another type;
 - side players that differ from the members of the side's entry;
 - bye sides with players;
-- group rounds without exactly one `round_participation` row per `main` entry;
-- games on a match without a result or on a walkover, a result that is not a walkover and has no games, game numbers with a gap, and games that do not fit the format or the outcome (§4.5);
+- group rounds without exactly one `round_participation` row per `main` entry, and a row that says `played` while the entry has no side in the round's matches, or another status while it has one;
+- a group-phase match or a first-round bracket match without two stored sides;
+- games on a match without a result or on a walkover, a result that is not a walkover and has no games, game numbers with a gap, and games that do not fit the format or the outcome (§4.5; the last with the results, P8);
 - a phase at a position that does not fit its kind and the tournament's other phase (D9);
 - a tournament without a field, a field whose match is in another tournament or has a result, a requeued match on a field, and two fields whose matches share a player, for matches with stored sides.
 
