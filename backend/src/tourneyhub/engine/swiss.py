@@ -343,9 +343,10 @@ def draw_next_swiss_round(
        top of the standings is kept first. Only pairs that have not met and are at most 16 apart are
        allowed; while no perfect matching exists the window doubles (32, 64,
        ...) up to the whole field. If even the whole field has none, pairs
-       that have met are allowed at a cost above any sum of the others, once
-       per earlier meeting, so the draw has as few repeats as possible and
-       prefers pairs that met once over pairs that met twice (BR-057).
+       that have met are allowed, and the matching first has as few pairs
+       that have met as possible (BR-057), then as few earlier meetings
+       among them (a pair that met once over a pair that met twice), then
+       the lowest cost above.
 
     The result depends only on the standing and on who has met whom, so it
     is the same for the same seed and round.
@@ -496,19 +497,30 @@ def _pair_by_matching(count: int, met: Counter[Pair]) -> tuple[Pair, ...]:
         if window >= count - 1:
             break
         window *= 2
-    # More than any sum of the other costs: each pair costs at most
-    # `(count - 1) ** 2 * count`, and `count // 2` pairs are drawn. So fewer
-    # earlier meetings always win (BR-057), and among equal ones, the closer pairs.
-    repeat_cost = count // 2 * (count - 1) ** 2 * count + 1
-    return min_cost_matching(
-        count,
-        (
-            (
-                top,
-                bottom,
-                _pair_cost(count, top, bottom) + repeat_cost * met[(top, bottom)],
-            )
-            for top in range(count)
-            for bottom in range(top + 1, count)
-        ),
-    )
+    return min_cost_matching(count, _repeat_costs(count, met))
+
+
+def _repeat_costs(count: int, met: Counter[Pair]) -> Iterable[tuple[int, int, int]]:
+    """Cost every pair so a matching is ranked by three keys in turn (BR-057).
+
+    1. The fewest pairs that have met: a repeat pair costs `pair_weight`.
+    2. Then the fewest earlier meetings among those pairs: each costs
+       `meeting_weight`, so one pair that met once beats one that met twice.
+    3. Then `_pair_cost`, the distance in the standings.
+
+    Each weight is more than the most the lower keys can add up to over a
+    whole matching, so a key decides only when the keys before it are equal.
+    A matching has `count // 2` pairs of distance cost at most
+    `(count - 1) ** 2 * count` each, and at most every earlier meeting among
+    its pairs. The weights grow with `count` and the history, so the order
+    holds for any field size; the costs stay whole numbers, without ties
+    from rounding.
+    """
+    distance_bound = count // 2 * (count - 1) ** 2 * count
+    meeting_weight = distance_bound + 1
+    pair_weight = meeting_weight * sum(met.values()) + distance_bound + 1
+    for top in range(count):
+        for bottom in range(top + 1, count):
+            times = met[(top, bottom)]
+            repeat = pair_weight + meeting_weight * times if times else 0
+            yield top, bottom, repeat + _pair_cost(count, top, bottom)
