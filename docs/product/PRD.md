@@ -179,7 +179,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 
 | ID | Requirement |
 |---|---|
-| FR-060 | Every tournament shows its standings, which update as results come in (§7.13). Swiss and Monster DYP standings also show BH1, BH2, score difference and sit-outs. |
+| FR-060 | Every tournament shows its standings, which update as results come in (§7.13). Swiss and Monster DYP standings also show BH1, BH2, score difference and sit-outs. The sat-out column counts sit-outs only, not missed rounds (BR-064, BR-067). |
 | FR-061 | Every season shows season standings: each player who has played in a finished tournament of the season, with their total placement points, tournaments played and tournament wins (§7.14). |
 
 ### 6.8 Sharing
