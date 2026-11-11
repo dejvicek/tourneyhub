@@ -44,7 +44,12 @@ from tourneyhub.engine.tournaments import (
 )
 from tourneyhub.errors import ErrorCode
 from tourneyhub.services import tournaments as tournament_service
-from tourneyhub.services.tournaments import DrawTarget, FormatRequest, MatchResult
+from tourneyhub.services.tournaments import (
+    DrawTarget,
+    FieldPlacement,
+    FormatRequest,
+    MatchResult,
+)
 
 router = APIRouter(
     prefix="/leagues/{league_id}",
@@ -602,6 +607,51 @@ class PlayRead(ResponseModel):
     group_done: bool
 
 
+class FieldCreate(RequestModel):
+    """A new field, with the number it expects to get: the lowest free one (BR-132).
+
+    The number is the expectation of ADR-008, so a repeat gets 409 instead of
+    a second field.
+    """
+
+    number: Annotated[int, Field(ge=1, le=MAX_FIELD_COUNT)]
+
+
+class PlacementWrite(RequestModel):
+    """A match on a field, or back to waiting when `field_id` is null (FR-093).
+
+    `from_field_id` is the field the screen saw the match on, null when it
+    saw it waiting. A match that is elsewhere now is 409 `placement_changed`.
+    """
+
+    match_id: UUID
+    field_id: UUID | None
+    from_field_id: UUID | None
+
+
+def _distinct_placements(placements: list[PlacementWrite]) -> list[PlacementWrite]:
+    _distinct([placement.match_id for placement in placements])
+    _distinct([p.field_id for p in placements if p.field_id is not None])
+    return placements
+
+
+class PlacementsWrite(RequestModel):
+    """Where matches are to be played, the target state (FR-093, ADR-008).
+
+    One placement puts a waiting match on a free field, moves a match to a
+    free field, or sends it back to waiting. A swap is two placements: both
+    matches, on fields, with each other's field. Nothing else is allowed
+    (422 `placement_not_allowed`). A match or a field named twice is 422
+    `validation_failed` (`given_twice`).
+    """
+
+    placements: Annotated[
+        list[PlacementWrite],
+        Field(min_length=1, max_length=2),
+        AfterValidator(_distinct_placements),
+    ]
+
+
 class FinishWrite(RequestModel):
     """Finish the tournament, from the state the screen showed (FR-040, ADR-008)."""
 
@@ -1066,6 +1116,122 @@ def read_play(
         ],
         group_done=play.group_done,
     )
+
+
+@router.post(
+    "/tournaments/{tournament_id}/fields",
+    status_code=HTTPStatus.CREATED,
+    responses=_WRITE_ERRORS,
+)
+def add_field(
+    league_id: UUID,
+    tournament_id: UUID,
+    body: FieldCreate,
+    session: SessionDep,
+    user: CurrentUserDep,
+    clock: ClockDep,
+) -> FieldRead:
+    """Add a field while the tournament runs (FR-090, BR-132).
+
+    The body carries the number the field expects to get, the lowest free
+    one. The new field takes the next waiting match at once; `match_id` is
+    null when no waiting match can be played.
+
+    A tournament in setup or finished is 409 `tournament_not_in_progress`
+    (detail `state`); setup sets the number of fields with the format. Any
+    other number, a repeat included, is 409 `field_number_changed` with the
+    `number` a new field would get now, null when all 32 are taken.
+    """
+    field = tournament_service.add_field(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user.id,
+        number=body.number,
+        clock=clock,
+    )
+    return FieldRead.model_validate(field)
+
+
+@router.delete(
+    "/tournaments/{tournament_id}/fields/{field_id}",
+    status_code=HTTPStatus.NO_CONTENT,
+    responses=_WRITE_ERRORS,
+)
+def remove_field(
+    league_id: UUID,
+    tournament_id: UUID,
+    field_id: UUID,
+    session: SessionDep,
+    user: CurrentUserDep,
+    clock: ClockDep,
+) -> None:
+    """Remove a field while the tournament runs; the UI asks first (FR-090, BR-132).
+
+    The other fields keep their numbers. The match on the removed field goes
+    to the front of the waiting list, so it takes the next field that frees
+    up, or a free one at once.
+
+    An unknown field, or a repeated delete, is 404 `field_not_found`: the
+    field is gone. A tournament not in progress is 409
+    `tournament_not_in_progress`. The last field is 422 `last_field`.
+    """
+    tournament_service.remove_field(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        field_id=field_id,
+        user_id=user.id,
+        clock=clock,
+    )
+
+
+@router.put("/tournaments/{tournament_id}/fields/placements", responses=_WRITE_ERRORS)
+def place_matches(
+    league_id: UUID,
+    tournament_id: UUID,
+    body: PlacementsWrite,
+    session: SessionDep,
+    user: CurrentUserDep,
+    clock: ClockDep,
+) -> TournamentRead:
+    """Place, move, swap or take off matches by hand (FR-093, BR-133).
+
+    Each named match ends on its named field, or waiting, from the field the
+    screen saw it on (`from_field_id`). A placement by hand holds until the
+    match has a result. A field a match leaves takes the next waiting match,
+    but not one this request sends back to waiting, which waits in schedule
+    order. Returns the whole
+    tournament with its fields and waiting list.
+
+    An unknown match is 404 `match_not_found`, an unknown field 404
+    `field_not_found`. A stale screen gets 409: `tournament_not_in_progress`,
+    `match_has_result` (detail `match_id`), `placement_changed` (a match is not
+    on the `from_field_id` any more) or `field_not_free` (another match is on
+    the field now; detail `field_id`, `match_id`). A match whose sides are not
+    both known, or with a bye, is 422 `match_sides_unknown` (BR-091). Anything
+    but the four operations of FR-093 (replacing the match on a field, a
+    rotation) is 422 `placement_not_allowed`.
+    A player who would be on two fields at once is 422
+    `player_on_another_field` (BR-131; detail `player_ids`, and `field_ids`,
+    the fields that would hold them, lowest number first).
+    """
+    tournament = tournament_service.place_matches(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user.id,
+        placements=[
+            FieldPlacement(
+                match_id=p.match_id,
+                field_id=p.field_id,
+                from_field_id=p.from_field_id,
+            )
+            for p in body.placements
+        ],
+        clock=clock,
+    )
+    return TournamentRead.model_validate(tournament)
 
 
 @router.post("/tournaments/{tournament_id}/finish", responses=_WRITE_ERRORS)

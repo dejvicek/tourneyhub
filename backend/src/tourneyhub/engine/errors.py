@@ -1,3 +1,6 @@
+from uuid import UUID
+
+
 class EngineError(Exception):
     """The base of every rule the engine refuses (ADR-009).
 
@@ -102,3 +105,18 @@ class ResultDoesNotFitFormatError(EngineError):
         super().__init__(match_format, games)
         self.match_format = match_format
         self.games = games
+
+
+class PlayerOnAnotherFieldError(EngineError):
+    """A placement by hand would put a player on two fields at once (BR-131).
+
+    `player_ids` are the players, `field_ids` every field that would hold
+    them, lowest number first.
+    """
+
+    def __init__(
+        self, *, player_ids: tuple[UUID, ...], field_ids: tuple[UUID, ...]
+    ) -> None:
+        super().__init__(player_ids, field_ids)
+        self.player_ids = player_ids
+        self.field_ids = field_ids

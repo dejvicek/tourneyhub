@@ -96,3 +96,45 @@ export async function enterResult(
   );
   expect(response.status(), `result of ${matchId}`).toBe(200);
 }
+
+export interface FieldsOf {
+  /** Each field's number with the match on it, lowest number first. */
+  fields: { id: string; number: number; match_id: string | null }[];
+  /** The waiting list, in the order the matches get a field (FR-092). */
+  waiting: string[];
+  /** Every player of each match. */
+  players: Map<string, string[]>;
+}
+
+/** The tournament's fields, waiting list and the players of its matches. */
+export async function fieldsOf(
+  request: APIRequestContext,
+  token: string,
+  leagueId: string,
+  tournamentId: string,
+): Promise<FieldsOf> {
+  const response = await request.get(
+    `/api/v1/leagues/${leagueId}/tournaments/${tournamentId}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  expect(response.status()).toBe(200);
+  const body = (await response.json()) as {
+    fields: FieldsOf["fields"];
+    waiting: string[];
+    rounds: {
+      matches: { id: string; sides: { player_ids: string[] }[] }[];
+    }[];
+  };
+  return {
+    fields: body.fields.toSorted((a, b) => a.number - b.number),
+    waiting: body.waiting,
+    players: new Map(
+      body.rounds.flatMap((round) =>
+        round.matches.map((match) => [
+          match.id,
+          match.sides.flatMap((side) => side.player_ids),
+        ]),
+      ),
+    ),
+  };
+}

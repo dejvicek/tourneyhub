@@ -60,6 +60,7 @@ export const fields = {
     add: "Add a field",
     addHint:
       "It becomes Field {{number}} and takes the next match that can be played.",
+    limit: "A tournament has at most {{max}} fields.",
     noticeTitle: "Removing a field with a match on it",
     noticeBody:
       "The match goes back to the front of the waiting list. The other fields keep their numbers. The last field can't be removed.",
@@ -75,8 +76,14 @@ export const fields = {
   },
   errors: {
     changed: "The fields changed elsewhere. They were reloaded.",
+    placementChanged:
+      "The fields changed in the meantime; the screen has been refreshed.",
+    notInProgress:
+      "The tournament is no longer in progress, for example because it was finished.",
+    fieldRemoved: "That field was already removed. The fields were reloaded.",
     twoFields: "That would put a player on two fields at once.",
     lastField: "The last field can't be removed.",
+    sidesUnknown: "This match can't be played yet: a side isn't known.",
     generic: "The fields could not be changed. Try again.",
   },
 };

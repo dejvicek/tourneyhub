@@ -292,6 +292,14 @@
           "match_not_found",
           "match_sides_unknown",
           "group_phase_not_done",
+          "field_not_found",
+          "field_number_changed",
+          "field_not_free",
+          "match_has_result",
+          "placement_changed",
+          "placement_not_allowed",
+          "last_field",
+          "player_on_another_field",
           "not_enough_players",
           "not_enough_entries",
           "dyp_halves_unequal",
@@ -328,6 +336,23 @@
         "maximum": 32.0,
         "minimum": 1.0,
         "type": "integer"
+      },
+      "FieldCreate": {
+        "additionalProperties": false,
+        "description": "A new field, with the number it expects to get: the lowest free one (BR-132).\n\nThe number is the expectation of ADR-008, so a repeat gets 409 instead of\na second field.",
+        "properties": {
+          "number": {
+            "maximum": 32.0,
+            "minimum": 1.0,
+            "title": "Number",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "number"
+        ],
+        "title": "FieldCreate",
+        "type": "object"
       },
       "FieldRead": {
         "description": "A field and the match being played on it, null while it is free (D10).",
@@ -1360,6 +1385,68 @@
           "placement_points"
         ],
         "title": "PlacementPointsUpdate",
+        "type": "object"
+      },
+      "PlacementWrite": {
+        "additionalProperties": false,
+        "description": "A match on a field, or back to waiting when `field_id` is null (FR-093).\n\n`from_field_id` is the field the screen saw the match on, null when it\nsaw it waiting. A match that is elsewhere now is 409 `placement_changed`.",
+        "properties": {
+          "field_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field Id"
+          },
+          "from_field_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Field Id"
+          },
+          "match_id": {
+            "format": "uuid",
+            "title": "Match Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "match_id",
+          "field_id",
+          "from_field_id"
+        ],
+        "title": "PlacementWrite",
+        "type": "object"
+      },
+      "PlacementsWrite": {
+        "additionalProperties": false,
+        "description": "Where matches are to be played, the target state (FR-093, ADR-008).\n\nOne placement puts a waiting match on a free field, moves a match to a\nfree field, or sends it back to waiting. A swap is two placements: both\nmatches, on fields, with each other's field. Nothing else is allowed\n(422 `placement_not_allowed`). A match or a field named twice is 422\n`validation_failed` (`given_twice`).",
+        "properties": {
+          "placements": {
+            "items": {
+              "$ref": "#/components/schemas/PlacementWrite"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Placements",
+            "type": "array"
+          }
+        },
+        "required": [
+          "placements"
+        ],
+        "title": "PlacementsWrite",
         "type": "object"
       },
       "PlacesRead": {
@@ -5159,6 +5246,296 @@
           }
         ],
         "summary": "Back To Setup",
+        "tags": [
+          "tournaments"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/fields": {
+      "post": {
+        "description": "Add a field while the tournament runs (FR-090, BR-132).\n\nThe body carries the number the field expects to get, the lowest free\none. The new field takes the next waiting match at once; `match_id` is\nnull when no waiting match can be played.\n\nA tournament in setup or finished is 409 `tournament_not_in_progress`\n(detail `state`); setup sets the number of fields with the format. Any\nother number, a repeat included, is 409 `field_number_changed` with the\n`number` a new field would get now, null when all 32 are taken.",
+        "operationId": "add_field",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Add Field",
+        "tags": [
+          "tournaments"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/fields/placements": {
+      "put": {
+        "description": "Place, move, swap or take off matches by hand (FR-093, BR-133).\n\nEach named match ends on its named field, or waiting, from the field the\nscreen saw it on (`from_field_id`). A placement by hand holds until the\nmatch has a result. A field a match leaves takes the next waiting match,\nbut not one this request sends back to waiting, which waits in schedule\norder. Returns the whole\ntournament with its fields and waiting list.\n\nAn unknown match is 404 `match_not_found`, an unknown field 404\n`field_not_found`. A stale screen gets 409: `tournament_not_in_progress`,\n`match_has_result` (detail `match_id`), `placement_changed` (a match is not\non the `from_field_id` any more) or `field_not_free` (another match is on\nthe field now; detail `field_id`, `match_id`). A match whose sides are not\nboth known, or with a bye, is 422 `match_sides_unknown` (BR-091). Anything\nbut the four operations of FR-093 (replacing the match on a field, a\nrotation) is 422 `placement_not_allowed`.\nA player who would be on two fields at once is 422\n`player_on_another_field` (BR-131; detail `player_ids`, and `field_ids`,\nthe fields that would hold them, lowest number first).",
+        "operationId": "place_matches",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlacementsWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TournamentRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Place Matches",
+        "tags": [
+          "tournaments"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/fields/{field_id}": {
+      "delete": {
+        "description": "Remove a field while the tournament runs; the UI asks first (FR-090, BR-132).\n\nThe other fields keep their numbers. The match on the removed field goes\nto the front of the waiting list, so it takes the next field that frees\nup, or a free one at once.\n\nAn unknown field, or a repeated delete, is 404 `field_not_found`: the\nfield is gone. A tournament not in progress is 409\n`tournament_not_in_progress`. The last field is 422 `last_field`.",
+        "operationId": "remove_field",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "field_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Field Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Remove Field",
         "tags": [
           "tournaments"
         ]

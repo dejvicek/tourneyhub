@@ -5,6 +5,7 @@ from tourneyhub.engine.errors import (
     GameScoreMismatchError,
     NotEnoughEntriesError,
     NotEnoughPlayersError,
+    PlayerOnAnotherFieldError,
     ResultDoesNotFitFormatError,
     ScoresRequiredError,
     TooManyLeftOutError,
@@ -40,6 +41,12 @@ def to_app_error(error: EngineError) -> RuleViolationError:  # noqa: PLR0911  (o
         case ResultDoesNotFitFormatError(match_format=match_format, games=games):
             return RuleViolationError(
                 ErrorCode.RESULT_DOES_NOT_FIT_FORMAT, format=match_format, games=games
+            )
+        case PlayerOnAnotherFieldError(player_ids=player_ids, field_ids=field_ids):
+            return RuleViolationError(
+                ErrorCode.PLAYER_ON_ANOTHER_FIELD,
+                player_ids=[str(player_id) for player_id in player_ids],
+                field_ids=[str(field_id) for field_id in field_ids],
             )
         case _:
             msg = f"no error code for {type(error).__name__}"

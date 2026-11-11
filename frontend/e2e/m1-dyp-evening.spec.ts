@@ -5,6 +5,8 @@ import {
   accessTokenOf,
   addPlayers,
   enterResult,
+  type FieldsOf,
+  fieldsOf,
   matchesOf,
   type Organizer,
 } from "./support/api";
@@ -250,7 +252,6 @@ async function tapScore(page: Page, against?: number) {
 
 test("the organizer enters, changes and clears results and the field takes the next match (§5.1.6)", async ({
   page,
-  request,
 }) => {
   await logIn(page);
   const schedule = `/leagues/${evening.leagueId}/tournaments/${evening.tournamentId}/schedule`;
@@ -314,9 +315,113 @@ test("the organizer enters, changes and clears results and the field takes the n
       "10:",
     );
   });
+});
+
+/** BR-131 over what the API reads: each player is on one field at most. */
+function expectNobodyOnTwoFields({ fields, players }: FieldsOf) {
+  const onFields = fields.flatMap((field) =>
+    field.match_id === null ? [] : (players.get(field.match_id) ?? []),
+  );
+  expect(new Set(onFields).size).toBe(onFields.length);
+}
+
+/** The first waiting match whose players are on no field, if any (BR-130). */
+function nextPlayable({ fields, waiting, players }: FieldsOf) {
+  const busy = new Set(
+    fields.flatMap((field) =>
+      field.match_id === null ? [] : (players.get(field.match_id) ?? []),
+    ),
+  );
+  return (
+    waiting.find((matchId) =>
+      (players.get(matchId) ?? []).every((player) => !busy.has(player)),
+    ) ?? null
+  );
+}
+
+test("the fields move the matches, and a third table is added halfway (§5.1.6)", async ({
+  page,
+  request,
+}) => {
+  await logIn(page);
+  const token = await accessTokenOf(request, organizer);
+  const state = () =>
+    fieldsOf(request, token, evening.leagueId, evening.tournamentId);
+  await page.goto(
+    `/leagues/${evening.leagueId}/tournaments/${evening.tournamentId}/fields`,
+  );
+  const fieldCard = (number: number) =>
+    page.getByRole("article", { name: `Field ${n(number)}`, exact: true });
+
+  await test.step("add Field 3 on the fields screen; a waiting match moves onto it", async () => {
+    const before = await state();
+    const next = nextPlayable(before);
+    expect(next).not.toBeNull();
+    await page.getByRole("link", { name: "Manage fields" }).click();
+    const sheet = page.getByRole("dialog", { name: "Fields" });
+    await sheet.getByRole("button", { name: /^Add a field/ }).click();
+    await expect(sheet.getByText("Field 3 added.")).toBeVisible();
+    await sheet.getByRole("button", { name: "Done" }).click();
+
+    await expect(fieldCard(3)).toBeVisible();
+    const after = await state();
+    expect(after.fields.map((field) => field.number)).toEqual([1, 2, 3]);
+    expect(after.fields[2]?.match_id).toBe(next);
+    expectNobodyOnTwoFields(after);
+  });
+
+  await test.step("the matches of Field 1 and Field 2 swap by hand", async () => {
+    const before = await state();
+    await fieldCard(1).getByRole("link", { name: /^Move/ }).click();
+    const sheet = page.getByRole("dialog", { name: "Move this match" });
+    await sheet.getByRole("radio", { name: "Field 2" }).click();
+    await sheet.getByRole("button", { name: "Swap with Field 2" }).click();
+    await expect(sheet).toBeHidden();
+
+    const after = await state();
+    expect(after.fields[0]?.match_id).toBe(before.fields[1]?.match_id);
+    expect(after.fields[1]?.match_id).toBe(before.fields[0]?.match_id);
+    expectNobodyOnTwoFields(after);
+  });
+
+  await test.step("a match goes back to waiting; its field takes another one", async () => {
+    const before = await state();
+    const sentBack = before.fields[0]?.match_id;
+    await fieldCard(1).getByRole("link", { name: /^Move/ }).click();
+    const sheet = page.getByRole("dialog", { name: "Move this match" });
+    await sheet.getByRole("radio", { name: "Back to waiting" }).click();
+    await sheet.getByRole("button", { name: "Move to waiting" }).click();
+    await expect(sheet).toBeHidden();
+
+    const after = await state();
+    expect(after.waiting).toContain(sentBack);
+    expect(after.fields.map((field) => field.match_id)).not.toContain(sentBack);
+    expectNobodyOnTwoFields(after);
+  });
+
+  await test.step("Field 3 is removed; its match waits first", async () => {
+    const before = await state();
+    const onThree = before.fields[2]?.match_id ?? null;
+    expect(onThree).not.toBeNull();
+    await page.getByRole("link", { name: "Manage fields" }).click();
+    const sheet = page.getByRole("dialog", { name: "Fields" });
+    await sheet.getByRole("button", { name: "Remove Field 3" }).click();
+    await page
+      .getByRole("alertdialog", { name: "Remove Field 3?" })
+      .getByRole("button", { name: "Remove Field 3" })
+      .click();
+    await expect(sheet.getByText("Field 3 removed.")).toBeVisible();
+    await sheet.getByRole("button", { name: "Done" }).click();
+
+    const after = await state();
+    expect(after.fields.map((field) => field.number)).toEqual([1, 2]);
+    // It waits first, or has taken a field that was free at once (BR-132).
+    const placed = after.fields.some((field) => field.match_id === onThree);
+    expect(placed ? onThree : after.waiting[0]).toBe(onThree);
+    expectNobodyOnTwoFields(after);
+  });
 
   await test.step("the other matches over the API, to keep the run short", async () => {
-    const token = await accessTokenOf(request, organizer);
     const matches = await matchesOf(
       request,
       token,
@@ -338,7 +443,9 @@ test("the organizer enters, changes and clears results and the field takes the n
         },
       );
     }
-    await page.reload();
+    await page.goto(
+      `/leagues/${evening.leagueId}/tournaments/${evening.tournamentId}/schedule`,
+    );
     await expect(
       page.getByText(`${n(MATCHES)} of ${n(MATCHES)} matches played`),
     ).toBeVisible();
@@ -387,16 +494,6 @@ test("the group is done and the organizer finishes: places with season points (�
     await expect(places.getByRole("listitem")).toHaveCount(PAIRS);
     await expect(page.getByText("Both get 10 season points.")).toBeVisible();
     await expect(places.getByText("+10 each")).toBeVisible();
-  });
-});
-
-test.fixme("P9: the fields move the matches, and a third table is added halfway (§5.1.6)", async ({
-  page,
-}) => {
-  await logIn(page);
-
-  await test.step("add Field 3 on the fields screen; a waiting match moves onto it", async () => {
-    // Manage fields (6d) adds Field 3; the next waiting match starts on it.
   });
 });
 
