@@ -15,12 +15,15 @@ from tourneyhub.api.deps import SessionDep
 from tourneyhub.api.leagues import SeasonRead
 from tourneyhub.api.public_headers import PUBLIC_PREFIX
 from tourneyhub.api.schemas import ErrorResponse, ResponseModel
+from tourneyhub.api.standings import SeasonStandingRead
 from tourneyhub.api.tournaments import (
     EntryRead,
     FieldRead,
     PhaseRead,
+    PlacesRead,
     RoundRead,
     TournamentSummary,
+    places_read,
 )
 from tourneyhub.engine.tournaments import TournamentState, TournamentType
 from tourneyhub.services import public as public_service
@@ -75,6 +78,26 @@ class PublicTournamentRead(ResponseModel):
     waiting: list[UUID]
 
 
+class PublicStandingRow(ResponseModel):
+    """One entry's line in a round robin's standings, for viewers (FR-060, BR-101).
+
+    `place` is shared by entries still level (BR-074), and the next place
+    skips (BR-104). `points` include the sit-out points of the rounds sat out
+    (BR-071). The organizer's extras, the form and what ranks one entry above
+    the next, are not part of it.
+    """
+
+    place: int
+    entry_id: UUID
+    played: int
+    won: int
+    drawn: int
+    lost: int
+    sat_out: int
+    points: int
+    score_difference: int
+
+
 @router.get("")
 def read_public_league(share_token: str, session: SessionDep) -> PublicLeagueRead:
     """Return the league of a share link (FR-070).
@@ -112,3 +135,53 @@ def read_public_tournament(
         session, share_token=share_token, tournament_id=tournament_id
     )
     return PublicTournamentRead.model_validate(tournament)
+
+
+@router.get("/seasons/{season_id}/standings")
+def read_public_season_standings(
+    share_token: str, season_id: UUID, session: SessionDep
+) -> list[SeasonStandingRead]:
+    """Return a season's standings from its finished tournaments (FR-070, FR-061).
+
+    The same table as the organizer's, with removed players, whose points stay
+    (BR-002). A season of another league is 404 `season_not_found`.
+    """
+    rows = public_service.read_shared_season_standings(
+        session, share_token=share_token, season_id=season_id
+    )
+    return [SeasonStandingRead.model_validate(row) for row in rows]
+
+
+@router.get("/tournaments/{tournament_id}/standings")
+def read_public_standings(
+    share_token: str, tournament_id: UUID, session: SessionDep
+) -> list[PublicStandingRow]:
+    """Return a round robin's standings as they are now (FR-060, FR-070).
+
+    A tournament in a format without a standings table yet, such as Swiss, has
+    an empty list. A tournament in setup is 404 `tournament_not_found`, like an
+    unknown one or one of another league.
+    """
+    rows = public_service.read_shared_standings(
+        session, share_token=share_token, tournament_id=tournament_id
+    )
+    return [PublicStandingRow.model_validate(row) for row in rows]
+
+
+@router.get(
+    "/tournaments/{tournament_id}/places",
+    responses={HTTPStatus.UNPROCESSABLE_CONTENT: {"model": ErrorResponse}},
+)
+def read_public_places(
+    share_token: str, tournament_id: UUID, session: SessionDep
+) -> PlacesRead:
+    """Return the places and the season points of a finished tournament (FR-070).
+
+    Before the tournament finishes, `complete` is false and there are no rows.
+    A finished tournament with a knockout is 422 `format_not_supported` until
+    the knockout is served. A tournament in setup is 404 `tournament_not_found`.
+    """
+    places = public_service.read_shared_places(
+        session, share_token=share_token, tournament_id=tournament_id
+    )
+    return places_read(places)

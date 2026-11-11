@@ -57,7 +57,7 @@ from tourneyhub.engine.fields import (
 from tourneyhub.engine.ids import EntryId, FieldId, MatchId, PlayerId
 from tourneyhub.engine.leagues import SeasonState
 from tourneyhub.engine.lots import RNG_SEED_SIZE
-from tourneyhub.engine.places import PlacingEntry, place_entries
+from tourneyhub.engine.places import EntryPlace, PlacingEntry, place_entries
 from tourneyhub.engine.ranking import PlayerRecord, RankedPlayer, rank_league
 from tourneyhub.engine.results import Game, match_outcome
 from tourneyhub.engine.schedule import (
@@ -67,7 +67,7 @@ from tourneyhub.engine.schedule import (
     round_robin,
     seed_order,
 )
-from tourneyhub.engine.season_points import season_points
+from tourneyhub.engine.season_points import PlayerPoints, season_points
 from tourneyhub.engine.seeding import SeedingEntry, seed_by_lot, seed_by_ranking
 from tourneyhub.engine.standings import (
     PlayedMatch,
@@ -2307,12 +2307,20 @@ def _standings_of(
 
 
 def _load_tournament(
-    session: Session, *, league: League, tournament_id: UUID
+    session: Session,
+    *,
+    league: League,
+    tournament_id: UUID,
+    past_setup: bool = False,
 ) -> Tournament:
-    """A tournament of the league with its rounds, read without a lock."""
-    tournament = session.scalars(
-        _tournament_query(league, tournament_id, rounds=True)
-    ).one_or_none()
+    """A tournament of the league with its rounds, read without a lock.
+
+    With `past_setup`, one in setup is not found (FR-070).
+    """
+    query = _tournament_query(league, tournament_id, rounds=True)
+    if past_setup:
+        query = query.where(Tournament.state != TournamentState.SETUP)
+    tournament = session.scalars(query).one_or_none()
     if tournament is None:
         raise NotFoundError(ErrorCode.TOURNAMENT_NOT_FOUND)
     return tournament
@@ -2687,17 +2695,30 @@ def read_places(
 ) -> PlacesView:
     """Return the places and season points of a finished tournament (§7.13, §7.14).
 
-    Read without a lock and computed on read (D1): the round robin's
-    standings are the places (BR-101, BR-103), and each player earns the
-    placement points of their place from the season's table, entries sharing
-    a place the average of the places they cover, rounded down (BR-110,
-    BR-111). A tournament not yet finished has no places. One with a knockout
-    is 422 `format_not_supported` until the knockout is played.
+    See `view_places`.
     """
     league = get_league(session, league_id=league_id, user_id=user_id)
-    tournament = _load_tournament(session, league=league, tournament_id=tournament_id)
-    if tournament.state is not TournamentState.FINISHED:
-        return PlacesView(complete=False, group_format=None, rows=())
+    return view_places(session, league=league, tournament_id=tournament_id)
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _Placed:
+    """A finished tournament's group standings, places and season points."""
+
+    group: TournamentPhase
+    standings: tuple[StandingRow, ...]
+    places: tuple[EntryPlace, ...]
+    points: tuple[PlayerPoints, ...]
+
+
+def _placed(tournament: Tournament, placement_points: Sequence[int]) -> _Placed:
+    """Place a finished tournament's entries and give them the table's points.
+
+    The round robin's standings are the places (BR-101, BR-103), and each
+    player earns the placement points of their place, entries sharing a place
+    the average of the places they cover, rounded down (BR-110, BR-111). One
+    with a knockout is 422 `format_not_supported` until the knockout is played.
+    """
     group = _require_group_only(tournament)
     standings = _standings_of(tournament, group)
     entries = [
@@ -2708,15 +2729,46 @@ def read_places(
         for entry in _main_entries(tournament)
     ]
     places = place_entries(entries, standing=standing_of(standings))
-    season = next(s for s in league.seasons if s.id == tournament.season_id)
-    points = {
-        row.entry_id: row.points
-        for row in season_points(places, season.placement_points)
-    }
-    group_place = {row.entry_id: row.place for row in standings}
+    return _Placed(
+        group=group,
+        standings=standings,
+        places=places,
+        points=season_points(places, placement_points),
+    )
+
+
+def _season_of(league: League, season_id: UUID) -> Season:
+    return next(s for s in league.seasons if s.id == season_id)
+
+
+def view_places(
+    session: Session,
+    *,
+    league: League,
+    tournament_id: UUID,
+    past_setup: bool = False,
+) -> PlacesView:
+    """Return the places and season points of one of the league's tournaments.
+
+    Read without a lock and computed on read (D1), with the season's table
+    (BR-110, BR-111). A tournament not yet finished has no places. One with a
+    knockout is 422 `format_not_supported` until the knockout is played. With
+    `past_setup`, a tournament in setup is 404 `tournament_not_found`, like an
+    unknown one (FR-070).
+    """
+    tournament = _load_tournament(
+        session, league=league, tournament_id=tournament_id, past_setup=past_setup
+    )
+    if tournament.state is not TournamentState.FINISHED:
+        return PlacesView(complete=False, group_format=None, rows=())
+    placed = _placed(
+        tournament, _season_of(league, tournament.season_id).placement_points
+    )
+    points = {row.entry_id: row.points for row in placed.points}
+    group_place = {row.entry_id: row.place for row in placed.standings}
     return PlacesView(
         complete=True,
-        group_format=group.format,
+        group_format=placed.group.format,
         rows=tuple(
             PlaceView(
                 place=place.place,
@@ -2724,6 +2776,51 @@ def read_places(
                 points_per_player=points.get(place.entry_id, 0),
                 group_place=group_place[place.entry_id],
             )
-            for place in places
+            for place in placed.places
         ),
     )
+
+
+def view_group_standings(
+    session: Session, *, league: League, tournament_id: UUID, past_setup: bool = False
+) -> tuple[StandingRow, ...]:
+    """Return the round robin's standings now, none for other formats (FR-060).
+
+    The same standings as the play read's (`read_play`). With `past_setup`, a
+    tournament in setup is 404 `tournament_not_found` (FR-070).
+    """
+    tournament = _load_tournament(
+        session, league=league, tournament_id=tournament_id, past_setup=past_setup
+    )
+    group = _group_phase(tournament)
+    if group is None or group.format is not PhaseFormat.ROUND_ROBIN:
+        return ()
+    return _standings_of(tournament, group)
+
+
+def finished_season_points(
+    session: Session, *, season: Season
+) -> dict[UUID, tuple[PlayerPoints, ...]]:
+    """The season points of each finished tournament of a season (BR-112).
+
+    Keyed by tournament id, oldest first; computed with the season's table as
+    it is now (BR-012). Tournaments that are not finished do not count.
+    """
+    tournaments = session.scalars(
+        select(Tournament)
+        .where(
+            Tournament.season_id == season.id,
+            Tournament.state == TournamentState.FINISHED,
+        )
+        .options(
+            selectinload(Tournament.phases),
+            selectinload(Tournament.entries).selectinload(Entry.members),
+            _ROUNDS_IN_FULL,
+        )
+        .order_by(Tournament.date, Tournament.created_at, Tournament.id)
+        .execution_options(populate_existing=True)
+    ).all()
+    return {
+        tournament.id: _placed(tournament, season.placement_points).points
+        for tournament in tournaments
+    }

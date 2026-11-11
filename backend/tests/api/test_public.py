@@ -167,6 +167,9 @@ def test_fr013_a_deleted_leagues_share_link_stops_working(
         _public(token),
         _public(token, f"/seasons/{uuid7()}/tournaments"),
         _public(token, f"/tournaments/{uuid7()}"),
+        _public(token, f"/seasons/{uuid7()}/standings"),
+        _public(token, f"/tournaments/{uuid7()}/standings"),
+        _public(token, f"/tournaments/{uuid7()}/places"),
     ):
         response = client.get(path)
         assert (response.status_code, response.json()) == (404, UNKNOWN), path
@@ -178,6 +181,9 @@ def test_fr013_a_deleted_leagues_share_link_stops_working(
         pytest.param("", id="league"),
         pytest.param("/seasons/{season}/tournaments", id="tournaments"),
         pytest.param("/tournaments/{tournament}", id="tournament"),
+        pytest.param("/seasons/{season}/standings", id="season-standings"),
+        pytest.param("/tournaments/{tournament}/standings", id="standings"),
+        pytest.param("/tournaments/{tournament}/places", id="places"),
     ],
 )
 def test_fr071_every_route_answers_an_unknown_token_alike(
@@ -359,6 +365,11 @@ def test_owasp_api1_a_valid_token_does_not_open_another_leagues_tournament(
         pytest.param("", id="league"),
         pytest.param("/seasons/{season}/tournaments", id="tournaments"),
         pytest.param("/tournaments/{tournament}", id="unknown-tournament"),
+        pytest.param("/seasons/{season}/standings", id="season-standings"),
+        pytest.param("/seasons/not-a-uuid/standings", id="season-standings-422"),
+        pytest.param("/tournaments/{tournament}/standings", id="standings"),
+        pytest.param("/tournaments/{tournament}/places", id="places"),
+        pytest.param("/tournaments/not-a-uuid/places", id="places-422"),
         pytest.param("/tournaments/not-a-uuid", id="validation-error"),
         pytest.param("/seasons/not-a-uuid/tournaments", id="invalid-season-422"),
         pytest.param("/no-such-route", id="router-404"),
@@ -442,7 +453,8 @@ def test_fr071_public_schemas_carry_nothing_only_the_organizer_sees(
         set(),
     )
 
-    assert len(public) == 3
+    assert len(public) == 6
     assert all(set(item) == {"get"} for item in public.values())  # FR-072
     assert {"name", "players", "rounds", "fields", "waiting"} <= names
+    assert {"tournaments_played", "points_per_player", "score_difference"} <= names
     assert not names & _ORGANIZER_ONLY
