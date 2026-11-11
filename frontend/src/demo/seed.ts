@@ -219,6 +219,7 @@ const ROUND_ROBIN: Omit<PhaseRead, "id" | "position"> = {
   format: "round_robin",
   round_robin_legs: 1,
   sit_out_points: 0,
+  sit_out_points_set_by_hand: true,
   tiebreakers: null,
   qualifiers: null,
   third_place_match: null,

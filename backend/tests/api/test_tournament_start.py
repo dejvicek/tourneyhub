@@ -414,6 +414,27 @@ def test_owasp_api1_a_tournament_of_another_league_does_not_start(
 # ---------------------------------------------------------------- the read
 
 
+def test_br071_generating_fixes_the_sit_out_points(
+    client: TestClient, league: League, headers: dict[str, str], players: list[str]
+) -> None:
+    setup = _setup(client, league, headers, players[:3], sit_out_points=None)
+    assert setup["format"]["sit_out_points"] == 1
+    started = _started(client, league, setup, headers)
+
+    refused = client.put(
+        _t_url(league, setup["tournament_id"], "/format"),
+        json={**ROUND_ROBIN, "group_match_format": "bo3", "sit_out_points": None},
+        headers=headers,
+    )
+
+    [phase] = started["phases"]
+    assert (phase["sit_out_points"], phase["sit_out_points_set_by_hand"]) == (1, False)
+    assert refused.status_code == 409
+    assert refused.json()["code"] == "tournament_not_in_setup"
+    read = client.get(_t_url(league, setup["tournament_id"]), headers=headers)
+    assert read.json()["phases"][0]["sit_out_points"] == 1
+
+
 def test_fr030_a_tournament_in_setup_reads_without_rounds(
     client: TestClient, league: League, headers: dict[str, str], players: list[str]
 ) -> None:
@@ -436,6 +457,7 @@ def test_fr030_a_tournament_in_setup_reads_without_rounds(
             "format": "round_robin",
             "round_robin_legs": 1,
             "sit_out_points": 0,
+            "sit_out_points_set_by_hand": True,
             "tiebreakers": None,
             "qualifiers": None,
             "third_place_match": None,

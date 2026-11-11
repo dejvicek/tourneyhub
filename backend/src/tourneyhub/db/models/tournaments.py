@@ -10,6 +10,7 @@ from sqlalchemy import (
     LargeBinary,
     String,
     UniqueConstraint,
+    false,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -141,8 +142,12 @@ class TournamentPhase(Base):
         ),
         CheckConstraint(
             "(kind = 'group') = (sit_out_points IS NOT NULL)"
-            " AND (sit_out_points IS NULL OR sit_out_points IN (0, 1))",
+            " AND (sit_out_points IS NULL OR sit_out_points IN (0, 1, 2))",
             name="sit_out_points",
+        ),
+        CheckConstraint(
+            "NOT sit_out_points_set_by_hand OR kind = 'group'",
+            name="sit_out_points_set_by_hand",
         ),
         # The helper is created by the migration: a subset of the three, no repeat.
         CheckConstraint(
@@ -181,6 +186,7 @@ class TournamentPhase(Base):
     )
     round_robin_legs: Mapped[int | None]
     sit_out_points: Mapped[int | None]
+    sit_out_points_set_by_hand: Mapped[bool] = mapped_column(server_default=false())
     tiebreakers: Mapped[list[str] | None] = mapped_column(ARRAY(String))
     qualifiers: Mapped[int | None]
     third_place_match: Mapped[bool | None]

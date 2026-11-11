@@ -175,13 +175,14 @@ describe("D19: closing the result sheet", () => {
 });
 
 describe("D26: switches", () => {
-  it("toggles the sit-out switch from its label", async () => {
+  it("toggles the third-place switch from its label", async () => {
     const user = userEvent.setup();
     renderAt(generatePath(paths.newTournament, { leagueId: DEMO_LEAGUE_ID }));
 
-    const label = await screen.findByText("Points for sitting out");
+    await user.click(await screen.findByRole("radio", { name: "None" }));
+    const label = await screen.findByText("Third-place match");
     const toggle = screen.getByRole("switch", {
-      name: "Points for sitting out",
+      name: "Third-place match",
     });
     const before = toggle.getAttribute("aria-checked");
     await user.click(label);

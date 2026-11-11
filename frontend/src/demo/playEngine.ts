@@ -569,8 +569,7 @@ function swissStandings(
   t: StoredTournament,
   group: PhaseRead,
 ): Omit<PlayStandingRow, "form" | "ahead_by">[] {
-  const sitOutPoints =
-    group.sit_out_points === 1 ? rules.sitOutPointsWhenOn : 0;
+  const sitOutPoints = group.sit_out_points ?? 0;
   const rows = new Map<string, SwissRow>(
     t.entries
       .filter((entry) => entry.stage === "main")

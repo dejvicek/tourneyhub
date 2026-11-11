@@ -52,6 +52,81 @@ describe("the fake API for tournament setup", () => {
     expect(again.format.field_count).toBe(2);
   });
 
+  it.each([
+    ["bo1", 1],
+    ["bo3", 2],
+    ["bo5", 2],
+  ] as const)(
+    "gives a %s group phase %i sit-out points until the organizer picks (BR-071)",
+    async (format, points) => {
+      const id = await createDraft({
+        group_match_format: format,
+        sit_out_points: null,
+      });
+
+      const read = (await setupOf(id)).format;
+
+      expect([read.sit_out_points, read.sit_out_points_set_by_hand]).toEqual([
+        points,
+        false,
+      ]);
+    },
+  );
+
+  it("follows the format with a null pick, and keeps a number", async () => {
+    const id = await createDraft({ sit_out_points: null });
+    const put = (body: {
+      group_match_format: "bo1" | "bo3" | "bo5";
+      sit_out_points: 0 | 1 | 2 | null;
+    }) =>
+      dataOf(
+        api.PUT(
+          "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/format",
+          {
+            ...at(id),
+            body: {
+              ...dypFormat,
+              goals_per_game: 10,
+              field_count: 2,
+              round_robin_legs: 1,
+              knockout_match_format: null,
+              final_match_format: null,
+              third_place_match: null,
+              ...body,
+            },
+          },
+        ),
+      );
+
+    const followed = await put({
+      group_match_format: "bo3",
+      sit_out_points: null,
+    });
+    const picked = await put({ group_match_format: "bo1", sit_out_points: 2 });
+    const kept = await put({ group_match_format: "bo5", sit_out_points: 0 });
+    const reset = await put({
+      group_match_format: "bo5",
+      sit_out_points: null,
+    });
+
+    expect([
+      followed.format.sit_out_points,
+      followed.format.sit_out_points_set_by_hand,
+    ]).toEqual([2, false]);
+    expect([
+      picked.format.sit_out_points,
+      picked.format.sit_out_points_set_by_hand,
+    ]).toEqual([2, true]);
+    expect([
+      kept.format.sit_out_points,
+      kept.format.sit_out_points_set_by_hand,
+    ]).toEqual([0, true]);
+    expect([
+      reset.format.sit_out_points,
+      reset.format.sit_out_points_set_by_hand,
+    ]).toEqual([2, false]);
+  });
+
   it("refuses BO2 in a league without draws and a group phase the type does not allow", async () => {
     const bo2 = await failure(createDraft({ group_match_format: "bo2" }));
     const monster = await failure(createDraft({ type: "monster_dyp" }));
