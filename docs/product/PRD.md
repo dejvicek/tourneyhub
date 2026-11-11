@@ -68,7 +68,7 @@ The MVP lets an organizer run a league in seasons, play tournaments inside each 
 4. Tournament types: Singles, Doubles, DYP and Monster DYP.
 5. Tournaments in two phases, either of which can be left out: a group phase — round robin (once or twice), Swiss or Monster DYP rounds — then a single-elimination knockout (optional third-place match). Swiss and Monster DYP rounds go on for as long as the organizer wants.
 6. Seeding by league ranking or random shuffle, adjustable by hand; generating brackets, schedules and rounds; adding and deleting rounds, late players and disabling players; result entry and corrections.
-7. Group-phase points (2 / 1 / 0, and 0, 1 or 2 points for sitting out), tie-breakers (head-to-head, game difference and score difference in a round robin; score difference, BH1 and BH2 in Swiss and Monster DYP), and season standings from placement points.
+7. Group-phase points (2 / 1 / 0, and 0, 1 or 2 points for sitting out in Swiss and Monster DYP), tie-breakers (head-to-head, game difference and score difference in a round robin; score difference, BH1 and BH2 in Swiss and Monster DYP), and season standings from placement points.
 8. A read-only share link per league.
 9. English and Czech UI, usable on a phone.
 10. Match formats BO1, BO2, BO3 and BO5, chosen per phase, with an optional different format for the final.
@@ -149,7 +149,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | FR-036 | Until the first result is entered, the organizer can go back to setup, change anything — including a new DYP draw — and generate again. |
 | FR-037 | A tournament with a knockout finishes automatically when every knockout match has a result. A tournament without one finishes when the organizer finishes it after the group phase (FR-040). |
 | FR-038 | The organizer can delete a tournament after confirming, unless its season is closed. |
-| FR-039 | Round robin, Swiss and Monster DYP have a setup setting, **points for sitting out**: 0, 1 or 2. The default is 1 when a group-phase match can be drawn (BR-090), otherwise 2 (BR-071). |
+| FR-039 | Swiss and Monster DYP have a setup setting, **points for sitting out**: 0, 1 or 2. The default is 1 when a group-phase match can be drawn (BR-090), otherwise 2 (BR-071). Setup does not show it for a round robin, which has no points for sitting out (BR-071). |
 
 ### 6.5 Group phase and knockout
 
@@ -297,7 +297,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | ID | Rule |
 |---|---|
 | BR-070 | In round robin, Swiss and Monster DYP rounds, a win is worth 2 points, a draw 1 and a loss 0. In Monster DYP, both players of a team get the points. |
-| BR-071 | A sit-out is worth the tournament's points for sitting out: 0, 1 or 2, with the default of FR-039, so that the default is never worth a result no match can produce. Until the phase's first result is entered, the same boundary as FR-054, the default follows the phase's match format and the league's draw setting, also when either changes, unless the organizer has picked a value by hand; their value then stays. From the phase's first result, the value is fixed. Sit-out points count as points in the standings (BR-072, BR-101). In Monster DYP, each player who sits out gets them. Match points stay as in BR-070. |
+| BR-071 | In Swiss and Monster DYP, a sit-out is worth the tournament's points for sitting out: 0, 1 or 2, with the default of FR-039, so that the default is never worth a result no match can produce. Until the phase's first result is entered, the same boundary as FR-054, the default follows the phase's match format and the league's draw setting, also when either changes, unless the organizer has picked a value by hand; their value then stays. From the phase's first result, the value is fixed. Sit-out points count as points in the standings (BR-072). In Monster DYP, each player who sits out gets them. Match points stay as in BR-070. A round-robin phase has no points for sitting out, not even 0, and a value stored for one earlier is removed: in a complete round robin every entry sits out equally often (BR-051), and with a late entry (BR-054) the points would distort the order. |
 | BR-072 | Swiss and Monster DYP: entries level on points are ordered by the enabled tie-breakers, in the organizer's order (FR-043). |
 | BR-073 | BH1 is the sum of the current points of every opponent faced, counted once per match. BH2 is the sum of those opponents' BH1. Score difference is goals for minus goals against over all games. Sit-outs add nothing to BH1 or BH2, and score difference counts only entered game scores. |
 | BR-074 | Entries still level share the place. Where a strict order is needed — pairing the next round, or the knockout's cut and seeding — the lot decides. |
@@ -331,7 +331,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | ID | Rule |
 |---|---|
 | BR-100 | Places belong to entries. Every player in an entry gets the entry's place. |
-| BR-101 | Round robin: entries are ranked by points (BR-070, BR-071), with played, won, drawn, lost, sat out, game difference, score difference and points shown. When exactly two entries are level, the one with more points from the matches between them ranks higher. Entries still level are ordered by game difference (a walkover counts the games needed to win the format, as in the glossary), then by score difference, counting only entered scores, and after that share the place (BR-074). The game-difference column is shown only when the phase plays BO3 or BO5: in BO1 and BO2 it cannot separate entries that points do not, and it costs width on a phone (FR-082). |
+| BR-101 | Round robin: entries are ranked by the points of their matches (BR-070), as a round robin has no points for sitting out (BR-071), with played, won, drawn, lost, sat out, game difference, score difference and points shown. When exactly two entries are level, the one with more points from the matches between them ranks higher. Entries still level are ordered by game difference (a walkover counts the games needed to win the format, as in the glossary), then by score difference, counting only entered scores, and after that share the place (BR-074). The game-difference column is shown only when the phase plays BO3 or BO5: in BO1 and BO2 it cannot separate entries that points do not, and it costs width on a phone (FR-082). |
 | BR-102 | Knockout: the winner is 1st and the final's loser 2nd. With a third-place match, its winner is 3rd and its loser 4th; without one, the two semifinal losers share 3rd. Entries knocked out in the same earlier round share a place: quarterfinal losers share 5th, round-of-16 losers share 9th, and so on. |
 | BR-103 | With a group phase but no knockout, the group-phase standings are the places. With both, the knockout entries take the top places by BR-102, and the other entries follow in their group-phase order, numbered after the knockout entries: after 8 knockout pairs, the best non-qualifier is 9th. |
 | BR-104 | After a shared place, numbering skips accordingly: two entries sharing 3rd are followed by 5th. |
