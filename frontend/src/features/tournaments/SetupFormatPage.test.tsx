@@ -73,7 +73,6 @@ describe("setup: format (screen 2)", () => {
       goals_per_game: 11,
       group_phase: "round_robin",
       sit_out_points: null,
-      sit_out_points_set_by_hand: false,
       group_match_format: "bo3",
       knockout_match_format: null,
       third_place_match: null,
@@ -121,27 +120,7 @@ describe("setup: format (screen 2)", () => {
     ).toBeInTheDocument();
   });
 
-  describe("points for sitting out in a league without draws (BR-071)", () => {
-    it("defaults to 2, like a win, and says why", async () => {
-      const user = userEvent.setup();
-      renderAt(newTournament);
-      await screen.findByRole("textbox", { name: "Name" });
-      await user.click(screen.getByRole("radio", { name: "Swiss" }));
-
-      expect(
-        within(
-          screen.getByRole("radiogroup", { name: "Points for sitting out" }),
-        ).getByRole("radio", { name: "2 points (default)" }),
-      ).toBeChecked();
-      expect(
-        screen.getByText(
-          /The default is 2 points, like a win: no match in this league can end level\./,
-        ),
-      ).toBeVisible();
-    });
-  });
-
-  describe("points for sitting out (FR-039, BR-071)", () => {
+  describe("points for sitting out (FR-039, BR-071, BR-075)", () => {
     beforeEach(async () => {
       await allowDraws();
     });
@@ -175,7 +154,7 @@ describe("setup: format (screen 2)", () => {
       expect(sitOut()).toBeVisible();
     });
 
-    it("offers 0, 1 and 2, with the default of the match format marked", async () => {
+    it("offers 0, 1 and 2, with 0 marked as the default", async () => {
       const user = userEvent.setup();
       renderAt(newTournament);
       await screen.findByRole("textbox", { name: "Name" });
@@ -187,15 +166,15 @@ describe("setup: format (screen 2)", () => {
           .map(
             (radio) => radio.getAttribute("aria-label") ?? radio.textContent,
           ),
-      ).toEqual(["0 points", "1 point (default)", "2 points"]);
+      ).toEqual(["0 points (default)", "1 point", "2 points"]);
       expect(
-        within(sitOut()).getByRole("radio", { name: "1 point (default)" }),
+        within(sitOut()).getByRole("radio", { name: "0 points (default)" }),
       ).toBeChecked();
       expect(
-        screen.getByText(/The default for BO1 matches: 1 point, like a draw\./),
+        screen.getByText(/1 point is like a draw, 2 points like a win\./),
       ).toBeVisible();
       expect(
-        screen.queryByRole("button", { name: /^Use the default/ }),
+        screen.queryByRole("button", { name: /default/i }),
       ).not.toBeInTheDocument();
     });
 
@@ -210,92 +189,59 @@ describe("setup: format (screen 2)", () => {
         within(screen.getByRole("radiogroup", { name: "Body za volno" }))
           .getAllByRole("radio")
           .map((radio) => radio.textContent),
-      ).toEqual(["0 bodů", "1 bod (výchozí)", "2 body"]);
+      ).toEqual(["0 bodů (výchozí)", "1 bod", "2 body"]);
     });
 
-    it("follows the match format until the organizer picks a value", async () => {
+    it("stays at 0 whatever the match format", async () => {
       const user = userEvent.setup();
       renderAt(newTournament);
       await screen.findByRole("textbox", { name: "Name" });
       await chooseSwiss(user);
 
-      await user.click(within(matches()).getByRole("radio", { name: "BO3" }));
-      expect(
-        within(sitOut()).getByRole("radio", { name: "2 points (default)" }),
-      ).toBeChecked();
-      expect(
-        screen.getByText(/The default for BO3 matches: 2 points, like a win\./),
-      ).toBeVisible();
-      await user.click(within(matches()).getByRole("radio", { name: "BO1" }));
-
-      expect(
-        within(sitOut()).getByRole("radio", { name: "1 point (default)" }),
-      ).toBeChecked();
+      for (const format of ["BO2", "BO3", "BO5", "BO1"]) {
+        await user.click(
+          within(matches()).getByRole("radio", { name: format }),
+        );
+        expect(
+          within(sitOut()).getByRole("radio", { name: "0 points (default)" }),
+        ).toBeChecked();
+      }
     });
 
-    it("keeps a picked value when the match format changes, and goes back to the default", async () => {
+    it("keeps a picked value when the match format changes", async () => {
       const user = userEvent.setup();
       renderAt(newTournament);
       await screen.findByRole("textbox", { name: "Name" });
       await chooseSwiss(user);
 
       await user.click(
-        within(sitOut()).getByRole("radio", { name: "0 points" }),
+        within(sitOut()).getByRole("radio", { name: "2 points" }),
       );
       await user.click(within(matches()).getByRole("radio", { name: "BO5" }));
 
       expect(
-        within(sitOut()).getByRole("radio", { name: "0 points" }),
+        within(sitOut()).getByRole("radio", { name: "2 points" }),
       ).toBeChecked();
-      expect(screen.getByText(/Set by you\./)).toBeVisible();
-      expect(
-        within(sitOut()).getByRole("radio", { name: "2 points (default)" }),
-      ).not.toBeChecked();
-      const reset = screen.getByRole("button", { name: "Use the default (2)" });
-      await user.click(reset);
-
-      expect(
-        within(sitOut()).getByRole("radio", { name: "2 points (default)" }),
-      ).toBeChecked();
-      expect(
-        screen.queryByRole("button", { name: /^Use the default/ }),
-      ).not.toBeInTheDocument();
     });
 
-    it("counts a click or Space or Enter on the checked default as a pick", async () => {
+    it("drops a pick with a round robin and starts from 0 coming back (BR-071)", async () => {
       const user = userEvent.setup();
       renderAt(newTournament);
       await screen.findByRole("textbox", { name: "Name" });
       await chooseSwiss(user);
-      const reset = () =>
-        screen.queryByRole("button", { name: /^Use the default/ });
-
       await user.click(
-        within(sitOut()).getByRole("radio", { name: "1 point (default)" }),
+        within(sitOut()).getByRole("radio", { name: "2 points" }),
       );
-      expect(screen.getByText(/Set by you\./)).toBeVisible();
-      await user.click(
-        screen.getByRole("button", { name: /^Use the default/ }),
-      );
-      expect(reset()).not.toBeInTheDocument();
 
-      for (const key of ["{Enter}", " "]) {
-        within(sitOut())
-          .getByRole("radio", { name: "1 point (default)" })
-          .focus();
-        await user.keyboard(key);
-        expect(reset()).toBeInTheDocument();
-        await user.click(
-          screen.getByRole("button", { name: /^Use the default/ }),
-        );
-        expect(reset()).not.toBeInTheDocument();
-      }
+      await user.click(screen.getByRole("radio", { name: "Round robin" }));
+      await chooseSwiss(user);
+
       expect(
-        within(sitOut()).getByRole("radio", { name: "1 point (default)" }),
+        within(sitOut()).getByRole("radio", { name: "0 points (default)" }),
       ).toBeChecked();
     });
 
-    it("saves a pick as the organizer's own", async () => {
+    it("saves a pick", async () => {
       const user = userEvent.setup();
       const view = renderAt(newTournament);
       await screen.findByRole("textbox", { name: "Name" });
@@ -311,13 +257,10 @@ describe("setup: format (screen 2)", () => {
       });
       const picked = (await tournamentsOfSeason()).at(-1);
 
-      expect((await setupOf(picked?.id ?? "")).format).toMatchObject({
-        sit_out_points: 2,
-        sit_out_points_set_by_hand: true,
-      });
+      expect((await setupOf(picked?.id ?? "")).format.sit_out_points).toBe(2);
     });
 
-    it("shows a stored pick and saves the way back to the default", async () => {
+    it("shows a stored pick and saves a new one", async () => {
       const user = userEvent.setup();
       const id = await createDraft({ group_phase: "swiss", sit_out_points: 2 });
       const view = renderAt(`${newTournament}?tournament=${id}`);
@@ -327,7 +270,7 @@ describe("setup: format (screen 2)", () => {
       ).toBeChecked();
 
       await user.click(
-        screen.getByRole("button", { name: "Use the default (1)" }),
+        within(sitOut()).getByRole("radio", { name: "0 points (default)" }),
       );
       await user.click(
         screen.getByRole("button", { name: "Next: pick players" }),
@@ -336,10 +279,7 @@ describe("setup: format (screen 2)", () => {
         expect(view.state.location.pathname).toMatch(/\/setup\/players$/);
       });
 
-      expect((await setupOf(id)).format).toMatchObject({
-        sit_out_points: 1,
-        sit_out_points_set_by_hand: false,
-      });
+      expect((await setupOf(id)).format.sit_out_points).toBe(0);
     });
   });
 

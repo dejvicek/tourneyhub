@@ -1,23 +1,10 @@
-import type { components } from "@/api/schema";
-
-type MatchFormat = components["schemas"]["MatchFormat"];
-
-/** The points of a sit-out the organizer can pick (FR-039, BR-071). */
+/** The points for sitting out the organizer can pick (FR-039, BR-071, BR-075). */
 export const SIT_OUT_POINTS = [0, 1, 2] as const;
 export type SitOutPoints = (typeof SIT_OUT_POINTS)[number];
 
 /**
- * The default points of a sit-out (BR-071): 1, worth a draw, only where a match
- * can end level, that is when the league allows draws and the group phase plays
- * BO1 or BO2. Otherwise 2, worth a win, so a sit-out never earns a result that
- * no match can produce. The default follows the match format and the league's
- * draw setting until the group phase's first result, unless the organizer picked
- * a value by hand; it is then fixed (BR-071, as reviewed in #46). The backend
- * computes the same default; this only shows it.
+ * The default points for sitting out in Swiss and Monster DYP (FR-039). It does
+ * not depend on the match format or the league's draw setting. A round robin
+ * has none (BR-071).
  */
-export function defaultSitOutPoints(
-  format: MatchFormat,
-  drawsAllowed: boolean,
-): 1 | 2 {
-  return drawsAllowed && (format === "bo1" || format === "bo2") ? 1 : 2;
-}
+export const DEFAULT_SIT_OUT_POINTS: SitOutPoints = 0;

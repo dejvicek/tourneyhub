@@ -14,7 +14,7 @@ import { setupMutations, setupQueries } from "@/features/tournaments/api";
 import { useLayout } from "@/hooks/useLayout";
 import { useRouteParam } from "@/hooks/useRouteParam";
 import { paths } from "@/lib/paths";
-import { defaultSitOutPoints } from "@/lib/sitOutPoints";
+import { DEFAULT_SIT_OUT_POINTS } from "@/lib/sitOutPoints";
 
 import { dayAndMonth, today } from "./setup/dates";
 import { describeError } from "./setup/errors";
@@ -24,7 +24,6 @@ import {
   type KnockoutMatchFormat,
   type MatchFormat,
   scoresSitOuts,
-  sitOutPointsOf,
   type TournamentType,
   writeOf,
 } from "./setup/format";
@@ -92,11 +91,7 @@ export function SetupFormatPage() {
     type: "dyp",
     group_phase: "round_robin",
     round_robin_legs: 1,
-    sit_out_points: defaultSitOutPoints(
-      settings.data.default_match_format,
-      settings.data.draws_allowed,
-    ),
-    sit_out_points_set_by_hand: false,
+    sit_out_points: DEFAULT_SIT_OUT_POINTS,
     group_match_format: settings.data.default_match_format,
     knockout_match_format: settings.data.default_match_format,
     final_match_format: null,
@@ -112,11 +107,7 @@ export function SetupFormatPage() {
       initial={
         existing.data === undefined
           ? defaults
-          : formOf(
-              existing.data.format,
-              settings.data.default_match_format,
-              settings.data.draws_allowed,
-            )
+          : formOf(existing.data.format, settings.data.default_match_format)
       }
       drawsAllowed={settings.data.draws_allowed}
     />
@@ -163,15 +154,21 @@ function FormatForm({
         type: typeLabel(t, form.type),
         date: dayAndMonth(form.date),
       });
-  const sitOutPoints = sitOutPointsOf(form, drawsAllowed);
-  const shown: FormatForm = { ...form, name, sit_out_points: sitOutPoints };
+  const shown: FormatForm = { ...form, name };
   const payload = writeOf(shown);
   const noGroup = form.group_phase === "none";
   const monster = form.type === "monster_dyp";
   const groupChoice = choiceOf(form);
 
   const patch = (changes: Partial<FormatForm>) => {
-    setForm((current) => ({ ...current, ...changes }));
+    setForm((current) => {
+      const next = { ...current, ...changes };
+      // A round robin or no group phase drops the points for sitting out, a
+      // picked value included; switching back starts from the default (BR-071).
+      return scoresSitOuts(next.group_phase)
+        ? next
+        : { ...next, sit_out_points: DEFAULT_SIT_OUT_POINTS };
+    });
   };
   const chooseType = (type: TournamentType) => {
     patch({
@@ -430,18 +427,9 @@ function FormatForm({
         />
         {scoresSitOuts(form.group_phase) && (
           <SitOutPointsField
-            points={sitOutPoints}
-            setByHand={form.sit_out_points_set_by_hand}
-            matchFormat={form.group_match_format}
-            drawsAllowed={drawsAllowed}
+            points={form.sit_out_points}
             onPick={(points) => {
-              patch({
-                sit_out_points: points,
-                sit_out_points_set_by_hand: true,
-              });
-            }}
-            onUseDefault={() => {
-              patch({ sit_out_points_set_by_hand: false });
+              patch({ sit_out_points: points });
             }}
           />
         )}

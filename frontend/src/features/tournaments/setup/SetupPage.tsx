@@ -57,7 +57,7 @@ function useSetupData(): {
       tournamentId,
       setup: setup.data,
       // The unused settings only fill the form; no screen shows them.
-      format: formOf(setup.data.format, "bo1", false),
+      format: formOf(setup.data.format, "bo1"),
       ranking: setup.data.ranking.map((row) => ({
         ...row,
         name: names.get(row.player_id) ?? "",

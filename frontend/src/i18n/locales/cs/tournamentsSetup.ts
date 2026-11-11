@@ -173,16 +173,7 @@ export const tournamentsSetup: CsMessages<typeof english> = {
       fieldsMore: "Více hřišť",
       sitOut: "Body za volno",
       sitOutHint: "Záleží jen tehdy, když někdo má volno.",
-      sitOutLikeDraw: "jako remíza",
-      sitOutLikeWin: "jako výhra",
-      sitOutDefault: "Výchozí pro zápasy {{format}}: {{points}}, {{like}}.",
-      sitOutByHand:
-        "Nastavili jste sami. Výchozí pro zápasy {{format}} je {{points}}, {{like}}.",
-      sitOutDefaultNoDraws:
-        "Výchozí je {{points}}, {{like}}: žádný zápas v této lize nemůže skončit nerozhodně.",
-      sitOutByHandNoDraws:
-        "Nastavili jste sami. Výchozí je {{points}}, {{like}}: žádný zápas v této lize nemůže skončit nerozhodně.",
-      sitOutUseDefault: "Použít výchozí ({{value}})",
+      sitOutScale: "1 bod je jako remíza, 2 body jako výhra.",
       knockoutLater: {
         title: "Vyřazovací fázi zvolíte později",
         body: "Až skončí skupinová fáze, rozhodnete, kolik dvojic postoupí, nebo turnaj ukončíte bez ní.",
@@ -385,6 +376,7 @@ export const tournamentsSetup: CsMessages<typeof english> = {
       fr035:
         "Spuštění tohoto formátu přijde v další verzi. Každý s každým lze spustit už teď.",
       br121: "BO2 nabízíme jen v ligách s remízami.",
+      br071: "Každý s každým nemá body za volno.",
       fr033: "Není koho spárovat.",
       br032Unequal:
         "Obě poloviny musí mít stejně hráčů: nahoře {{top}}, dole {{bottom}}.",
