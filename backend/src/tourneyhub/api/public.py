@@ -16,7 +16,6 @@ from tourneyhub.api.leagues import SeasonRead
 from tourneyhub.api.public_headers import PUBLIC_PREFIX
 from tourneyhub.api.schemas import ErrorResponse, ResponseModel
 from tourneyhub.api.tournaments import (
-    BracketRoundName,
     EntryRead,
     FieldRead,
     PhaseRead,
@@ -24,6 +23,7 @@ from tourneyhub.api.tournaments import (
     RoundRead,
     TournamentSummary,
 )
+from tourneyhub.engine.knockout import RoundName
 from tourneyhub.engine.tournaments import PhaseFormat, TournamentState, TournamentType
 from tourneyhub.services import public as public_service
 from tourneyhub.services.tournaments import PlacesView
@@ -116,7 +116,7 @@ class PublicPlaceReasonRead(ResponseModel):
     """Why an entry has its place, for viewers (§7.13): the organizer's reason."""
 
     kind: PlaceReasonKind
-    round: BracketRoundName | None
+    round: RoundName | None
     score: tuple[int, int] | None
     opponent_entry_id: UUID | None
     group_place: int | None
@@ -152,10 +152,10 @@ def _public_places(places: PlacesView) -> PublicPlacesRead:
                 entry_id=row.entry_id,
                 points_per_player=row.points_per_player,
                 reason=PublicPlaceReasonRead(
-                    kind="group_place",
-                    round=None,
-                    score=None,
-                    opponent_entry_id=None,
+                    kind=row.kind,
+                    round=row.round,
+                    score=row.score,
+                    opponent_entry_id=row.opponent_entry_id,
                     group_place=row.group_place,
                     group_format=places.group_format,
                 ),
