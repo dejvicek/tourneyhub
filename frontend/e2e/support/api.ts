@@ -38,25 +38,61 @@ export async function addPlayers(
   }
 }
 
-/**
- * Starts the tournament as the review's "Generate and start" does: with the
- * draw counter its setup shows now (FR-035). A stand-in while that button is
- * disabled by a missing route; see the spec.
- */
-export async function startTournament(
+export interface MatchOf {
+  id: string;
+  round_no: number;
+  position: number;
+  outcome: string | null;
+}
+
+/** The tournament's matches in schedule order (round, then position). */
+export async function matchesOf(
   request: APIRequestContext,
   token: string,
   leagueId: string,
   tournamentId: string,
+): Promise<MatchOf[]> {
+  const response = await request.get(
+    `/api/v1/leagues/${leagueId}/tournaments/${tournamentId}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  expect(response.status()).toBe(200);
+  const body = (await response.json()) as {
+    rounds: {
+      round_no: number;
+      matches: { id: string; position: number; outcome: string | null }[];
+    }[];
+  };
+  return body.rounds
+    .toSorted((a, b) => a.round_no - b.round_no)
+    .flatMap((round) =>
+      round.matches
+        .toSorted((a, b) => a.position - b.position)
+        .map((match) => ({ ...match, round_no: round.round_no })),
+    );
+}
+
+/**
+ * Enters a BO1 result in which side 1 wins `goals` to `against`: the bulk of
+ * the evening, which the UI has no extra coverage to add to.
+ */
+export async function enterResult(
+  request: APIRequestContext,
+  token: string,
+  leagueId: string,
+  tournamentId: string,
+  matchId: string,
+  { goals, against }: { goals: number; against: number },
 ): Promise<void> {
-  const base = `/api/v1/leagues/${leagueId}/tournaments/${tournamentId}`;
-  const headers = { Authorization: `Bearer ${token}` };
-  const setup = await request.get(`${base}/setup`, { headers });
-  expect(setup.status()).toBe(200);
-  const { draw_counter } = (await setup.json()) as { draw_counter: number };
-  const started = await request.post(`${base}/start`, {
-    headers,
-    data: { expected_draw_counter: draw_counter },
-  });
-  expect(started.status()).toBe(200);
+  const response = await request.put(
+    `/api/v1/leagues/${leagueId}/tournaments/${tournamentId}/matches/${matchId}/result`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      data: {
+        walkover_winner: null,
+        games: [{ winner: "side_1", score_1: goals, score_2: against }],
+      },
+    },
+  );
+  expect(response.status(), `result of ${matchId}`).toBe(200);
 }

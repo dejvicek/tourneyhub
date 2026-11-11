@@ -4,8 +4,9 @@ import { expect, type Page, test } from "@playwright/test";
 import {
   accessTokenOf,
   addPlayers,
+  enterResult,
+  matchesOf,
   type Organizer,
-  startTournament,
 } from "./support/api";
 import { setSignupCode } from "./support/stack";
 
@@ -14,9 +15,9 @@ import { setSignupCode } from "./support/stack";
 // API does the bulk setup, such as adding the regulars, to keep the run short.
 //
 // The parts are tests of one serial group, in the order of the evening, and
-// they share one organizer, league and tournament. Today the group reaches a
-// started tournament; each later part is a `test.fixme` that names the package
-// enabling it. When that package lands, drop the `fixme` and fill the step in.
+// they share one organizer, league and tournament. The steps no package
+// delivers yet are `test.fixme`s that name the package enabling them. When
+// that package lands, drop the `fixme` and fill the step in.
 
 test.describe.configure({ mode: "serial" });
 
@@ -187,27 +188,14 @@ test("the organizer signs up, sets up the league and starts the DYP", async ({
   });
 
   await test.step("generate and start gives the schedule (§5.1.5)", async () => {
-    // DEFECT: the review screen's "Generate and start" stays disabled in the
-    // real stack. The screen waits for GET .../setup/preview, a provisional
-    // route the backend does not serve yet (404; src/features/tournaments/
-    // api.ts), so it never enables the button and "Matches" says "Loading…".
-    // Until that route exists the test starts the tournament with the
-    // request the button sends, then goes on in the UI. The fixme below is
-    // the UI click.
     evening.tournamentId =
       /\/tournaments\/([0-9a-f-]{36})\//.exec(page.url())?.[1] ?? "";
     expect(evening.tournamentId).not.toBe("");
-    const token = await accessTokenOf(request, organizer);
-    await startTournament(
-      request,
-      token,
-      evening.leagueId,
-      evening.tournamentId,
-    );
-
-    await page.goto(
-      `/leagues/${evening.leagueId}/tournaments/${evening.tournamentId}/schedule`,
-    );
+    await expect(
+      page.getByText(`${n(MATCHES)} in ${n(ROUNDS)} rounds, all BO1`),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Generate and start" }).click();
+    await expect(page).toHaveURL(/\/schedule$/);
 
     await expect(
       page.getByText(`0 of ${n(MATCHES)} matches played`),
@@ -233,30 +221,172 @@ test("the organizer signs up, sets up the league and starts the DYP", async ({
   });
 });
 
-// The review's button, which the real stack cannot click yet: the screen waits
-// for GET .../setup/preview, which the backend does not serve (404), so
-// "Generate and start" stays disabled. When the route exists, replace the
-// API start in the first test with this click and delete this test.
-test.fixme("setup/preview: the review's Generate and start starts the tournament (§5.1.5)", async ({
+/** Opens the result sheet of the nth match of the schedule (0-based). */
+async function openMatch(page: Page, index: number) {
+  const matches = page
+    .getByRole("region", { name: /^Round \d$/ })
+    .getByRole("listitem");
+  await matches.nth(index).getByRole("link").click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+}
+
+/** Taps the last bead of the first pair, and the other pair's goals if given. */
+async function tapScore(page: Page, against?: number) {
+  const dialog = page.getByRole("dialog");
+  // eslint-disable-next-line playwright/no-raw-locators -- the label wrapping a visually hidden radio has no role or name of its own
+  await dialog
+    .getByRole("radio", { name: /^10 goals for/ })
+    .first()
+    // The input is hidden; its label is the bead the thumb taps.
+    .locator("xpath=..")
+    .click();
+  if (against !== undefined) {
+    await dialog
+      .getByRole("textbox", { name: /^Goals for/ })
+      .last()
+      .fill(n(against));
+  }
+}
+
+test("the organizer enters, changes and clears results and the field takes the next match (§5.1.6)", async ({
   page,
+  request,
 }) => {
   await logIn(page);
+  const schedule = `/leagues/${evening.leagueId}/tournaments/${evening.tournamentId}/schedule`;
+  await page.goto(schedule);
+  const fields = page.getByRole("region", { name: "On the fields" });
+  const firstField = fields.getByRole("listitem").first();
+  const roundOne = page.getByRole("region", { name: "Round 1", exact: true });
+  const standings = page.getByRole("table", { name: "Standings" });
+  const firstPlayed = firstField.textContent();
 
-  await test.step("review shows 15 matches in 5 rounds, and the button starts the tournament", async () => {
-    // Expect the "Matches" row to read "15 in 5 rounds, all BO1", the button
-    // to be enabled, and a click to open the schedule.
+  await test.step("a result by three taps: the standings move and the field refills", async () => {
+    const before = await firstPlayed;
+    await openMatch(page, 0);
+    await tapScore(page);
+    await page.getByRole("button", { name: "Save result" }).click();
+
+    await expect(
+      page.getByText(`1 of ${n(MATCHES)} matches played`),
+    ).toBeVisible();
+    // Field 1 takes the waiting match of round 1.
+    await expect(firstField).not.toHaveText(before ?? "");
+    await expect(roundOne.getByRole("listitem").nth(2)).toContainText(
+      "Field 1",
+    );
+    await expect(
+      standings.getByText("1 played, 1 won, 0 drawn, 0 lost"),
+    ).toHaveCount(1);
+    await expect(
+      standings.getByText("1 played, 0 won, 0 drawn, 1 lost"),
+    ).toHaveCount(1);
+  });
+
+  await test.step("the result is changed to a score", async () => {
+    await openMatch(page, 0);
+    await tapScore(page, 4);
+    await page.getByRole("button", { name: "Save result" }).click();
+    await expect(roundOne.getByRole("listitem").nth(0)).toContainText("10:4");
+    await expect(
+      page.getByText(`1 of ${n(MATCHES)} matches played`),
+    ).toBeVisible();
+  });
+
+  await test.step("a second result is cleared again", async () => {
+    await openMatch(page, 1);
+    await tapScore(page);
+    await page.getByRole("button", { name: "Save result" }).click();
+    await expect(
+      page.getByText(`2 of ${n(MATCHES)} matches played`),
+    ).toBeVisible();
+
+    await openMatch(page, 1);
+    await page.getByRole("button", { name: "Clear result" }).click();
+    await page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "Clear result" })
+      .click();
+    await expect(
+      page.getByText(`1 of ${n(MATCHES)} matches played`),
+    ).toBeVisible();
+    await expect(roundOne.getByRole("listitem").nth(1)).not.toContainText(
+      "10:",
+    );
+  });
+
+  await test.step("the other matches over the API, to keep the run short", async () => {
+    const token = await accessTokenOf(request, organizer);
+    const matches = await matchesOf(
+      request,
+      token,
+      evening.leagueId,
+      evening.tournamentId,
+    );
+    expect(matches).toHaveLength(MATCHES);
+    // The first match keeps its score from the UI.
+    for (const [index, match] of matches.slice(1).entries()) {
+      await enterResult(
+        request,
+        token,
+        evening.leagueId,
+        evening.tournamentId,
+        match.id,
+        {
+          goals: 10,
+          against: (index + 1) % 10,
+        },
+      );
+    }
+    await page.reload();
+    await expect(
+      page.getByText(`${n(MATCHES)} of ${n(MATCHES)} matches played`),
+    ).toBeVisible();
   });
 });
 
-test.fixme("P8: the organizer enters the results and the field takes the next match (§5.1.6)", async ({
+test("the group is done and the organizer finishes: places with season points (§5.1.7)", async ({
   page,
 }) => {
   await logIn(page);
+  await page.goto(
+    `/leagues/${evening.leagueId}/tournaments/${evening.tournamentId}/schedule`,
+  );
 
-  await test.step("enter each result; every freed field takes the next waiting match", async () => {
-    // Open the schedule, enter the result of each match on a field (screen 7),
-    // and assert that the standings and the "played" line move, and that the
-    // next waiting match is on the freed field.
+  await test.step("the round robin is played", async () => {
+    await page
+      .getByRole("link", {
+        name: "See the final standings and what comes next",
+      })
+      .click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Round robin done" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("table", { name: "Final standings" }),
+    ).toBeVisible();
+  });
+
+  await test.step("finishing the tournament now asks first", async () => {
+    await page
+      .getByRole("radio", { name: /^Finish the tournament now/ })
+      .check();
+    await page.getByRole("button", { name: "Finish the tournament" }).click();
+    await page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "Finish the tournament" })
+      .click();
+    await expect(page).toHaveURL(/\/places$/);
+  });
+
+  await test.step("the places carry the season points of the league's table", async () => {
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Finished" }),
+    ).toBeVisible();
+    const places = page.getByRole("region", { name: "Final places" });
+    await expect(places.getByRole("listitem")).toHaveCount(PAIRS);
+    await expect(page.getByText("Both get 10 season points.")).toBeVisible();
+    await expect(places.getByText("+10 each")).toBeVisible();
   });
 });
 
@@ -291,11 +421,72 @@ test.fixme("P10: the season standings add 10, 8, 5 and 5 points (§5.1.7)", asyn
   });
 });
 
-test.fixme("P11: players open the share link and see the round robin, the bracket and the standings (§5.1.8)", async ({
+test.describe("the share link (§5.1.8)", () => {
+  test.use({ permissions: ["clipboard-read", "clipboard-write"] });
+
+  test("players open the shared link without a session and see the league and the tournament", async ({
+    page,
+    browser,
+  }) => {
+    await logIn(page);
+    await page.goto(
+      `/leagues/${evening.leagueId}/tournaments/${evening.tournamentId}/places`,
+    );
+    await page.getByRole("button", { name: "Copy share link" }).click();
+    await expect(page.getByText("Share link copied")).toBeVisible();
+    const link = await page.evaluate(() => navigator.clipboard.readText());
+    expect(link).toMatch(/\/public\/[^/]+$/);
+
+    // A fresh context: no cookie, no token in memory.
+    const viewer = await browser.newContext({
+      ignoreHTTPSErrors: true,
+      locale: "en-US",
+    });
+    try {
+      const shared = await viewer.newPage();
+      await shared.goto(link);
+      await expect(
+        shared.getByRole("heading", { level: 1, name: LEAGUE_NAME }),
+      ).toBeVisible();
+      await expect(
+        shared.getByText("Shared league, read-only", { exact: false }),
+      ).toBeVisible();
+      await expect(
+        shared.getByRole("link", { name: /DYP evening/ }),
+      ).toBeVisible();
+
+      await shared.getByRole("link", { name: /DYP evening/ }).click();
+      await expect(
+        shared.getByRole("heading", { level: 1, name: "DYP evening" }),
+      ).toBeVisible();
+      await expect(
+        shared.getByText("Finished", { exact: false }).first(),
+      ).toBeVisible();
+      // Every match of the round robin with its score. The viewer's standings
+      // and places are still the demo's contract until P10 (see the fixme).
+      const results = shared.getByRole("region", { name: "Results" });
+      for (let round = 1; round <= ROUNDS; round++) {
+        await expect(
+          results.getByRole("region", {
+            name: `Round ${n(round)}`,
+            exact: true,
+          }),
+        ).toBeVisible();
+      }
+      await expect(results.getByRole("listitem")).toHaveCount(MATCHES);
+      await expect(results.getByText("10 : 4").first()).toBeVisible();
+      await expect(shared).not.toHaveURL(/\/login/);
+    } finally {
+      await viewer.close();
+    }
+  });
+});
+
+test.fixme("P10: the shared view also shows the standings and the final places (§5.1.8)", async ({
   browser,
 }) => {
-  await test.step("copy the share link; open it in a fresh context without a session", async () => {
-    const viewer = await browser.newContext({ ignoreHTTPSErrors: true });
-    await viewer.close();
-  });
+  // GET /public/{token}/tournaments/{id}/standings and /places are not served
+  // yet: the viewer's "Standings" is empty and "Final places" is missing.
+  const viewer = await browser.newContext({ ignoreHTTPSErrors: true });
+  await viewer.close();
 });
