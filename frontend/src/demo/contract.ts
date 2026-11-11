@@ -33,6 +33,15 @@ export type TournamentState = "setup" | "in_progress" | "finished";
 export type Side = "side_1" | "side_2";
 export type Outcome = Side | "draw";
 
+// ---------------------------------------------------------------- demo only
+
+/** Never in the backend: the seeded account the login shows in demo mode. */
+export interface DemoAccount {
+  email: string;
+  password: string;
+  signup_code: string;
+}
+
 // ---------------------------------------------------------------- seasons and standings
 
 export interface SeasonStandingRow {
@@ -206,6 +215,12 @@ interface Json<T> {
 interface Errors {
   default: Json<ErrorResponse>;
 }
+interface NoParams {
+  query?: never;
+  header?: never;
+  path?: never;
+  cookie?: never;
+}
 interface Params<P> {
   query?: never;
   header?: never;
@@ -240,6 +255,11 @@ export interface ProvisionalPaths {
     get: Get<Season, SeasonStandingRow[]>;
   };
 
+  // players: the unfinished tournaments a player is in, which block a removal (BR-002)
+  "/api/v1/leagues/{league_id}/players/{player_id}/tournaments": {
+    get: Get<Params<{ league_id: Uuid; player_id: Uuid }>, TournamentSummary[]>;
+  };
+
   // tournaments
   "/api/v1/leagues/{league_id}/seasons/{season_id}/tournaments": {
     get: Get<Season, TournamentSummary[]>;
@@ -266,6 +286,27 @@ export interface ProvisionalPaths {
       TournamentRead
     >;
   };
+  "/api/v1/public/{share_token}/tournaments/{tournament_id}/standings": {
+    get: Get<
+      Params<{ share_token: string; tournament_id: Uuid }>,
+      TournamentStandingRow[]
+    >;
+  };
+
+  // public: the knockout, the Swiss and Monster DYP ranking and the places
+  // (the same reads as the organizer's, without an account)
+  "/api/v1/public/{share_token}/tournaments/{tournament_id}/bracket": {
+    get: Get<Params<{ share_token: string; tournament_id: Uuid }>, BracketRead>;
+  };
+  "/api/v1/public/{share_token}/tournaments/{tournament_id}/ranking": {
+    get: Get<Params<{ share_token: string; tournament_id: Uuid }>, RankingRead>;
+  };
+  "/api/v1/public/{share_token}/tournaments/{tournament_id}/places": {
+    get: Get<Params<{ share_token: string; tournament_id: Uuid }>, PlacesRead>;
+  };
+
+  // demo only: the backend never has this route
+  "/api/v1/demo/account": { get: Get<NoParams, DemoAccount> };
 }
 
 /**

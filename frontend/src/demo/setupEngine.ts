@@ -209,6 +209,10 @@ export function formatProblem(
   if (format.goals_per_game < 1 || format.field_count < 1) {
     return fail("positive_numbers");
   }
+  // The backend's bounds for a league's defaults (backend/openapi.json).
+  if (format.goals_per_game > 99 || format.field_count > 32) {
+    return fail("too_large");
+  }
   // FR-031: Monster DYP plays its own rounds, the other types do not.
   if (
     (format.type === "monster_dyp") !==

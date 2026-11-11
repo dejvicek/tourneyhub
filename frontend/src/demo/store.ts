@@ -4,6 +4,7 @@
 import type {
   LeagueRead,
   PlaceRow,
+  PlacesRead,
   PublicLeague,
   SeasonStandingRow,
   TournamentRead,
@@ -26,6 +27,7 @@ import {
   type StoredSeason,
   type StoredTournament,
 } from "./seed";
+import { createOutsideState, type OutsideState } from "./seedOutside";
 
 let state: DemoState = createSeed();
 
@@ -177,6 +179,33 @@ function places(t: StoredTournament): PlaceRow[] | null {
   );
 }
 
+/** The places with the reason for each, for the organizer and the share link alike. */
+export function placesRead(t: StoredTournament): PlacesRead {
+  syncBracket(t);
+  const table =
+    state.seasons.find((season) => season.id === t.season_id)
+      ?.placement_points ?? [];
+  const detailed = placesOf(t, table);
+  if (detailed) {
+    return detailed;
+  }
+  // A plain round robin: the base engine's places.
+  return {
+    complete: t.state === "finished",
+    rows: (places(t) ?? []).map((row) => ({
+      ...row,
+      reason: {
+        kind: "group_place" as const,
+        round: null,
+        score: null,
+        opponent_entry_id: null,
+        group_place: row.place,
+        group_format: "round_robin" as const,
+      },
+    })),
+  };
+}
+
 export function tournamentRead(t: StoredTournament): TournamentRead {
   syncBracket(t); // finals: the winners move on, the tournament finishes (FR-037)
   return {
@@ -219,4 +248,20 @@ export function publicLeague(shareToken: string): PublicLeague | undefined {
       .map(tournamentSummary),
     standings: season ? seasonStandingsOf(season.id) : [],
   };
+}
+
+// ---------------------------------------------------------------- outside (auth)
+// Accounts and sessions are no rows of DemoState; they live next to it and
+// start again with it: a new DemoState after resetDemoStore() gets a fresh
+// OutsideState.
+
+const outsideByState = new WeakMap<DemoState, OutsideState>();
+
+export function outsideDb(): OutsideState {
+  let outside = outsideByState.get(state);
+  if (outside === undefined) {
+    outside = createOutsideState(state.me);
+    outsideByState.set(state, outside);
+  }
+  return outside;
 }

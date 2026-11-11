@@ -15,7 +15,6 @@ import {
   knockoutPhase,
   need,
   participantsOf,
-  placesOf,
   planKnockout,
   previewOf,
   rankingOf,
@@ -28,7 +27,7 @@ import { demoId } from "../ids";
 import { apiError, route } from "../route";
 import { MONSTER_KNOCKOUT_MODES, rules } from "../rules";
 import type { StoredTournament } from "../seed";
-import { db, findTournament, tournamentRead } from "../store";
+import { db, findTournament, placesRead, tournamentRead } from "../store";
 
 interface Ids {
   league_id: string;
@@ -85,10 +84,6 @@ function participant(
   return participantsOf(t).find((p) => p.entry_id === entryId);
 }
 
-function seasonTable(t: StoredTournament): number[] {
-  return db().seasons.find((s) => s.id === t.season_id)?.placement_points ?? [];
-}
-
 export const finalsHandlers = [
   route(
     "get",
@@ -113,26 +108,7 @@ export const finalsHandlers = [
       if (!t) {
         return notFound(params);
       }
-      syncBracket(t);
-      const detailed = placesOf(t, seasonTable(t));
-      if (detailed) {
-        return detailed;
-      }
-      // A plain round robin: the base engine's places.
-      return {
-        complete: t.state === "finished",
-        rows: (tournamentRead(t).places ?? []).map((row) => ({
-          ...row,
-          reason: {
-            kind: "group_place" as const,
-            round: null,
-            score: null,
-            opponent_entry_id: null,
-            group_place: row.place,
-            group_format: "round_robin" as const,
-          },
-        })),
-      };
+      return placesRead(t);
     },
   ),
 

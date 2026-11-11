@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { api, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
+import { newId } from "@/lib/newId";
 
 import {
   DEMO_LEAGUE_ID,
@@ -9,6 +10,7 @@ import {
   DEMO_SHARE_TOKEN,
   demoId,
 } from "./ids";
+import { db } from "./store";
 
 const league = { league_id: DEMO_LEAGUE_ID };
 
@@ -105,7 +107,7 @@ describe("the demo's fake API", () => {
     await expect(
       dataOf(
         api.PUT("/api/v1/leagues/{league_id}/players/{player_id}/name", {
-          params: { path: { ...league, player_id: crypto.randomUUID() } },
+          params: { path: { ...league, player_id: newId() } },
           body: { name: "X" },
         }),
       ),
@@ -113,6 +115,10 @@ describe("the demo's fake API", () => {
   });
 
   it("starts a season only from the number it expects, and keeps a closed table (FR-021, BR-011)", async () => {
+    // BR-010: a new season only once every tournament is finished.
+    for (const tournament of db().tournaments) {
+      tournament.state = "finished";
+    }
     const stale = dataOf(
       provisionalApi.POST("/api/v1/leagues/{league_id}/seasons", {
         params: { path: league },

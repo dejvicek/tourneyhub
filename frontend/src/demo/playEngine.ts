@@ -5,6 +5,8 @@
 // live round-robin standings. They follow PRD.md §7.10–§7.16 loosely and
 // src/demo/rules.ts for the rules still open; none of this is the real
 // behaviour (ADR-009).
+import { newId } from "@/lib/newId";
+
 import type {
   FieldRead,
   FormResult,
@@ -221,7 +223,7 @@ export function addField(
   if (number !== expected) {
     return { status: 409, detail: { number, expected } };
   }
-  const field: FieldRead = { id: crypto.randomUUID(), number, match_id: null };
+  const field: FieldRead = { id: newId(), number, match_id: null };
   t.fields = [...t.fields, field].sort((a, b) => a.number - b.number);
   fill(t);
   return t.fields.find((f) => f.id === field.id) ?? field;

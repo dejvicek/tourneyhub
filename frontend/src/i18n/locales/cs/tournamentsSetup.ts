@@ -359,6 +359,7 @@ export const tournamentsSetup: CsMessages<typeof english> = {
     rules: {
       name_required: "Zadejte název turnaje.",
       positive_numbers: "Branek ve hře a hracích polí musí být alespoň 1.",
+      too_large: "Použijte nejvýš 99 branek ve hře a 32 hracích polí.",
       fr031: "Tento typ turnaje takovou skupinovou fázi nedovoluje.",
       fr032: "Hráčů je málo, potřeba je alespoň {{min}}.",
       br121: "BO2 nabízíme jen v ligách s remízami.",

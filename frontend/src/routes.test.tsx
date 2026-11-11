@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { DEMO_LEAGUE_ID, DEMO_SHARE_TOKEN } from "@/demo/ids";
 import { createSeed } from "@/demo/seed";
+import { outsideDb } from "@/demo/store";
 import { i18n } from "@/i18n";
 import { paths } from "@/lib/paths";
 import { renderAt } from "@/test/renderApp";
@@ -85,9 +86,16 @@ const SCREENS: Screen[] = [
   ["seasonStandings", "Season standings", "Pořadí sezóny"],
   ["players", "Players", "Hráči"],
   ["leagueSettings", "League settings", "Nastavení ligy"],
-  ["publicLeague", "League", "Liga"],
-  ["publicTournament", "Tournament", "Turnaj"],
+  ["publicLeague", "Thursday Foosball", "Thursday Foosball"],
+  ["publicTournament", "Thursday DYP", "Thursday DYP"],
 ];
+
+/** The login of someone who is signed in goes to My leagues (D33). */
+function signOutForLogin(name: keyof typeof paths) {
+  if (name === "login") {
+    outsideDb().signedInUserId = null;
+  }
+}
 
 async function findTitle(title: string, overlay = false) {
   // A screen's title can wait for its data, slowly under a full run.
@@ -113,6 +121,7 @@ describe("the route table", () => {
   it.each(SCREENS)(
     "renders %s with its English title",
     async (name, en, _, options) => {
+      signOutForLogin(name);
       renderAt(generatePath(paths[name], { ...params, ...options?.params }));
 
       expect(await findTitle(en, options?.overlay)).toBeInTheDocument();
@@ -123,6 +132,7 @@ describe("the route table", () => {
     "renders %s with its Czech title",
     async (name, _, cs, options) => {
       await i18n.changeLanguage("cs");
+      signOutForLogin(name);
       renderAt(generatePath(paths[name], { ...params, ...options?.params }));
 
       expect(await findTitle(cs, options?.overlay)).toBeInTheDocument();
