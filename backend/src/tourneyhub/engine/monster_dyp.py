@@ -148,7 +148,7 @@ class MonsterStanding:
         place: The shown place: players level on points and on every enabled
             tie-breaker share the position of the best of them (BR-074).
         points: The player's own points from results and sit-outs (BR-070,
-            BR-071).
+            BR-076, BR-077).
         bh1: The sum of the points of both opponents, once per match (BR-073).
         bh2: The sum of those opponents' BH1, once per match (BR-073).
         score_difference: Goals for minus goals against, entered scores only
@@ -294,8 +294,8 @@ def monster_standings(
     """Compute the Monster DYP standings (BR-070 to BR-074, FR-043, FR-060).
 
     Each player collects their own points: a win earns both players of the
-    team 2, a draw 1 and a loss 0 (BR-070); a sit-out earns `sit_out_points`,
-    0, 1 or 2 (BR-071). Players are ordered by points, then by `tiebreakers`, the
+    team 2, a draw 1 and a loss 0 (BR-070); each player who sits out earns
+    `sit_out_points`, 0, 1 or 2 (BR-071, BR-077), as points (BR-076). Players are ordered by points, then by `tiebreakers`, the
     enabled tie-breakers in the organizer's order, each higher first (BR-072,
     FR-043). BH1 sums the current points of both opponents, once per match,
     and BH2 sums those opponents' BH1; partners and sit-outs add nothing

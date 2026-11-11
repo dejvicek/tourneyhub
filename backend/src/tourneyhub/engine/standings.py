@@ -65,8 +65,8 @@ class StandingRow:
         drawn: Matches drawn.
         lost: Matches lost.
         sat_out: Rounds sat out (BR-051).
-        points: 2 per win, 1 per draw and the sit-out points per round sat
-            out (BR-070, BR-071).
+        points: 2 per win and 1 per draw (BR-070); a round sat out earns none
+            in a round robin (BR-071).
         score_difference: Goals for minus goals against, over the games with
             a score (BR-101).
         form: The entry's latest results, at most `FORM_LENGTH`, oldest first.

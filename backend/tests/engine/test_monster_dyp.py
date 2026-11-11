@@ -297,7 +297,7 @@ def test_br073_bh1_sums_both_opponents_and_bh2_their_bh1() -> None:
 
 
 @pytest.mark.parametrize("sit_out_points", [0, 1, 2])
-def test_br071_a_sit_out_earns_the_sit_out_points(sit_out_points: int) -> None:
+def test_br076_a_sit_out_earns_the_sit_out_points(sit_out_points: int) -> None:
     rounds = [
         MonsterRound(
             round_no=1,
@@ -323,7 +323,7 @@ def test_br071_a_sit_out_earns_the_sit_out_points(sit_out_points: int) -> None:
     )
 
 
-def test_br071_each_player_who_sits_out_gets_2_points_that_bh1_and_bh2_sum() -> None:
+def test_br077_each_player_who_sits_out_gets_2_points_that_bh1_and_bh2_sum() -> None:
     rounds = [
         MonsterRound(
             round_no=1,
