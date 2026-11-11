@@ -6,6 +6,7 @@ export const tournaments: CsMessages<Messages["tournaments"]> = {
   ...tournamentsSetup,
   header: {
     menu: "Nabídka: jazyk a účet",
+    shareLink: "Zkopírovat odkaz na tento turnaj",
     back: "Zpět na turnaje",
     tabs: "Pohledy na turnaj",
   },

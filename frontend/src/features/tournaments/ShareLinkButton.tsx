@@ -30,7 +30,7 @@ export function ShareLinkButton({
         type="button"
         variant="ghost"
         size="icon"
-        aria-label={t("shell.copyShareLink")}
+        aria-label={t("tournaments.header.shareLink")}
         disabled={shareToken === undefined}
         onClick={() => {
           if (shareToken === undefined) {

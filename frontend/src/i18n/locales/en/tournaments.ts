@@ -6,6 +6,7 @@ export const tournaments = {
   ...tournamentsSetup,
   header: {
     menu: "Menu: language and account",
+    shareLink: "Copy this tournament's share link",
     back: "Back to tournaments",
     tabs: "Views of this tournament",
   },
