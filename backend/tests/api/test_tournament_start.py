@@ -423,27 +423,84 @@ def _set_draws(
     assert response.status_code == 200, response.text
 
 
-def test_br071_generating_fixes_the_sit_out_points(
+S1_WINS: Json = {
+    "walkover_winner": None,
+    "games": [{"winner": "side_1", "score_1": 10, "score_2": 7}],
+}
+
+
+def _sit_out(
+    client: TestClient, league: League, headers: dict[str, str], tournament: Json
+) -> tuple[int, bool]:
+    read = client.get(_t_url(league, tournament["tournament_id"]), headers=headers)
+    [phase] = read.json()["phases"]
+    return phase["sit_out_points"], phase["sit_out_points_set_by_hand"]
+
+
+def _first_result(
+    client: TestClient, league: League, headers: dict[str, str], started: Json
+) -> None:
+    match = next(
+        m
+        for r in started["rounds"]
+        for m in r["matches"]
+        if not any(side["is_bye"] for side in m["sides"])
+    )
+    response = client.put(
+        _t_url(league, started["id"], f"/matches/{match['id']}/result"),
+        json=S1_WINS,
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+
+
+def test_br071_after_generating_a_draw_change_moves_the_default_until_the_first_result(
     client: TestClient, league: League, headers: dict[str, str], players: list[str]
 ) -> None:
     _set_draws(client, league, headers, allowed=True)
     setup = _setup(client, league, headers, players[:3], sit_out_points=None)
     assert setup["format"]["sit_out_points"] == 1
-    started = _started(client, league, setup, headers)
+    _started(client, league, setup, headers)
 
+    _set_draws(client, league, headers, allowed=False)
+
+    assert _sit_out(client, league, headers, setup) == (2, False)
+
+    _set_draws(client, league, headers, allowed=True)
+
+    assert _sit_out(client, league, headers, setup) == (1, False)
+
+
+def test_br071_after_the_first_result_nothing_moves_the_default(
+    client: TestClient, league: League, headers: dict[str, str], players: list[str]
+) -> None:
+    _set_draws(client, league, headers, allowed=True)
+    setup = _setup(client, league, headers, players[:3], sit_out_points=None)
+    started = _started(client, league, setup, headers)
+    _first_result(client, league, headers, started)
+
+    _set_draws(client, league, headers, allowed=False)
+
+    assert _sit_out(client, league, headers, setup) == (1, False)
     refused = client.put(
         _t_url(league, setup["tournament_id"], "/format"),
         json={**ROUND_ROBIN, "group_match_format": "bo3", "sit_out_points": None},
         headers=headers,
     )
-    _set_draws(client, league, headers, allowed=False)
-
-    [phase] = started["phases"]
-    assert (phase["sit_out_points"], phase["sit_out_points_set_by_hand"]) == (1, False)
     assert refused.status_code == 409
     assert refused.json()["code"] == "tournament_not_in_setup"
-    read = client.get(_t_url(league, setup["tournament_id"]), headers=headers)
-    assert read.json()["phases"][0]["sit_out_points"] == 1
+    assert _sit_out(client, league, headers, setup) == (1, False)
+
+
+def test_br071_a_manual_pick_never_moves_after_generating(
+    client: TestClient, league: League, headers: dict[str, str], players: list[str]
+) -> None:
+    setup = _setup(client, league, headers, players[:3], sit_out_points=2)
+    _started(client, league, setup, headers)
+
+    _set_draws(client, league, headers, allowed=True)
+
+    assert _sit_out(client, league, headers, setup) == (2, True)
 
 
 def test_fr030_a_tournament_in_setup_reads_without_rounds(

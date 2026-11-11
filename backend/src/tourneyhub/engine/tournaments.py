@@ -161,6 +161,9 @@ def default_sit_out_points(match_format: MatchFormat, *, draws_allowed: bool) ->
     A sit-out is worth a draw (1) only where a match can end level: the league
     allows draws and the match format is BO1 or BO2. In every other case it is
     worth a win (2), so a sit-out never earns a result that no match can produce.
+    The default follows the match format and the league's draw setting until the
+    group phase's first result, unless the organizer picked a value by hand; then
+    it is fixed (BR-071, as reviewed in #46), the same boundary as FR-054.
     """
     level = draws_allowed and match_format in {MatchFormat.BO1, MatchFormat.BO2}
     return 1 if level else 2

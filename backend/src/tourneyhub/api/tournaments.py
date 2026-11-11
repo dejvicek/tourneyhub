@@ -154,8 +154,8 @@ class TournamentFormatWrite(_FormatChecks):
     own choice and stays; null takes the default and follows it
     (`sit_out_points_set_by_hand` false in the read). The default is 1 when the
     league allows draws and the group phase plays BO1 or BO2, otherwise 2; a
-    change of the league's draw setting during setup moves it too. Generating the
-    schedule fixes the value.
+    change of the league's draw setting moves it too. The value is fixed at the
+    first result of the group phase (BR-071, as reviewed in #46).
     Any number counts as a manual pick, even one equal to the default, so a
     client that read the format must send null, not the read value, while
     `sit_out_points_set_by_hand` is false to keep following the default.
@@ -273,7 +273,8 @@ class TournamentFormatRead(ResponseModel):
 
     `sit_out_points_set_by_hand` tells whether the organizer chose the
     sit-out points (true) or they are the default (false): it follows the
-    league's draw setting and the group phase's match format until generating.
+    league's draw setting and the group phase's match format until the phase's
+    first result (BR-071, as reviewed in #46).
     """
 
     name: str

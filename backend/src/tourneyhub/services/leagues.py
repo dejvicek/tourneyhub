@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from tourneyhub.db.models.leagues import League, Season
+from tourneyhub.db.models.matches import Match, Round
 from tourneyhub.db.models.tournaments import Tournament, TournamentPhase
 from tourneyhub.engine.leagues import (
     DEFAULT_PLACEMENT_POINTS,
@@ -152,19 +153,30 @@ def update_league(
 
 
 def _refresh_sit_out_defaults(session: Session, league: League) -> None:
-    """Move the sit-out default of tournaments still in setup (FR-039, BR-071).
+    """Move the sit-out default until the group phase's first result (BR-071).
 
     The default depends on the league's draw setting, so a group phase that
-    follows it (not set by hand) is recomputed in the same transaction. Once the
-    schedule is generated the tournament leaves setup and the value stays.
+    follows it (not set by hand) is recomputed in the same transaction. That
+    covers a tournament in setup and one in progress whose group phase has no
+    result yet, the same boundary as the format change of FR-054. After the first
+    result the value is fixed (BR-071, as reviewed in #46). The first result is
+    the first match of the phase with an outcome (`matches.outcome`), found with
+    an EXISTS on the phase's rounds.
     """
+    has_result = (
+        select(Match.id)
+        .join(Round, Match.round_id == Round.id)
+        .where(Round.phase_id == TournamentPhase.id, Match.outcome.is_not(None))
+        .exists()
+    )
     phases = session.scalars(
         select(TournamentPhase)
         .join(Tournament, TournamentPhase.tournament_id == Tournament.id)
         .join(Season, Tournament.season_id == Season.id)
         .where(
             Season.league_id == league.id,
-            Tournament.state == TournamentState.SETUP,
+            Tournament.state.in_((TournamentState.SETUP, TournamentState.IN_PROGRESS)),
+            ~has_result,
             TournamentPhase.kind == PhaseKind.GROUP,
             TournamentPhase.sit_out_points_set_by_hand.is_(False),
         )
