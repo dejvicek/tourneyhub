@@ -9,6 +9,8 @@ import {
   fieldsOf,
   matchesOf,
   type Organizer,
+  playerIdsOf,
+  startDypRoundRobin,
 } from "./support/api";
 import { setSignupCode } from "./support/stack";
 
@@ -524,14 +526,105 @@ test("the group is done and the organizer finishes: places with season points (�
   });
 });
 
-test.fixme("P10: the knockout of the top 4 decides the places (§5.1.6, §5.1.7)", async ({
+test("the knockout of the top 4 decides the places (§5.1.6, §5.1.7)", async ({
   page,
+  request,
 }) => {
+  // The evening's own tournament is finished above; a second DYP of the same
+  // twelve plays its round robin over the API, and the UI draws and plays
+  // the knockout (FR-045, BR-040–BR-044, BR-102, BR-120).
+  const token = await accessTokenOf(request, organizer);
+  const ids = await playerIdsOf(request, token, evening.leagueId);
+  const tournamentId = await startDypRoundRobin(
+    request,
+    token,
+    evening.leagueId,
+    {
+      name: "Knockout night",
+      playerIds: PLAYERS.map((name) => ids.get(name) ?? ""),
+    },
+  );
+  const matches = await matchesOf(
+    request,
+    token,
+    evening.leagueId,
+    tournamentId,
+  );
+  for (const [index, match] of matches.entries()) {
+    await enterResult(
+      request,
+      token,
+      evening.leagueId,
+      tournamentId,
+      match.id,
+      {
+        goals: 10,
+        against: index % 10,
+      },
+    );
+  }
   await logIn(page);
+  const knockout = `/leagues/${evening.leagueId}/tournaments/${tournamentId}/knockout`;
 
   await test.step("start a knockout for the top 4 without a third-place match, BO3 final", async () => {
-    // 1st v 4th and 2nd v 3rd; the bracket advances by itself; the final's
-    // result finishes the tournament: places 1, 2, 3 (shared), 5, 6.
+    await page.goto(`${knockout}/start?qualifiers=4&thirdPlace=false`);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Start the knockout" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Semifinals" }),
+    ).toBeVisible();
+    await page
+      .getByRole("radiogroup", { name: "Final" })
+      .getByRole("radio", { name: "BO3" })
+      .click();
+    await page.getByRole("button", { name: "Draw the knockout" }).click();
+    await expect(page).toHaveURL(knockout);
+    await expect(page.getByText("Semifinal 1").first()).toBeVisible();
+  });
+
+  await test.step("1st v 4th and 2nd v 3rd; the winners fill the final", async () => {
+    for (const semifinal of ["Semifinal 1", "Semifinal 2"]) {
+      await page
+        .getByRole("link", { name: `Enter result, ${semifinal}` })
+        .first()
+        .click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+      await tapScore(page);
+      await page.getByRole("button", { name: "Save result" }).click();
+      await expect(page.getByRole("dialog")).toBeHidden();
+    }
+  });
+
+  await test.step("the final's BO3 result finishes the tournament: 1, 2, 3 shared, 5, 6", async () => {
+    await page
+      .getByRole("link", { name: "Enter result, Final" })
+      .first()
+      .click();
+    const sheet = page.getByRole("dialog");
+    await sheet.getByRole("tab", { name: "Winners only" }).click();
+    for (const game of [1, 2]) {
+      await sheet
+        .getByRole("radiogroup", { name: `Winner of game ${n(game)}` })
+        .getByRole("radio")
+        .first()
+        .click();
+    }
+    await sheet.getByRole("button", { name: "Save result" }).click();
+    await page.getByRole("link", { name: "See the final places" }).click();
+    await expect(page).toHaveURL(/\/places$/);
+    // One row per place: the semifinal losers share 3rd (BR-102, BR-111).
+    const rows = page
+      .getByRole("region", { name: "Final places" })
+      .getByRole("listitem");
+    await expect(rows).toHaveCount(PAIRS - 1);
+    await expect(rows.nth(0)).toContainText("Won the final 2:0");
+    await expect(rows.nth(0)).toContainText("+10 each");
+    await expect(rows.nth(1)).toContainText("+8 each");
+    await expect(rows.nth(2)).toContainText("Shared. Lost in the semifinals.");
+    await expect(rows.nth(2)).toContainText("+5 each");
+    await expect(rows.nth(3)).toContainText("5th in the round robin");
+    await expect(rows.nth(3)).toContainText("+2 each");
   });
 });
 
