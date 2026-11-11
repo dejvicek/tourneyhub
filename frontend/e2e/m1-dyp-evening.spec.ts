@@ -1,5 +1,5 @@
 /* eslint-disable playwright/expect-expect -- the fixme parts have no body yet; each package that enables one writes its assertions */
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 
 import {
   accessTokenOf,
@@ -56,7 +56,34 @@ const n = (value: number) => String(value);
 const LEAGUE_NAME = "Thursday Foosball";
 
 /** What the later parts need from the earlier ones. */
-const evening = { leagueId: "", tournamentId: "" };
+const evening = { leagueId: "", tournamentId: "", shareLink: "" };
+
+interface SeasonRow {
+  place: number;
+  played: number;
+  wins: number;
+  points: number;
+}
+
+/** The body rows of a season standings table: place, player, played, wins, points. */
+async function seasonRows(table: Locator): Promise<SeasonRow[]> {
+  const rows = await table
+    .getByRole("row")
+    .filter({ has: table.page().getByRole("cell") })
+    .evaluateAll((trs) =>
+      trs.map((tr) =>
+        // The player's name is a cell on the organizer's table and a row
+        // header on the viewer's; either way it is the second child.
+        [...tr.children].map((cell) => cell.textContent),
+      ),
+    );
+  return rows.map(([place, , played, wins, points]) => ({
+    place: Number.parseInt(place ?? "", 10),
+    played: Number(played),
+    wins: Number(wins),
+    points: Number(points),
+  }));
+}
 
 async function logIn(page: Page) {
   await page.goto("/login");
@@ -508,13 +535,37 @@ test.fixme("P10: the knockout of the top 4 decides the places (§5.1.6, §5.1.7)
   });
 });
 
-test.fixme("P10: the season standings add 10, 8, 5 and 5 points (§5.1.7)", async ({
+test("the season standings add the tournament's points (§5.1.7)", async ({
   page,
 }) => {
   await logIn(page);
+  await page.goto(`/leagues/${evening.leagueId}/standings`);
 
-  await test.step("open the season standings; winners 10, runners-up 8, semifinal losers 5 each", async () => {
-    // Then 2 points for 5th, 0 for 6th.
+  await test.step("every player of the finished tournament is on the table", async () => {
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Season standings" }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("after 1 finished tournament", { exact: false }),
+    ).toBeVisible();
+    await expect(page.getByRole("table")).toBeVisible();
+    const rows = await seasonRows(page.getByRole("table"));
+    expect(rows).toHaveLength(PLAYERS.length);
+    // Both players of a pair get the entry's points (BR-100): the winning pair
+    // 10 each (the places screen above), nobody more.
+    expect(rows.slice(0, 2)).toEqual([
+      expect.objectContaining({ place: 1, played: 1, wins: 1, points: 10 }),
+      expect.objectContaining({ place: 1, played: 1, wins: 1, points: 10 }),
+    ]);
+    expect(rows.every((row) => row.played === 1)).toBe(true);
+    expect(rows.reduce((sum, row) => sum + row.wins, 0)).toBe(2);
+    const points = rows.map((row) => row.points);
+    expect(points).toEqual([...points].sort((a, b) => b - a));
+  });
+
+  await test.step("the tournament counts, and links to its places", async () => {
+    await page.getByRole("link", { name: /DYP evening/ }).click();
+    await expect(page).toHaveURL(/\/places$/);
   });
 });
 
@@ -533,6 +584,7 @@ test.describe("the share link (§5.1.8)", () => {
     await expect(page.getByText("Share link copied")).toBeVisible();
     const link = await page.evaluate(() => navigator.clipboard.readText());
     expect(link).toMatch(/\/public\/[^/]+$/);
+    evening.shareLink = link;
 
     // A fresh context: no cookie, no token in memory.
     const viewer = await browser.newContext({
@@ -560,7 +612,7 @@ test.describe("the share link (§5.1.8)", () => {
         shared.getByText("Finished", { exact: false }).first(),
       ).toBeVisible();
       // Every match of the round robin with its score. The viewer's standings
-      // and places are still the demo's contract until P10 (see the fixme).
+      // and places come in the next test.
       const results = shared.getByRole("region", { name: "Results" });
       for (let round = 1; round <= ROUNDS; round++) {
         await expect(
@@ -579,11 +631,56 @@ test.describe("the share link (§5.1.8)", () => {
   });
 });
 
-test.fixme("P10: the shared view also shows the standings and the final places (§5.1.8)", async ({
+test("the shared view also shows the season standings and the final places (§5.1.8)", async ({
   browser,
 }) => {
-  // GET /public/{token}/tournaments/{id}/standings and /places are not served
-  // yet: the viewer's "Standings" is empty and "Final places" is missing.
-  const viewer = await browser.newContext({ ignoreHTTPSErrors: true });
-  await viewer.close();
+  expect(evening.shareLink).not.toBe("");
+  const viewer = await browser.newContext({
+    ignoreHTTPSErrors: true,
+    locale: "en-US",
+  });
+  try {
+    const shared = await viewer.newPage();
+    const problems: string[] = [];
+    shared.on("console", (message) => {
+      if (message.type() === "error" || message.type() === "warning") {
+        problems.push(`console ${message.type()}: ${message.text()}`);
+      }
+    });
+    shared.on("response", (response) => {
+      if (response.status() >= 400) {
+        problems.push(`${n(response.status())} ${response.url()}`);
+      }
+    });
+
+    await test.step("the league page has the season standings", async () => {
+      await shared.goto(evening.shareLink);
+      const standings = shared.getByRole("region", {
+        name: "Season standings",
+      });
+      await expect(standings.getByRole("table")).toBeVisible();
+      const rows = await seasonRows(standings.getByRole("table"));
+      expect(rows).toHaveLength(PLAYERS.length);
+      expect(rows[0]).toEqual(
+        expect.objectContaining({ place: 1, played: 1, wins: 1, points: 10 }),
+      );
+    });
+
+    await test.step("the tournament page has the standings and the final places", async () => {
+      await shared.getByRole("link", { name: /DYP evening/ }).click();
+      const places = shared.getByRole("region", { name: "Final places" });
+      await expect(places.getByRole("listitem")).toHaveCount(PAIRS);
+      await expect(places.getByRole("listitem").first()).toContainText(
+        "+10 each",
+      );
+      const table = shared
+        .getByRole("region", { name: "Standings", exact: true })
+        .getByRole("table");
+      await expect(table.getByRole("row")).toHaveCount(PAIRS + 1);
+    });
+
+    expect(problems).toEqual([]);
+  } finally {
+    await viewer.close();
+  }
 });
