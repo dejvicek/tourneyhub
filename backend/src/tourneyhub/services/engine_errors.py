@@ -6,6 +6,7 @@ from tourneyhub.engine.errors import (
     NotEnoughEntriesError,
     NotEnoughPlayersError,
     PlayerOnAnotherFieldError,
+    QualifierCountError,
     ResultDoesNotFitFormatError,
     ScoresRequiredError,
     TooManyLeftOutError,
@@ -41,6 +42,13 @@ def to_app_error(error: EngineError) -> RuleViolationError:  # noqa: PLR0911  (o
         case ResultDoesNotFitFormatError(match_format=match_format, games=games):
             return RuleViolationError(
                 ErrorCode.RESULT_DOES_NOT_FIT_FORMAT, format=match_format, games=games
+            )
+        case QualifierCountError(minimum=minimum, maximum=maximum, given=given):
+            return RuleViolationError(
+                ErrorCode.QUALIFIERS_OUT_OF_RANGE,
+                minimum=minimum,
+                maximum=maximum,
+                given=given,
             )
         case PlayerOnAnotherFieldError(player_ids=player_ids, field_ids=field_ids):
             return RuleViolationError(

@@ -66,6 +66,14 @@ class ErrorCode(StrEnum):
     MATCH_NOT_FOUND = "match_not_found"
     MATCH_SIDES_UNKNOWN = "match_sides_unknown"  # BR-091
     GROUP_PHASE_NOT_DONE = "group_phase_not_done"  # FR-040
+    GROUP_PHASE_LOCKED = "group_phase_locked"  # the knockout is drawn (BR-053)
+    RESULT_LOCKED = "result_locked"  # a later knockout match has a result (BR-094)
+    CURRENT_PHASE_CHANGED = "current_phase_changed"  # the knockout was drawn (FR-045)
+    QUALIFIERS_OUT_OF_RANGE = "qualifiers_out_of_range"  # BR-080
+    PHASE_NOT_FOUND = "phase_not_found"
+    PHASE_NOT_DELETABLE = "phase_not_deletable"  # only a knockout after a group phase
+    KNOCKOUT_NOT_FOUND = "knockout_not_found"  # the tournament has no knockout
+    KNOCKOUT_MODE_NOT_APPLICABLE = "knockout_mode_not_applicable"  # Monster DYP only
     # Fields (FR-090 to FR-094)
     FIELD_NOT_FOUND = "field_not_found"
     FIELD_NUMBER_CHANGED = "field_number_changed"  # the expected new number is stale
