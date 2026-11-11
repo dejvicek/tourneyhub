@@ -16,7 +16,7 @@ from tourneyhub.api.deps import ClockDep, CurrentUserDep, SessionDep
 from tourneyhub.api.public_headers import PUBLIC_PREFIX
 from tourneyhub.api.schemas import ErrorResponse, RequestModel, ResponseModel
 from tourneyhub.api.tournaments import TournamentRead
-from tourneyhub.engine.knockout import RoundName
+from tourneyhub.engine.knockout import MAX_KNOCKOUT_ENTRIES, RoundName
 from tourneyhub.engine.tournaments import (
     KnockoutMatchFormat,
     MatchFormat,
@@ -48,10 +48,7 @@ _WRITE_ERRORS: dict[int | str, dict[str, object]] = {
     HTTPStatus.UNPROCESSABLE_CONTENT: {"model": ErrorResponse},
 }
 
-MAX_QUALIFIERS = 256
-"""The most entries a tournament is sized for (FR-032)."""
-
-type Qualifiers = Annotated[int, Field(ge=2, le=MAX_QUALIFIERS)]
+type Qualifiers = Annotated[int, Field(ge=2, le=MAX_KNOCKOUT_ENTRIES)]
 
 
 class KnockoutProblemRead(ResponseModel):
@@ -119,7 +116,9 @@ class KnockoutWrite(RequestModel):
     """
 
     expected_current_phase_id: UUID
-    expected_qualifier_ids: Annotated[list[UUID], Field(max_length=MAX_QUALIFIERS)]
+    expected_qualifier_ids: Annotated[
+        list[UUID], Field(max_length=MAX_KNOCKOUT_ENTRIES)
+    ]
     qualifiers: Qualifiers
     third_place_match: bool
     match_format: KnockoutMatchFormat | None
@@ -251,7 +250,7 @@ class PublicBracketRead(ResponseModel):
 def read_knockout_preview(
     league_id: UUID,
     tournament_id: UUID,
-    qualifiers: Annotated[int, Query(ge=2, le=MAX_QUALIFIERS)],
+    qualifiers: Annotated[int, Query(ge=2, le=MAX_KNOCKOUT_ENTRIES)],
     third_place_match: bool,  # noqa: FBT001  (a query parameter, not a flag argument)
     session: SessionDep,
     user: CurrentUserDep,
