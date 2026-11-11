@@ -80,7 +80,7 @@ class PublicTournamentRead(ResponseModel):
 
 # The docstring below is API text (openapi.json) and was left as it is. Its "the
 # sit-out points of the rounds sat out" holds for Swiss and Monster DYP (BR-071,
-# BR-078); a round robin has none (BR-071), which PR #65 (closes #59) makes true.
+# BR-076); a round robin has none (BR-071), which PR #65 (closes #59) makes true.
 class PublicStandingRow(ResponseModel):
     """One entry's line in a round robin's standings, for viewers (FR-060, BR-101).
 

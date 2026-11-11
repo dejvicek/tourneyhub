@@ -92,7 +92,7 @@ type PlayerIds = Annotated[
 ]
 
 type SitOutPoints = Literal[0, 1, 2]
-"""The points of a sit-out (FR-039, BR-071, BR-076).
+"""The points of a sit-out (FR-039, BR-071, BR-075).
 
 Only a Swiss or Monster DYP phase has them; a round robin has none, not even 0
 (BR-071). The API still takes a value for a round robin; PR #65 (closes
@@ -120,8 +120,8 @@ class _FormatChecks(RequestModel):
         group phase, its settings apply; without one, the knockout's. With
         `complete`, every setting that applies must be given (`final_match_format`
         may be null: the final plays the knockout's format; `sit_out_points` may
-        be null: the default of FR-039 and BR-075, which the code still takes from
-        the match format alone, issue #59).
+        be null: the default of FR-039, 0, which the code still takes from the
+        match format, PR #65).
         """
         if (self.type is TournamentType.MONSTER_DYP) != (
             self.group_phase is GroupPhase.MONSTER_DYP
@@ -149,10 +149,10 @@ class _FormatChecks(RequestModel):
 
 
 # The docstring below is API text (openapi.json) and was left as it is. It still
-# says that `sit_out_points` null follows the default of the match format only.
-# The PRD (BR-075, BR-077) makes the default follow the match format and the
-# league's draw setting while the phase has no result, and BR-071 allows no
-# value for a round robin. PR #65 (closes #59) changes the behaviour and this text.
+# says that `sit_out_points` null follows the default of the match format. The
+# PRD (FR-039) makes the default 0, with nothing following the match format or
+# the draw setting, and BR-071 allows no value for a round robin. PR #65
+# changes the behaviour and this text.
 class TournamentFormatWrite(_FormatChecks):
     """The whole format of a tournament in setup, the target state (FR-030, FR-031).
 
@@ -186,9 +186,9 @@ class TournamentFormatWrite(_FormatChecks):
 
 
 # The docstring below is API text (openapi.json) and was left as it is: its
-# "default sit-out points of the match format" is the match format only. BR-075
-# adds the league's draw setting and BR-077 the no-result state; BR-071 gives a
-# round robin no value. PR #65 (closes #59) changes the behaviour and this text.
+# "default sit-out points of the match format" follows the match format. FR-039
+# makes the default 0, and BR-071 gives a round robin no value. PR #65 changes
+# the behaviour and this text.
 class TournamentCreate(_FormatChecks):
     """A new tournament in the league's active season (FR-030).
 
@@ -586,9 +586,9 @@ class WaitingMatchRead(ResponseModel):
 
 # The docstring below is API text (openapi.json) and was left as it is. Its
 # "points include the sit-out points" holds for Swiss and Monster DYP (BR-071,
-# BR-078); a round robin has none (BR-071), which PR #65 (closes #59) makes true. A
+# BR-076); a round robin has none (BR-071), which PR #65 (closes #59) makes true. A
 # sit-out counts in the running standings once every match of its round has a
-# result (BR-078).
+# result (BR-076).
 class PlayStandingRow(ResponseModel):
     """One entry's line in the group-phase standings (BR-101, FR-060).
 
@@ -836,7 +836,7 @@ def start_tournament(
 
 
 # The summary below is API text (openapi.json) and was left as it is: "until the
-# first result". FR-036 and BR-077 say "while no match in the tournament has a
+# first result". FR-036 and BR-096 say "while no match in the tournament has a
 # result", which is also true again once every result is cleared (FR-053). The
 # service already refuses on any result, so only the text changes, in issue #59.
 @router.post("/tournaments/{tournament_id}/back-to-setup", responses=_WRITE_ERRORS)
