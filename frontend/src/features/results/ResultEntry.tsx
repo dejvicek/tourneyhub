@@ -119,48 +119,8 @@ export function ResultEntry({
       : entryId === null || inKnockout
         ? null
         : (model.entries.get(entryId)?.seed ?? null);
-  const context: ResultFormContext = {
-    info,
-    names: [names.side(sideA), names.side(sideB)],
-    firstNames: [names.sideFirst(sideA), names.sideFirst(sideB)],
-    seeds: [seedOf(sideA.entry_id, 0), seedOf(sideB.entry_id, 1)],
-    goalsPerGame: model.tournament.goals_per_game,
-    required: scoresRequired(phase),
-    drawAllowed: drawsAllowed(phase, league.data?.draws_allowed ?? false),
-    locked,
-    pending: save.isPending,
-    standings: play?.standings,
-    onSave,
-  };
-
-  return (
-    <div className="space-y-4">
-      {lock !== null && (
-        <Notice variant="warning" title={t(`results.locked.${lock}.title`)}>
-          {t(`results.locked.${lock}.body`)}
-        </Notice>
-      )}
-      {walkover ? (
-        <WalkoverForm
-          names={context.names}
-          initial={
-            match.is_walkover
-              ? match.outcome === "side_2"
-                ? "side_2"
-                : "side_1"
-              : null
-          }
-          pending={save.isPending || locked}
-          onSave={onSave}
-          onCancel={() => {
-            setWalkover(false);
-          }}
-        />
-      ) : info.format === "bo1" ? (
-        <SimpleResultForm context={context} />
-      ) : (
-        <BestOfResultPage context={context} />
-      )}
+  const actions = (
+    <>
       {errorText !== null && (
         <p role="alert" className="text-body-md font-bold text-destructive">
           {errorText}
@@ -214,6 +174,53 @@ export function ResultEntry({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+      )}
+    </>
+  );
+  const context: ResultFormContext = {
+    info,
+    names: [names.side(sideA), names.side(sideB)],
+    firstNames: [names.sideFirst(sideA), names.sideFirst(sideB)],
+    seeds: [seedOf(sideA.entry_id, 0), seedOf(sideB.entry_id, 1)],
+    goalsPerGame: model.tournament.goals_per_game,
+    required: scoresRequired(phase),
+    drawAllowed: drawsAllowed(phase, league.data?.draws_allowed ?? false),
+    locked,
+    pending: save.isPending,
+    standings: play?.standings,
+    onSave,
+    actions,
+  };
+
+  return (
+    <div className="space-y-4">
+      {lock !== null && (
+        <Notice variant="warning" title={t(`results.locked.${lock}.title`)}>
+          {t(`results.locked.${lock}.body`)}
+        </Notice>
+      )}
+      {walkover ? (
+        <WalkoverForm
+          names={context.names}
+          initial={
+            match.is_walkover
+              ? match.outcome === "side_2"
+                ? "side_2"
+                : "side_1"
+              : null
+          }
+          pending={save.isPending || locked}
+          onSave={onSave}
+          onCancel={() => {
+            setWalkover(false);
+          }}
+        >
+          {actions}
+        </WalkoverForm>
+      ) : info.format === "bo1" ? (
+        <SimpleResultForm context={context} />
+      ) : (
+        <BestOfResultPage context={context} />
       )}
     </div>
   );

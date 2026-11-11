@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { StickyActions } from "@/components/StickyActions";
 import { Button } from "@/components/ui/button";
 import { RadioGroup } from "@/components/ui/radio-group";
 import type { ResultWrite, Side } from "@/demo/contract";
@@ -12,6 +13,8 @@ interface WalkoverFormProps {
   pending: boolean;
   onSave: (body: ResultWrite) => void;
   onCancel: () => void;
+  /** More actions under Cancel, such as clearing the result. */
+  children?: ReactNode;
 }
 
 /**
@@ -24,6 +27,7 @@ export function WalkoverForm({
   pending,
   onSave,
   onCancel,
+  children,
 }: WalkoverFormProps) {
   const { t } = useTranslation();
   const [winner, setWinner] = useState<Side | null>(initial);
@@ -48,27 +52,30 @@ export function WalkoverForm({
           title={t("results.walkover.option", { names: names[1] })}
         />
       </RadioGroup>
-      <Button
-        type="button"
-        onClick={() => {
-          if (winner !== null) {
-            onSave({ walkover_winner: winner, games: [] });
-          }
-        }}
-        disabled={winner === null || pending}
-        size="lg"
-        className="w-full"
-      >
-        {t("results.walkover.save")}
-      </Button>
-      <Button
-        type="button"
-        variant="text"
-        className="w-full"
-        onClick={onCancel}
-      >
-        {t("results.walkover.cancel")}
-      </Button>
+      <StickyActions>
+        <Button
+          type="button"
+          onClick={() => {
+            if (winner !== null) {
+              onSave({ walkover_winner: winner, games: [] });
+            }
+          }}
+          disabled={winner === null || pending}
+          size="lg"
+          className="w-full"
+        >
+          {t("results.walkover.save")}
+        </Button>
+        <Button
+          type="button"
+          variant="text"
+          className="w-full"
+          onClick={onCancel}
+        >
+          {t("results.walkover.cancel")}
+        </Button>
+        {children}
+      </StickyActions>
     </div>
   );
 }

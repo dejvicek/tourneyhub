@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { StickyActions } from "@/components/StickyActions";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -10,7 +11,6 @@ import {
   SheetClose,
   SheetContent,
   SheetDescription,
-  SheetFooter,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
@@ -96,7 +96,7 @@ function LateForm({
           {errorText(t, add.error)}
         </p>
       )}
-      <SheetFooter>
+      <StickyActions>
         <Button
           type="button"
           size="lg"
@@ -128,7 +128,7 @@ function LateForm({
             {t("finals.common.cancel")}
           </Button>
         </SheetClose>
-      </SheetFooter>
+      </StickyActions>
     </>
   );
 }
