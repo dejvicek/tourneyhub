@@ -113,7 +113,8 @@ class _FormatChecks(RequestModel):
         group phase, its settings apply; without one, the knockout's. With
         `complete`, every setting that applies must be given (`final_match_format`
         may be null: the final plays the knockout's format; `sit_out_points` may
-        be null: the default of the match format, FR-039).
+        be null: the default of the match format, FR-039). A round robin keeps
+        no `sit_out_points` (BR-071): a number is `sit_out_points_not_applicable`.
         """
         if (self.type is TournamentType.MONSTER_DYP) != (
             self.group_phase is GroupPhase.MONSTER_DYP
@@ -125,9 +126,17 @@ class _FormatChecks(RequestModel):
         applies = set(_GROUP_SETTINGS if grouped else _KNOCKOUT_SETTINGS)
         if self.group_phase is not GroupPhase.ROUND_ROBIN:
             applies.discard("round_robin_legs")
+        else:
+            applies.discard("sit_out_points")  # BR-071: Swiss and Monster DYP only
         for name in (*_GROUP_SETTINGS, *_KNOCKOUT_SETTINGS):
             value = getattr(self, name)
             if name not in applies and value is not None:
+                if name == "sit_out_points" and grouped:
+                    # BR-071: a round robin keeps no sit-out points.
+                    raise PydanticCustomError(
+                        "sit_out_points_not_applicable",
+                        "a round robin does not score a sit-out",
+                    )
                 raise PydanticCustomError(
                     "setting_not_applicable", "a setting does not fit the phases"
                 )
@@ -150,7 +159,9 @@ class TournamentFormatWrite(_FormatChecks):
     A setting that does not apply is 422 `validation_failed` with
     `setting_not_applicable`; one that applies and is missing, `setting_missing`.
 
-    `sit_out_points` is 0, 1 or 2 (FR-039, BR-071). A number is the organizer's
+    `sit_out_points` is for a Swiss or Monster DYP group phase only (FR-039,
+    BR-071): a round robin has none, and a number there is 422 `validation_failed`
+    with `sit_out_points_not_applicable`. It is 0, 1 or 2. A number is the organizer's
     own choice and stays; null takes the default and follows it
     (`sit_out_points_set_by_hand` false in the read). The default is 1 when the
     league allows draws and the group phase plays BO1 or BO2, otherwise 2; a
@@ -181,7 +192,8 @@ class TournamentCreate(_FormatChecks):
     `id` is a UUIDv7 made by the client; a repeat gets the same tournament back
     (ADR-008). A setting left out or null takes the league's default: goals per
     game, the number of fields and the match format of the phase (FR-011); one
-    round robin leg, the default sit-out points (FR-039, BR-071) and no third-place match. `sit_out_points` null follows the default;
+    round robin leg, the default sit-out points (FR-039, BR-071; Swiss and Monster
+    DYP only) and no third-place match. `sit_out_points` null follows the default;
     any number counts as a manual pick.
     """
 

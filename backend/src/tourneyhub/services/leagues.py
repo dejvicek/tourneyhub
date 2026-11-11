@@ -15,7 +15,7 @@ from tourneyhub.engine.leagues import (
     SeasonState,
 )
 from tourneyhub.engine.tournaments import (
-    PhaseKind,
+    PhaseFormat,
     TournamentState,
     default_sit_out_points,
 )
@@ -155,6 +155,8 @@ def update_league(
 def _refresh_sit_out_defaults(session: Session, league: League) -> None:
     """Move the sit-out default until the group phase's first result (BR-071).
 
+    Only Swiss and Monster DYP phases score a sit-out; a round robin has no value.
+
     The default depends on the league's draw setting, so a group phase that
     follows it (not set by hand) is recomputed in the same transaction. That
     covers a tournament in setup and one in progress whose group phase has no
@@ -177,7 +179,7 @@ def _refresh_sit_out_defaults(session: Session, league: League) -> None:
             Season.league_id == league.id,
             Tournament.state.in_((TournamentState.SETUP, TournamentState.IN_PROGRESS)),
             ~has_result,
-            TournamentPhase.kind == PhaseKind.GROUP,
+            TournamentPhase.format.in_((PhaseFormat.SWISS, PhaseFormat.MONSTER_DYP)),
             TournamentPhase.sit_out_points_set_by_hand.is_(False),
         )
     ).all()

@@ -15,11 +15,13 @@ from tourneyhub.db.models.accounts import User
 from tourneyhub.db.models.entries import Entry
 from tourneyhub.db.models.leagues import League, Player
 from tourneyhub.db.models.matches import Match, MatchGame, Round
-from tourneyhub.db.models.tournaments import Field, Tournament
+from tourneyhub.db.models.tournaments import Field, Tournament, TournamentPhase
 from tourneyhub.engine.accounts import Language
 from tourneyhub.engine.tournaments import (
+    DEFAULT_TIEBREAKERS,
     GroupPhase,
     Outcome,
+    PhaseFormat,
     SeedingMethod,
     TournamentType,
 )
@@ -36,7 +38,7 @@ ROUND_ROBIN: Json = {
     "type": "singles",
     "group_phase": "round_robin",
     "round_robin_legs": 1,
-    "sit_out_points": 0,
+    "sit_out_points": None,
     "group_match_format": "bo1",
     "knockout_match_format": None,
     "final_match_format": None,
@@ -429,9 +431,31 @@ S1_WINS: Json = {
 }
 
 
+def _as_swiss(
+    session: Session, setup: Json, *, points: int, by_hand: bool = False
+) -> None:
+    """Make the started tournament's phase a Swiss one that has these sit-out points.
+
+    The backend does not generate Swiss rounds yet, so a running Swiss phase is made
+    from a started round robin: its rounds and matches stay, the phase's settings
+    change (BR-071 applies to Swiss and Monster DYP, not to a round robin).
+    """
+    phase = session.scalars(
+        select(TournamentPhase)
+        .where(TournamentPhase.tournament_id == UUID(setup["tournament_id"]))
+        .execution_options(populate_existing=True)
+    ).one()
+    phase.format = PhaseFormat.SWISS
+    phase.round_robin_legs = None
+    phase.tiebreakers = list(DEFAULT_TIEBREAKERS)
+    phase.sit_out_points = points
+    phase.sit_out_points_set_by_hand = by_hand
+    session.flush()
+
+
 def _sit_out(
     client: TestClient, league: League, headers: dict[str, str], tournament: Json
-) -> tuple[int, bool]:
+) -> tuple[int | None, bool]:
     read = client.get(_t_url(league, tournament["tournament_id"]), headers=headers)
     [phase] = read.json()["phases"]
     return phase["sit_out_points"], phase["sit_out_points_set_by_hand"]
@@ -455,12 +479,16 @@ def _first_result(
 
 
 def test_br071_after_generating_a_draw_change_moves_the_default_until_the_first_result(
-    client: TestClient, league: League, headers: dict[str, str], players: list[str]
+    client: TestClient,
+    league: League,
+    headers: dict[str, str],
+    players: list[str],
+    session: Session,
 ) -> None:
     _set_draws(client, league, headers, allowed=True)
     setup = _setup(client, league, headers, players[:3], sit_out_points=None)
-    assert setup["format"]["sit_out_points"] == 1
     _started(client, league, setup, headers)
+    _as_swiss(session, setup, points=1)
 
     _set_draws(client, league, headers, allowed=False)
 
@@ -472,11 +500,16 @@ def test_br071_after_generating_a_draw_change_moves_the_default_until_the_first_
 
 
 def test_br071_after_the_first_result_nothing_moves_the_default(
-    client: TestClient, league: League, headers: dict[str, str], players: list[str]
+    client: TestClient,
+    league: League,
+    headers: dict[str, str],
+    players: list[str],
+    session: Session,
 ) -> None:
     _set_draws(client, league, headers, allowed=True)
     setup = _setup(client, league, headers, players[:3], sit_out_points=None)
     started = _started(client, league, setup, headers)
+    _as_swiss(session, setup, points=1)
     _first_result(client, league, headers, started)
 
     _set_draws(client, league, headers, allowed=False)
@@ -493,14 +526,30 @@ def test_br071_after_the_first_result_nothing_moves_the_default(
 
 
 def test_br071_a_manual_pick_never_moves_after_generating(
-    client: TestClient, league: League, headers: dict[str, str], players: list[str]
+    client: TestClient,
+    league: League,
+    headers: dict[str, str],
+    players: list[str],
+    session: Session,
 ) -> None:
-    setup = _setup(client, league, headers, players[:3], sit_out_points=2)
+    setup = _setup(client, league, headers, players[:3])
     _started(client, league, setup, headers)
+    _as_swiss(session, setup, points=2, by_hand=True)
 
     _set_draws(client, league, headers, allowed=True)
 
     assert _sit_out(client, league, headers, setup) == (2, True)
+
+
+def test_br071_a_running_round_robin_keeps_no_value_when_the_draw_setting_moves(
+    client: TestClient, league: League, headers: dict[str, str], players: list[str]
+) -> None:
+    setup = _setup(client, league, headers, players[:3])
+    _started(client, league, setup, headers)
+
+    _set_draws(client, league, headers, allowed=True)
+
+    assert _sit_out(client, league, headers, setup) == (None, False)
 
 
 def test_fr030_a_tournament_in_setup_reads_without_rounds(
@@ -524,8 +573,8 @@ def test_fr030_a_tournament_in_setup_reads_without_rounds(
             "kind": "group",
             "format": "round_robin",
             "round_robin_legs": 1,
-            "sit_out_points": 0,
-            "sit_out_points_set_by_hand": True,
+            "sit_out_points": None,
+            "sit_out_points_set_by_hand": False,
             "tiebreakers": None,
             "qualifiers": None,
             "third_place_match": None,

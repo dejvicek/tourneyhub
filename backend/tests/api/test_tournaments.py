@@ -39,7 +39,7 @@ SINGLES_ROUND_ROBIN: Json = {
     "type": "singles",
     "group_phase": "round_robin",
     "round_robin_legs": 1,
-    "sit_out_points": 0,
+    "sit_out_points": None,
     "group_match_format": "bo1",
     "knockout_match_format": None,
     "final_match_format": None,
@@ -144,7 +144,10 @@ def test_fr030_post_creates_a_tournament_in_setup_in_the_active_season(
     body = response.json()
     assert body["tournament_id"] == tournament_id
     assert body["state"] == "setup"
-    assert body["format"] == {**SINGLES_ROUND_ROBIN, "sit_out_points_set_by_hand": True}
+    assert body["format"] == {
+        **SINGLES_ROUND_ROBIN,
+        "sit_out_points_set_by_hand": False,
+    }
     assert body["draw_counter"] == 0
     assert body["seeding_method"] == "ranking"
     assert body["player_ids"] == body["entries"] == body["halves"] == []
@@ -549,6 +552,15 @@ def _swiss_format(**changes: object) -> Json:
     }
 
 
+def _create_swiss(
+    client: TestClient, league: League, headers: dict[str, str], **values: object
+) -> Json:
+    """A Swiss tournament: the sit-out points apply to it, not to a round robin."""
+    return _create(
+        client, league, headers, group_phase="swiss", round_robin_legs=None, **values
+    )
+
+
 def _put_format(
     client: TestClient,
     league: League,
@@ -594,7 +606,7 @@ def test_br071_a_create_without_sit_out_points_takes_the_default(
     session.flush()
     expected = 1 if draws_allowed and match_format in {"bo1", "bo2"} else 2
 
-    created = _create(
+    created = _create_swiss(
         client,
         league,
         headers,
@@ -617,7 +629,7 @@ def _set_draws(
 
 def _format_read(
     client: TestClient, league: League, headers: dict[str, str], tid: str
-) -> tuple[int, bool]:
+) -> tuple[int | None, bool]:
     response = client.get(_tournament_url(league, tid, "/setup"), headers=headers)
     assert response.status_code == 200, response.text
     fmt = response.json()["format"]
@@ -627,9 +639,11 @@ def _format_read(
 def test_br071_the_league_draw_setting_moves_the_default_during_setup(
     client: TestClient, league: League, headers: dict[str, str]
 ) -> None:
-    following = _create(client, league, headers, sit_out_points=None)["tournament_id"]
-    by_hand = _create(client, league, headers, sit_out_points=2)["tournament_id"]
-    bo3 = _create(
+    following = _create_swiss(client, league, headers, sit_out_points=None)[
+        "tournament_id"
+    ]
+    by_hand = _create_swiss(client, league, headers, sit_out_points=2)["tournament_id"]
+    bo3 = _create_swiss(
         client, league, headers, sit_out_points=None, group_match_format="bo3"
     )["tournament_id"]
     assert _format_read(client, league, headers, following) == (2, False)
@@ -654,7 +668,9 @@ def test_br071_the_league_draw_setting_leaves_other_leagues_alone(
 ) -> None:
     other = make_league()
     other_headers = auth_header(other.owner_user_id)
-    kept = _create(client, other, other_headers, sit_out_points=None)["tournament_id"]
+    kept = _create_swiss(client, other, other_headers, sit_out_points=None)[
+        "tournament_id"
+    ]
 
     _set_draws(client, league, headers, allowed=True)
 
@@ -665,7 +681,7 @@ def test_br071_the_league_draw_setting_leaves_other_leagues_alone(
 def test_br071_the_default_follows_a_format_change_until_the_organizer_picks(
     client: TestClient, league: League, headers: dict[str, str]
 ) -> None:
-    created = _create(client, league, headers, sit_out_points=None)
+    created = _create_swiss(client, league, headers, sit_out_points=None)
     tid = created["tournament_id"]
     assert created["format"]["sit_out_points"] == 1
 
@@ -683,7 +699,7 @@ def test_br071_the_default_follows_a_format_change_until_the_organizer_picks(
 def test_br071_a_value_the_organizer_picks_stays_through_a_format_change(
     client: TestClient, league: League, headers: dict[str, str], session: Session
 ) -> None:
-    created = _create(client, league, headers, sit_out_points=None)
+    created = _create_swiss(client, league, headers, sit_out_points=None)
     tid = created["tournament_id"]
 
     picked = _put_format(
@@ -709,7 +725,7 @@ def test_br071_a_value_the_organizer_picks_stays_through_a_format_change(
 def test_br071_a_pick_equal_to_the_default_still_counts_as_picked(
     client: TestClient, league: League, headers: dict[str, str]
 ) -> None:
-    created = _create(client, league, headers, sit_out_points=None)
+    created = _create_swiss(client, league, headers, sit_out_points=None)
 
     picked = _put_format(
         client,
@@ -727,7 +743,7 @@ def test_br071_a_pick_equal_to_the_default_still_counts_as_picked(
 def test_br071_sending_the_read_value_back_pins_it_and_null_keeps_following(
     client: TestClient, league: League, headers: dict[str, str]
 ) -> None:
-    created = _create(client, league, headers, sit_out_points=None)
+    created = _create_swiss(client, league, headers, sit_out_points=None)
     tid = created["tournament_id"]
     read = created["format"]
     assert (read["sit_out_points"], read["sit_out_points_set_by_hand"]) == (1, False)
@@ -758,7 +774,7 @@ def test_br071_sending_the_read_value_back_pins_it_and_null_keeps_following(
 def test_br071_null_takes_the_default_back_after_a_pick(
     client: TestClient, league: League, headers: dict[str, str]
 ) -> None:
-    created = _create(client, league, headers, sit_out_points=0)
+    created = _create_swiss(client, league, headers, sit_out_points=0)
     tid = created["tournament_id"]
     assert created["format"]["sit_out_points_set_by_hand"] is True
 
@@ -773,7 +789,7 @@ def test_br071_null_takes_the_default_back_after_a_pick(
 def test_br071_changing_to_no_group_phase_forgets_the_pick(
     client: TestClient, league: League, headers: dict[str, str]
 ) -> None:
-    created = _create(client, league, headers, sit_out_points=0)
+    created = _create_swiss(client, league, headers, sit_out_points=0)
     tid = created["tournament_id"]
     knockout = {
         **SINGLES_ROUND_ROBIN,
@@ -791,11 +807,109 @@ def test_br071_changing_to_no_group_phase_forgets_the_pick(
     assert (back["sit_out_points"], back["sit_out_points_set_by_hand"]) == (1, False)
 
 
+def _round_robin_format(**changes: object) -> Json:
+    return {**SINGLES_ROUND_ROBIN, **changes}
+
+
+@pytest.mark.parametrize("points", [0, 1, 2])
+def test_br071_a_round_robin_refuses_sit_out_points(
+    client: TestClient, league: League, headers: dict[str, str], points: int
+) -> None:
+    """In a round robin every entry sits out equally often; a late entry (BR-054)
+    would make the points distort the order, so the value does not exist there."""
+    created = _create(client, league, headers)
+
+    status, body = _write(
+        client,
+        league,
+        created["tournament_id"],
+        "/format",
+        _round_robin_format(sit_out_points=points),
+        headers,
+    )
+    post = client.post(
+        _url(league, "/tournaments"),
+        json={"id": str(uuid7()), **_round_robin_format(sit_out_points=points)},
+        headers=headers,
+    )
+
+    assert status == post.status_code == 422
+    assert body["code"] == post.json()["code"] == "validation_failed"
+    assert [e["type"] for e in body["detail"]["errors"]] == [
+        "sit_out_points_not_applicable"
+    ]
+    assert [e["type"] for e in post.json()["detail"]["errors"]] == [
+        "sit_out_points_not_applicable"
+    ]
+
+
+def test_br071_a_round_robin_has_no_sit_out_points_and_no_pick(
+    client: TestClient, league: League, headers: dict[str, str], session: Session
+) -> None:
+    created = _create(client, league, headers, sit_out_points=None)
+
+    fmt = created["format"]
+    assert (fmt["sit_out_points"], fmt["sit_out_points_set_by_hand"]) == (None, False)
+    [phase] = session.scalars(
+        select(TournamentPhase)
+        .where(TournamentPhase.tournament_id == UUID(created["tournament_id"]))
+        .execution_options(populate_existing=True)
+    ).all()
+    assert phase.sit_out_points is None
+
+
+@pytest.mark.usefixtures("draws_league")
+def test_br071_swiss_to_round_robin_clears_the_value_and_back_sets_the_default(
+    client: TestClient, league: League, headers: dict[str, str]
+) -> None:
+    created = _create_swiss(client, league, headers, sit_out_points=0)
+    tid = created["tournament_id"]
+    assert created["format"]["sit_out_points_set_by_hand"] is True
+
+    round_robin = _ok(
+        _write(client, league, tid, "/format", _round_robin_format(), headers)
+    )["format"]
+    swiss = _put_format(client, league, tid, headers, sit_out_points=None)
+
+    assert (
+        round_robin["sit_out_points"],
+        round_robin["sit_out_points_set_by_hand"],
+    ) == (None, False)
+    assert (swiss["sit_out_points"], swiss["sit_out_points_set_by_hand"]) == (1, False)
+
+
+def test_br071_a_monster_dyp_group_phase_takes_the_default(
+    client: TestClient, league: League, headers: dict[str, str]
+) -> None:
+    created = _create(
+        client,
+        league,
+        headers,
+        type="monster_dyp",
+        group_phase="monster_dyp",
+        round_robin_legs=None,
+        sit_out_points=None,
+    )
+
+    fmt = created["format"]
+    assert (fmt["sit_out_points"], fmt["sit_out_points_set_by_hand"]) == (2, False)
+
+
+def test_br071_the_league_draw_setting_leaves_a_round_robin_without_a_value(
+    client: TestClient, league: League, headers: dict[str, str]
+) -> None:
+    round_robin = _create(client, league, headers)["tournament_id"]
+
+    _set_draws(client, league, headers, allowed=True)
+
+    assert _format_read(client, league, headers, round_robin) == (None, False)
+
+
 @pytest.mark.parametrize("points", [0, 1, 2])
 def test_fr039_a_sit_out_is_worth_0_1_or_2_points(
     client: TestClient, league: League, headers: dict[str, str], points: int
 ) -> None:
-    created = _create(client, league, headers)
+    created = _create_swiss(client, league, headers)
 
     fmt = _put_format(
         client, league, created["tournament_id"], headers, sit_out_points=points
@@ -807,7 +921,7 @@ def test_fr039_a_sit_out_is_worth_0_1_or_2_points(
 def test_fr039_a_sit_out_worth_3_points_is_refused(
     client: TestClient, league: League, headers: dict[str, str]
 ) -> None:
-    created = _create(client, league, headers)
+    created = _create_swiss(client, league, headers)
 
     status, body = _write(
         client,
@@ -819,7 +933,7 @@ def test_fr039_a_sit_out_worth_3_points_is_refused(
     )
     post = client.post(
         _url(league, "/tournaments"),
-        json={"id": str(uuid7()), **SINGLES_ROUND_ROBIN, "sit_out_points": 3},
+        json={"id": str(uuid7()), **_swiss_format(sit_out_points=3)},
         headers=headers,
     )
 

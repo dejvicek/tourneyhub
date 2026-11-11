@@ -658,17 +658,26 @@ def _resolve_format(request: FormatRequest, league: League) -> TournamentFormat:
         )
     else:
         group_match_format = request.group_match_format or MatchFormat(default_format)
-        by_hand = request.sit_out_points is not None
+        # BR-071: only Swiss and Monster DYP score a sit-out. A round robin keeps
+        # no value (the request validation refuses one), so a change to it clears
+        # the value and a change from it to Swiss takes the default.
+        scores_sit_outs = request.group_phase is not GroupPhase.ROUND_ROBIN
+        by_hand = scores_sit_outs and request.sit_out_points is not None
+        sit_out_points = None
+        if scores_sit_outs:
+            sit_out_points = (
+                request.sit_out_points
+                if request.sit_out_points is not None
+                else default_sit_out_points(
+                    group_match_format, draws_allowed=league.draws_allowed
+                )
+            )
         resolved = replace(
             base,
             round_robin_legs=(request.round_robin_legs or 1)
             if request.group_phase is GroupPhase.ROUND_ROBIN
             else None,
-            sit_out_points=request.sit_out_points
-            if request.sit_out_points is not None
-            else default_sit_out_points(
-                group_match_format, draws_allowed=league.draws_allowed
-            ),
+            sit_out_points=sit_out_points,
             sit_out_points_set_by_hand=by_hand,
             group_match_format=group_match_format,
         )
@@ -2314,11 +2323,11 @@ def _played_match(match: Match) -> PlayedMatch:
 def _standings_of(
     tournament: Tournament, phase: TournamentPhase
 ) -> tuple[StandingRow, ...]:
-    """The round robin's standings now (BR-070, BR-071, BR-101).
+    """The round robin's standings now (BR-070, BR-101).
 
-    A sit-out counts once every match of its round has a result: the schedule
+    A sit-out is counted once every match of its round has a result: the schedule
     holds every round from the start, and a sit-out in a round still to come
-    must not earn its point yet.
+    has not happened yet. It earns no points in a round robin (BR-071).
     """
     main = sorted(
         _main_entries(tournament), key=lambda e: (e.seed is None, e.seed or 0, e.id)
@@ -2338,7 +2347,6 @@ def _standings_of(
             for row in round_.participation
             if row.status is Participation.SAT_OUT
         ],
-        sit_out_points=phase.sit_out_points or 0,
     )
 
 
