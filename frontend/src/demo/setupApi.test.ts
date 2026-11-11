@@ -257,7 +257,7 @@ describe("the fake API for tournament setup", () => {
       ),
     );
 
-    expect([removed.status, removed.code]).toEqual([422, "player_removed"]);
+    expect([removed.status, removed.code]).toEqual([409, "player_removed"]);
     expect(picked.entries).toHaveLength(2);
     expect(halves.entries).toEqual([]);
     expect([incomplete.status, incomplete.detail]).toEqual([
@@ -268,6 +268,41 @@ describe("the fake API for tournament setup", () => {
       409,
       "tournament_type_changed",
     ]);
+  });
+
+  it("answers 422 nothing_to_pair when fewer than two Doubles players are left", async () => {
+    const doubles = await createDraft({ type: "doubles" });
+    const picked = await pickPlayers(doubles, 3);
+    const first = nth(picked.ranking, 0).player_id;
+    const second = nth(picked.ranking, 1).player_id;
+    const paired = await dataOf(
+      api.PUT(
+        "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/pairs",
+        { ...at(doubles), body: { pairs: [[first, second]] } },
+      ),
+    );
+
+    const refused = await failure(
+      dataOf(
+        api.POST(
+          "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/draw",
+          {
+            ...at(doubles),
+            body: {
+              expected_draw_counter: paired.draw_counter,
+              target: "pairs",
+            },
+          },
+        ),
+      ),
+    );
+
+    expect([refused.status, refused.code, refused.detail]).toEqual([
+      422,
+      "nothing_to_pair",
+      { unpaired: 1 },
+    ]);
+    expect((await setupOf(doubles)).draw_counter).toBe(paired.draw_counter);
   });
 
   it("deletes a tournament, and a repeated delete is a 404", async () => {

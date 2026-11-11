@@ -5,7 +5,7 @@ import { ApiError, type ErrorCode } from "@/api/client";
 /** The 422 codes of setup and their texts (ADR-008). */
 const CODE_TEXTS = {
   draws_not_allowed: "tournaments.errors.rules.br121",
-  player_removed: "tournaments.errors.rules.br002",
+  nothing_to_pair: "tournaments.errors.rules.fr033",
   not_enough_players: "tournaments.errors.rules.fr032",
   dyp_halves_unequal: "tournaments.errors.rules.br032Unequal",
   too_many_left_out: "tournaments.errors.rules.br032LeftOut",

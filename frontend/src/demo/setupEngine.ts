@@ -626,14 +626,15 @@ export function setPlayers(
   const league = db().players.filter((p) => p.league_id === t.league_id);
   const unknown = playerIds.find((id) => !league.some((p) => p.id === id));
   if (unknown !== undefined) {
-    return fail(404, "player_not_found", { player_id: unknown });
+    return fail(404, "player_not_found");
   }
-  // BR-002: a removed player cannot be picked.
+  // BR-002: a removed player cannot be picked; only a screen that was not
+  // reloaded after the removal offers one, so it is a 409 (ADR-008).
   const removed = playerIds.find(
     (id) => league.find((p) => p.id === id)?.removed_at !== null,
   );
   if (removed !== undefined) {
-    return fail(422, "player_removed", { player_id: removed });
+    return fail(409, "player_removed", { player_id: removed });
   }
   const same =
     playerIds.length === draft.playerIds.length &&
@@ -845,12 +846,14 @@ export function drawAgain(
   if (t.type === "doubles") {
     // The players without a partner are paired at random.
     const paired = new Set(draft.pairs.flat());
-    const rest = shuffled(
-      byRank(draft.playerIds, rankOf(t.league_id)).filter(
-        (id) => !paired.has(id),
-      ),
-      rngFor(t, draft.drawCounter + 1),
+    const alone = byRank(draft.playerIds, rankOf(t.league_id)).filter(
+      (id) => !paired.has(id),
     );
+    if (alone.length < 2) {
+      // FR-033: nothing to pair; the counter and the seeds stay.
+      return fail(422, "nothing_to_pair", { unpaired: alone.length });
+    }
+    const rest = shuffled(alone, rngFor(t, draft.drawCounter + 1));
     for (let i = 0; i + 1 < rest.length; i += 2) {
       draft.pairs.push([rest[i] ?? "", rest[i + 1] ?? ""]);
     }

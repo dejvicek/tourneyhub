@@ -320,7 +320,7 @@ export const tournamentsSetup = {
       name_required: "Give the tournament a name.",
       fr032: "Not enough players: at least {{min}} are needed.",
       br121: "BO2 is offered only in leagues that allow draws.",
-      br002: "A removed player cannot be picked.",
+      fr033: "Nobody is left to pair.",
       br032Unequal:
         "Both halves need the same number of players: {{top}} at the top, {{bottom}} at the bottom.",
       br032LeftOut: "Only one player can be left out.",

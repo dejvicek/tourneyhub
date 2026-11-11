@@ -360,7 +360,7 @@ export const tournamentsSetup: CsMessages<typeof english> = {
       name_required: "Zadejte název turnaje.",
       fr032: "Hráčů je málo, potřeba je alespoň {{min}}.",
       br121: "BO2 nabízíme jen v ligách s remízami.",
-      br002: "Odebraného hráče nelze vybrat.",
+      fr033: "Není koho spárovat.",
       br032Unequal:
         "Obě poloviny musí mít stejně hráčů: nahoře {{top}}, dole {{bottom}}.",
       br032LeftOut: "Vynechat lze jen jednoho hráče.",
