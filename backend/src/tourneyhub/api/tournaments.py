@@ -992,9 +992,10 @@ def set_match_result(
 
     The body is the whole result, so a repeat changes nothing (ADR-008).
     Entering one frees the match's field, which takes the next waiting match
-    (BR-130, BR-131). The empty result clears it: the match waits again and
-    does not take a field by itself (BR-134), and a finished tournament is
-    back in progress (BR-095).
+    (BR-130, BR-131). The empty result clears it: the match waits again, not
+    put back on its old field (BR-134), and a finished tournament is back in
+    progress (BR-095). The free fields are then filled, so the first match that
+    can be played takes one, the cleared match included.
 
     A closed season is 409 `season_closed`. An unknown match is 404
     `match_not_found`. A match whose sides are not both known is 422

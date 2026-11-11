@@ -459,7 +459,7 @@ def test_br011_a_result_in_a_closed_season_is_a_conflict(
 # ---------------------------------------------------------------- clearing
 
 
-def test_br134_a_cleared_match_waits_and_takes_no_field_by_itself(
+def test_br134_a_cleared_match_waits_in_schedule_order_and_takes_a_free_field(
     start: Callable[..., Json],
     put_result: Callable[..., tuple[int, Json]],
     read: Callable[[Json, str], Json],
@@ -468,6 +468,7 @@ def test_br134_a_cleared_match_waits_and_takes_no_field_by_itself(
     tournament = start(players[:2], field_count=2)
     match_id = matches_of(tournament)[0]["id"]
     put_result(tournament, match_id, S1_WINS)
+    assert field_matches(read(tournament, "")) == [None, None]
 
     status, body = put_result(tournament, match_id, EMPTY)
 
@@ -478,8 +479,46 @@ def test_br134_a_cleared_match_waits_and_takes_no_field_by_itself(
         None,
     )
     after = read(tournament, "")
-    assert field_matches(after) == [None, None]
-    assert after["waiting"] == [match_id]
+    assert field_matches(after) == [match_id, None]
+    assert after["waiting"] == []
+
+
+def test_br134_a_cleared_match_waits_at_its_place_while_the_fields_are_busy(
+    start: Callable[..., Json],
+    put_result: Callable[..., tuple[int, Json]],
+    read: Callable[[Json, str], Json],
+    players: list[str],
+) -> None:
+    tournament = start(players[:4], field_count=1)
+    first, second = tournament["rounds"][0]["matches"]
+    put_result(tournament, first["id"], S1_WINS)  # the field takes the second match
+    assert field_matches(read(tournament, "")) == [second["id"]]
+
+    put_result(tournament, first["id"], EMPTY)
+
+    after = read(tournament, "")
+    assert field_matches(after) == [second["id"]]
+    assert after["waiting"][0] == first["id"]
+
+
+def test_br131_a_cleared_match_whose_players_are_on_a_field_waits(
+    start: Callable[..., Json],
+    put_result: Callable[..., tuple[int, Json]],
+    read: Callable[[Json, str], Json],
+    players: list[str],
+) -> None:
+    tournament = start(players[:3], field_count=2)
+    played = field_matches(tournament)[0]
+    put_result(tournament, played, S1_WINS)  # every other match shares a player
+    on_field = field_matches(read(tournament, ""))
+    assert on_field[0] is not None
+    assert on_field[1] is None
+
+    put_result(tournament, played, EMPTY)
+
+    after = read(tournament, "")
+    assert field_matches(after) == on_field
+    assert after["waiting"][0] == played
 
 
 def test_fr053_clearing_a_match_without_a_result_changes_nothing(
@@ -496,6 +535,26 @@ def test_fr053_clearing_a_match_without_a_result_changes_nothing(
     assert status == 200
     assert body["outcome"] is None
     assert field_matches(read(tournament, "")) == [on_field]
+
+
+def test_br134_clearing_in_a_finished_tournament_puts_the_match_on_a_free_field(
+    start: Callable[..., Json],
+    put_result: Callable[..., tuple[int, Json]],
+    finish: Callable[[Json], tuple[int, Json]],
+    read: Callable[[Json, str], Json],
+    players: list[str],
+) -> None:
+    tournament = start(players[:2], field_count=2)
+    play_all(put_result, tournament)
+    finish(tournament)
+    match_id = matches_of(tournament)[0]["id"]
+
+    put_result(tournament, match_id, EMPTY)
+
+    after = read(tournament, "")
+    assert after["state"] == "in_progress"
+    assert field_matches(after) == [match_id, None]
+    assert after["waiting"] == []
 
 
 def test_br095_clearing_a_result_puts_a_finished_tournament_back_in_progress(

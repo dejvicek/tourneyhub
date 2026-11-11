@@ -2083,9 +2083,11 @@ def set_match_result(
     match never takes a field once it has a result. A result equal to the
     stored one changes nothing, the time included, so a repeat is harmless.
 
-    The empty result clears it: the match waits again like any other and does
-    not take a field by itself (BR-134), and a finished tournament is back in
-    progress (BR-095). Clearing a match without a result changes nothing.
+    The empty result clears it: the match waits again like any other, not
+    put back on its old field (BR-134), and a finished tournament is back in
+    progress (BR-095). The free fields are then filled as after any result, so
+    the first match that can be played takes one (BR-130), the cleared match
+    included. Clearing a match without a result changes nothing.
 
     A closed season is 409 `season_closed` (BR-011); an unknown match, or one
     of another tournament, 404 `match_not_found`; a match whose sides are not
@@ -2130,6 +2132,9 @@ def _clear_result(tournament: Tournament, match: Match, now: datetime) -> None:
     if tournament.state is TournamentState.FINISHED:
         tournament.state = TournamentState.IN_PROGRESS
         tournament.updated_at = now
+    # The match waits in schedule order like any other (BR-134); a free field
+    # takes the first match that can be played (BR-130), which can be this one.
+    _fill_fields(tournament, _match_slots(tournament), now)
 
 
 def _write_result(
