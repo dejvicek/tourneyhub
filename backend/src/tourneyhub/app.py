@@ -6,10 +6,12 @@ from http import HTTPStatus
 from uuid import uuid7
 
 from fastapi import FastAPI
-from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.datastructures import MutableHeaders
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from tourneyhub.api import admin, auth, leagues, me, players, tournaments
+from tourneyhub.api import admin, auth, leagues, me, players, public, tournaments
 from tourneyhub.api.errors import install_error_handlers
+from tourneyhub.api.public_headers import API_PREFIX, PUBLIC_HEADERS, is_public_path
 from tourneyhub.api.schemas import ErrorResponse
 from tourneyhub.db.session import create_db_engine, create_session_factory
 from tourneyhub.logging_config import LOGGING_CONFIG, request_id
@@ -27,6 +29,32 @@ class _RequestIdMiddleware:
             # Not reset: uvicorn logs an unhandled exception after this returns (§4.6).
             request_id.set(uuid7().hex)
         await self.app(scope, receive, send)
+
+
+class _PublicHeadersMiddleware:
+    """Headers for every answer under /api/v1/public that passes through (ADR-005).
+
+    An unhandled exception's 500 does not: the handler of `Exception` answers
+    outside this middleware and sets the same headers itself (api/errors.py).
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        path = scope.get("path", "") if scope["type"] == "http" else ""
+        if not is_public_path(path):
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_headers(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                for name, value in PUBLIC_HEADERS.items():
+                    headers[name] = value
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -48,13 +76,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.engine = engine
     app.state.session_factory = create_session_factory(engine)
+    app.add_middleware(_PublicHeadersMiddleware)
     app.add_middleware(_RequestIdMiddleware)
     install_error_handlers(app)
-    app.include_router(admin.router, prefix="/api/v1")
-    app.include_router(auth.router, prefix="/api/v1")
-    app.include_router(leagues.router, prefix="/api/v1")
-    app.include_router(me.router, prefix="/api/v1")
-    app.include_router(players.router, prefix="/api/v1")
-    app.include_router(tournaments.router, prefix="/api/v1")
+    for router in (
+        admin.router,
+        auth.router,
+        leagues.router,
+        me.router,
+        players.router,
+        public.router,
+        tournaments.router,
+    ):
+        app.include_router(router, prefix=API_PREFIX)
     logger.info("application created", extra={"env": settings.env})
     return app

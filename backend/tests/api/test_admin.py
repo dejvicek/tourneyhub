@@ -835,6 +835,8 @@ def test_adr006_while_a_new_password_is_required_every_other_route_answers_403(
     refused = 0
 
     for template, operations in app.openapi()["paths"].items():
+        if template.startswith("/api/v1/public/"):
+            continue  # the share-link routes take no account, so no password rule applies
         path = re.sub(r"\{[^}]+\}", lambda _: str(uuid7()), template)
         for method in operations:
             seen.add((method.upper(), template))

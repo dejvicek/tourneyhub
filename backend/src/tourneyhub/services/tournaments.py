@@ -462,18 +462,29 @@ def list_tournaments(
     picked players in setup and the players of the entries afterwards.
     """
     league = get_league(session, league_id=league_id, user_id=user_id)
+    return list_season_tournaments(session, league=league, season_id=season_id)
+
+
+def list_season_tournaments(
+    session: Session, *, league: League, season_id: UUID, past_setup: bool = False
+) -> list[TournamentSummary]:
+    """Return the tournaments of one of the league's seasons, newest date first.
+
+    `past_setup` leaves out the tournaments in setup, which only the organizer
+    sees (FR-070). Another league's season is 404 `season_not_found`.
+    """
     if all(season.id != season_id for season in league.seasons):
         raise NotFoundError(ErrorCode.SEASON_NOT_FOUND)
+    query = select(Tournament).where(Tournament.season_id == season_id)
+    if past_setup:
+        query = query.where(Tournament.state != TournamentState.SETUP)
     tournaments = session.scalars(
-        select(Tournament)
-        .where(Tournament.season_id == season_id)
-        .options(
+        query.options(
             selectinload(Tournament.phases),
             _ROUNDS.selectinload(Round.matches).selectinload(Match.sides),
             selectinload(Tournament.players),
             selectinload(Tournament.entries).selectinload(Entry.members),
-        )
-        .order_by(Tournament.date.desc(), Tournament.created_at.desc(), Tournament.id)
+        ).order_by(Tournament.date.desc(), Tournament.created_at.desc(), Tournament.id)
     ).all()
     return [_summary_of(tournament) for tournament in tournaments]
 
@@ -1572,9 +1583,21 @@ def read_tournament(
 ) -> TournamentView:
     """Return the whole tournament, without a lock (FR-035, FR-060, FR-092)."""
     league = get_league(session, league_id=league_id, user_id=user_id)
-    tournament = session.scalars(
-        _tournament_query(league, tournament_id, rounds=True)
-    ).one_or_none()
+    return view_tournament(session, league=league, tournament_id=tournament_id)
+
+
+def view_tournament(
+    session: Session, *, league: League, tournament_id: UUID, past_setup: bool = False
+) -> TournamentView:
+    """Return one of the league's tournaments whole, without a lock.
+
+    An unknown tournament, one of another league and, with `past_setup`, one in
+    setup are all 404 `tournament_not_found` (FR-070).
+    """
+    query = _tournament_query(league, tournament_id, rounds=True)
+    if past_setup:
+        query = query.where(Tournament.state != TournamentState.SETUP)
+    tournament = session.scalars(query).one_or_none()
     if tournament is None:
         raise NotFoundError(ErrorCode.TOURNAMENT_NOT_FOUND)
     return _view_of(tournament, _ranking(session, league=league, tournament=tournament))

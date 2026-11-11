@@ -1,9 +1,8 @@
 import { useTranslation } from "react-i18next";
 
 import { Badge } from "@/components/ui/badge";
-import type { PlayerRead } from "@/demo/contract";
 
-import type { PublicMatch, PublicTournament } from "./api";
+import type { PublicMatch, PublicPlayer, PublicTournament } from "./api";
 import { useNames } from "./useNames";
 
 /**
@@ -16,7 +15,7 @@ export function LiveFields({
   headingLevel = 2,
 }: {
   tournament: PublicTournament;
-  players: PlayerRead[];
+  players: PublicPlayer[];
   headingLevel?: 2 | 3;
 }) {
   const { t } = useTranslation();

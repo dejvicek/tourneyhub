@@ -7,8 +7,8 @@ import { PageFallback } from "@/components/PageFallback";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type {
-  PlayerRead,
-  PublicLeague,
+  SeasonRead,
+  SeasonStandingRow,
   TournamentSummary,
 } from "@/demo/contract";
 import { EmptyState } from "@/features/leagues/EmptyState";
@@ -16,7 +16,7 @@ import { useSeasonName } from "@/features/leagues/useSeasonName";
 import { useRouteParam } from "@/hooks/useRouteParam";
 import { paths } from "@/lib/paths";
 
-import { publicQueries } from "./api";
+import { type PublicLeague, type PublicPlayer, publicQueries } from "./api";
 import { LiveFields } from "./LiveFields";
 import { useNames } from "./useNames";
 
@@ -63,10 +63,6 @@ function LeagueView({
   const { t } = useTranslation();
   const seasonName = useSeasonName();
   const active = league.seasons.find((season) => season.state === "active");
-  const running = league.tournaments.filter((x) => x.state === "in_progress");
-  const finished = league.tournaments
-    .filter((x) => x.state === "finished")
-    .sort((a, b) => b.date.localeCompare(a.date));
 
   return (
     <section className="space-y-8">
@@ -84,7 +80,49 @@ function LeagueView({
           {t("publicView.league.refreshed")}
         </p>
       </header>
+      {active !== undefined && (
+        <SeasonView
+          shareToken={shareToken}
+          season={active}
+          players={league.players}
+        />
+      )}
+    </section>
+  );
+}
 
+/** The active season: its running tournaments, standings and finished ones. */
+function SeasonView({
+  shareToken,
+  season,
+  players,
+}: {
+  shareToken: string;
+  season: SeasonRead;
+  players: PublicPlayer[];
+}) {
+  const { t } = useTranslation();
+  const tournaments = useQuery(
+    publicQueries.tournaments(shareToken, season.id),
+  );
+  const standings = useQuery(
+    publicQueries.seasonStandings(shareToken, season.id),
+  );
+  if (tournaments.data === undefined) {
+    return tournaments.isPending ? (
+      <PageFallback />
+    ) : (
+      <p role="alert" className="text-body-md">
+        {t("publicView.tournament.loadFailed")}
+      </p>
+    );
+  }
+  // Newest first, as the API lists them.
+  const running = tournaments.data.filter((x) => x.state === "in_progress");
+  const finished = tournaments.data.filter((x) => x.state === "finished");
+
+  return (
+    <>
       <section aria-labelledby="live" className="space-y-3">
         <h2 id="live" className="font-display text-display-section">
           {t("publicView.league.liveHeading")}
@@ -99,7 +137,7 @@ function LeagueView({
               key={tournament.id}
               shareToken={shareToken}
               summary={tournament}
-              players={league.players}
+              players={players}
             />
           ))
         )}
@@ -109,10 +147,10 @@ function LeagueView({
         <h2 id="standings" className="font-display text-display-section">
           {t("publicView.league.standingsHeading")}
         </h2>
-        {league.standings.length === 0 ? (
+        {standings.data === undefined || standings.data.length === 0 ? (
           <EmptyState title={t("publicView.league.noStandings")} />
         ) : (
-          <SeasonStandings league={league} />
+          <SeasonStandings rows={standings.data} players={players} />
         )}
       </section>
 
@@ -134,7 +172,7 @@ function LeagueView({
           </ul>
         )}
       </section>
-    </section>
+    </>
   );
 }
 
@@ -195,7 +233,7 @@ function LiveTournament({
 }: {
   shareToken: string;
   summary: TournamentSummary;
-  players: PlayerRead[];
+  players: PublicPlayer[];
 }) {
   const { t } = useTranslation();
   const date = useDate();
@@ -253,9 +291,15 @@ function LiveTournament({
 }
 
 /** FR-070: the active season's standings, as a table that may scroll. */
-function SeasonStandings({ league }: { league: PublicLeague }) {
+function SeasonStandings({
+  rows,
+  players,
+}: {
+  rows: SeasonStandingRow[];
+  players: PublicPlayer[];
+}) {
   const { t } = useTranslation();
-  const names = useNames(league.players);
+  const names = useNames(players);
 
   return (
     <div className="overflow-x-auto rounded-lg border border-border-surface bg-card text-card-foreground">
@@ -280,7 +324,7 @@ function SeasonStandings({ league }: { league: PublicLeague }) {
           </tr>
         </thead>
         <tbody>
-          {league.standings.map((row) => (
+          {rows.map((row) => (
             <tr
               key={row.player_id}
               className="border-b border-border last:border-b-0"

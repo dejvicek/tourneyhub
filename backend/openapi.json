@@ -263,6 +263,7 @@
           "admin_target",
           "league_not_found",
           "league_id_taken",
+          "share_link_not_found",
           "season_not_found",
           "season_closed",
           "season_number_changed",
@@ -1706,6 +1707,160 @@
           }
         },
         "title": "ProfileUpdate",
+        "type": "object"
+      },
+      "PublicLeagueRead": {
+        "description": "A league through its share link: name, seasons oldest first, players.\n\nPlayers come in the order they were added; names sort in the UI's language.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "players": {
+            "items": {
+              "$ref": "#/components/schemas/PublicPlayerRead"
+            },
+            "title": "Players",
+            "type": "array"
+          },
+          "seasons": {
+            "items": {
+              "$ref": "#/components/schemas/SeasonRead"
+            },
+            "title": "Seasons",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "seasons",
+          "players"
+        ],
+        "title": "PublicLeagueRead",
+        "type": "object"
+      },
+      "PublicPlayerRead": {
+        "description": "A player's name for viewers; removed players too, for past results.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "PublicPlayerRead",
+        "type": "object"
+      },
+      "PublicTournamentRead": {
+        "description": "A tournament through the share link: entries, rounds and fields (FR-070).\n\nA separate allowlist of fields, not a copy of the organizer's whole\ntournament: a field added to TournamentRead must not reach viewers until it\nis added here on purpose. `waiting` lists the matches waiting for a field,\nin the order they will get one.",
+        "properties": {
+          "current_phase_done": {
+            "title": "Current Phase Done",
+            "type": "boolean"
+          },
+          "current_phase_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Phase Id"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/EntryRead"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/FieldRead"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
+          "goals_per_game": {
+            "title": "Goals Per Game",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "phases": {
+            "items": {
+              "$ref": "#/components/schemas/PhaseRead"
+            },
+            "title": "Phases",
+            "type": "array"
+          },
+          "rounds": {
+            "items": {
+              "$ref": "#/components/schemas/RoundRead"
+            },
+            "title": "Rounds",
+            "type": "array"
+          },
+          "season_id": {
+            "format": "uuid",
+            "title": "Season Id",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/TournamentState"
+          },
+          "type": {
+            "$ref": "#/components/schemas/TournamentType"
+          },
+          "waiting": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Waiting",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "season_id",
+          "name",
+          "date",
+          "type",
+          "state",
+          "current_phase_id",
+          "current_phase_done",
+          "goals_per_game",
+          "phases",
+          "entries",
+          "rounds",
+          "fields",
+          "waiting"
+        ],
+        "title": "PublicTournamentRead",
         "type": "object"
       },
       "RankingRow": {
@@ -6429,6 +6584,189 @@
         "summary": "Update Me",
         "tags": [
           "me"
+        ]
+      }
+    },
+    "/api/v1/public/{share_token}": {
+      "get": {
+        "description": "Return the league of a share link (FR-070).\n\nAn unknown token is 404 `share_link_not_found`, with an empty detail.",
+        "operationId": "read_public_league",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "share_token",
+            "required": true,
+            "schema": {
+              "title": "Share Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicLeagueRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "summary": "Read Public League",
+        "tags": [
+          "public"
+        ]
+      }
+    },
+    "/api/v1/public/{share_token}/seasons/{season_id}/tournaments": {
+      "get": {
+        "description": "List a season's tournaments, newest date first, without those in setup.\n\nA season of another league is 404 `season_not_found` (FR-070).",
+        "operationId": "list_public_tournaments",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "share_token",
+            "required": true,
+            "schema": {
+              "title": "Share Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "season_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Season Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TournamentSummary"
+                  },
+                  "title": "Response List Public Tournaments",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "summary": "List Public Tournaments",
+        "tags": [
+          "public"
+        ]
+      }
+    },
+    "/api/v1/public/{share_token}/tournaments/{tournament_id}": {
+      "get": {
+        "description": "Return a tournament whole: its entries, rounds, results and fields.\n\nA tournament in setup is 404 `tournament_not_found`, like an unknown one or\none of another league (FR-070).",
+        "operationId": "read_public_tournament",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "share_token",
+            "required": true,
+            "schema": {
+              "title": "Share Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicTournamentRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "summary": "Read Public Tournament",
+        "tags": [
+          "public"
         ]
       }
     }

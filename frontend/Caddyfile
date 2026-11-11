@@ -3,6 +3,18 @@
 {
 	# The container has no trust store to add Caddy's local root CA to.
 	skip_install_trust
+
+	# The default logger, which logs what Caddy fails to proxy (a 502 while the
+	# api is down) with the request: its uri names the share token, and so does
+	# the Referer of a call made from a share page. Both are written with the
+	# token replaced (ADR-008). There is no access log.
+	log {
+		format filter {
+			wrap json
+			request>uri regexp "/public/[^/?#]+" "/public/***"
+			request>headers>Referer regexp "/public/[^/?#]+" "/public/***"
+		}
+	}
 }
 
 # SITE_ADDRESS is localhost locally, the domain on the VPS. For localhost and
