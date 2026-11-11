@@ -37,8 +37,7 @@ function nameValidation(name: string): Problem | undefined {
 /** BR-002: the unfinished tournaments the player is picked for (setup) or plays in. */
 function unfinishedTournaments(playerId: string) {
   return db().tournaments.filter(
-    (t) =>
-      t.state !== "finished" && isPicked(t, playerId),
+    (t) => t.state !== "finished" && isPicked(t, playerId),
   );
 }
 
