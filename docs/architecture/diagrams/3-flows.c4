@@ -398,7 +398,7 @@ views "III. Flows" {
     variant sequence
     title "19. Generate and start, back to setup"
     order 23
-    description "FR-035, FR-036, BR-050 to BR-052, BR-130, ADR-008 and ADR-010: the review screen reads the preview first, which runs the same checks and the same round robin without writing and returns the draw counter. Starting carries that counter. The engine makes the round robin from the seeds and fills the fields; the schedule is stored in one transaction. Back to setup deletes the schedule while no match in the tournament has a result (FR-036, BR-077) and keeps the draws. Only the round robin is generated so far."
+    description "FR-035, FR-036, BR-050 to BR-052, BR-130, ADR-008 and ADR-010: the review screen reads the preview first, which runs the same checks and the same round robin without writing and returns the draw counter. Starting carries that counter. The engine makes the round robin from the seeds and fills the fields; the schedule is stored in one transaction. Back to setup deletes the schedule while no match in the tournament has a result (FR-036, BR-096) and keeps the draws. Only the round robin is generated so far."
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "GET setup/preview"
     tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "same checks and round robin as the start, nothing written"
     tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: rounds and counts, or the reason it cannot start; the draw counter"
@@ -416,11 +416,11 @@ views "III. Flows" {
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "POST back-to-setup expecting in_progress"
     tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the league, then the tournament"
     alt {
-      when "no match has a result (BR-077)" {
+      when "no match has a result (BR-096)" {
         tourneyhub.api.tournamentsApi -> tourneyhub.db.play "frees the fields, deletes the rounds; entries, seeds and draws stay"
         tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: the tournament in setup"
       }
-      when "some match has a result (BR-077)" {
+      when "some match has a result (BR-096)" {
         tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "422 tournament_has_results"
       }
       when "not in progress (a repeat)" {
