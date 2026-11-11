@@ -311,8 +311,8 @@ function resolveFormat(
   // BR-076: a number is the organizer's pick; null takes the default. The PRD
   // default (BR-075) also follows the league's draw setting and moves while the
   // phase has no result (BR-077); this demo takes the match format's default
-  // once, and still gives a round robin a value, which BR-071 forbids. Issues
-  // #59 and #65 change both.
+  // once, and still gives a round robin a value, which BR-071 forbids. PR #65
+  // (closes #59) changes both.
   const picked = format.sit_out_points ?? null;
   return {
     name: format.name.trim(),
@@ -1093,7 +1093,10 @@ export function preview(t: StoredTournament): SchedulePreview {
   };
 }
 
-/** The most entries a round robin is generated for; the backend's limit (FR-032). */
+/**
+ * The most entries a round robin is generated for; the backend's limit (FR-032).
+ * FR-032 now says 256; the change is the #48 follow-up (issue to open after approval).
+ */
 export const MAX_ROUND_ROBIN_ENTRIES = 64;
 
 /**

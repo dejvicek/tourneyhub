@@ -32,6 +32,9 @@ MAX_PLAYERS_PER_LEAGUE = 500
 """The most players a league may hold, removed ones included (DATA-MODEL §4.2).
 
 Removed players keep their rows and their names, so they count.
+
+BR-006 now says 1000 active players, removed ones not counted, and restores count
+again. The change is the #48 follow-up (issue to open after approval).
 """
 
 MAX_GOALS_PER_GAME = 99

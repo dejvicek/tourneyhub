@@ -66,6 +66,8 @@ _WRITE_ERRORS: dict[int | str, dict[str, object]] = {
     HTTPStatus.UNPROCESSABLE_CONTENT: {"model": ErrorResponse},
 }
 
+# FR-030 allows 200 characters; the code stops at 100 until the #48 follow-up
+# (issue to open after approval).
 type TournamentName = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)
 ]
@@ -93,8 +95,8 @@ type SitOutPoints = Literal[0, 1, 2]
 """The points of a sit-out (FR-039, BR-071, BR-076).
 
 Only a Swiss or Monster DYP phase has them; a round robin has none, not even 0
-(BR-071). The API still takes a value for a round robin; issue #65 changes
-that.
+(BR-071). The API still takes a value for a round robin; PR #65 (closes
+#59) changes that.
 """
 
 _GROUP_SETTINGS = ("round_robin_legs", "sit_out_points", "group_match_format")
@@ -150,7 +152,7 @@ class _FormatChecks(RequestModel):
 # says that `sit_out_points` null follows the default of the match format only.
 # The PRD (BR-075, BR-077) makes the default follow the match format and the
 # league's draw setting while the phase has no result, and BR-071 allows no
-# value for a round robin. Issues #59 and #65 change the behaviour and this text.
+# value for a round robin. PR #65 (closes #59) changes the behaviour and this text.
 class TournamentFormatWrite(_FormatChecks):
     """The whole format of a tournament in setup, the target state (FR-030, FR-031).
 
@@ -186,7 +188,7 @@ class TournamentFormatWrite(_FormatChecks):
 # The docstring below is API text (openapi.json) and was left as it is: its
 # "default sit-out points of the match format" is the match format only. BR-075
 # adds the league's draw setting and BR-077 the no-result state; BR-071 gives a
-# round robin no value. Issues #59 and #65 change the behaviour and this text.
+# round robin no value. PR #65 (closes #59) changes the behaviour and this text.
 class TournamentCreate(_FormatChecks):
     """A new tournament in the league's active season (FR-030).
 
@@ -584,7 +586,7 @@ class WaitingMatchRead(ResponseModel):
 
 # The docstring below is API text (openapi.json) and was left as it is. Its
 # "points include the sit-out points" holds for Swiss and Monster DYP (BR-071,
-# BR-078); a round robin has none (BR-071), which issue #65 makes true. A
+# BR-078); a round robin has none (BR-071), which PR #65 (closes #59) makes true. A
 # sit-out counts in the running standings once every match of its round has a
 # result (BR-078).
 class PlayStandingRow(ResponseModel):
