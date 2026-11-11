@@ -320,6 +320,14 @@ export const finalsMutations = {
             },
           ),
         ),
+      // The bracket is gone: drop it, so that the refresh after the delete
+      // does not ask for it again (404) before the screen leaves.
+      onSuccess: () => {
+        queryClient.removeQueries({
+          queryKey: [...tournamentKey(leagueId, tournamentId), "bracket"],
+          exact: true,
+        });
+      },
       onSettled: () => settle(queryClient, leagueId),
     }),
 };
