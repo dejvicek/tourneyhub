@@ -146,7 +146,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | FR-033 | Doubles: the organizer puts the players into pairs. DYP: the players are split into a top and a bottom half — by the league ranking or by hand — and the pairs are drawn (BR-031–BR-033). |
 | FR-034 | The first phase of a Singles, Doubles or DYP tournament is seeded by league ranking (default) or random shuffle, and the organizer can then reorder the seeds by hand. A knockout after a group phase is seeded by the group-phase places (§7.11). |
 | FR-035 | Generating creates the bracket, the round-robin schedule, or the first round of a Swiss or Monster DYP, and starts the tournament. |
-| FR-036 | While the tournament's first phase has no result (BR-077), the organizer can go back to setup, change anything — including a new DYP draw — and generate again. |
+| FR-036 | While no match in the tournament has a result (BR-077), the organizer can go back to setup, change anything — including a new DYP draw — and generate again. |
 | FR-037 | A tournament with a knockout finishes automatically when every knockout match has a result. A tournament without one finishes when the organizer finishes it after the group phase (FR-040). |
 | FR-038 | The organizer can delete a tournament after confirming, unless its season is closed. |
 | FR-039 | Swiss and Monster DYP have a setup setting, **points for sitting out**: 0, 1 or 2. The default is 1 when a group-phase match can end in a draw (BR-090), otherwise 2 (BR-071, BR-075–BR-079). Setup does not show it for a round robin, which has no points for sitting out (BR-071). |
