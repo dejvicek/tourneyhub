@@ -62,6 +62,7 @@ class ErrorCode(StrEnum):
     FORMAT_NOT_SUPPORTED = "format_not_supported"  # until its rounds are served
     PLAYERS_WITHOUT_PARTNER = "players_without_partner"  # Doubles (BR-030)
     TOO_MANY_ENTRIES_FOR_ROUND_ROBIN = "too_many_entries_for_round_robin"  # 64
+    TOO_MANY_ENTRIES_FOR_KNOCKOUT = "too_many_entries_for_knockout"  # 256
     # Results, standings and finishing
     MATCH_NOT_FOUND = "match_not_found"
     MATCH_SIDES_UNKNOWN = "match_sides_unknown"  # BR-091
