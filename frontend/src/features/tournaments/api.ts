@@ -8,14 +8,13 @@ import {
 import { api, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
 import type { components } from "@/api/schema";
-import type { TournamentState } from "@/demo/contract";
 
 type Schemas = components["schemas"];
 
-// ---- setup (screens 1-5). The backend serves the setup; the preview, the
-// top players, "Generate and start" and "Back to setup" are still
+// ---- setup (screens 1-5). The backend serves the setup, "Generate and
+// start" and "Back to setup"; the preview and the top players are still
 // provisional routes (the "setup" section of src/demo/contract.ts). Every
-// write sends the target state (ADR-008).
+// write sends the target state or the state it expects (ADR-008).
 
 const tournamentPath = (leagueId: string, tournamentId: string) => ({
   params: { path: { league_id: leagueId, tournament_id: tournamentId } },
@@ -172,10 +171,11 @@ export const setupMutations = {
         ),
       ),
     ),
+  /** FR-035: carries the draw counter the review showed (409 when stale). */
   start: (leagueId: string, tournamentId: string) =>
     leagueWrite(leagueId, (expectedDrawCounter: number) =>
       dataOf(
-        provisionalApi.POST(
+        api.POST(
           "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/start",
           {
             ...tournamentPath(leagueId, tournamentId),
@@ -186,16 +186,18 @@ export const setupMutations = {
     ),
   /** FR-036: possible until the first result; also used by the running screens. */
   backToSetup: (leagueId: string, tournamentId: string) =>
-    leagueWrite(leagueId, (expectedState: TournamentState) =>
-      dataOf(
-        provisionalApi.POST(
-          "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/back-to-setup",
-          {
-            ...tournamentPath(leagueId, tournamentId),
-            body: { expected_state: expectedState },
-          },
+    leagueWrite(
+      leagueId,
+      (expectedState: Schemas["BackToSetupWrite"]["expected_state"]) =>
+        dataOf(
+          api.POST(
+            "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/back-to-setup",
+            {
+              ...tournamentPath(leagueId, tournamentId),
+              body: { expected_state: expectedState },
+            },
+          ),
         ),
-      ),
     ),
   /** FR-038; a repeated delete answers 404, which also ends in the reload. */
   remove: (leagueId: string, tournamentId: string) =>
@@ -230,21 +232,18 @@ export const tournamentQueries = {
                 ),
               ),
     }),
-  /** The whole tournament with its rounds: still a provisional route (P7b, P8). */
+  /** The whole tournament with its rounds, fields and waiting matches. */
   detail: (leagueId: string, tournamentId: string) =>
     queryOptions({
       queryKey: ["leagues", leagueId, "tournaments", tournamentId],
       queryFn: ({ signal }) =>
         dataOf(
-          provisionalApi.GET(
-            "/api/v1/leagues/{league_id}/tournaments/{tournament_id}",
-            {
-              params: {
-                path: { league_id: leagueId, tournament_id: tournamentId },
-              },
-              signal,
+          api.GET("/api/v1/leagues/{league_id}/tournaments/{tournament_id}", {
+            params: {
+              path: { league_id: leagueId, tournament_id: tournamentId },
             },
-          ),
+            signal,
+          }),
         ),
     }),
 };

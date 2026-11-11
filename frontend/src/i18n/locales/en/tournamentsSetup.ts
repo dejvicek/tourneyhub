@@ -319,6 +319,11 @@ export const tournamentsSetup = {
     rules: {
       name_required: "Give the tournament a name.",
       fr032: "Not enough players: at least {{min}} are needed.",
+      fr032Entries: "Not enough entries: at least {{min}} are needed.",
+      br030_one: "{{count}} player has no partner yet.",
+      br030_other: "{{count}} players have no partner yet.",
+      fr035:
+        "Starting this format comes in a later version. A round robin starts now.",
       br121: "BO2 is offered only in leagues that allow draws.",
       fr033: "Nobody is left to pair.",
       br032Unequal:

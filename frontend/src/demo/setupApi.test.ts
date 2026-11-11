@@ -123,14 +123,14 @@ describe("the fake API for tournament setup", () => {
     const setup = await pickPlayers(id, 12);
     const start = (expected: number) =>
       dataOf(
-        provisionalApi.POST(
+        api.POST(
           "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/start",
           { ...at(id), body: { expected_draw_counter: expected } },
         ),
       );
     const back = () =>
       dataOf(
-        provisionalApi.POST(
+        api.POST(
           "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/back-to-setup",
           { ...at(id), body: { expected_state: "in_progress" } },
         ),
@@ -163,7 +163,11 @@ describe("the fake API for tournament setup", () => {
       ),
     );
     const refused = await failure(back());
-    expect([refused.status, refused.detail.rule]).toEqual([422, "FR-036"]);
+    expect([refused.status, refused.code, refused.detail]).toEqual([
+      422,
+      "tournament_has_results",
+      { results: 1 },
+    ]);
   });
 
   it("generates the first round of a Monster DYP and a knockout bracket with byes", async () => {
@@ -179,7 +183,7 @@ describe("the fake API for tournament setup", () => {
     await pickPlayers(knockout, 6);
     const run = (id: string, expected: number) =>
       dataOf(
-        provisionalApi.POST(
+        api.POST(
           "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/start",
           { ...at(id), body: { expected_draw_counter: expected } },
         ),

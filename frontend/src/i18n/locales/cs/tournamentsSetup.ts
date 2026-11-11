@@ -359,6 +359,13 @@ export const tournamentsSetup: CsMessages<typeof english> = {
     rules: {
       name_required: "Zadejte název turnaje.",
       fr032: "Hráčů je málo, potřeba je alespoň {{min}}.",
+      fr032Entries: "Účastníků je málo, potřeba je alespoň {{min}}.",
+      br030_one: "{{count}} hráč ještě nemá spoluhráče.",
+      br030_few: "{{count}} hráči ještě nemají spoluhráče.",
+      br030_many: "{{count}} hráče ještě nemá spoluhráče.",
+      br030_other: "{{count}} hráčů ještě nemá spoluhráče.",
+      fr035:
+        "Spuštění tohoto formátu přijde v další verzi. Každý s každým lze spustit už teď.",
       br121: "BO2 nabízíme jen v ligách s remízami.",
       fr033: "Není koho spárovat.",
       br032Unequal:

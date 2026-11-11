@@ -25,9 +25,20 @@ async function tournamentsOfSeason() {
 
 async function tournament(id: string) {
   return dataOf(
+    api.GET("/api/v1/leagues/{league_id}/tournaments/{tournament_id}", {
+      params: { path: { ...league, tournament_id: id } },
+    }),
+  );
+}
+
+/** The share link's read, which carries the places (PublicTournamentRead). */
+async function publicTournament(id: string) {
+  return dataOf(
     provisionalApi.GET(
-      "/api/v1/leagues/{league_id}/tournaments/{tournament_id}",
-      { params: { path: { ...league, tournament_id: id } } },
+      "/api/v1/public/{share_token}/tournaments/{tournament_id}",
+      {
+        params: { path: { share_token: DEMO_SHARE_TOKEN, tournament_id: id } },
+      },
     ),
   );
 }
@@ -176,7 +187,7 @@ describe("the demo's fake API", () => {
     ]);
 
     const [singles, autumn, running] = await Promise.all(
-      summaries.map((t) => tournament(t.id)),
+      summaries.map((t) => publicTournament(t.id)),
     );
     expect(singles?.places?.map((row) => row.place)).toHaveLength(6);
     // §5.1: the semifinal losers share 3rd and split 6 + 4 points.

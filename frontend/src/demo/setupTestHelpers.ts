@@ -2,7 +2,6 @@
 import axe from "axe-core";
 
 import { api, dataOf } from "@/api/client";
-import { provisionalApi } from "@/api/provisional";
 import type { components } from "@/api/schema";
 
 import { DEMO_LEAGUE_ID, DEMO_SEASON_ID } from "./ids";
@@ -77,7 +76,7 @@ export function setupOf(tournamentId: string) {
 
 export function tournamentOf(tournamentId: string) {
   return dataOf(
-    provisionalApi.GET(
+    api.GET(
       "/api/v1/leagues/{league_id}/tournaments/{tournament_id}",
       at(tournamentId),
     ),
@@ -143,15 +142,12 @@ export async function drawElsewhere(
 /** Generates and starts a tournament with its current draw counter. */
 export async function startTournament(tournamentId: string) {
   await dataOf(
-    provisionalApi.POST(
-      "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/start",
-      {
-        ...at(tournamentId),
-        body: {
-          expected_draw_counter: (await setupOf(tournamentId)).draw_counter,
-        },
+    api.POST("/api/v1/leagues/{league_id}/tournaments/{tournament_id}/start", {
+      ...at(tournamentId),
+      body: {
+        expected_draw_counter: (await setupOf(tournamentId)).draw_counter,
       },
-    ),
+    }),
   );
 }
 

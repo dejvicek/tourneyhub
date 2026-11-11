@@ -1062,26 +1062,29 @@ export function preview(t: StoredTournament): SchedulePreview {
   };
 }
 
-/** The reason the tournament cannot start (FR-032, BR-031); null when it can. */
-/** A refusal of the provisional start and "back to setup", which name their rule. */
-const invalid = (
-  rule: string,
-  extra: Record<string, number> = {},
-): SetupFailure => fail(422, "validation_failed", { rule, ...extra });
-
+/**
+ * The reason the tournament cannot start, with the backend's codes (FR-032,
+ * FR-033); null when it can. Unlike the backend, which generates only the
+ * round robin so far, the demo starts every format.
+ */
 export function startProblem(t: StoredTournament): SetupFailure | null {
   const draft = draftOf(t);
   const entries = t.entries.filter((entry) => entry.stage === "main");
+  if (t.type === "doubles") {
+    const paired = new Set(entries.flatMap((entry) => entry.player_ids));
+    const unpaired = draft.playerIds.filter((id) => !paired.has(id)).length;
+    if (unpaired > 0) {
+      return fail(422, "players_without_partner", { unpaired });
+    }
+  }
   const minimum =
     t.type === "monster_dyp"
       ? 4
       : draft.format.group_phase === "none" && draft.format.third_place_match
         ? 4
         : 2;
-  const count =
-    t.type === "monster_dyp" ? draft.playerIds.length : entries.length;
-  return count < minimum
-    ? invalid("FR-032", { min: minimum, given: count })
+  return entries.length < minimum
+    ? fail(422, "not_enough_entries", { minimum, given: entries.length })
     : null;
 }
 
@@ -1104,7 +1107,7 @@ export function start(
   }
   const phase = t.phases[0];
   if (!phase) {
-    return invalid("FR-035");
+    return fail(422, "format_not_supported");
   }
   const made = plan(t, draft);
   t.rounds = made.rounds.map((round, index): RoundRead => {
@@ -1153,18 +1156,15 @@ export function start(
 }
 
 /** FR-036: back to setup is possible until the first result is entered. */
-export function backToSetup(
-  t: StoredTournament,
-  expectedState: string,
-): SetupFailure | null {
-  if (t.state !== expectedState) {
-    return fail(409, "tournament_not_in_setup", { state: t.state });
-  }
+export function backToSetup(t: StoredTournament): SetupFailure | null {
   if (t.state !== "in_progress") {
-    return invalid("FR-036");
+    return fail(409, "tournament_not_in_progress", { state: t.state });
   }
-  if (t.rounds.some((round) => round.matches.some((m) => m.outcome !== null))) {
-    return invalid("FR-036");
+  const results = t.rounds
+    .flatMap((round) => round.matches)
+    .filter((match) => match.outcome !== null).length;
+  if (results > 0) {
+    return fail(422, "tournament_has_results", { results });
   }
   draftOf(t);
   t.rounds = [];
