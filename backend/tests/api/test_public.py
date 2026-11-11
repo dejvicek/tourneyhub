@@ -557,7 +557,7 @@ def test_fr071_public_schemas_carry_nothing_only_the_organizer_sees(
         reachable,
     )
 
-    assert len(public) == 6
+    assert len(public) == 7
     assert all(set(item) == {"get"} for item in public.values())  # FR-072
     assert {
         name: set(schemas[name]["properties"])

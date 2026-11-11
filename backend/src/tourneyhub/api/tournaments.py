@@ -18,6 +18,7 @@ from pydantic_core import PydanticCustomError
 from tourneyhub.api.deps import ClockDep, CurrentUserDep, SessionDep
 from tourneyhub.api.schemas import INT_MAX, ErrorResponse, RequestModel, ResponseModel
 from tourneyhub.engine.dyp import DypHalf
+from tourneyhub.engine.knockout import RoundName
 from tourneyhub.engine.leagues import (
     MAX_FIELD_COUNT,
     MAX_GOALS_PER_GAME,
@@ -667,20 +668,22 @@ type PlaceReasonKind = Literal[
     "lost_in_round",
     "group_place",
 ]
-type BracketRoundName = Literal["round_of_16", "quarterfinal", "semifinal", "final"]
 
 
 class PlaceReasonRead(ResponseModel):
     """Why an entry has its place (§7.13).
 
-    After a group phase without a knockout it is `group_place`, with the
-    entry's place in the standings and the phase's format (BR-103). The
-    knockout's kinds, `round`, `score` (the entry's first) and the opponent
-    come with the knockout and are null until then.
+    An entry that did not go through to the knockout, or every entry of a
+    group phase without one, has `group_place`: its place in the standings
+    and the phase's format (BR-103). A knockout entry has the final, the
+    third-place match or `lost_in_round` with the `round` it went out in, the
+    `score` of that match (the entry's first: a BO1 game's goals, else the
+    games won; null for a walkover or a game without a score) and the
+    opponent (BR-102); its `group_place` is that of the entry it continues.
     """
 
     kind: PlaceReasonKind
-    round: BracketRoundName | None
+    round: RoundName | None
     score: tuple[int, int] | None
     opponent_entry_id: UUID | None
     group_place: int | None
@@ -1078,6 +1081,13 @@ def set_match_result(
     `draws_not_allowed` (BR-090), `game_score_mismatch` (BR-092, detail
     `game_no`) or `scores_required` (Swiss and Monster DYP, detail `game_no`).
     A walkover with games is 422 `validation_failed`.
+
+    The knockout: once it is drawn, a group-phase result is 422
+    `group_phase_locked` (BR-053, detail `phase_id`); a knockout result that a
+    later match it feeds has a result for is 422 `result_locked` (BR-094,
+    detail `match_ids`), and a knockout has no draws (BR-090). A new winner
+    changes the later matches' sides. The result that completes the
+    knockout finishes the tournament (FR-037).
     """
     match = tournament_service.set_match_result(
         session,
@@ -1272,8 +1282,9 @@ def read_places(
     """Return the places and the season points of a finished tournament (§7.13, §7.14).
 
     Computed on read. Before the tournament finishes, `complete` is false and
-    there are no rows. A finished tournament with a knockout is 422
-    `format_not_supported` until the knockout is served.
+    there are no rows. With a knockout, its entries take the top places and
+    the others follow in their group-phase order (BR-102, BR-103). A Swiss or
+    a Monster DYP is 422 `format_not_supported` until they are played.
     """
     places = tournament_service.read_places(
         session, league_id=league_id, tournament_id=tournament_id, user_id=user.id
@@ -1291,10 +1302,10 @@ def places_read(places: PlacesView) -> PlacesRead:
                 entry_id=row.entry_id,
                 points_per_player=row.points_per_player,
                 reason=PlaceReasonRead(
-                    kind="group_place",
-                    round=None,
-                    score=None,
-                    opponent_entry_id=None,
+                    kind=row.kind,
+                    round=row.round,
+                    score=row.score,
+                    opponent_entry_id=row.opponent_entry_id,
                     group_place=row.group_place,
                     group_format=places.group_format,
                 ),
