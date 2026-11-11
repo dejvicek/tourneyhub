@@ -61,8 +61,9 @@ const GROUP_BASE: Omit<PhaseRead, "id" | "position"> = {
   kind: "group",
   format: "round_robin",
   round_robin_legs: 1,
-  sit_out_points: 0,
-  sit_out_points_set_by_hand: true,
+  // BR-071: a round robin keeps no sit-out points.
+  sit_out_points: null,
+  sit_out_points_set_by_hand: false,
   tiebreakers: null,
   qualifiers: null,
   third_place_match: null,
@@ -157,7 +158,6 @@ function dypEvening(players: StoredPlayer[], kit: SeedKit): StoredTournament {
   const order = roundRobinStandings(
     entries.map((e) => e.id),
     b.tournament.rounds,
-    0,
   ).map((row) => required(entries.find((e) => e.id === row.entry_id)));
   b.tournament.rounds.push(
     ...drawKnockoutRounds({
@@ -190,6 +190,9 @@ function monsterDyp(players: StoredPlayer[], kit: SeedKit): StoredTournament {
     ...GROUP_BASE,
     format: "monster_dyp",
     round_robin_legs: null,
+    // BR-071: Swiss and Monster DYP score a sit-out.
+    sit_out_points: 0,
+    sit_out_points_set_by_hand: true,
     // FR-043: the default order, from the rules.
     tiebreakers: [...rules.swissTiebreakers],
     qualifiers: 8,
@@ -237,6 +240,8 @@ function swiss(players: StoredPlayer[], kit: SeedKit): StoredTournament {
     ...GROUP_BASE,
     format: "swiss",
     round_robin_legs: null,
+    sit_out_points: 0,
+    sit_out_points_set_by_hand: true,
     tiebreakers: [...rules.swissTiebreakers],
     qualifiers: 4,
   });

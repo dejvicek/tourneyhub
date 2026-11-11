@@ -84,12 +84,7 @@ describe("the fake API for results and finishing (the backend's codes, P8)", () 
     expect(play.group_done).toBe(false);
   });
 
-  it("counts the picked points of a sit-out in the standings (BR-071)", async () => {
-    const group = runningDyp().phases.find((phase) => phase.kind === "group");
-    if (!group) {
-      throw new Error("The seed has no group phase");
-    }
-    group.sit_out_points = 2;
+  it("counts a sit-out in a round robin but gives it no points (BR-071)", async () => {
     const [sitter] = runningDyp().entries;
     const [round] = runningDyp().rounds;
     if (!sitter || !round) {
@@ -108,7 +103,7 @@ describe("the fake API for results and finishing (the backend's codes, P8)", () 
       play.standings.reduce((sum, row) => sum + row.sat_out, 0),
     ).toBeGreaterThan(0);
     for (const row of play.standings) {
-      expect(row.points).toBe(2 * row.won + row.drawn + 2 * row.sat_out);
+      expect(row.points).toBe(2 * row.won + row.drawn);
     }
   });
 

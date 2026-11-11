@@ -218,8 +218,9 @@ const ROUND_ROBIN: Omit<PhaseRead, "id" | "position"> = {
   kind: "group",
   format: "round_robin",
   round_robin_legs: 1,
-  sit_out_points: 0,
-  sit_out_points_set_by_hand: true,
+  // BR-071: a round robin keeps no sit-out points.
+  sit_out_points: null,
+  sit_out_points_set_by_hand: false,
   tiebreakers: null,
   qualifiers: null,
   third_place_match: null,
@@ -289,7 +290,6 @@ function autumnOpenDyp(
   const order = roundRobinStandings(
     entries.map((entry) => entry.id),
     t.tournament.rounds,
-    0,
   ).map((row) => required(entries.find((entry) => entry.id === row.entry_id)));
   const semifinals = t.round(knockout, knockoutFirstRound(order.slice(0, 4)));
   for (const match of semifinals.matches) {

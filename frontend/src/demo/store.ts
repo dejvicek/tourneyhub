@@ -168,11 +168,9 @@ export function tournamentStandings(
   if (!group) {
     return [];
   }
-  const sitOutPoints = group.sit_out_points ?? 0;
   return roundRobinStandings(
     t.entries.filter((entry) => entry.stage === "main").map((e) => e.id),
     t.rounds.filter((round) => round.phase_id === group.id),
-    sitOutPoints,
   );
 }
 
