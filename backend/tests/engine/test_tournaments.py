@@ -1,12 +1,11 @@
 import pytest
 
 from tourneyhub.engine.tournaments import (
+    DEFAULT_SIT_OUT_POINTS,
     EntryKind,
     GroupPhase,
-    MatchFormat,
     PhaseFormat,
     TournamentType,
-    default_sit_out_points,
     entry_kind,
     group_phase_format,
     is_seeded,
@@ -47,20 +46,5 @@ def test_fr034_every_type_but_monster_dyp_is_seeded() -> None:
     assert [is_seeded(t) for t in TournamentType] == [True, True, True, False]
 
 
-@pytest.mark.parametrize(
-    ("match_format", "draws_allowed", "expected"),
-    [
-        pytest.param(MatchFormat.BO1, True, 1, id="draws-bo1-like-a-draw"),
-        pytest.param(MatchFormat.BO2, True, 1, id="draws-bo2-like-a-draw"),
-        pytest.param(MatchFormat.BO3, True, 2, id="draws-bo3-like-a-win"),
-        pytest.param(MatchFormat.BO5, True, 2, id="draws-bo5-like-a-win"),
-        pytest.param(MatchFormat.BO1, False, 2, id="no-draws-bo1-like-a-win"),
-        pytest.param(MatchFormat.BO2, False, 2, id="no-draws-bo2-like-a-win"),
-        pytest.param(MatchFormat.BO3, False, 2, id="no-draws-bo3-like-a-win"),
-        pytest.param(MatchFormat.BO5, False, 2, id="no-draws-bo5-like-a-win"),
-    ],
-)
-def test_br071_the_default_sit_out_points_follow_draws_and_the_match_format(
-    match_format: MatchFormat, draws_allowed: bool, expected: int
-) -> None:
-    assert default_sit_out_points(match_format, draws_allowed=draws_allowed) == expected
+def test_fr039_the_default_sit_out_points_are_0() -> None:
+    assert DEFAULT_SIT_OUT_POINTS == 0
