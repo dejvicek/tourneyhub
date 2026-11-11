@@ -113,10 +113,10 @@ model {
         link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#62-leagues-and-players "PRD §6.2 and §6.3"
       }
       tournamentsApi = component "API: tournaments" {
-        summary "Setup, draws, generating, rounds, results, knockout, late players, disabling."
+        summary "Setup, draws, generating, rounds, results, fields, knockout, late players, disabling."
         description "
-          Setup, draws, generating, rounds, results, knockout, late players, disabling.
-          A round is deleted by its id, adding a round carries the expected round_no, “shuffle again” carries the expected draw counter; a mismatch returns 409 and the client reloads the state.
+          Setup, draws, generating, rounds, results, fields, knockout, late players, disabling.
+          A round is deleted by its id, adding a round carries the expected round_no, “shuffle again” carries the expected draw counter, adding a field carries the number it expects; a mismatch returns 409 and the client reloads the state.
         "
         link https://github.com/dejvicek/tourneyhub/blob/main/PRD.md#64-tournaments "PRD §6.4 to §6.7"
         link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-008--api-conventions-and-generated-client-types "ADR-008"

@@ -273,6 +273,10 @@ views "III. Flows" {
         navigateTo resultEntry
       }
     }
+    organizer -> tourneyhub.spa.organizerUi "a third table frees up: adds Field 3, moves matches by hand"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "adds a field, places matches" {
+      navigateTo fieldsDuringPlay
+    }
     organizer -> tourneyhub.spa.organizerUi "after the round robin: knockout for the top 4 pairs, no third-place match"
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "start the knockout"
     tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "bracket 1st v 4th and 2nd v 3rd, progression derived by itself"
@@ -446,5 +450,40 @@ views "III. Flows" {
     tourneyhub.api.tournamentsApi -> tourneyhub.db.leagues "the season's placement points table"
     tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "standings to places, places to points per player, shared places split and rounded down"
     tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: places with points per player"
+  }
+
+  dynamic view fieldsDuringPlay {
+    variant sequence
+    title "21. Fields during play"
+    order 25
+    description "FR-090 to FR-094, BR-130 to BR-134 and ADR-008: the organizer adds and removes fields and places matches by hand while the tournament runs. Each write locks the league, then the tournament, and sends a target state: a new field carries the number it expects, a field is removed by its id, a placement names each match with its field or with none (a swap names both). The engine refuses a player on two fields; the freed fields take the next waiting match, except one the request sent back to waiting. The waiting list is computed on read."
+    organizer -> tourneyhub.spa.organizerUi "Manage fields: Add a field"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "POST …/fields with the expected number, the lowest free one"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.leagues "locks the league"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the tournament: not in progress 409; another number 409 field_number_changed"
+    tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "the new field takes the first waiting match whose players are free"
+    tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "201: the field and its match"
+    organizer -> tourneyhub.spa.organizerUi "moves a match, swaps two fields or sends one back to waiting"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "PUT …/fields/placements: each match with its field, or none"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the league, then the tournament, with its rounds and fields"
+    alt {
+      when "a stale screen" {
+        tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "409 match_has_result or field_not_free: reload"
+      }
+      when "a player on two fields (BR-131)" {
+        tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "places by hand, checks every player"
+        tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "422 player_on_another_field"
+      }
+      when "otherwise" {
+        tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "places by hand; the freed fields take the next waiting matches, not the ones sent back"
+        tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "fields hold their new matches; a match placed by hand stays until its result"
+        tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: the tournament with its fields and waiting list"
+      }
+    }
+    organizer -> tourneyhub.spa.organizerUi "removes a field after confirming"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "DELETE …/fields/{id}; a repeat 404, the last field 422"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.play "its match goes to the front of the waiting list (requeued_at)"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "the field goes, the others keep their numbers; free fields are filled"
+    tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "204"
   }
 }
