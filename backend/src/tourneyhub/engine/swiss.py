@@ -14,38 +14,14 @@ from tourneyhub.engine.errors import NotEnoughEntriesError
 from tourneyhub.engine.ids import EntryId, ensure_distinct
 from tourneyhub.engine.lots import lot_digest
 from tourneyhub.engine.matching import Pair, min_cost_matching
+from tourneyhub.engine.results import POINTS, Result, result_for, tiebreak_purpose
 from tourneyhub.engine.tournaments import MatchOutcome, Tiebreaker
-
-WIN_POINTS = 2
-"""Points for a win in a group phase; a loss earns 0 (BR-070)."""
-
-DRAW_POINTS = 1
-"""Points for a draw in a group phase (BR-070)."""
 
 PAIRING_WINDOW = 16
 """How far apart, among the entries that play, the fallback first pairs (ADR-011)."""
 
 MINIMUM_ENTRIES = 2
 """The fewest entries that can play a round (FR-032)."""
-
-
-class _Result(StrEnum):
-    WON = "won"
-    DRAWN = "drawn"
-    LOST = "lost"
-
-
-_POINTS = {_Result.WON: WIN_POINTS, _Result.DRAWN: DRAW_POINTS, _Result.LOST: 0}
-"""The points each result earns (BR-070)."""
-
-
-def tiebreak_purpose(completed_rounds: int) -> str:
-    """Name the lot of BR-074, `tiebreak:after-round-<completed_rounds>` (ADR-010).
-
-    The number of completed rounds is part of the purpose, so tied entries are
-    ordered afresh after each round, and the same way on every read.
-    """
-    return f"tiebreak:after-round-{completed_rounds}"
 
 
 class PairingMethod(StrEnum):
@@ -240,7 +216,7 @@ def swiss_standings(
         raise ValueError(msg)
 
     points: Counter[EntryId] = Counter()
-    results: dict[EntryId, Counter[_Result]] = {id_: Counter() for id_ in ids}
+    results: dict[EntryId, Counter[Result]] = {id_: Counter() for id_ in ids}
     difference: Counter[EntryId] = Counter()
     sat_out: Counter[EntryId] = Counter()
     opponents: dict[EntryId, list[EntryId]] = {id_: [] for id_ in ids}
@@ -255,9 +231,9 @@ def swiss_standings(
                 (match.side_1, match.side_2, MatchOutcome.SIDE_1, 1),
                 (match.side_2, match.side_1, MatchOutcome.SIDE_2, -1),
             ):
-                result = _result_for(match.outcome, own)
+                result = result_for(match.outcome, own)
                 results[entry_id][result] += 1
-                points[entry_id] += _POINTS[result]
+                points[entry_id] += POINTS[result]
                 difference[entry_id] += goals * match.score_difference
                 opponents[entry_id].append(opponent)
     bh1 = {id_: sum(points[other] for other in opponents[id_]) for id_ in ids}
@@ -298,9 +274,9 @@ def swiss_standings(
             bh2=bh2[entry_id],
             score_difference=difference[entry_id],
             played=len(opponents[entry_id]),
-            won=results[entry_id][_Result.WON],
-            drawn=results[entry_id][_Result.DRAWN],
-            lost=results[entry_id][_Result.LOST],
+            won=results[entry_id][Result.WON],
+            drawn=results[entry_id][Result.DRAWN],
+            lost=results[entry_id][Result.LOST],
             sat_out=sat_out[entry_id],
             is_decided_by_lot=ties[criteria(entry_id)] > 1,
         )
@@ -367,9 +343,10 @@ def draw_next_swiss_round(
        top of the standings is kept first. Only pairs that have not met and are at most 16 apart are
        allowed; while no perfect matching exists the window doubles (32, 64,
        ...) up to the whole field. If even the whole field has none, pairs
-       that have met are allowed at a cost above any sum of the others, once
-       per earlier meeting, so the draw has as few repeats as possible and
-       prefers pairs that met once over pairs that met twice (BR-057).
+       that have met are allowed, and the matching first has as few pairs
+       that have met as possible (BR-057), then as few earlier meetings
+       among them (a pair that met once over a pair that met twice), then
+       the lowest cost above.
 
     The result depends only on the standing and on who has met whom, so it
     is the same for the same seed and round.
@@ -478,13 +455,6 @@ def _checked_rounds(
     return ordered
 
 
-def _result_for(outcome: MatchOutcome, own: MatchOutcome) -> _Result:
-    """Return a match's result from the view of the side `own`."""
-    if outcome is MatchOutcome.DRAW:
-        return _Result.DRAWN
-    return _Result.WON if outcome is own else _Result.LOST
-
-
 def _pair_neighbours(count: int, met: Counter[Pair]) -> tuple[Pair, ...] | None:
     """Pair top-down with the next entry below that has not been met (BR-056)."""
     unpaired = list(range(count))
@@ -527,19 +497,30 @@ def _pair_by_matching(count: int, met: Counter[Pair]) -> tuple[Pair, ...]:
         if window >= count - 1:
             break
         window *= 2
-    # More than any sum of the other costs: each pair costs at most
-    # `(count - 1) ** 2 * count`, and `count // 2` pairs are drawn. So fewer
-    # earlier meetings always win (BR-057), and among equal ones, the closer pairs.
-    repeat_cost = count // 2 * (count - 1) ** 2 * count + 1
-    return min_cost_matching(
-        count,
-        (
-            (
-                top,
-                bottom,
-                _pair_cost(count, top, bottom) + repeat_cost * met[(top, bottom)],
-            )
-            for top in range(count)
-            for bottom in range(top + 1, count)
-        ),
-    )
+    return min_cost_matching(count, _repeat_costs(count, met))
+
+
+def _repeat_costs(count: int, met: Counter[Pair]) -> Iterable[tuple[int, int, int]]:
+    """Cost every pair so a matching is ranked by three keys in turn (BR-057).
+
+    1. The fewest pairs that have met: a repeat pair costs `pair_weight`.
+    2. Then the fewest earlier meetings among those pairs: each costs
+       `meeting_weight`, so one pair that met once beats one that met twice.
+    3. Then `_pair_cost`, the distance in the standings.
+
+    Each weight is more than the most the lower keys can add up to over a
+    whole matching, so a key decides only when the keys before it are equal.
+    A matching has `count // 2` pairs of distance cost at most
+    `(count - 1) ** 2 * count` each, and at most every earlier meeting among
+    its pairs. The weights grow with `count` and the history, so the order
+    holds for any field size; the costs stay whole numbers, without ties
+    from rounding.
+    """
+    distance_bound = count // 2 * (count - 1) ** 2 * count
+    meeting_weight = distance_bound + 1
+    pair_weight = meeting_weight * sum(met.values()) + distance_bound + 1
+    for top in range(count):
+        for bottom in range(top + 1, count):
+            times = met[(top, bottom)]
+            repeat = pair_weight + meeting_weight * times if times else 0
+            yield top, bottom, repeat + _pair_cost(count, top, bottom)
