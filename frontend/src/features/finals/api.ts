@@ -337,9 +337,21 @@ export const finalsMutations = {
 type QueryData<T extends { queryKey: unknown }> =
   T["queryKey"] extends DataTag<unknown, infer Data, unknown> ? Data : never;
 
-export type BracketData = QueryData<ReturnType<typeof finalsQueries.bracket>>;
-export type BracketRoundData = BracketData["rounds"][number];
-export type BracketMatchData = BracketRoundData["matches"][number];
+type OrganizerBracket = QueryData<ReturnType<typeof finalsQueries.bracket>>;
+type OrganizerMatch = OrganizerBracket["rounds"][number]["matches"][number];
+
+// The bracket screens also draw the share link's bracket, which has no
+// `result_locked` (it is the organizer's, BR-094), so there it is optional.
+export type BracketMatchData = Omit<OrganizerMatch, "result_locked"> & {
+  result_locked?: boolean;
+};
+export type BracketRoundData = Omit<
+  OrganizerBracket["rounds"][number],
+  "matches"
+> & { matches: BracketMatchData[] };
+export type BracketData = Omit<OrganizerBracket, "rounds"> & {
+  rounds: BracketRoundData[];
+};
 export type BracketSideData = BracketMatchData["sides"][number];
 export type PlacesData = QueryData<ReturnType<typeof finalsQueries.places>>;
 export type PlaceData = PlacesData["rows"][number];

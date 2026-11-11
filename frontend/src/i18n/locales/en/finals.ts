@@ -19,6 +19,7 @@ export const finals = {
       team: "{{first}} / {{second}}",
     },
     unknown: "Unknown player",
+    byLot: "By lot",
   },
   errors: {
     groupNotDone:
@@ -31,6 +32,8 @@ export const finals = {
     phaseNotDeletable: "Only a knockout after a group phase can be deleted.",
     seasonClosed:
       "The season was closed meanwhile, so nothing in it can change.",
+    qualifiersChanged:
+      "A group result changed who goes through, so the preview was refreshed. Check it and draw again.",
   },
   place: {
     label: "{{place}}{{suffix}}",

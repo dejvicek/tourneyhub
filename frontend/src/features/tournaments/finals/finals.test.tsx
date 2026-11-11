@@ -316,6 +316,59 @@ describe("Changing a knockout result (FR-053, BR-094)", () => {
   });
 });
 
+describe("The sides a result names (ADR-008, BR-094)", () => {
+  it("is refused by the fake API when the entries are not the ones on the match", async () => {
+    const bracket = await provisionalApi.GET(`${root}/bracket`, {
+      params: { path: ids(DYP_EVENING) },
+    });
+    const final = bracket.data?.rounds.at(-1)?.matches[0];
+    const [one, two] = final?.sides ?? [];
+    const put = (expected: [string, string]) =>
+      provisionalApi.PUT(`${root}/matches/{match_id}/result`, {
+        params: {
+          path: { ...ids(DYP_EVENING), match_id: final?.match_id ?? "" },
+        },
+        body: {
+          walkover_winner: null,
+          games: [
+            { winner: "side_1", score_1: 10, score_2: 7 },
+            { winner: "side_1", score_1: 10, score_2: 5 },
+          ],
+          expected_sides: expected,
+        },
+      });
+
+    const stale = await put([two?.entry_id ?? "", one?.entry_id ?? ""]);
+    const right = await put([one?.entry_id ?? "", two?.entry_id ?? ""]);
+
+    expect(stale.response.status).toBe(409);
+    expect(right.response.ok).toBe(true);
+  });
+});
+
+describe("Lots in the bracket (BR-074, ADR-009)", () => {
+  it("marks the seeds a lot decided", async () => {
+    const real = await provisionalApi.GET(`${root}/bracket`, {
+      params: { path: ids(DYP_EVENING) },
+    });
+    const bracket = structuredClone(real.data);
+    const semifinal = bracket?.rounds[0]?.matches[0];
+    if (!semifinal?.sides[0]) {
+      throw new Error("the demo's semifinal has sides");
+    }
+    semifinal.sides[0].decided_by_lot = true;
+    server.use(
+      http.get(
+        "/api/v1/leagues/:leagueId/tournaments/:tournamentId/bracket",
+        () => HttpResponse.json(bracket),
+      ),
+    );
+    renderAt(at(paths.knockout, DYP_EVENING));
+
+    expect(await screen.findAllByText("By lot")).toHaveLength(1);
+  });
+});
+
 describe("Finished (screen 10)", () => {
   it("shows shared places and season points rounded down", async () => {
     await playFinal(DYP_EVENING);
@@ -761,6 +814,38 @@ describe("Start the knockout (screen 13)", () => {
     expect(
       tournament.data?.phases.find((phase) => phase.kind === "knockout"),
     ).toMatchObject({ match_format: "bo3", final_match_format: "bo5" });
+  });
+
+  it("names the entries its preview showed, and leaves the format to the server unless picked", async () => {
+    let sent: unknown;
+    server.use(
+      http.put(
+        "/api/v1/leagues/:leagueId/tournaments/:tournamentId/knockout",
+        async ({ request }) => {
+          sent = await request.clone().json();
+        },
+      ),
+    );
+    const user = userEvent.setup();
+    renderAt(`${at(paths.startKnockout, ROUND_ROBIN_DONE)}?qualifiers=4`);
+
+    await user.click(
+      await screen.findByRole("button", { name: "Draw the knockout" }),
+    );
+    await screen.findByText("Semifinal 1");
+
+    const preview = await provisionalApi.GET(`${root}/knockout/preview`, {
+      params: {
+        path: ids(ROUND_ROBIN_DONE),
+        query: { qualifiers: 4, third_place_match: false },
+      },
+    });
+    expect(sent).toMatchObject({
+      match_format: null,
+      expected_qualifier_ids: preview.data?.entries.map(
+        (entry) => entry.members[0]?.entry_id,
+      ),
+    });
   });
 
   it("ignores query values it cannot use", async () => {

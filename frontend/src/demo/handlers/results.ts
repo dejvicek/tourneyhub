@@ -28,6 +28,19 @@ export const resultHandlers = [
       if (!match || !phase) {
         return apiError(404, "match_not_found", {});
       }
+      // ADR-008: the entries the screen saw on both sides are still there.
+      const [first, second] = match.sides;
+      const expected = body.expected_sides;
+      if (
+        expected &&
+        first.entry_id &&
+        second.entry_id &&
+        (first.entry_id !== expected[0] || second.entry_id !== expected[1])
+      ) {
+        return apiError(409, "match_sides_changed", {
+          entry_ids: [first.entry_id, second.entry_id],
+        });
+      }
       if (match.sides.some((side) => side.player_ids.length === 0)) {
         return apiError(422, "match_sides_unknown", {});
       }

@@ -147,7 +147,9 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
   // the final the knockout's format unless it has its own.
   const [picked, setPicked] = useState<KnockoutFormat | null>(null);
   const [finalChoice, setFinalChoice] = useState<FinalChoice>("same");
-  const matchFormat = picked ?? league.data?.default_match_format ?? "bo1";
+  // What the segmented control shows; the start sends only what was picked,
+  // and the server applies the league's default for the rest (BR-120).
+  const shownFormat = picked ?? league.data?.default_match_format ?? "bo1";
   const effectiveMode = monster ? mode : null;
   const preview = useQuery({
     ...finalsQueries.preview(leagueId, tournamentId, {
@@ -356,7 +358,7 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
       <SegmentedControl
         label={t("tournaments.setup.format.knockoutMatches")}
         hint={t("tournaments.setup.format.knockoutMatchesHint")}
-        value={matchFormat}
+        value={shownFormat}
         options={KNOCKOUT_FORMATS.map((format) => ({
           value: format,
           label: t(`tournaments.setup.matchFormat.${format}`),
@@ -409,6 +411,11 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
               <span className="flex-1 text-body-md font-bold">
                 {entryLabel(entry.seed)}
               </span>
+              {entry.decided_by_lot && (
+                <span className="text-caption text-muted-foreground">
+                  {t("finals.common.byLot")}
+                </span>
+              )}
               <span className="text-body-sm text-muted-foreground">
                 {entry.members.length === 2 &&
                 entry.members[0] &&
@@ -518,9 +525,13 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
           drawKnockout.mutate(
             {
               expected_current_phase_id: data.current_phase_id ?? group.id,
+              // The entries the preview shows going through, in seed order.
+              expected_qualifier_ids: plan.entries.flatMap((entry) =>
+                entry.members.slice(0, 1).map((member) => member.entry_id),
+              ),
               qualifiers: shown,
               third_place_match: thirdPlace,
-              match_format: matchFormat,
+              match_format: picked,
               final_match_format: finalChoice === "same" ? null : finalChoice,
               mode: effectiveMode,
             },

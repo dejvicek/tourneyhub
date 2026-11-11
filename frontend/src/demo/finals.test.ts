@@ -51,9 +51,10 @@ async function playOut(id: string): Promise<void> {
   }
 }
 
-/** A knockout start; the demo does not check the expected phase. */
+/** A knockout start; the demo does not check the expected phase or qualifiers. */
 const KNOCKOUT = {
   expected_current_phase_id: "",
+  expected_qualifier_ids: [] as string[],
   qualifiers: 8,
   third_place_match: false,
   match_format: null,

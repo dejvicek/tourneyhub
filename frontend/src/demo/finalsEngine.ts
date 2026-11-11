@@ -440,6 +440,8 @@ export function bracketOf(t: StoredTournament): BracketRead | null {
           seed:
             side.entry_id === null ? null : (seedOf.get(side.entry_id) ?? null),
           is_bye: side.is_bye,
+          // The demo's standings never end level, so no lot decides a seed.
+          decided_by_lot: false,
         })) as BracketMatch["sides"],
         outcome: match.outcome,
         is_walkover: match.is_walkover,

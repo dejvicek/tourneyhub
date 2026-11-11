@@ -19,6 +19,7 @@ export const finals: CsMessages<Messages["finals"]> = {
       team: "{{first}} / {{second}}",
     },
     unknown: "Neznámý hráč",
+    byLot: "Losem",
   },
   errors: {
     groupNotDone:
@@ -31,6 +32,8 @@ export const finals: CsMessages<Messages["finals"]> = {
       "Smazat jde jen vyřazovací fázi, která následuje po skupině.",
     seasonClosed:
       "Sezóna byla mezitím uzavřena, takže v ní už nic nejde změnit.",
+    qualifiersChanged:
+      "Výsledek ve skupině změnil, kdo postupuje, proto jsme náhled načetli znovu. Zkontrolujte ho a losujte znovu.",
   },
   place: {
     label: "{{place}}{{suffix}}",
