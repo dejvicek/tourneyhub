@@ -271,16 +271,16 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | BR-055 | Round 1 pairs the top half of the seeds against the bottom half: seed 1 plays seed N/2 + 1, seed 2 plays seed N/2 + 2, and so on (8 entries: 1 v 5, 2 v 6, 3 v 7, 4 v 8). |
 | BR-056 | From round 2, entries are ordered by current standing and play their neighbour: 1st v 2nd, 3rd v 4th, and so on. An entry that has already played its neighbour plays the next entry down that it has not played. |
 | BR-057 | No entry meets the same opponent twice while it can be avoided. |
-| BR-058 | With an odd number of entries in a round, one sits out. Entries that did not sit out the round before are picked first; among them, the one with the fewest sit-outs so far, and then the lowest-placed. Disabled entries do not count. |
+| BR-058 | With an odd number of entries in a round, one sits out. Entries that did not sit out the round before are picked to sit out first; among them, the one with the fewest sit-outs so far, and then the lowest-placed. In round 1, before any result, the lowest seed sits out, and the others are paired by BR-055 (7 entries: seed 7 sits out, then 1 v 4, 2 v 5, 3 v 6). Disabled entries do not count. |
 
 ### 7.8 Monster DYP rounds
 
 | ID | Rule |
 |---|---|
 | BR-060 | Every round, players are grouped in fours by their current standing — in round 1, by the league ranking. In each group, the 1st and 4th play the 2nd and 3rd (#1 + #4 vs #2 + #3). |
-| BR-061 | There are as many top players as matches in a round. In rounds 1 and 2 they are in different groups, and the other players fill the groups in standing order (16 players, top 4: #1 #5 #6 #7 · #2 #8 #9 #10 · #3 #11 #12 #13 · #4 #14 #15 #16). Top players are not exempt from sitting out: those who sit out are picked first (BR-063), and the top players are taken from the players who play, in this order: the players marked by the organizer (FR-041), then the others, each in league-ranking order. A top player who sits out or is disabled is replaced by the next one, so every group has exactly one. The number of top players follows each round's number of matches, so it changes when a late or disabled player changes the number of matches between rounds 1 and 2. |
+| BR-061 | There are as many top players as matches in a round. In rounds 1 and 2 they are in different groups, and the other players fill the groups in standing order (16 players, top 4: #1 #5 #6 #7 · #2 #8 #9 #10 · #3 #11 #12 #13 · #4 #14 #15 #16). Top players are not exempt from sitting out: the sit-outs are chosen before the top players (BR-063), and the top players are taken from the players who play, in this order: the players marked by the organizer (FR-041), then the others, each in league-ranking order. A top player who sits out or is disabled is replaced by the next one, so every group has exactly one. The number of top players follows each round's number of matches, so it changes when a late or disabled player changes the number of matches between rounds 1 and 2. |
 | BR-062 | Nobody gets the same partner twice while it can be avoided; the grouping changes as little as needed to avoid it. |
-| BR-063 | When the number of players is not divisible by 4, the extra one to three players sit out the round. Players who did not sit out the round before are picked first; among them, those who have sat out the fewest times, and remaining ties are decided by lot. Disabled players do not count. |
+| BR-063 | When the number of players is not divisible by 4, the extra one to three players sit out the round. Players who did not sit out the round before are picked to sit out first; among them, those who have sat out the fewest times, and remaining ties are decided by lot. Disabled players do not count. |
 
 ### 7.9 Round by round (Swiss and Monster DYP)
 
