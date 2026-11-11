@@ -6,7 +6,7 @@ import {
 
 import { api, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
-import { setAccessToken } from "@/api/token";
+import { forgetSession, isLoggedOut, setAccessToken } from "@/api/token";
 import type { Language } from "@/i18n/language";
 
 // Every route here is the backend's; only the demo account is the demo's.
@@ -19,6 +19,8 @@ export const authQueries = {
     queryOptions({
       queryKey: ["me"],
       queryFn: ({ signal }) => dataOf(api.GET("/api/v1/me", { signal })),
+      // After a logout there is nobody to ask about (it would only be a 401).
+      enabled: !isLoggedOut(),
     }),
   /** Demo only: the seeded account the login screen offers. */
   demoAccount: () =>
@@ -93,7 +95,7 @@ export const authMutations = {
       // Logged out on this device whatever the answer: nothing of the
       // organizer's data stays in the cache.
       onSettled: () => {
-        setAccessToken(null);
+        forgetSession();
         queryClient.clear();
       },
     }),
@@ -104,6 +106,9 @@ export const authMutations = {
  * memory, as after a reload (ADR-006). True if it worked.
  */
 export async function restoreSession(): Promise<boolean> {
+  if (isLoggedOut()) {
+    return false;
+  }
   try {
     const { access_token } = await dataOf(
       api.POST("/api/v1/auth/refresh", { params: { header: CSRF } }),
