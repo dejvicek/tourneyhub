@@ -1,5 +1,6 @@
 from tourneyhub.db.models import matches  # noqa: F401  (no models yet; Alembic will see them, §3)
 from tourneyhub.db.models.accounts import (
+    AdminAction,
     AuthAttempt,
     InstanceSettings,
     RefreshToken,
@@ -15,6 +16,7 @@ from tourneyhub.db.models.tournaments import (
 )
 
 __all__ = [
+    "AdminAction",
     "AuthAttempt",
     "Entry",
     "EntryMember",

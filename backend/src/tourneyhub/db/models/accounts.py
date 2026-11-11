@@ -14,6 +14,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from tourneyhub.db.base import Base, str_enum
 from tourneyhub.engine.accounts import Language
+from tourneyhub.engine.admin import AdminActionKind, AdminActionSource
 from tourneyhub.engine.auth import AuthAttemptKind
 
 
@@ -92,3 +93,38 @@ class InstanceSettings(Base):
     # Plain text, so that the admin can see and share it; NULL: sign-up is closed.
     signup_code: Mapped[str | None]
     updated_at: Mapped[datetime | None]
+
+
+class AdminAction(Base):
+    """One admin action, from the web or the CLI (DATA-MODEL §4.1, ADR-007).
+
+    The sign-up code itself is never stored here. The two CHECKs work in one
+    direction only, because ON DELETE SET NULL has to clear a deleted account's
+    reference.
+    """
+
+    __tablename__ = "admin_actions"
+    __table_args__ = (
+        CheckConstraint(
+            "source = 'web' OR admin_user_id IS NULL", name="cli_action_has_no_admin"
+        ),
+        CheckConstraint(
+            "action <> 'set_signup_code' OR target_user_id IS NULL",
+            name="signup_code_has_no_target",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
+    source: Mapped[AdminActionSource] = mapped_column(
+        str_enum(AdminActionSource, name="admin_action_source")
+    )
+    admin_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    action: Mapped[AdminActionKind] = mapped_column(
+        str_enum(AdminActionKind, name="admin_action_kind")
+    )
+    target_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime]
