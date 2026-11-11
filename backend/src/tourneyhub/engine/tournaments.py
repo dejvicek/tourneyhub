@@ -155,14 +155,15 @@ def group_phase_format(choice: GroupPhase) -> PhaseFormat | None:
     return None if choice is GroupPhase.NONE else PhaseFormat(choice.value)
 
 
-def default_sit_out_points(match_format: MatchFormat) -> int:
+def default_sit_out_points(match_format: MatchFormat, *, draws_allowed: bool) -> int:
     """Return the default points for a sit-out in a group phase (FR-039, BR-071).
 
-    BO1 and BO2 matches can end level, so a sit-out is worth a draw: 1. BO3 and
-    BO5 matches cannot, so a sit-out is worth a win: 2. The league's draw setting
-    plays no part.
+    A sit-out is worth a draw (1) only where a match can end level: the league
+    allows draws and the match format is BO1 or BO2. In every other case it is
+    worth a win (2), so a sit-out never earns a result that no match can produce.
     """
-    return 1 if match_format in {MatchFormat.BO1, MatchFormat.BO2} else 2
+    level = draws_allowed and match_format in {MatchFormat.BO1, MatchFormat.BO2}
+    return 1 if level else 2
 
 
 def entry_kind(tournament_type: TournamentType) -> EntryKind:
