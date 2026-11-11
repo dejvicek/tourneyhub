@@ -127,11 +127,6 @@ def _entry_and_check(
             id="BR-071-round-robin-with-sit-out-points",
         ),
         pytest.param(
-            "sit_out_points_set_by_hand = true",
-            "ck_tournament_phases_sit_out_points_set_by_hand",
-            id="BR-071-round-robin-with-a-picked-value",
-        ),
-        pytest.param(
             "sit_out_points = 3",
             "ck_tournament_phases_sit_out_points",
             id="FR-039-three-sit-out-points",
@@ -245,9 +240,9 @@ def _knockout(session: Session, tournament: Tournament, **values: object) -> Non
             {"position": 3}, "ck_tournament_phases_position", id="D9-knockout-at-3"
         ),
         pytest.param(
-            {"sit_out_points_set_by_hand": True},
-            "ck_tournament_phases_sit_out_points_set_by_hand",
-            id="FR-039-sit-out-points-picked-in-a-knockout",
+            {"sit_out_points": 0},
+            "ck_tournament_phases_sit_out_points",
+            id="BR-071-sit-out-points-in-a-knockout",
         ),
     ],
 )
