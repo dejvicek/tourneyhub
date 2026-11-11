@@ -28,6 +28,8 @@ export const publicView = {
     round: "Round {{number}}",
     placesHeading: "Final places",
     pointsEach: "+{{count}} each",
+    knockoutHeading: "Knockout",
+    loadFailed: "Could not load this. Try again in a moment.",
     noResults: "No results yet.",
     notFound: "This tournament is not shared, or the link is wrong.",
   },
@@ -47,6 +49,7 @@ export const publicView = {
     walkover: "Walkover",
     pair: "{{a}} & {{b}}",
     separator: " v ",
+    bye: "{{name}}: bye",
     queue: "{{position}}.",
   },
   table: {

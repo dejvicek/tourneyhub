@@ -29,6 +29,8 @@ export const publicView: CsMessages<Messages["publicView"]> = {
     round: "{{number}}. kolo",
     placesHeading: "Konečné pořadí",
     pointsEach: "+{{count}} každý",
+    knockoutHeading: "Vyřazovací část",
+    loadFailed: "Nepodařilo se načíst. Zkuste to za chvíli.",
     noResults: "Zatím žádné výsledky.",
     notFound: "Tento turnaj se nesdílí, nebo je odkaz špatně.",
   },
@@ -48,6 +50,7 @@ export const publicView: CsMessages<Messages["publicView"]> = {
     walkover: "Kontumace",
     pair: "{{a}} a {{b}}",
     separator: " – ",
+    bye: "{{name}}: volný los",
     queue: "{{position}}.",
   },
   table: {

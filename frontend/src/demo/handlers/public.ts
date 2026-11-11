@@ -1,9 +1,11 @@
 // Demo handlers: the share-link views, without an account (FR-070–FR-072).
 // Read-only; tournaments in setup answer 404, as if they did not exist.
+import { bracketOf, rankingOf, syncBracket } from "../finalsEngine";
 import { apiError, route } from "../route";
 import type { StoredTournament } from "../seed";
 import {
   db,
+  placesRead,
   publicLeague,
   tournamentRead,
   tournamentStandings,
@@ -49,6 +51,43 @@ export const publicHandlers = [
       const t = visibleTournament(params.share_token, params.tournament_id);
       return t
         ? tournamentStandings(t)
+        : apiError(404, "not_found", { tournament_id: params.tournament_id });
+    },
+  ),
+
+  route(
+    "get",
+    "/api/v1/public/{share_token}/tournaments/{tournament_id}/bracket",
+    ({ params }) => {
+      const t = visibleTournament(params.share_token, params.tournament_id);
+      if (!t) {
+        return apiError(404, "not_found", {
+          tournament_id: params.tournament_id,
+        });
+      }
+      syncBracket(t);
+      return bracketOf(t) ?? apiError(404, "not_found", { knockout: "none" });
+    },
+  ),
+
+  route(
+    "get",
+    "/api/v1/public/{share_token}/tournaments/{tournament_id}/ranking",
+    ({ params }) => {
+      const t = visibleTournament(params.share_token, params.tournament_id);
+      return t
+        ? rankingOf(t)
+        : apiError(404, "not_found", { tournament_id: params.tournament_id });
+    },
+  ),
+
+  route(
+    "get",
+    "/api/v1/public/{share_token}/tournaments/{tournament_id}/places",
+    ({ params }) => {
+      const t = visibleTournament(params.share_token, params.tournament_id);
+      return t
+        ? placesRead(t)
         : apiError(404, "not_found", { tournament_id: params.tournament_id });
     },
   ),

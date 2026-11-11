@@ -74,4 +74,61 @@ export const publicQueries = {
         ),
       refetchInterval: LIVE_MS,
     }),
+  /** The knockout; only a tournament with one has a bracket (404 otherwise). */
+  bracket: (shareToken: string, tournamentId: string, enabled: boolean) =>
+    queryOptions({
+      queryKey: ["public", shareToken, "tournaments", tournamentId, "bracket"],
+      queryFn: ({ signal }) =>
+        dataOf(
+          provisionalApi.GET(
+            "/api/v1/public/{share_token}/tournaments/{tournament_id}/bracket",
+            {
+              params: {
+                path: { share_token: shareToken, tournament_id: tournamentId },
+              },
+              signal,
+            },
+          ),
+        ),
+      enabled,
+      refetchInterval: LIVE_MS,
+    }),
+  /** Swiss and Monster DYP standings with their tie-breakers (FR-043). */
+  ranking: (shareToken: string, tournamentId: string, enabled: boolean) =>
+    queryOptions({
+      queryKey: ["public", shareToken, "tournaments", tournamentId, "ranking"],
+      queryFn: ({ signal }) =>
+        dataOf(
+          provisionalApi.GET(
+            "/api/v1/public/{share_token}/tournaments/{tournament_id}/ranking",
+            {
+              params: {
+                path: { share_token: shareToken, tournament_id: tournamentId },
+              },
+              signal,
+            },
+          ),
+        ),
+      enabled,
+      refetchInterval: LIVE_MS,
+    }),
+  /** The places decided so far, with the reason for each. */
+  places: (shareToken: string, tournamentId: string, enabled: boolean) =>
+    queryOptions({
+      queryKey: ["public", shareToken, "tournaments", tournamentId, "places"],
+      queryFn: ({ signal }) =>
+        dataOf(
+          provisionalApi.GET(
+            "/api/v1/public/{share_token}/tournaments/{tournament_id}/places",
+            {
+              params: {
+                path: { share_token: shareToken, tournament_id: tournamentId },
+              },
+              signal,
+            },
+          ),
+        ),
+      enabled,
+      refetchInterval: LIVE_MS,
+    }),
 };

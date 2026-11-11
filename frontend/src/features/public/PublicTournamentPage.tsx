@@ -6,11 +6,13 @@ import { DocumentTitle } from "@/components/DocumentTitle";
 import { PageFallback } from "@/components/PageFallback";
 import { Badge } from "@/components/ui/badge";
 import type { PlayerRead } from "@/demo/contract";
+import { RankingTable } from "@/features/tournaments/finals/RankingTable";
 import { useRouteParam } from "@/hooks/useRouteParam";
 import { paths } from "@/lib/paths";
 
 import { publicQueries, type PublicTournament } from "./api";
 import { LiveFields } from "./LiveFields";
+import { PublicKnockout } from "./PublicKnockout";
 import { useNames } from "./useNames";
 
 /**
@@ -129,7 +131,14 @@ function TournamentView({
       {tournament.places !== null && (
         <Places tournament={tournament} players={players} />
       )}
-      <div className="grid gap-8 lg:grid-cols-2 lg:items-start">
+      {tournament.phases.some((phase) => phase.kind === "knockout") && (
+        <PublicKnockout
+          shareToken={shareToken}
+          tournament={tournament}
+          players={players}
+        />
+      )}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-2 lg:items-start">
         <Standings
           shareToken={shareToken}
           tournament={tournament}
@@ -186,7 +195,83 @@ function Places({
   );
 }
 
+/**
+ * The group phase's standings: a round robin's table, or the ranking of a
+ * Swiss or Monster DYP with its tie-breakers, as the organizer sees it. A
+ * knockout-only tournament has none.
+ */
 function Standings({
+  shareToken,
+  tournament,
+  players,
+}: {
+  shareToken: string;
+  tournament: PublicTournament;
+  players: PlayerRead[];
+}) {
+  const { t } = useTranslation();
+  const format = tournament.phases.find(
+    (phase) => phase.kind === "group",
+  )?.format;
+  if (format === undefined) {
+    return null;
+  }
+  return (
+    <section aria-labelledby="standings" className="min-w-0 space-y-3">
+      <h2 id="standings" className="font-display text-display-section">
+        {t("publicView.tournament.standingsHeading")}
+      </h2>
+      {format === "swiss" || format === "monster_dyp" ? (
+        <RankingStandings
+          shareToken={shareToken}
+          tournament={tournament}
+          players={players}
+        />
+      ) : (
+        <TableStandings
+          shareToken={shareToken}
+          tournament={tournament}
+          players={players}
+        />
+      )}
+    </section>
+  );
+}
+
+function RankingStandings({
+  shareToken,
+  tournament,
+  players,
+}: {
+  shareToken: string;
+  tournament: PublicTournament;
+  players: PlayerRead[];
+}) {
+  const { t } = useTranslation();
+  const names = useNames(players, tournament);
+  const ranking = useQuery(
+    publicQueries.ranking(shareToken, tournament.id, true),
+  );
+  if (ranking.data === undefined) {
+    return (
+      <p role="status" className="text-body-md text-muted-foreground">
+        {t("loading")}
+      </p>
+    );
+  }
+  return (
+    <div className="rounded-lg border border-border-surface bg-card px-4 text-card-foreground">
+      <RankingTable
+        ranking={ranking.data}
+        participants={[]}
+        entryName={names.ofEntry}
+        caption={t("publicView.tournament.standingsHeading")}
+      />
+    </div>
+  );
+}
+
+function TableStandings({
   shareToken,
   tournament,
   players,
@@ -203,64 +288,70 @@ function Standings({
   const signed = new Intl.NumberFormat(i18n.resolvedLanguage, {
     signDisplay: "exceptZero",
   });
-
+  if (standings.data === undefined) {
+    return standings.isPending ? (
+      <p role="status" className="text-body-md text-muted-foreground">
+        {t("loading")}
+      </p>
+    ) : null;
+  }
   return (
-    <section aria-labelledby="standings" className="space-y-3">
-      <h2 id="standings" className="font-display text-display-section">
-        {t("publicView.tournament.standingsHeading")}
-      </h2>
-      {standings.data === undefined ? (
-        standings.isPending ? (
-          <PageFallback />
-        ) : null
-      ) : (
-        <div className="overflow-x-auto rounded-lg border border-border-surface bg-card text-card-foreground">
-          <table className="w-full text-left text-body-md">
-            <thead className="text-caption text-muted-foreground">
-              <tr className="border-b border-border">
-                <th scope="col" className="px-4 py-2 font-bold">
-                  {t("publicView.table.place")}
-                </th>
-                <th scope="col" className="px-2 py-2 font-bold">
-                  {t("publicView.table.entry")}
-                </th>
-                <th scope="col" className="px-2 py-2 text-right font-bold">
-                  {t("publicView.table.played")}
-                </th>
-                <th scope="col" className="px-2 py-2 text-right font-bold">
-                  {t("publicView.table.difference")}
-                </th>
-                <th scope="col" className="px-4 py-2 text-right font-bold">
-                  {t("publicView.table.points")}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {standings.data.map((row) => (
-                <tr
-                  key={row.entry_id}
-                  className="border-b border-border last:border-b-0"
-                >
-                  <td className="px-4 py-2 font-display text-score-m">
-                    {t("publicView.table.placeValue", { place: row.place })}
-                  </td>
-                  <th scope="row" className="px-2 py-2 font-bold">
-                    {names.ofEntry(row.entry_id)}
-                  </th>
-                  <td className="px-2 py-2 text-right">{row.played}</td>
-                  <td className="px-2 py-2 text-right text-muted-foreground">
-                    {signed.format(row.score_difference)}
-                  </td>
-                  <td className="px-4 py-2 text-right font-display text-score-m">
-                    {row.points}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
+    // The table scrolls inside its own box, never the page; a phone drops the
+    // score-difference column to keep the names readable.
+    <div className="overflow-x-auto rounded-lg border border-border-surface bg-card text-card-foreground">
+      <table className="w-full text-left text-body-md">
+        <caption className="sr-only">
+          {t("publicView.tournament.standingsHeading")}
+        </caption>
+        <thead className="text-caption text-muted-foreground">
+          <tr className="border-b border-border">
+            <th scope="col" className="px-3 py-2 font-bold">
+              {t("publicView.table.place")}
+            </th>
+            <th scope="col" className="px-2 py-2 font-bold">
+              {t("publicView.table.entry")}
+            </th>
+            <th scope="col" className="px-2 py-2 text-right font-bold">
+              {t("publicView.table.played")}
+            </th>
+            <th
+              scope="col"
+              className="hidden px-2 py-2 text-right font-bold sm:table-cell"
+            >
+              {t("publicView.table.difference")}
+            </th>
+            <th scope="col" className="px-3 py-2 text-right font-bold">
+              {t("publicView.table.points")}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {standings.data.map((row) => (
+            <tr
+              key={row.entry_id}
+              className="border-b border-border last:border-b-0"
+            >
+              <td className="px-3 py-2 font-display text-score-m">
+                {t("publicView.table.placeValue", { place: row.place })}
+              </td>
+              <th
+                scope="row"
+                className="min-w-0 px-2 py-2 font-bold break-words"
+              >
+                {names.ofEntry(row.entry_id)}
+              </th>
+              <td className="px-2 py-2 text-right">{row.played}</td>
+              <td className="hidden px-2 py-2 text-right text-muted-foreground sm:table-cell">
+                {signed.format(row.score_difference)}
+              </td>
+              <td className="px-3 py-2 text-right font-display text-score-m">
+                {row.points}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -283,7 +374,7 @@ function Results({
     .reverse();
 
   return (
-    <section aria-labelledby="results" className="space-y-3">
+    <section aria-labelledby="results" className="min-w-0 space-y-3">
       <h2 id="results" className="font-display text-display-section">
         {t("publicView.tournament.resultsHeading")}
       </h2>
@@ -306,6 +397,21 @@ function Results({
             </h3>
             <ul className="rounded-lg border border-border-surface bg-card px-4 text-card-foreground">
               {round.played.map((match) => {
+                const bye = match.sides.find((side) => side.is_bye);
+                if (bye !== undefined) {
+                  // An entry with no opponent goes through; it is not a match.
+                  const entry = match.sides.find((side) => !side.is_bye);
+                  return (
+                    <li
+                      key={match.id}
+                      className="border-t border-border py-2.5 text-body-sm break-words text-muted-foreground first:border-t-0"
+                    >
+                      {t("publicView.match.bye", {
+                        name: names.ofPlayers(entry?.player_ids ?? []),
+                      })}
+                    </li>
+                  );
+                }
                 // BO1: the goals; best-of: the games won (BR-120).
                 const score =
                   match.games.length === 1

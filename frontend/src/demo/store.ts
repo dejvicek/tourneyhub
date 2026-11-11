@@ -4,6 +4,7 @@
 import type {
   LeagueRead,
   PlaceRow,
+  PlacesRead,
   PublicLeague,
   SeasonStandingRow,
   TournamentRead,
@@ -176,6 +177,33 @@ function places(t: StoredTournament): PlaceRow[] | null {
     ),
     table,
   );
+}
+
+/** The places with the reason for each, for the organizer and the share link alike. */
+export function placesRead(t: StoredTournament): PlacesRead {
+  syncBracket(t);
+  const table =
+    state.seasons.find((season) => season.id === t.season_id)
+      ?.placement_points ?? [];
+  const detailed = placesOf(t, table);
+  if (detailed) {
+    return detailed;
+  }
+  // A plain round robin: the base engine's places.
+  return {
+    complete: t.state === "finished",
+    rows: (places(t) ?? []).map((row) => ({
+      ...row,
+      reason: {
+        kind: "group_place" as const,
+        round: null,
+        score: null,
+        opponent_entry_id: null,
+        group_place: row.place,
+        group_format: "round_robin" as const,
+      },
+    })),
+  };
 }
 
 export function tournamentRead(t: StoredTournament): TournamentRead {

@@ -2,11 +2,13 @@ import { screen, within } from "@testing-library/react";
 import { generatePath } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { rankingOf } from "@/demo/finalsEngine";
 import { DEMO_SHARE_TOKEN, demoId } from "@/demo/ids";
 import { db } from "@/demo/store";
 import { axeViolations } from "@/features/auth/axeCheck";
 import { i18n } from "@/i18n";
 import { paths } from "@/lib/paths";
+import { stubViewport } from "@/test/media";
 import { renderAt } from "@/test/renderApp";
 
 const league = generatePath(paths.publicLeague, {
@@ -16,6 +18,18 @@ const running = generatePath(paths.publicTournament, {
   shareToken: DEMO_SHARE_TOKEN,
   tournamentId: demoId(400, "foundation"),
 });
+
+/** The seeded tournament called `name`, as its share-link page. */
+function pageOf(name: string): string {
+  const found = db().tournaments.find((t) => t.name === name);
+  if (found === undefined) {
+    throw new Error(`The seed has no ${name}`);
+  }
+  return generatePath(paths.publicTournament, {
+    shareToken: DEMO_SHARE_TOKEN,
+    tournamentId: found.id,
+  });
+}
 
 /** A tournament in setup, which only the organizer may see (FR-070). */
 function addSetupTournament(): string {
@@ -101,5 +115,61 @@ describe("share-link views", () => {
     await screen.findAllByRole("table");
 
     expect(await axeViolations()).toEqual([]);
+  });
+
+  it("D02: a Monster DYP shows the organizer's standings, with real points and places", async () => {
+    const monster = db().tournaments.find((t) => t.name === "Monster DYP");
+    if (monster === undefined) {
+      throw new Error("The seed has a Monster DYP");
+    }
+    const expected = rankingOf(monster).rows;
+    renderAt(pageOf("Monster DYP"));
+
+    const table = await screen.findByRole("table", { name: "Standings" });
+    // Place, player, points and the tie-breakers of each row.
+    const rows = within(table)
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => within(row).getAllByRole("cell"));
+    expect(rows).toHaveLength(expected.length);
+    expect(expected[0]?.points).toBeGreaterThan(0);
+    expect(rows.at(0)?.[0]).toHaveTextContent("1");
+    expect(rows.at(0)?.[2]).toHaveTextContent(String(expected[0]?.points));
+    // Not everyone shares the first place.
+    expect(rows.at(-1)?.[0]).not.toHaveTextContent(/^1$/);
+  });
+
+  it("D03: a knockout shows its bracket and byes as byes, not as 0 : 0 matches", async () => {
+    stubViewport(1280);
+    renderAt(pageOf("Spring Cup"));
+
+    expect(
+      await screen.findByRole("region", { name: "Bracket" }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Knockout" }),
+    ).toBeInTheDocument();
+    expect(await screen.findAllByText(/: bye$/)).not.toHaveLength(0);
+    expect(screen.queryByText(/ v \?/)).not.toBeInTheDocument();
+    // No group phase, so no standings; and no way to enter a result.
+    expect(
+      screen.queryByRole("heading", { name: "Standings" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Enter result/ })).toBeNull();
+  });
+
+  it("D03: a DYP evening shows its knockout after the group standings", async () => {
+    stubViewport(1280);
+    renderAt(pageOf("DYP evening"));
+
+    expect(
+      await screen.findByRole("heading", { name: "Knockout" }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByRole("region", { name: "Bracket" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Standings" }),
+    ).toBeInTheDocument();
   });
 });

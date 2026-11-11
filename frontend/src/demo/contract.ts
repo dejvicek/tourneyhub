@@ -288,6 +288,18 @@ export interface ProvisionalPaths {
     >;
   };
 
+  // public: the knockout, the Swiss and Monster DYP ranking and the places
+  // (the same reads as the organizer's, without an account)
+  "/api/v1/public/{share_token}/tournaments/{tournament_id}/bracket": {
+    get: Get<Params<{ share_token: string; tournament_id: Uuid }>, BracketRead>;
+  };
+  "/api/v1/public/{share_token}/tournaments/{tournament_id}/ranking": {
+    get: Get<Params<{ share_token: string; tournament_id: Uuid }>, RankingRead>;
+  };
+  "/api/v1/public/{share_token}/tournaments/{tournament_id}/places": {
+    get: Get<Params<{ share_token: string; tournament_id: Uuid }>, PlacesRead>;
+  };
+
   // demo only: the backend never has this route
   "/api/v1/demo/account": { get: Get<NoParams, DemoAccount> };
 }
