@@ -111,17 +111,16 @@ describe("setup: review and start (screen 5)", () => {
     ).not.toHaveLength(0);
   });
 
-  it("points to the tournament when setup is already closed", async () => {
+  it("goes on to the tournament when setup is already closed (D21)", async () => {
     const id = await dypWith(12);
     await startTournament(id);
-    renderAt(reviewPage(id));
+    const view = renderAt(reviewPage(id));
 
-    expect(
-      await screen.findByText("This tournament has already started"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: "Open the tournament" }),
-    ).toBeVisible();
+    await waitFor(() => {
+      expect(view.state.location.pathname).toBe(
+        generatePath(paths.schedule, { leagueId, tournamentId: id }),
+      );
+    });
     expect(
       screen.queryByRole("button", { name: "Generate and start" }),
     ).not.toBeInTheDocument();

@@ -17,6 +17,8 @@ export type TournamentView = Omit<
 export type TournamentScreen = keyof typeof paths &
   (
     | "setupPlayers"
+    | "setupDraw"
+    | "setupReview"
     | "schedule"
     | "fields"
     | "tournamentStandings"
@@ -107,4 +109,33 @@ export function tournamentTabs(t: TournamentView): TournamentTab[] {
   }
   tabs.push({ path: "tournamentStandings", label: "standings" });
   return tabs;
+}
+
+/**
+ * The screens a tournament has in its state: the wizard in setup, then the
+ * tabs, and the two that follow a phase (the end of a round robin, the start
+ * of a knockout). A deep link to any other screen goes to the tournament's
+ * own path, which opens the right one.
+ */
+export function tournamentScreens(t: TournamentView): TournamentScreen[] {
+  if (t.state === "setup") {
+    return ["setupPlayers", "setupDraw", "setupReview"];
+  }
+  const screens = tournamentTabs(t).map((tab) => tab.path);
+  const group = groupFormat(t);
+  if (
+    t.state === "in_progress" &&
+    group !== undefined &&
+    currentPhase(t)?.kind !== "knockout"
+  ) {
+    // A round robin ends in screen 8, Swiss and Monster DYP in screen 11,
+    // which offer the knockout (13) at any time.
+    if (group !== "round_robin" || t.current_phase_done) {
+      screens.push("startKnockout");
+    }
+    if (group === "round_robin" && t.current_phase_done) {
+      screens.push("groupPhaseDone");
+    }
+  }
+  return screens;
 }

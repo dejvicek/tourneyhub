@@ -11,6 +11,7 @@ import type { RouteObject } from "react-router";
 import { Navigate } from "react-router";
 
 import { AppShell } from "@/components/AppShell";
+import { NotFoundPage } from "@/components/NotFoundPage";
 import { PageFallback } from "@/components/PageFallback";
 import { RouteError } from "@/components/RouteError";
 import { AccountMenu } from "@/features/auth/AccountMenu";
@@ -22,7 +23,6 @@ import { RootWithSession } from "@/features/auth/SessionEndedRedirect";
 import { paths } from "@/lib/paths";
 import type { RouteHandle } from "@/lib/routeHandle";
 import { HomePage } from "@/pages/HomePage";
-import { NotFoundPage } from "@/pages/NotFoundPage";
 
 // The result overlay (7, or 7b for a best-of match) over the screen that
 // opened it: the schedule, the fields, the knockout or the rounds.
@@ -150,6 +150,11 @@ export const routes: RouteObject[] = [
               },
               {
                 path: paths.tournament,
+                lazy: async () => ({
+                  Component: (
+                    await import("@/features/tournaments/TournamentGuard")
+                  ).TournamentGuard,
+                }),
                 children: [
                   {
                     index: true,
@@ -161,6 +166,7 @@ export const routes: RouteObject[] = [
                   },
                   {
                     path: paths.setupPlayers, // 3
+                    handle: { screen: "setupPlayers" } satisfies RouteHandle,
                     lazy: async () => ({
                       Component: (
                         await import("@/features/tournaments/SetupPlayersPage")
@@ -169,6 +175,7 @@ export const routes: RouteObject[] = [
                   },
                   {
                     path: paths.setupDraw, // 4
+                    handle: { screen: "setupDraw" } satisfies RouteHandle,
                     lazy: async () => ({
                       Component: (
                         await import("@/features/tournaments/SetupDrawPage")
@@ -177,6 +184,7 @@ export const routes: RouteObject[] = [
                   },
                   {
                     path: paths.setupReview, // 5
+                    handle: { screen: "setupReview" } satisfies RouteHandle,
                     lazy: async () => ({
                       Component: (
                         await import("@/features/tournaments/SetupReviewPage")
@@ -185,6 +193,7 @@ export const routes: RouteObject[] = [
                   },
                   {
                     path: paths.schedule, // 6
+                    handle: { screen: "schedule" } satisfies RouteHandle,
                     lazy: async () => ({
                       Component: (
                         await import("@/features/tournaments/RoundRobinPage")
@@ -196,6 +205,7 @@ export const routes: RouteObject[] = [
                   },
                   {
                     path: paths.fields, // 6b
+                    handle: { screen: "fields" } satisfies RouteHandle,
                     lazy: async () => ({
                       Component: (await import("@/features/fields/FieldsPage"))
                         .FieldsPage,
@@ -222,6 +232,9 @@ export const routes: RouteObject[] = [
                   },
                   {
                     path: paths.tournamentStandings,
+                    handle: {
+                      screen: "tournamentStandings",
+                    } satisfies RouteHandle,
                     lazy: async () => ({
                       Component: (
                         await import("@/features/tournaments/TournamentStandingsPage")
@@ -230,6 +243,7 @@ export const routes: RouteObject[] = [
                   },
                   {
                     path: paths.groupPhaseDone, // 8
+                    handle: { screen: "groupPhaseDone" } satisfies RouteHandle,
                     lazy: async () => ({
                       Component: (
                         await import("@/features/tournaments/GroupPhaseDonePage")
@@ -238,6 +252,7 @@ export const routes: RouteObject[] = [
                   },
                   {
                     path: paths.knockout, // 9
+                    handle: { screen: "knockout" } satisfies RouteHandle,
                     lazy: async () => ({
                       Component: (
                         await import("@/features/tournaments/KnockoutPage")
@@ -249,6 +264,7 @@ export const routes: RouteObject[] = [
                   },
                   {
                     path: paths.startKnockout, // 13
+                    handle: { screen: "startKnockout" } satisfies RouteHandle,
                     lazy: async () => ({
                       Component: (
                         await import("@/features/tournaments/StartKnockoutPage")
@@ -257,6 +273,7 @@ export const routes: RouteObject[] = [
                   },
                   {
                     path: paths.finished, // 10
+                    handle: { screen: "finished" } satisfies RouteHandle,
                     lazy: async () => ({
                       Component: (
                         await import("@/features/tournaments/FinishedPage")
@@ -265,6 +282,7 @@ export const routes: RouteObject[] = [
                   },
                   {
                     path: paths.betweenRounds, // 11
+                    handle: { screen: "betweenRounds" } satisfies RouteHandle,
                     lazy: async () => ({
                       Component: (
                         await import("@/features/tournaments/BetweenRoundsPage")
@@ -276,6 +294,7 @@ export const routes: RouteObject[] = [
                   },
                   {
                     path: paths.lateAndDisabled, // 12
+                    handle: { screen: "lateAndDisabled" } satisfies RouteHandle,
                     lazy: async () => ({
                       Component: (
                         await import("@/features/tournaments/LateAndDisabledPage")

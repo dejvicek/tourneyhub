@@ -307,11 +307,13 @@ describe("Finished (screen 10)", () => {
     ).toBeInTheDocument();
   });
 
-  it("says so when the tournament is not finished", async () => {
-    renderAt(at(paths.finished, DYP_EVENING));
-    expect(
-      await screen.findByText("This tournament is not at this step."),
-    ).toBeInTheDocument();
+  it("goes back to the tournament's own screen when it is not finished (D21)", async () => {
+    const view = renderAt(at(paths.finished, DYP_EVENING));
+    await waitFor(() => {
+      expect(view.state.location.pathname).toBe(
+        at(paths.knockout, DYP_EVENING),
+      );
+    });
   });
 
   it("has no axe violations", async () => {

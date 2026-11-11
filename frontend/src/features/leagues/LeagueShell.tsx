@@ -3,9 +3,11 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, Outlet, useMatches } from "react-router";
 
+import { ApiError } from "@/api/client";
 import { DemoNotice } from "@/components/DemoNotice";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { LeagueNav } from "@/components/LeagueNav";
+import { NotFoundPage } from "@/components/NotFoundPage";
 import { authQueries } from "@/features/auth/api";
 import { leagueQueries } from "@/features/leagues/api";
 import { CopyShareLink } from "@/features/leagues/CopyShareLink";
@@ -40,6 +42,15 @@ export function LeagueShell({ account }: { account?: ReactNode }) {
   const active = seasons.data?.find((season) => season.state === "active");
   const leagueName = league.data?.name;
   const activeName = active === undefined ? undefined : seasonName(active);
+
+  // An unknown league: say so, rather than wait for data that never comes.
+  if (league.error instanceof ApiError && league.error.status === 404) {
+    return (
+      <main className="mx-auto w-full max-w-3xl px-4 py-6">
+        <NotFoundPage />
+      </main>
+    );
+  }
 
   if (layout === "desktop") {
     return (

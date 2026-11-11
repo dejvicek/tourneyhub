@@ -1,8 +1,8 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import { generatePath } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { DEMO_LEAGUE_ID, DEMO_SHARE_TOKEN } from "@/demo/ids";
+import { DEMO_LEAGUE_ID, DEMO_SHARE_TOKEN, demoId } from "@/demo/ids";
 import { createSeed } from "@/demo/seed";
 import { outsideDb } from "@/demo/store";
 import { i18n } from "@/i18n";
@@ -19,6 +19,11 @@ function seeded(name: string) {
 }
 const running = seeded("Thursday DYP");
 const autumn = seeded("Autumn Open DYP");
+const setup = seeded("Next Thursday DYP");
+const monster = seeded("Monster DYP");
+const knockoutRunning = seeded("DYP evening");
+const groupDone = seeded("Round robin night");
+const monsterMatch = monster.rounds.at(-1)?.matches.at(-1)?.id ?? "";
 const runningMatch = running.rounds.at(-1)?.matches.at(-1)?.id ?? "";
 const autumnFinal = autumn.rounds.at(-1)?.matches[0]?.id ?? "";
 
@@ -48,9 +53,25 @@ const SCREENS: Screen[] = [
   ["myLeagues", "My leagues", "Moje ligy"],
   ["tournaments", "Tournaments", "Turnaje"],
   ["newTournament", "Choose the format", "Zvolte formát"],
-  ["setupPlayers", "Who is playing tonight?", "Kdo dnes hraje?"],
-  ["setupDraw", "Draw the pairs", "Losování dvojic"],
-  ["setupReview", "Ready to start?", "Můžeme začít?"],
+  // A screen needs a tournament in the state that has it (TournamentGuard).
+  [
+    "setupPlayers",
+    "Who is playing tonight?",
+    "Kdo dnes hraje?",
+    { params: { tournamentId: setup.id } },
+  ],
+  [
+    "setupDraw",
+    "Draw the pairs",
+    "Losování dvojic",
+    { params: { tournamentId: setup.id } },
+  ],
+  [
+    "setupReview",
+    "Ready to start?",
+    "Můžeme začít?",
+    { params: { tournamentId: setup.id } },
+  ],
   // The running round robin opens on its schedule.
   ["tournament", "Round robin in progress", "Probíhá každý s každým"],
   ["schedule", "Round robin in progress", "Probíhá každý s každým"],
@@ -66,8 +87,18 @@ const SCREENS: Screen[] = [
   ["editFields", "Fields", "Hřiště", { overlay: true }],
   ["fieldsResult", "Round 5", "5. kolo", { overlay: true }],
   ["tournamentStandings", "Tournament standings", "Pořadí turnaje"],
-  ["groupPhaseDone", "Round robin done", "Každý s každým skončil"],
-  ["knockout", "Knockout", "Vyřazovací část"],
+  [
+    "groupPhaseDone",
+    "Round robin done",
+    "Každý s každým skončil",
+    { params: { tournamentId: groupDone.id } },
+  ],
+  [
+    "knockout",
+    "Knockout",
+    "Vyřazovací část",
+    { params: { tournamentId: knockoutRunning.id } },
+  ],
   // The final of Autumn Open DYP is best of three (7b).
   [
     "knockoutResult",
@@ -78,11 +109,29 @@ const SCREENS: Screen[] = [
       params: { tournamentId: autumn.id, matchId: autumnFinal },
     },
   ],
-  ["startKnockout", "Start the knockout", "Začít vyřazovací část"],
-  ["finished", "Finished", "Dohráno"],
-  ["betweenRounds", "Rounds", "Kola"],
-  ["roundsResult", "Enter a result", "Zadat výsledek", { overlay: true }],
-  ["lateAndDisabled", "Players", "Hráči"],
+  [
+    "startKnockout",
+    "Start the knockout",
+    "Začít vyřazovací část",
+    { params: { tournamentId: monster.id } },
+  ],
+  ["finished", "Finished", "Dohráno", { params: { tournamentId: autumn.id } }],
+  ["betweenRounds", "Rounds", "Kola", { params: { tournamentId: monster.id } }],
+  [
+    "roundsResult",
+    "Enter a result",
+    "Zadat výsledek",
+    {
+      overlay: true,
+      params: { tournamentId: monster.id, matchId: monsterMatch },
+    },
+  ],
+  [
+    "lateAndDisabled",
+    "Players",
+    "Hráči",
+    { params: { tournamentId: monster.id } },
+  ],
   ["seasonStandings", "Season standings", "Pořadí sezóny"],
   ["players", "Players", "Hráči"],
   ["leagueSettings", "League settings", "Nastavení ligy"],
@@ -162,5 +211,43 @@ describe("the route table", () => {
     expect(view.state.location.pathname).toBe(
       generatePath(paths.tournaments, params),
     );
+  });
+
+  // The end of a round robin that is still running, the schedule of a
+  // tournament in setup, the wizard of a running one (D20, D21).
+  it.each([
+    ["groupPhaseDone", running.id, "schedule"],
+    ["schedule", setup.id, "setupPlayers"],
+    ["setupPlayers", running.id, "schedule"],
+    ["setupReview", running.id, "schedule"],
+    ["knockout", running.id, "schedule"],
+  ] as const)(
+    "sends %s of a tournament that has no such screen to its own screen",
+    async (screen, tournamentId, home) => {
+      const view = renderAt(
+        generatePath(paths[screen], { ...params, tournamentId }),
+      );
+      await waitFor(() => {
+        expect(view.state.location.pathname).toBe(
+          generatePath(paths[home], { ...params, tournamentId }),
+        );
+      });
+    },
+  );
+
+  it("shows a not-found page for an unknown tournament (D21)", async () => {
+    renderAt(
+      generatePath(paths.schedule, { ...params, tournamentId: demoId(9999) }),
+    );
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Page not found" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a not-found page for an unknown league (D07)", async () => {
+    renderAt(generatePath(paths.tournaments, { leagueId: demoId(9998) }));
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Page not found" }),
+    ).toBeInTheDocument();
   });
 });
