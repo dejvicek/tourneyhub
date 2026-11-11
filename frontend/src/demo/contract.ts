@@ -267,31 +267,9 @@ export type DemoPaths = MergePaths<
 // Tournament list and setup, screens 1-5 (FR-030-FR-039). The backend serves
 // the list, creating, the format, the picks, the pairs, the halves, the
 // seeds, "draw again" and deleting (P7a), and "Generate and start" (FR-035)
-// and "Back to setup" (FR-036, P7b); these routes wait for later pull
-// requests: the Monster DYP top players (FR-041) and the schedule preview.
-
-export interface PreviewMatch {
-  /** The players of each side. */
-  sides: [Uuid[], Uuid[]];
-}
-
-export interface PreviewRound {
-  round_no: number;
-  matches: PreviewMatch[];
-  /** The players of each entry that sits the round out. */
-  sitting_out: Uuid[][];
-}
-
-/** What "Generate and start" would create (FR-035). */
-export interface SchedulePreview {
-  /** Round robin: all rounds. Swiss, Monster DYP and a knockout: the first round. */
-  rounds: PreviewRound[];
-  /** Null when rounds are added one by one. */
-  match_count: number | null;
-  round_count: number | null;
-  /** A knockout's bracket size (BR-040). */
-  bracket_size: number | null;
-}
+// and "Back to setup" (FR-036, P7b), and the schedule preview of the review
+// screen; this route waits for a later pull request: the Monster DYP top
+// players (FR-041).
 
 // ================================================================ play
 // The running group phase, its fields and its end (screens 6–8, FR-040,
@@ -547,9 +525,6 @@ interface Action<P, B, R> {
 export interface SetupPaths {
   "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/top-players": {
     put: Put<Tournament, { player_ids: Uuid[] }, TournamentSetupRead>;
-  };
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/preview": {
-    get: Get<Tournament, SchedulePreview>;
   };
 }
 

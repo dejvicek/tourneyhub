@@ -22,6 +22,28 @@ function hasText<T extends object>(texts: T, key: unknown): key is keyof T {
 }
 
 /**
+ * The text for a refusal of the API: the 422 that names the rule, as an error
+ * or as the preview's `problem` (ADR-008). Any other code has the generic text.
+ */
+export function describeRefusal(
+  code: ErrorCode | undefined,
+  detail: Record<string, unknown>,
+  t: TFunction,
+): string {
+  const values = {
+    min: Number(detail.minimum),
+    limit: Number(detail.limit),
+    count: Number(detail.unpaired),
+    top: Number(detail.top),
+    bottom: Number(detail.bottom),
+  };
+  if (hasText(CODE_TEXTS, code)) {
+    return t(CODE_TEXTS[code], values);
+  }
+  return t("tournaments.errors.generic");
+}
+
+/**
  * The text for a failed setup call. A 409 is not an error to the organizer:
  * the screen reloaded and shows what changed (ADR-008), so it has its own
  * message; a 422 names the rule that refused the request.
@@ -33,18 +55,7 @@ export function describeError(error: unknown, t: TFunction): string {
   if (isChanged(error)) {
     return t("tournaments.errors.changed");
   }
-  const { detail } = error;
-  const values = {
-    min: Number(detail.minimum),
-    limit: Number(detail.limit),
-    count: Number(detail.unpaired),
-    top: Number(detail.top),
-    bottom: Number(detail.bottom),
-  };
-  if (hasText(CODE_TEXTS, error.code)) {
-    return t(CODE_TEXTS[error.code], values);
-  }
-  return t("tournaments.errors.generic");
+  return describeRefusal(error.code, error.detail, t);
 }
 
 /** True for the 409 and 404 that mean "this changed elsewhere; reloaded". */

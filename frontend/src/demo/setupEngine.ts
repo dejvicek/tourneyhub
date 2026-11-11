@@ -11,14 +11,7 @@
 // keyed on the store's current state so that resetDemoStore() drops it too.
 import type { components } from "@/api/schema";
 
-import type {
-  EntryRead,
-  MatchRead,
-  PhaseRead,
-  PreviewRound,
-  RoundRead,
-  SchedulePreview,
-} from "./contract";
+import type { EntryRead, MatchRead, PhaseRead, RoundRead } from "./contract";
 import {
   createRng,
   fillFields,
@@ -37,6 +30,8 @@ type DypHalfRead = Schemas["DypHalfRead"];
 type RankingRow = Schemas["RankingRow"];
 type SeedingMethod = Schemas["SeedingMethod"];
 type ErrorCode = Schemas["ErrorCode"];
+type SchedulePreview = Schemas["SchedulePreviewRead"];
+type PreviewRound = Schemas["PreviewRoundRead"];
 
 /** A UUIDv7: the time in the first 48 bits, the rest random. */
 export function newId(): string {
@@ -1035,8 +1030,28 @@ function plan(t: StoredTournament, draft: SetupDraft): Plan {
   }
 }
 
+/**
+ * What "Generate and start" would create, or why it would not: the backend's
+ * `GET …/setup/preview` (FR-035). Like the backend it names the refusal the
+ * start would give instead of a schedule, and it writes nothing.
+ */
 export function preview(t: StoredTournament): SchedulePreview {
   const draft = draftOf(t);
+  const problem =
+    t.state === "setup"
+      ? startProblem(t)
+      : fail(409, "tournament_not_in_setup", { state: t.state });
+  if (problem) {
+    return {
+      draw_counter: draft.drawCounter,
+      can_start: false,
+      problem: { code: problem.code, detail: problem.detail },
+      rounds: [],
+      match_count: null,
+      round_count: null,
+      bracket_size: null,
+    };
+  }
   const made = plan(t, draft);
   const shown: PreviewRound[] =
     made.bracketSize === null
@@ -1055,6 +1070,9 @@ export function preview(t: StoredTournament): SchedulePreview {
           sitting_out: [],
         }));
   return {
+    draw_counter: draft.drawCounter,
+    can_start: true,
+    problem: null,
     rounds: shown,
     match_count: made.matchCount,
     round_count: made.roundCount,

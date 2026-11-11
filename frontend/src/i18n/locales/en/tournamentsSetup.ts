@@ -287,6 +287,7 @@ export const tournamentsSetup = {
       matches_other: "{{count}} in {{rounds}} rounds, all {{format}}",
       matchesKnockout_one: "{{count}} match, {{format}}",
       matchesKnockout_other: "{{count}} matches, {{format}}",
+      matchesBlocked: "Not available yet",
       matchesOpen: "Added round by round, {{format}}",
       drawsAllowed: "Allowed in this league",
       drawsNotAllowed: "Not allowed in this league",

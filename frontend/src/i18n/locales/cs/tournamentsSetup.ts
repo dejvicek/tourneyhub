@@ -327,6 +327,7 @@ export const tournamentsSetup: CsMessages<typeof english> = {
       matchesKnockout_few: "{{count}} zápasy, {{format}}",
       matchesKnockout_many: "{{count}} zápasu, {{format}}",
       matchesKnockout_other: "{{count}} zápasů, {{format}}",
+      matchesBlocked: "Zatím nelze určit",
       matchesOpen: "Přidává se kolo po kole, {{format}}",
       drawsAllowed: "V této lize povoleny",
       drawsNotAllowed: "V této lize nepovoleny",

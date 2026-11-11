@@ -12,8 +12,8 @@ import type { components } from "@/api/schema";
 type Schemas = components["schemas"];
 
 // ---- setup (screens 1-5). The backend serves the setup, "Generate and
-// start" and "Back to setup"; the preview and the top players are still
-// provisional routes (the "setup" section of src/demo/contract.ts). Every
+// start", "Back to setup" and the schedule preview; the top players are still
+// a provisional route (the "setup" section of src/demo/contract.ts). Every
 // write sends the target state or the state it expects (ADR-008).
 
 const tournamentPath = (leagueId: string, tournamentId: string) => ({
@@ -40,13 +40,16 @@ export const setupQueries = {
                 ),
               ),
     }),
-  /** The first round or the whole schedule that "Generate and start" would make. */
+  /**
+   * The schedule that "Generate and start" would make, or the reason it would
+   * not, with the draw counter the start must carry (FR-035).
+   */
   preview: (leagueId: string, tournamentId: string) =>
     queryOptions({
       queryKey: ["leagues", leagueId, "tournaments", tournamentId, "preview"],
       queryFn: ({ signal }) =>
         dataOf(
-          provisionalApi.GET(
+          api.GET(
             "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/preview",
             { ...tournamentPath(leagueId, tournamentId), signal },
           ),

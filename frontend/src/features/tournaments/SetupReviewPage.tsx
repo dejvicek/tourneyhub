@@ -13,7 +13,7 @@ import {
 import { useLayout } from "@/hooks/useLayout";
 import { paths } from "@/lib/paths";
 
-import { describeError, isChanged } from "./setup/errors";
+import { describeError, describeRefusal, isChanged } from "./setup/errors";
 import { Notice } from "./setup/Notice";
 import { type SetupData, SetupPage } from "./setup/SetupPage";
 import {
@@ -83,9 +83,13 @@ function Review({ data }: { data: SetupData }) {
         });
     }
   })();
+  const problem = preview.data?.problem ?? null;
   const matchesRow = (() => {
     if (preview.data === undefined) {
       return t("loading");
+    }
+    if (problem !== null) {
+      return t("tournaments.setup.review.matchesBlocked");
     }
     if (matchCount === null) {
       return t("tournaments.setup.review.matchesOpen", {
@@ -188,6 +192,11 @@ function Review({ data }: { data: SetupData }) {
           {t("tournaments.errors.load")}
         </p>
       )}
+      {problem !== null && (
+        <p role="status" className="text-body-md text-destructive">
+          {describeRefusal(problem.code, problem.detail, t)}
+        </p>
+      )}
       {visibleRounds.map((round) => (
         <div key={round.round_no} className="grid gap-2">
           {layout !== "phone" && roundRobin && (
@@ -280,11 +289,13 @@ function Review({ data }: { data: SetupData }) {
         </Button>
         <Button
           type="button"
-          disabled={start.isPending || preview.data === undefined}
+          disabled={start.isPending || preview.data?.can_start !== true}
           size="lg"
           className="md:min-w-60"
           onClick={() => {
-            start.mutate(setup.draw_counter);
+            if (preview.data !== undefined) {
+              start.mutate(preview.data.draw_counter);
+            }
           }}
         >
           {t("tournaments.setup.review.start")}

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ApiError } from "@/api/client";
 import { i18n } from "@/i18n";
 
-import { describeError } from "./errors";
+import { describeError, describeRefusal } from "./errors";
 
 const refused = (status: number, code: string, detail: object = {}) =>
   new ApiError(status, { code, detail });
@@ -49,5 +49,23 @@ describe("the texts for a refused start or back to setup", () => {
     await i18n.changeLanguage(language);
 
     expect(describeError(error, i18n.t)).toBe(text);
+  });
+});
+
+describe("the texts for a refusal that the preview names", () => {
+  it("uses the same text as the refused start", async () => {
+    await i18n.changeLanguage("en");
+
+    expect(describeRefusal("not_enough_entries", { minimum: 4 }, i18n.t)).toBe(
+      describeError(refused(422, "not_enough_entries", { minimum: 4 }), i18n.t),
+    );
+  });
+
+  it("falls back to the generic text for a code it has no text for", async () => {
+    await i18n.changeLanguage("en");
+
+    expect(describeRefusal("tournament_not_in_setup", {}, i18n.t)).toBe(
+      i18n.t("tournaments.errors.generic"),
+    );
   });
 });
