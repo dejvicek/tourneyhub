@@ -911,6 +911,8 @@ function bracketOrder(size: number): number[] {
 
 interface Plan {
   rounds: { sides: [Side, Side][]; sittingOut: Side[] }[];
+  /** A knockout's entries that go straight to round 2, by seed (BR-041). */
+  byes?: Side[];
   matchCount: number | null;
   roundCount: number | null;
   bracketSize: number | null;
@@ -1030,6 +1032,7 @@ function plan(t: StoredTournament, draft: SetupDraft): Plan {
       }
       return {
         rounds,
+        byes: sorted.slice(0, size - sorted.length).map(sideOf),
         matchCount:
           sorted.length - 1 + (draft.format.third_place_match ? 1 : 0),
         roundCount: rounds.length,
@@ -1070,6 +1073,7 @@ export function preview(t: StoredTournament): SchedulePreview {
             sides: [a.players, b.players],
           })),
           sitting_out: round.sittingOut.map((side) => side.players),
+          byes: [],
         }))
       : made.rounds.slice(0, 1).map((round, index) => ({
           round_no: index + 1,
@@ -1077,6 +1081,7 @@ export function preview(t: StoredTournament): SchedulePreview {
             sides: [a.players, b.players],
           })),
           sitting_out: [],
+          byes: (made.byes ?? []).map((side) => side.players),
         }));
   return {
     draw_counter: draft.drawCounter,
@@ -1092,10 +1097,14 @@ export function preview(t: StoredTournament): SchedulePreview {
 /** The most entries a round robin is generated for; the backend's limit (FR-032). */
 export const MAX_ROUND_ROBIN_ENTRIES = 64;
 
+/** The most entries of a knockout without a group phase; the backend's limit (FR-032). */
+export const MAX_KNOCKOUT_ENTRIES = 256;
+
 /**
  * The reason the tournament cannot start, with the backend's codes (FR-032,
  * FR-033); null when it can. Unlike the backend, which generates only the
- * round robin so far, the demo starts every format.
+ * round robin and the knockout without a group phase so far, the demo starts
+ * every format.
  */
 export function startProblem(t: StoredTournament): SetupFailure | null {
   const draft = draftOf(t);
@@ -1115,6 +1124,13 @@ export function startProblem(t: StoredTournament): SetupFailure | null {
         : 2;
   if (entries.length < minimum) {
     return fail(422, "not_enough_entries", { minimum, given: entries.length });
+  }
+  if (draft.format.group_phase === "none") {
+    return entries.length > MAX_KNOCKOUT_ENTRIES
+      ? fail(422, "too_many_entries_for_knockout", {
+          limit: MAX_KNOCKOUT_ENTRIES,
+        })
+      : null;
   }
   return draft.format.group_phase === "round_robin" &&
     entries.length > MAX_ROUND_ROBIN_ENTRIES
