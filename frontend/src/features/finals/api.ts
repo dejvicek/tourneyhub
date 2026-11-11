@@ -17,10 +17,10 @@ import type {
 } from "@/demo/contract";
 import type { MonsterKnockoutMode } from "@/demo/rules";
 import { tournamentQueries } from "@/features/tournaments/api";
-import { providesProvisionalRoutes } from "@/lib/demoMode";
 
 // Provisional routes of the demo's contract, "finals" section
-// (src/demo/contract.ts), except the places, which the backend serves (P8). Keys start with the entity (docs/style/frontend-style.md §8.1).
+// (src/demo/contract.ts), except the places (P8) and the season effect (P10a),
+// which the backend serves. Keys start with the entity (docs/style/frontend-style.md §8.1).
 const tournamentKey = (leagueId: string, tournamentId: string) =>
   ["leagues", leagueId, "tournaments", tournamentId] as const;
 
@@ -61,11 +61,9 @@ export const finalsQueries = {
   seasonEffect: (leagueId: string, tournamentId: string) =>
     queryOptions({
       queryKey: [...tournamentKey(leagueId, tournamentId), "season-effect"],
-      // The backend serves this with P10; outside demo mode it stays off.
-      enabled: providesProvisionalRoutes(),
       queryFn: ({ signal }) =>
         dataOf(
-          provisionalApi.GET(
+          api.GET(
             "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/season-effect",
             { params: pathOf(leagueId, tournamentId), signal },
           ),
@@ -134,8 +132,27 @@ export const finalsQueries = {
       queryKey: ["leagues", leagueId, "players"],
       queryFn: ({ signal }) =>
         dataOf(
-          provisionalApi.GET("/api/v1/leagues/{league_id}/players", {
+          api.GET("/api/v1/leagues/{league_id}/players", {
             params: { path: { league_id: leagueId } },
+            signal,
+          }),
+        ),
+    }),
+  /**
+   * Every player of the league, removed ones too, for the names on past
+   * results (BR-002: a removed player keeps their results). Its own key: the
+   * lists under ["leagues", id, "players"] hold the active players only.
+   */
+  namedPlayers: (leagueId: string) =>
+    queryOptions({
+      queryKey: ["leagues", leagueId, "players", "with-removed"],
+      queryFn: ({ signal }) =>
+        dataOf(
+          api.GET("/api/v1/leagues/{league_id}/players", {
+            params: {
+              path: { league_id: leagueId },
+              query: { include_removed: true },
+            },
             signal,
           }),
         ),

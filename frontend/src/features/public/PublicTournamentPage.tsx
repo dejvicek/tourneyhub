@@ -165,8 +165,6 @@ function Places({
 }) {
   const { t } = useTranslation();
   const names = useNames(players, tournament);
-  // The backend serves the places with P10; until then a finished
-  // tournament shows none.
   const places = useQuery(
     publicQueries.places(shareToken, tournament.id, true),
   );

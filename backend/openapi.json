@@ -1826,6 +1826,139 @@
         "title": "PublicLeagueRead",
         "type": "object"
       },
+      "PublicPlaceRead": {
+        "description": "An entry's final place and the season points each of its players earns.",
+        "properties": {
+          "entry_id": {
+            "format": "uuid",
+            "title": "Entry Id",
+            "type": "string"
+          },
+          "place": {
+            "title": "Place",
+            "type": "integer"
+          },
+          "points_per_player": {
+            "title": "Points Per Player",
+            "type": "integer"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/PublicPlaceReasonRead"
+          }
+        },
+        "required": [
+          "place",
+          "entry_id",
+          "points_per_player",
+          "reason"
+        ],
+        "title": "PublicPlaceRead",
+        "type": "object"
+      },
+      "PublicPlaceReasonRead": {
+        "description": "Why an entry has its place, for viewers (\u00a77.13): the organizer's reason.",
+        "properties": {
+          "group_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PhaseFormat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "group_place": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Place"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PlaceReasonKind"
+          },
+          "opponent_entry_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opponent Entry Id"
+          },
+          "round": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BracketRoundName"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          }
+        },
+        "required": [
+          "kind",
+          "round",
+          "score",
+          "opponent_entry_id",
+          "group_place",
+          "group_format"
+        ],
+        "title": "PublicPlaceReasonRead",
+        "type": "object"
+      },
+      "PublicPlacesRead": {
+        "description": "The places of a tournament for viewers (FR-070), best place first.\n\n`complete` is true once the tournament is finished; before that `rows` is\nempty.",
+        "properties": {
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/PublicPlaceRead"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "complete",
+          "rows"
+        ],
+        "title": "PublicPlacesRead",
+        "type": "object"
+      },
       "PublicPlayerRead": {
         "description": "A player's name for viewers; removed players too, for past results.",
         "properties": {
@@ -1844,6 +1977,96 @@
           "name"
         ],
         "title": "PublicPlayerRead",
+        "type": "object"
+      },
+      "PublicSeasonStandingRow": {
+        "description": "One player's line in the season standings, for viewers (FR-061, BR-113).\n\n`place` is shared by players level on points and wins, and the next place\nskips (BR-104). Removed players stay, with their points (BR-002).",
+        "properties": {
+          "place": {
+            "title": "Place",
+            "type": "integer"
+          },
+          "player_id": {
+            "format": "uuid",
+            "title": "Player Id",
+            "type": "string"
+          },
+          "points": {
+            "title": "Points",
+            "type": "integer"
+          },
+          "tournament_wins": {
+            "title": "Tournament Wins",
+            "type": "integer"
+          },
+          "tournaments_played": {
+            "title": "Tournaments Played",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "place",
+          "player_id",
+          "points",
+          "tournaments_played",
+          "tournament_wins"
+        ],
+        "title": "PublicSeasonStandingRow",
+        "type": "object"
+      },
+      "PublicStandingRow": {
+        "description": "One entry's line in a round robin's standings, for viewers (FR-060, BR-101).\n\n`place` is shared by entries still level (BR-074), and the next place\nskips (BR-104). `points` include the sit-out points of the rounds sat out\n(BR-071). The organizer's extras, the form and what ranks one entry above\nthe next, are not part of it.",
+        "properties": {
+          "drawn": {
+            "title": "Drawn",
+            "type": "integer"
+          },
+          "entry_id": {
+            "format": "uuid",
+            "title": "Entry Id",
+            "type": "string"
+          },
+          "lost": {
+            "title": "Lost",
+            "type": "integer"
+          },
+          "place": {
+            "title": "Place",
+            "type": "integer"
+          },
+          "played": {
+            "title": "Played",
+            "type": "integer"
+          },
+          "points": {
+            "title": "Points",
+            "type": "integer"
+          },
+          "sat_out": {
+            "title": "Sat Out",
+            "type": "integer"
+          },
+          "score_difference": {
+            "title": "Score Difference",
+            "type": "integer"
+          },
+          "won": {
+            "title": "Won",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "place",
+          "entry_id",
+          "played",
+          "won",
+          "drawn",
+          "lost",
+          "sat_out",
+          "points",
+          "score_difference"
+        ],
+        "title": "PublicStandingRow",
         "type": "object"
       },
       "PublicTournamentRead": {
@@ -2136,6 +2359,48 @@
         "title": "SchedulePreviewRead",
         "type": "object"
       },
+      "SeasonEffectRead": {
+        "description": "One player's change in the season standings after a tournament (\u00a77.13).\n\n`place` and `points` are those with the tournament; `earned` is what the\nplayer got from it (0 without playing in it); `previous_place` is the place\nin the standings of the season's other finished tournaments, null for a\nplayer who played in none of them.",
+        "properties": {
+          "earned": {
+            "title": "Earned",
+            "type": "integer"
+          },
+          "place": {
+            "title": "Place",
+            "type": "integer"
+          },
+          "player_id": {
+            "format": "uuid",
+            "title": "Player Id",
+            "type": "string"
+          },
+          "points": {
+            "title": "Points",
+            "type": "integer"
+          },
+          "previous_place": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Place"
+          }
+        },
+        "required": [
+          "player_id",
+          "place",
+          "points",
+          "earned",
+          "previous_place"
+        ],
+        "title": "SeasonEffectRead",
+        "type": "object"
+      },
       "SeasonName": {
         "maxLength": 100,
         "minLength": 1,
@@ -2223,6 +2488,41 @@
           "name"
         ],
         "title": "SeasonRename",
+        "type": "object"
+      },
+      "SeasonStandingRead": {
+        "description": "One player's line in the season standings (FR-061, BR-113).\n\n`place` is shared by players level on points and wins, and the next place\nskips (BR-104). `tournament_wins` counts the finished tournaments in which\nthe player's entry was 1st, a shared 1st included.",
+        "properties": {
+          "place": {
+            "title": "Place",
+            "type": "integer"
+          },
+          "player_id": {
+            "format": "uuid",
+            "title": "Player Id",
+            "type": "string"
+          },
+          "points": {
+            "title": "Points",
+            "type": "integer"
+          },
+          "tournament_wins": {
+            "title": "Tournament Wins",
+            "type": "integer"
+          },
+          "tournaments_played": {
+            "title": "Tournaments Played",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "place",
+          "player_id",
+          "points",
+          "tournaments_played",
+          "tournament_wins"
+        ],
+        "title": "SeasonStandingRead",
         "type": "object"
       },
       "SeasonStart": {
@@ -4821,6 +5121,89 @@
         ]
       }
     },
+    "/api/v1/leagues/{league_id}/seasons/{season_id}/standings": {
+      "get": {
+        "description": "Return the season's standings: every player of a finished tournament (FR-061).\n\nTotal placement points, then tournament wins; players still level share\nthe place (BR-113). Only finished tournaments count (BR-112), and removed\nplayers stay (BR-002). A closed season is read with the table it was\nplayed under. Another league's season is 404 `season_not_found`.",
+        "operationId": "read_season_standings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "season_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Season Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SeasonStandingRead"
+                  },
+                  "title": "Response Read Season Standings",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Read Season Standings",
+        "tags": [
+          "standings"
+        ]
+      }
+    },
     "/api/v1/leagues/{league_id}/seasons/{season_id}/tournaments": {
       "get": {
         "description": "List a season's tournaments, newest date first; closed seasons too (FR-022).\n\nAnother league's season is 404 `season_not_found`.",
@@ -6006,6 +6389,89 @@
         ]
       }
     },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/season-effect": {
+      "get": {
+        "description": "Return what a finished tournament changed in the season standings (screen 10).\n\nOne row per player of the season standings, best first. A tournament that\nis not finished contributes nothing yet (BR-112): the list is empty, like\nits places. Another league's tournament is 404 `tournament_not_found`.",
+        "operationId": "read_season_effect",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SeasonEffectRead"
+                  },
+                  "title": "Response Read Season Effect",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Read Season Effect",
+        "tags": [
+          "standings"
+        ]
+      }
+    },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup": {
       "get": {
         "description": "Return a tournament's setup; another league's tournament is 404.",
@@ -7022,6 +7488,73 @@
         ]
       }
     },
+    "/api/v1/public/{share_token}/seasons/{season_id}/standings": {
+      "get": {
+        "description": "Return a season's standings from its finished tournaments (FR-070, FR-061).\n\nThe same table as the organizer's, with removed players, whose points stay\n(BR-002). A season of another league is 404 `season_not_found`.",
+        "operationId": "read_public_season_standings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "share_token",
+            "required": true,
+            "schema": {
+              "title": "Share Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "season_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Season Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PublicSeasonStandingRow"
+                  },
+                  "title": "Response Read Public Season Standings",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "summary": "Read Public Season Standings",
+        "tags": [
+          "public"
+        ]
+      }
+    },
     "/api/v1/public/{share_token}/seasons/{season_id}/tournaments": {
       "get": {
         "description": "List a season's tournaments, newest date first, without those in setup.\n\nA season of another league is 404 `season_not_found` (FR-070).",
@@ -7147,6 +7680,136 @@
           }
         },
         "summary": "Read Public Tournament",
+        "tags": [
+          "public"
+        ]
+      }
+    },
+    "/api/v1/public/{share_token}/tournaments/{tournament_id}/places": {
+      "get": {
+        "description": "Return the places and the season points of a finished tournament (FR-070).\n\nBefore the tournament finishes, `complete` is false and there are no rows.\nA finished tournament with a knockout is 422 `format_not_supported` until\nthe knockout is served. A tournament in setup is 404 `tournament_not_found`.",
+        "operationId": "read_public_places",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "share_token",
+            "required": true,
+            "schema": {
+              "title": "Share Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicPlacesRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "summary": "Read Public Places",
+        "tags": [
+          "public"
+        ]
+      }
+    },
+    "/api/v1/public/{share_token}/tournaments/{tournament_id}/standings": {
+      "get": {
+        "description": "Return a round robin's standings as they are now (FR-060, FR-070).\n\nA tournament in a format without a standings table yet, such as Swiss, has\nan empty list. A tournament in setup is 404 `tournament_not_found`, like an\nunknown one or one of another league.",
+        "operationId": "read_public_standings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "share_token",
+            "required": true,
+            "schema": {
+              "title": "Share Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PublicStandingRow"
+                  },
+                  "title": "Response Read Public Standings",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "summary": "Read Public Standings",
         "tags": [
           "public"
         ]

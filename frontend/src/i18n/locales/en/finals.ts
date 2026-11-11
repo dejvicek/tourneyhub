@@ -120,7 +120,6 @@ export const finals = {
     seasonTitle: "{{season}} standings",
     seasonLead:
       "Updated with this tournament's points. Top {{shown}} of {{total}}.",
-    seasonLater: "Season standings arrive in a later version.",
     seasonChange: "{{change}}",
     changePoints: "+{{points}}",
     changeUp: "{{points}}, up {{count}}",

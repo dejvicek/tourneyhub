@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { generatePath, Link } from "react-router";
 
@@ -83,11 +84,6 @@ function FinishedContent() {
     style: "short",
     type: "unit",
   });
-  const players = new Map(
-    (effect.data ?? []).map((row) => [row.player_id, row] as const),
-  );
-  const standings = effect.data ?? [];
-  const shown = standings.slice(0, 6);
   const playerNames = roster.player;
 
   const earn =
@@ -127,80 +123,81 @@ function FinishedContent() {
     </section>
   );
 
-  // The season's effect is served with P10; until then there is none to show.
-  const seasonLater =
-    effect.data === undefined && effect.fetchStatus === "idle";
-  const seasonSection = seasonLater ? (
-    <section aria-labelledby="season-after" className="space-y-3">
-      <h2 id="season-after" className="font-display text-display-section">
-        {t("finals.finished.seasonTitle", {
-          season: season === undefined ? "" : seasonName(season),
-        })}
-      </h2>
-      <p className="text-body-md text-muted-foreground">
-        {t("finals.finished.seasonLater")}
-      </p>
-    </section>
-  ) : (
-    <section aria-labelledby="season-after" className="space-y-3">
-      <div>
-        <h2 id="season-after" className="font-display text-display-section">
-          {t("finals.finished.seasonTitle", {
-            season: season === undefined ? "" : seasonName(season),
-          })}
-        </h2>
+  const seasonTitle = t("finals.finished.seasonTitle", {
+    season: season === undefined ? "" : seasonName(season),
+  });
+  // The places do not wait for the season's effect: it has its own state.
+  let seasonBody: ReactNode;
+  if (effect.isError) {
+    seasonBody = <LoadError onRetry={() => void effect.refetch()} />;
+  } else if (effect.data === undefined) {
+    seasonBody = <Loading />;
+  } else {
+    const standings = effect.data;
+    const shown = standings.slice(0, 6);
+    seasonBody = (
+      <>
         <p className="text-body-sm text-muted-foreground">
           {t("finals.finished.seasonLead", {
             shown: shown.length,
             total: standings.length,
           })}
         </p>
-      </div>
-      <ol
-        aria-label={t("finals.finished.seasonList")}
-        className="divide-y divide-border border-t border-b border-border"
-      >
-        {shown.map((row) => {
-          const moved =
-            row.previous_place === null ? 0 : row.previous_place - row.place;
-          const earned = players.get(row.player_id)?.earned ?? 0;
-          const change =
-            earned === 0 && moved === 0
-              ? ""
-              : moved > 0
-                ? t("finals.finished.changeUp", {
-                    points: t("finals.finished.changePoints", {
-                      points: earned,
-                    }),
-                    count: moved,
-                  })
-                : moved < 0
-                  ? t("finals.finished.changeDown", {
+        <ol
+          aria-label={t("finals.finished.seasonList")}
+          className="divide-y divide-border border-t border-b border-border"
+        >
+          {shown.map((row) => {
+            const moved =
+              row.previous_place === null ? 0 : row.previous_place - row.place;
+            const earned = row.earned;
+            const change =
+              earned === 0 && moved === 0
+                ? ""
+                : moved > 0
+                  ? t("finals.finished.changeUp", {
                       points: t("finals.finished.changePoints", {
                         points: earned,
                       }),
-                      count: -moved,
+                      count: moved,
                     })
-                  : t("finals.finished.changePoints", { points: earned });
-          return (
-            <li
-              key={row.player_id}
-              className="grid grid-cols-[2.5rem_minmax(0,1fr)_auto_3rem] items-center gap-x-3 py-2.5"
-            >
-              <span className="font-display text-score-m">{row.place}</span>
-              <span className="text-body-md font-bold">
-                {playerNames(row.player_id)}
-              </span>
-              <span className="text-body-sm text-muted-foreground">
-                {change}
-              </span>
-              <span className="text-end font-display text-score-l">
-                {row.points}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
+                  : moved < 0
+                    ? t("finals.finished.changeDown", {
+                        points: t("finals.finished.changePoints", {
+                          points: earned,
+                        }),
+                        count: -moved,
+                      })
+                    : t("finals.finished.changePoints", { points: earned });
+            return (
+              <li
+                key={row.player_id}
+                className="grid grid-cols-[2.5rem_minmax(0,1fr)_auto_3rem] items-center gap-x-3 py-2.5"
+              >
+                <span className="font-display text-score-m">{row.place}</span>
+                <span className="text-body-md font-bold">
+                  {playerNames(row.player_id)}
+                </span>
+                <span className="text-body-sm text-muted-foreground">
+                  {change}
+                </span>
+                <span className="text-end font-display text-score-l">
+                  {row.points}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      </>
+    );
+  }
+
+  const seasonSection = (
+    <section aria-labelledby="season-after" className="space-y-3">
+      <h2 id="season-after" className="font-display text-display-section">
+        {seasonTitle}
+      </h2>
+      {seasonBody}
       <Link
         to={generatePath(paths.seasonStandings, { leagueId })}
         className="inline-flex min-h-11 items-center text-body-md font-bold text-primary underline underline-offset-4"

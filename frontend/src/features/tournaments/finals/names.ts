@@ -11,13 +11,13 @@ export function shortName(fullName: string): string {
   return last === undefined ? first : `${first} ${last.charAt(0)}.`;
 }
 
-/** Names of players and entries, from the league's player list. */
+/** Names of players and entries, from the league's player list, removed players too. */
 export function useRoster(
   leagueId: string,
   entries: readonly EntryRead[] | undefined,
 ) {
   const { t } = useTranslation();
-  const players = useQuery(finalsQueries.players(leagueId));
+  const players = useQuery(finalsQueries.namedPlayers(leagueId));
   const names = new Map(
     (players.data ?? []).map((p) => [p.id, shortName(p.name)] as const),
   );

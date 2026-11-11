@@ -8,7 +8,6 @@ export const standings: CsMessages<Messages["standings"]> = {
     lead_many: "{{season}}, po {{count}} dohraného turnaje.",
     lead_other: "{{season}}, po {{count}} dohraných turnajích.",
     pick: "Sezóna",
-    later: "Pořadí sezóny přibude v pozdější verzi.",
     emptyTitle: "Zatím žádný dohraný turnaj",
     emptyBody:
       "Hráči se tu objeví, jakmile se dohraje první turnaj sezóny a rozdá body.",

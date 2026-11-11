@@ -9,7 +9,16 @@ from fastapi import FastAPI
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from tourneyhub.api import admin, auth, leagues, me, players, public, tournaments
+from tourneyhub.api import (
+    admin,
+    auth,
+    leagues,
+    me,
+    players,
+    public,
+    standings,
+    tournaments,
+)
 from tourneyhub.api.errors import install_error_handlers
 from tourneyhub.api.public_headers import API_PREFIX, PUBLIC_HEADERS, is_public_path
 from tourneyhub.api.schemas import ErrorResponse
@@ -86,6 +95,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         me.router,
         players.router,
         public.router,
+        standings.router,
         tournaments.router,
     ):
         app.include_router(router, prefix=API_PREFIX)
