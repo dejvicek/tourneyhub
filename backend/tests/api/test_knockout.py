@@ -931,6 +931,55 @@ def test_br130_a_final_whose_side_is_cleared_leaves_its_field(
     assert after[3, "standard", 1]["state"] == "waiting"
 
 
+def test_br074_the_bracket_marks_the_seeds_a_lot_decided(
+    played_group: Callable[..., Json],
+    start_knockout: Callable[..., tuple[int, Json]],
+    read: Callable[[str, str], Json],
+    put_result: Callable[[str, str, Json], tuple[int, Json]],
+    client: TestClient,
+    token: str,
+) -> None:
+    # Three entries each beat one other: level on every criterion, so a lot
+    # orders them and takes two through the cut.
+    tournament = played_group(3, finish=False)
+    seed = seeds_of(tournament)
+    beats = {(1, 2), (2, 3), (3, 1)}
+    for match in matches_of(tournament, group_of(tournament)):
+        one, two = (seed[side["entry_id"]] for side in match["sides"])
+        put_result(
+            tournament["id"],
+            match["id"],
+            win("side_1" if (one, two) in beats else "side_2"),
+        )
+    tournament = read(tournament["id"], "")
+    query = "/knockout/preview?qualifiers=2&third_place_match=false"
+    preview = read(tournament["id"], query)
+    assert preview["is_cut_by_lot"] is True
+    status, _ = start_knockout(tournament, qualifiers=2, third_place_match=False)
+    assert status == 200
+
+    bracket = read(tournament["id"], "/bracket")
+    public = client.get(_public(token, tournament["id"], "/bracket")).json()
+
+    for shown in (bracket, public):
+        final = bracket_matches(shown)[1, "standard", 1]
+        assert [(side["seed"], side["decided_by_lot"]) for side in final["sides"]] == [
+            (1, True),
+            (2, True),
+        ]
+    assert [e["decided_by_lot"] for e in preview["entries"]] == [True, True]
+
+
+def test_br074_a_clear_standing_marks_no_seed(
+    drawn: Json, read: Callable[[str, str], Json]
+) -> None:
+    bracket = bracket_matches(read(drawn["id"], "/bracket"))
+
+    assert not any(
+        side["decided_by_lot"] for match in bracket.values() for side in match["sides"]
+    )
+
+
 def test_br120_the_final_plays_its_own_format(
     played_group: Callable[..., Json],
     start_knockout: Callable[..., tuple[int, Json]],
@@ -1210,7 +1259,7 @@ PUBLIC_MATCH = {
     "field_number",
     "next_number",
 }
-PUBLIC_SIDE = {"entry_id", "seed", "is_bye"}
+PUBLIC_SIDE = {"entry_id", "seed", "is_bye", "decided_by_lot"}
 
 
 def test_fr070_the_share_link_shows_the_bracket_and_nothing_more(

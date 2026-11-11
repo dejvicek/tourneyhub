@@ -131,11 +131,16 @@ type MatchState = Literal["bye", "played", "on_field", "ready", "waiting"]
 
 
 class BracketSideRead(ResponseModel):
-    """A side: the entry and its knockout seed, a bye, or null while to come."""
+    """A side: the entry and its knockout seed, a bye, or null while to come.
+
+    `decided_by_lot` says a lot placed the entry among those level with it in
+    the group phase, or took it through the cut (BR-074, ADR-009).
+    """
 
     entry_id: UUID | None
     seed: int | None
     is_bye: bool
+    decided_by_lot: bool
 
 
 class BracketMatchRead(ResponseModel):
@@ -192,11 +197,12 @@ class BracketRead(ResponseModel):
 
 
 class PublicBracketSideRead(ResponseModel):
-    """A side for viewers: the entry and its seed, or a bye."""
+    """A side for viewers: the entry, its seed and whether a lot decided it, or a bye."""
 
     entry_id: UUID | None
     seed: int | None
     is_bye: bool
+    decided_by_lot: bool
 
 
 class PublicBracketMatchRead(ResponseModel):

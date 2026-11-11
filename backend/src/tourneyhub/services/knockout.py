@@ -574,11 +574,16 @@ type MatchState = Literal["bye", "played", "on_field", "ready", "waiting"]
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class BracketSideView:
-    """A side of a bracket match: the entry and its knockout seed, or a bye."""
+    """A side of a bracket match: the entry and its knockout seed, or a bye.
+
+    `decided_by_lot` says a lot placed the entry among those level with it in
+    the group phase, or took it through the cut (BR-074, ADR-009).
+    """
 
     entry_id: UUID | None
     seed: int | None
     is_bye: bool
+    decided_by_lot: bool
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -656,6 +661,7 @@ def view_bracket(
 
 def _bracket_view(tournament: Tournament, knockout: KnockoutBracket) -> BracketView:
     seed = {entry.id: entry.seed for entry in tournament.entries}
+    by_lot = _decided_by_lot(tournament, knockout)
     on_field = {
         field.match_id: field.number
         for field in tournament.fields
@@ -688,10 +694,16 @@ def _bracket_view(tournament: Tournament, knockout: KnockoutBracket) -> BracketV
             state=_state(match, on_field.get(row.id)),
             sides=(
                 _side_view(
-                    match.side_1.entry_id, is_bye=match.side_1.is_bye, seed=seed
+                    match.side_1.entry_id,
+                    is_bye=match.side_1.is_bye,
+                    seed=seed,
+                    by_lot=by_lot,
                 ),
                 _side_view(
-                    match.side_2.entry_id, is_bye=match.side_2.is_bye, seed=seed
+                    match.side_2.entry_id,
+                    is_bye=match.side_2.is_bye,
+                    seed=seed,
+                    by_lot=by_lot,
                 ),
             ),
             outcome=row.outcome,
@@ -730,13 +742,42 @@ def _bracket_view(tournament: Tournament, knockout: KnockoutBracket) -> BracketV
     )
 
 
+def _decided_by_lot(
+    tournament: Tournament, knockout: KnockoutBracket
+) -> frozenset[UUID]:
+    """The knockout entries a lot placed or took through the cut (BR-074, ADR-009).
+
+    Nothing is stored (ADR-010): the cut is computed again from the group
+    phase, whose results are locked since the start (BR-053), so it is the one
+    that was drawn.
+    """
+    group = _group_phase(tournament)
+    if group is None or group.format is not PhaseFormat.ROUND_ROBIN:
+        return frozenset()
+    entries = [e for e in tournament.entries if e.stage is EntryStage.KNOCKOUT]
+    cut = _cut(
+        tournament,
+        _standings_of(tournament, group),
+        qualifiers=len(entries),
+        third_place_match=knockout.bracket.third_place_match,
+    )
+    return frozenset(
+        entry.id for entry in entries if entry.source_entry_id in cut.decided_by_lot
+    )
+
+
 def _side_view(
-    entry_id: EntryId | None, *, is_bye: bool, seed: dict[UUID, int | None]
+    entry_id: EntryId | None,
+    *,
+    is_bye: bool,
+    seed: dict[UUID, int | None],
+    by_lot: frozenset[UUID],
 ) -> BracketSideView:
     return BracketSideView(
         entry_id=entry_id,
         seed=None if entry_id is None else seed[entry_id],
         is_bye=is_bye,
+        decided_by_lot=entry_id in by_lot,
     )
 
 
