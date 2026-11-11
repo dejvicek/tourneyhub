@@ -452,6 +452,14 @@ _ROUTES: list[tuple[str, str, Json | None]] = [
         "/tournaments/{t}/setup/draw",
         {"expected_draw_counter": 0, "target": "seeds"},
     ),
+    (
+        "PUT",
+        "/tournaments/{t}/matches/{m}/result",
+        {"walkover_winner": None, "games": []},
+    ),
+    ("GET", "/tournaments/{t}/play", None),
+    ("POST", "/tournaments/{t}/finish", {"expected_state": "in_progress"}),
+    ("GET", "/tournaments/{t}/places", None),
 ]
 
 
@@ -472,7 +480,9 @@ def test_owasp_api1_another_organizers_league_is_not_found_on_every_route(
     intruder = auth_header(make_league().owner_user_id)
     url = _url(
         league,
-        path.format(season=season_id, t=created["tournament_id"], new=uuid7()),
+        path.format(
+            season=season_id, t=created["tournament_id"], new=uuid7(), m=uuid7()
+        ),
     )
     if body is not None:
         body = {k: str(uuid7()) if v == "{new}" else v for k, v in body.items()}

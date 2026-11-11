@@ -1,12 +1,20 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid7
 
+import pytest
+
 from tourneyhub.db.models.matches import Match, MatchSide, MatchSidePlayer, Round
 from tourneyhub.db.models.tournaments import Tournament, TournamentPhase
 from tourneyhub.engine.ids import PlayerId
-from tourneyhub.engine.tournaments import MatchKind
+from tourneyhub.engine.tournaments import (
+    KnockoutMatchFormat,
+    MatchFormat,
+    MatchKind,
+    PhaseKind,
+)
 from tourneyhub.services.tournaments import (
     SideView,
+    _match_format,
     _match_slots,
     _match_view,
 )
@@ -98,3 +106,61 @@ def test_d2_a_bye_and_a_team_without_an_entry_are_known_sides() -> None:
     assert _match_slots(_tournament(played))[0].player_ids == frozenset(
         {PlayerId(one), PlayerId(other)}
     )
+
+
+def _knockout(final_format: KnockoutMatchFormat | None) -> TournamentPhase:
+    rounds = [
+        Round(
+            id=uuid7(),
+            round_no=round_no,
+            created_at=NOW,
+            matches=[
+                Match(id=uuid7(), position=1, kind=kind, created_at=NOW)
+                for kind in kinds
+            ],
+        )
+        for round_no, kinds in (
+            (1, (MatchKind.STANDARD, MatchKind.STANDARD)),
+            (2, (MatchKind.STANDARD, MatchKind.THIRD_PLACE)),
+        )
+    ]
+    return TournamentPhase(
+        id=uuid7(),
+        position=1,
+        kind=PhaseKind.KNOCKOUT,
+        match_format=MatchFormat.BO3,
+        final_match_format=final_format,
+        rounds=rounds,
+    )
+
+
+@pytest.mark.parametrize(
+    ("final_format", "round_no", "kind", "expected"),
+    [
+        pytest.param(
+            KnockoutMatchFormat.BO5, 2, MatchKind.STANDARD, MatchFormat.BO5, id="final"
+        ),
+        pytest.param(
+            KnockoutMatchFormat.BO5,
+            2,
+            MatchKind.THIRD_PLACE,
+            MatchFormat.BO3,
+            id="third-place",
+        ),
+        pytest.param(
+            KnockoutMatchFormat.BO5, 1, MatchKind.STANDARD, MatchFormat.BO3, id="semi"
+        ),
+        pytest.param(None, 2, MatchKind.STANDARD, MatchFormat.BO3, id="no-own"),
+    ],
+)
+def test_br120_the_final_plays_its_own_format(
+    final_format: KnockoutMatchFormat | None,
+    round_no: int,
+    kind: MatchKind,
+    expected: MatchFormat,
+) -> None:
+    phase = _knockout(final_format)
+    round_ = phase.rounds[round_no - 1]
+    match = next(m for m in round_.matches if m.kind is kind)
+
+    assert _match_format(phase, round_, match) is expected
