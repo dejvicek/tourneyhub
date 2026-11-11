@@ -534,6 +534,7 @@
           "format_not_supported",
           "players_without_partner",
           "too_many_entries_for_round_robin",
+          "too_many_entries_for_knockout",
           "match_not_found",
           "match_sides_unknown",
           "match_sides_changed",
@@ -2243,8 +2244,19 @@
         "type": "object"
       },
       "PreviewRoundRead": {
-        "description": "A round of the preview, with the players of each entry that sits it out.",
+        "description": "A round of the preview, with the players of each entry that sits it out.\n\n`byes` lists, by seed, the players of each entry that goes straight to a\nknockout's second round (BR-041); empty in a round robin.",
         "properties": {
+          "byes": {
+            "items": {
+              "items": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Byes",
+            "type": "array"
+          },
           "matches": {
             "items": {
               "$ref": "#/components/schemas/PreviewMatchRead"
@@ -2271,7 +2283,8 @@
         "required": [
           "round_no",
           "matches",
-          "sitting_out"
+          "sitting_out",
+          "byes"
         ],
         "title": "PreviewRoundRead",
         "type": "object"
@@ -3085,7 +3098,7 @@
         "type": "string"
       },
       "SchedulePreviewRead": {
-        "description": "What \"Generate and start\" would create, or why it would not (FR-035).\n\n`can_start` is false exactly when `problem` is set: the same code and detail\nas the 422 of `POST /start` (the 409s of a stale draw counter apart). Then\n`rounds` is empty and the counts are null. A round robin lists all its\nrounds; `bracket_size` is null until a knockout can start. `draw_counter`\ngoes back in the start (ADR-008).",
+        "description": "What \"Generate and start\" would create, or why it would not (FR-035).\n\n`can_start` is false exactly when `problem` is set: the same code and detail\nas the 422 of `POST /start` (the 409s of a stale draw counter apart). Then\n`rounds` is empty and the counts are null. A round robin lists all its\nrounds, and `bracket_size` is null. A knockout without a group phase lists\nits first round with its matches and byes (BR-040 to BR-042);\n`match_count` counts every match of the bracket, the third-place match\ntoo and no bye, `round_count` its rounds and `bracket_size` its\nfirst-round spots. `draw_counter` goes back in the start (ADR-008).",
         "properties": {
           "bracket_size": {
             "anyOf": [
@@ -6804,7 +6817,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/finish": {
       "post": {
-        "description": "Finish a round robin without a knockout, once the UI has asked (FR-040).\n\nA tournament that is not in progress is 409 `tournament_not_in_progress`\n(detail `state`), so a repeat changes nothing. A match without a result is\n422 `group_phase_not_done` (detail `matches_left`). A tournament with a\nknockout, a Swiss or a Monster DYP is 422 `format_not_supported` for now.\nThe standings become the places (`GET \u2026/places`).",
+        "description": "Finish a round robin without a knockout, once the UI has asked (FR-040).\n\nA tournament that is not in progress is 409 `tournament_not_in_progress`\n(detail `state`), so a repeat changes nothing. A match without a result is\n422 `group_phase_not_done` (detail `matches_left`). A tournament with a\nknockout, which finishes with its last result (FR-037), a Swiss or a\nMonster DYP is 422 `format_not_supported`.\nThe standings become the places (`GET \u2026/places`).",
         "operationId": "finish_tournament",
         "parameters": [
           {
@@ -7417,7 +7430,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/places": {
       "get": {
-        "description": "Return the places and the season points of a finished tournament (\u00a77.13, \u00a77.14).\n\nComputed on read. Before the tournament finishes, `complete` is false and\nthere are no rows. With a knockout, its entries take the top places and\nthe others follow in their group-phase order (BR-102, BR-103). A Swiss or\na Monster DYP is 422 `format_not_supported` until they are played.",
+        "description": "Return the places and the season points of a finished tournament (\u00a77.13, \u00a77.14).\n\nComputed on read. Before the tournament finishes, `complete` is false and\nthere are no rows. With a knockout, its entries take the top places and\nthe others follow in their group-phase order (BR-102, BR-103); without a\ngroup phase, every entry is placed by the knockout, and its reason has no\n`group_place` and no `group_format`. A Swiss or\na Monster DYP is 422 `format_not_supported` until they are played.",
         "operationId": "read_places",
         "parameters": [
           {
@@ -8133,7 +8146,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/preview": {
       "get": {
-        "description": "Return what \"Generate and start\" would create, and write nothing (FR-035).\n\nA tournament that cannot start is still 200 with `can_start` false and the\n`problem`: `players_without_partner`, `not_enough_entries`,\n`too_many_entries_for_round_robin` (detail `limit`: 64),\n`format_not_supported`, the DYP codes of a draw that cannot be made, or\n`tournament_not_in_setup` for a started tournament. Another league's\ntournament is 404.",
+        "description": "Return what \"Generate and start\" would create, and write nothing (FR-035).\n\nA tournament that cannot start is still 200 with `can_start` false and the\n`problem`: `players_without_partner`, `not_enough_entries`,\n`too_many_entries_for_round_robin` (detail `limit`: 64),\n`too_many_entries_for_knockout` (detail `limit`: 256),\n`format_not_supported`, the DYP codes of a draw that cannot be made, or\n`tournament_not_in_setup` for a started tournament. Another league's\ntournament is 404.",
         "operationId": "read_schedule_preview",
         "parameters": [
           {
@@ -8410,7 +8423,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/start": {
       "post": {
-        "description": "Generate the schedule and start the tournament (FR-035).\n\nA round robin gets all its rounds (BR-050 to BR-052), and the first\nmatches take the fields (BR-130). A started tournament is 409\n`tournament_not_in_setup`; a stale `expected_draw_counter` is 409\n`draw_counter_changed`. Another format is 422 `format_not_supported` for\nnow. An incomplete setup is 422: `players_without_partner` (Doubles),\n`not_enough_players`, `dyp_halves_incomplete`, `dyp_halves_unequal`,\n`too_many_left_out` (DYP), `not_enough_entries` (FR-032) or\n`too_many_entries_for_round_robin` (detail `limit`: 64).",
+        "description": "Generate the schedule and start the tournament (FR-035).\n\nA round robin gets all its rounds (BR-050 to BR-052); a knockout without\na group phase gets its whole bracket from the setup seeds, the byes for\nthe top seeds (BR-040 to BR-044). The first matches take the fields\n(BR-130). A started tournament is 409 `tournament_not_in_setup`; a stale\n`expected_draw_counter` is 409 `draw_counter_changed`. Swiss and Monster\nDYP are 422 `format_not_supported` for now. An incomplete setup is 422:\n`players_without_partner` (Doubles), `not_enough_players`,\n`dyp_halves_incomplete`, `dyp_halves_unequal`, `too_many_left_out` (DYP),\n`not_enough_entries` (FR-032: 2, or 4 with a third-place match),\n`too_many_entries_for_round_robin` (detail `limit`: 64) or\n`too_many_entries_for_knockout` (detail `limit`: 256).",
         "operationId": "start_tournament",
         "parameters": [
           {
@@ -8934,7 +8947,7 @@
     },
     "/api/v1/public/{share_token}/tournaments/{tournament_id}/places": {
       "get": {
-        "description": "Return the places and the season points of a finished tournament (FR-070).\n\nBefore the tournament finishes, `complete` is false and there are no rows.\nA finished tournament with a knockout is 422 `format_not_supported` until\nthe knockout is served. A tournament in setup is 404 `tournament_not_found`.",
+        "description": "Return the places and the season points of a finished tournament (FR-070).\n\nBefore the tournament finishes, `complete` is false and there are no rows.\nWith a knockout, its entries take the top places by BR-102, the others\nfollow in their group-phase order (BR-103); a Swiss or a Monster DYP is\n422 `format_not_supported` until they are played. A tournament in setup\nis 404 `tournament_not_found`.",
         "operationId": "read_public_places",
         "parameters": [
           {
