@@ -6,7 +6,7 @@
 # Node stays on the current Active LTS (ADR-003), so Node majors are ignored.
 version: 2
 updates:
-  # backend/pyproject.toml and backend/uv.lock (docs/python-style.md §2)
+  # backend/pyproject.toml and backend/uv.lock (docs/style/python-style.md §2)
   - package-ecosystem: "uv"
     directory: "/backend"
     schedule:

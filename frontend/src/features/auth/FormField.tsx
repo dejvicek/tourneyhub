@@ -13,7 +13,7 @@ interface FormFieldProps extends Omit<ComponentProps<typeof Input>, "id"> {
 }
 
 /**
- * A labelled text field with its hint and error (docs/frontend-style.md §6):
+ * A labelled text field with its hint and error (docs/style/frontend-style.md §6):
  * after a failed validation the input gets aria-invalid and is described by
  * the message, which is text, never colour alone.
  */

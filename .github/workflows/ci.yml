@@ -84,7 +84,7 @@ jobs:
           - 5432:5432
     env:
       TOURNEYHUB_TEST_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/tourneyhub_test
-      # pytest-alembic's tests empty this one before each test (docs/python-style.md §9)
+      # pytest-alembic's tests empty this one before each test (docs/style/python-style.md §9)
       TOURNEYHUB_TEST_MIGRATIONS_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/tourneyhub_test_migrations
       # Settings for `alembic upgrade head` and `alembic check`
       TOURNEYHUB_ENV: development

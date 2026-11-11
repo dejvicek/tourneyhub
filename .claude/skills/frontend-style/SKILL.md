@@ -1,11 +1,11 @@
 ---
 name: frontend-style
-description: Use when planning, writing, changing or reviewing anything in TourneyHub's frontend/ — React components, screens and routes, Tailwind classes, theme tokens in index.css, shadcn/ui components, translations in src/i18n, TanStack Query queries and mutations, the API client in src/api, Vitest or Playwright tests, package.json, eslint.config.js, the tsconfigs, .prettierrc.json, vite.config.ts or pnpm-workspace.yaml — or when editing docs/frontend-style.md.
+description: Use when planning, writing, changing or reviewing anything in TourneyHub's frontend/ — React components, screens and routes, Tailwind classes, theme tokens in index.css, shadcn/ui components, translations in src/i18n, TanStack Query queries and mutations, the API client in src/api, Vitest or Playwright tests, package.json, eslint.config.js, the tsconfigs, .prettierrc.json, vite.config.ts or pnpm-workspace.yaml — or when editing docs/style/frontend-style.md.
 ---
 
 # TourneyHub frontend style
 
-The rules live in `docs/frontend-style.md`. Before writing code, read the sections for what you touch (§3 TypeScript, §4 React, §5 styling and themes, §6 accessibility, §7 translations, §8 data and the API client, §9 routing, §10 tests, §11 structure). Take tool versions and configuration from `frontend/package.json`, `frontend/pnpm-lock.yaml` and `frontend/eslint.config.js`, not from memory; the guide's §2 explains the choices in them that are not obvious. Where it disagrees with `ADR.md`, the ADR wins until it is changed; the guide's §12 lists the changes it proposes.
+The rules live in `docs/style/frontend-style.md`. Before writing code, read the sections for what you touch (§3 TypeScript, §4 React, §5 styling and themes, §6 accessibility, §7 translations, §8 data and the API client, §9 routing, §10 tests, §11 structure). Take tool versions and configuration from `frontend/package.json`, `frontend/pnpm-lock.yaml` and `frontend/eslint.config.js`, not from memory; the guide's §2 explains the choices in them that are not obvious. Where it disagrees with `ADR.md`, the ADR wins until it is changed; the guide's §12 lists the changes it proposes.
 
 ## Project decisions an agent will not guess
 
@@ -29,4 +29,4 @@ The skeleton lacks some rules the first feature brings; the guide's checklist "F
 
 Run from `frontend/`, never from the repository root: `pnpm install --frozen-lockfile`, `pnpm format`, then `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test` and `pnpm build`. Run `pnpm e2e` when a screen changed and the production images are up (ADR-013).
 
-If a rule stops you from doing what the task needs, do not work around it. Say which rule, and propose a change to `docs/frontend-style.md`.
+If a rule stops you from doing what the task needs, do not work around it. Say which rule, and propose a change to `docs/style/frontend-style.md`.

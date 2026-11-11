@@ -123,7 +123,7 @@ describe("group phase done (screen 8)", () => {
 });
 
 // jsdom computes no layout or colours: axe checks names, roles, ARIA and
-// labels here; contrast is the tokens' (docs/frontend-style.md §5.2).
+// labels here; contrast is the tokens' (docs/style/frontend-style.md §5.2).
 async function violations(): Promise<string[]> {
   const results = await axe.run(document.body, {
     runOnly: [

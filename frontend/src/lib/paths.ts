@@ -1,4 +1,4 @@
-// Every route path of the app (docs/frontend-style.md §9). Links are built
+// Every route path of the app (docs/style/frontend-style.md §9). Links are built
 // from these with generatePath, never by joining strings. The comment on a
 // screen is its number in the Figma file's "Tournament lifecycle" page.
 // An overlay is a nested route that opens a sheet over the screen of its

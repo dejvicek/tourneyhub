@@ -1,4 +1,4 @@
-// The one `cn` of the app (docs/frontend-style.md §5.3), the path that
+// The one `cn` of the app (docs/style/frontend-style.md §5.3), the path that
 // components.json names as shadcn's `utils` alias. It is the `cn` package
 // configured with the theme's text styles (src/index.css): unconfigured, it
 // would take `text-caption` for a colour and drop `text-muted-foreground`

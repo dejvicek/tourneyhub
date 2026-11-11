@@ -45,7 +45,7 @@ type PluralBase<K> = K extends `${infer Base}_one`
 /**
  * The Czech texts for the English reference `T`: the same keys, plus
  * `_few` (2–4) and `_many` (decimals) for each key that English has as
- * `_one` or `_other`, which Czech plurals need (docs/frontend-style.md §7).
+ * `_one` or `_other`, which Czech plurals need (docs/style/frontend-style.md §7).
  */
 export type CsMessages<T = Messages> = T extends string
   ? string

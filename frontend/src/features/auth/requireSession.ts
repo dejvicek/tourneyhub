@@ -6,7 +6,7 @@ import { restoreSession } from "./api";
 import { loginPath, safeNext } from "./loginPath";
 
 /**
- * Guards the organizer's routes (docs/frontend-style.md §9, FR-003): without
+ * Guards the organizer's routes (docs/style/frontend-style.md §9, FR-003): without
  * a session, and when the refresh cookie cannot restore one, it sends the
  * organizer to the login, which returns here afterwards.
  */

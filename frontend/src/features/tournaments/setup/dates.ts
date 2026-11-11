@@ -1,7 +1,7 @@
 import { i18n } from "@/i18n";
 
 // The design writes English dates as "Thu 22 Oct", so the English texts use
-// the British order; Czech uses its own (FR-081, docs/frontend-style.md §7).
+// the British order; Czech uses its own (FR-081, docs/style/frontend-style.md §7).
 function locale(): string {
   return i18n.resolvedLanguage === "cs" ? "cs-CZ" : "en-GB";
 }

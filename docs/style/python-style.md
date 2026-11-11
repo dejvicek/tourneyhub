@@ -19,7 +19,7 @@ The ADRs decide what the backend is built from; this guide decides how its code 
 
 ## 2. Toolchain
 
-The configuration CI runs is [`backend/pyproject.toml`](../backend/pyproject.toml). It gives lower bounds only; the exact versions live in `backend/uv.lock`.
+The configuration CI runs is [`backend/pyproject.toml`](../../backend/pyproject.toml). It gives lower bounds only; the exact versions live in `backend/uv.lock`.
 
 | Tool | Role |
 |---|---|
