@@ -230,6 +230,7 @@
           "seeding_method_changed",
           "seed_order_changed",
           "dyp_halves_incomplete",
+          "nothing_to_pair",
           "not_enough_players",
           "dyp_halves_unequal",
           "too_many_left_out"
@@ -3386,7 +3387,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/draw": {
       "post": {
-        "description": "Draw again: a new DYP draw, the rest of Doubles paired, or a shuffle (ADR-010).\n\nA stale `expected_draw_counter` is 409 `draw_counter_changed` with the\ncurrent `draw_counter`. Shuffling seeds that come from the ranking is 409\n`seeding_method_changed`. A DYP draw needs complete, valid halves: 422\n`dyp_halves_incomplete`, `dyp_halves_unequal`, `too_many_left_out` or\n`not_enough_players`.",
+        "description": "Draw again: a new DYP draw, the rest of Doubles paired, or a shuffle (ADR-010).\n\nA stale `expected_draw_counter` is 409 `draw_counter_changed` with the\ncurrent `draw_counter`. Shuffling seeds that come from the ranking is 409\n`seeding_method_changed`. A DYP draw needs complete, valid halves: 422\n`dyp_halves_incomplete`, `dyp_halves_unequal`, `too_many_left_out` or\n`not_enough_players`. Pairing the rest of Doubles with fewer than two\nunpaired players is 422 `nothing_to_pair`; nothing changes.",
         "operationId": "draw_again",
         "parameters": [
           {

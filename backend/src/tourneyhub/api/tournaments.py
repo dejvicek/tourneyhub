@@ -568,7 +568,8 @@ def draw_again(
     current `draw_counter`. Shuffling seeds that come from the ranking is 409
     `seeding_method_changed`. A DYP draw needs complete, valid halves: 422
     `dyp_halves_incomplete`, `dyp_halves_unequal`, `too_many_left_out` or
-    `not_enough_players`.
+    `not_enough_players`. Pairing the rest of Doubles with fewer than two
+    unpaired players is 422 `nothing_to_pair`; nothing changes.
     """
     setup = tournament_service.draw_again(
         session,

@@ -914,11 +914,60 @@ def test_fr033_the_rest_of_doubles_is_paired_by_lot(
             method="POST",
         )
     )
+    [by_hand] = [
+        e for e in paired["entries"] if set(e["player_ids"]) == set(players[:2])
+    ]
 
     assert len(body["entries"]) == 3
     in_pairs = [p for e in body["entries"] for p in e["player_ids"]]
     assert len(set(in_pairs)) == 6
     assert body["draw_counter"] == paired["draw_counter"] + 1
+    kept = [e for e in body["entries"] if set(e["player_ids"]) == set(players[:2])]
+    assert [e["id"] for e in kept] == [by_hand["id"]]
+
+
+@pytest.mark.parametrize(
+    ("picked", "unpaired"),
+    [
+        pytest.param(4, 0, id="FR-033-everyone-is-paired"),
+        pytest.param(5, 1, id="FR-033-one-player-is-left"),
+    ],
+)
+def test_fr033_pairing_the_rest_with_fewer_than_two_left_changes_nothing(
+    client: TestClient,
+    league: League,
+    headers: dict[str, str],
+    players: list[str],
+    picked: int,
+    unpaired: int,
+) -> None:
+    tid = _doubles(client, league, headers, players[:picked])
+    paired = _ok(
+        _write(
+            client,
+            league,
+            tid,
+            "/setup/pairs",
+            {"pairs": [[players[0], players[1]], [players[2], players[3]]]},
+            headers,
+        )
+    )
+
+    status, body = _write(
+        client,
+        league,
+        tid,
+        "/setup/draw",
+        {"expected_draw_counter": paired["draw_counter"], "target": "pairs"},
+        headers,
+        method="POST",
+    )
+    read = client.get(_tournament_url(league, tid, "/setup"), headers=headers)
+
+    assert status == 422
+    assert body == {"code": "nothing_to_pair", "detail": {"unpaired": unpaired}}
+    assert read.json()["draw_counter"] == paired["draw_counter"]
+    assert read.json()["entries"] == paired["entries"]
 
 
 # ---------------------------------------------------------------- DYP

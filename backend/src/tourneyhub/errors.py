@@ -48,6 +48,7 @@ class ErrorCode(StrEnum):
     SEEDING_METHOD_CHANGED = "seeding_method_changed"
     SEED_ORDER_CHANGED = "seed_order_changed"
     DYP_HALVES_INCOMPLETE = "dyp_halves_incomplete"
+    NOTHING_TO_PAIR = "nothing_to_pair"  # "pair the rest" with fewer than 2 left
     # Engine rules (engine/errors.py)
     NOT_ENOUGH_PLAYERS = "not_enough_players"
     DYP_HALVES_UNEQUAL = "dyp_halves_unequal"

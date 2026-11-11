@@ -1094,7 +1094,8 @@ def draw_again(
       the partners; hand-set halves must be complete and valid (422
       `dyp_halves_incomplete`, `dyp_halves_unequal`, `too_many_left_out`,
       `not_enough_players`).
-    - `pairs` in Doubles pairs the players without a partner by lot.
+    - `pairs` in Doubles pairs the players without a partner by lot; with fewer
+      than two of them it is 422 `nothing_to_pair` and changes nothing.
     - `seeds` shuffles the seeds again; only with random seeding (409
       `seeding_method_changed`).
     """
@@ -1155,13 +1156,19 @@ def _pair_the_rest(
     ranking: Sequence[RankedPlayer],
     now: datetime,
 ) -> None:
-    """Pair the Doubles players without a partner by lot (FR-033)."""
+    """Pair the Doubles players without a partner by lot (FR-033).
+
+    Fewer than two of them leave nothing to pair: 422 `nothing_to_pair`, before the
+    draw counter moves, so that the seeds stay as they were.
+    """
     paired = {m.player_id for entry in tournament.entries for m in entry.members}
     rest = [
         PlayerId(row.player_id)
         for row in tournament.players
         if row.player_id not in paired
     ]
+    if len(rest) < 2:  # noqa: PLR2004  (a pair)
+        raise RuleViolationError(ErrorCode.NOTHING_TO_PAIR, unpaired=len(rest))
     tournament.draw_counter += 1
     tournament.updated_at = now
     for top, bottom in pair_the_rest(
