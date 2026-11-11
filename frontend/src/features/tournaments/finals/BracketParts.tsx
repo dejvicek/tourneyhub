@@ -27,28 +27,65 @@ function winnerSide(match: BracketMatch): 0 | 1 | null {
   return match.outcome === "side_1" ? 0 : match.outcome === "side_2" ? 1 : null;
 }
 
+/** "Enter result" for a match to play, "Change result" for a played one (FR-053). */
 function ResultLink({
   href,
-  label,
+  match,
+  title,
   inverse,
   className,
 }: {
   href: string;
-  label: string;
+  match: BracketMatch;
+  title: string;
   inverse?: boolean;
   className?: string;
 }) {
   const { t } = useTranslation();
+  const played = match.state === "played";
   return (
     <Button
       asChild
-      variant={inverse ? "feature" : "default"}
+      variant={inverse ? "feature" : played ? "outline" : "default"}
       className={className}
     >
-      <Link to={href} aria-label={label}>
-        {t("finals.knockout.enterResult")}
+      <Link
+        to={href}
+        aria-label={t(
+          played
+            ? "finals.knockout.changeResultFor"
+            : "finals.knockout.enterResultFor",
+          { match: title },
+        )}
+      >
+        {t(
+          played
+            ? "finals.knockout.changeResult"
+            : "finals.knockout.enterResult",
+        )}
       </Link>
     </Button>
+  );
+}
+
+/** Why a played match can't be changed: a later match has a result (BR-094). */
+function LockedNote({
+  ctx,
+  match,
+  className,
+}: {
+  ctx: BracketContext;
+  match: BracketMatch;
+  className?: string;
+}) {
+  const { t } = useTranslation();
+  if (!ctx.canChange || match.state !== "played" || !match.result_locked) {
+    return null;
+  }
+  return (
+    <p className={cn("text-caption", className)}>
+      {t("finals.knockout.locked")}
+    </p>
   );
 }
 
@@ -158,11 +195,13 @@ export function MatchBox({
       {href !== null && (
         <ResultLink
           href={href}
-          label={t("finals.knockout.enterResultFor", { match: title })}
+          match={match}
+          title={title}
           inverse={match.state === "on_field"}
           className="mt-2 w-full"
         />
       )}
+      <LockedNote ctx={ctx} match={match} className="mt-2" />
     </div>
   );
 }
@@ -231,7 +270,8 @@ export function FinalCard({ ctx, round, match }: FinalCardProps) {
       {href !== null && (
         <ResultLink
           href={href}
-          label={t("finals.knockout.enterResultFor", { match: title })}
+          match={match}
+          title={title}
           inverse
           className="w-full"
         />
@@ -259,11 +299,7 @@ export function MatchCard({ ctx, round, match }: MatchBoxProps) {
       className={cn("space-y-2 rounded-lg border p-3", boxState)}
     >
       <header className="flex items-baseline justify-between gap-3">
-        <p className="text-body-md font-bold">
-          {match.number === null
-            ? title
-            : t("finals.knockout.match", { number: match.number })}
-        </p>
+        <p className="text-body-md font-bold">{title}</p>
         <p className="text-caption text-muted-foreground">
           {status}
           {match.field_number !== null &&
@@ -283,16 +319,20 @@ export function MatchCard({ ctx, round, match }: MatchBoxProps) {
       </ul>
       {match.next_number !== null && (
         <p className="text-caption text-muted-foreground">
-          {t("finals.knockout.winnerPlays", { number: match.next_number })}
+          {t("finals.knockout.winnerPlays", {
+            match: ctx.titleOfNumber(match.next_number),
+          })}
         </p>
       )}
       {href !== null && (
         <ResultLink
           href={href}
-          label={t("finals.knockout.enterResultFor", { match: title })}
+          match={match}
+          title={title}
           className="w-full"
         />
       )}
+      <LockedNote ctx={ctx} match={match} />
     </article>
   );
 }

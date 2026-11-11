@@ -19,7 +19,6 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   type BracketMatchData as BracketMatch,
-  type BracketRoundData as BracketRound,
   type BracketSideData as BracketSide,
   finalsMutations,
   finalsQueries,
@@ -29,7 +28,7 @@ import { useLayout } from "@/hooks/useLayout";
 import { useRouteParam } from "@/hooks/useRouteParam";
 import { paths } from "@/lib/paths";
 
-import type { BracketContext } from "./finals/bracketContext";
+import { type BracketContext, bracketTitles } from "./finals/bracketContext";
 import { BracketView, CompactBracket, RoundList } from "./finals/BracketView";
 import { errorText } from "./finals/errorText";
 import { resultPath } from "./finals/links";
@@ -99,14 +98,14 @@ function KnockoutContent() {
         : side.entry_id === null
           ? t("finals.knockout.tbd")
           : roster.entry(side.entry_id),
+    canChange: true,
     resultHref: (match: BracketMatch) =>
-      match.state === "ready" || match.state === "on_field"
+      match.state === "ready" ||
+      match.state === "on_field" ||
+      (match.state === "played" && !match.result_locked)
         ? resultPath("knockout", leagueId, tournamentId, match.match_id)
         : null,
-    matchTitle: (round: BracketRound, match: BracketMatch) =>
-      match.kind === "third_place"
-        ? t("finals.matchTitle.third_place")
-        : t(`finals.matchTitle.${round.name}`, { n: match.position }),
+    ...bracketTitles(t, shape),
   };
   const body =
     layout === "phone" ? (

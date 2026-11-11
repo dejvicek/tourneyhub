@@ -462,6 +462,8 @@ export interface BracketMatch {
   field_number: number | null;
   /** The number of the match the winner plays in. */
   next_number: number | null;
+  /** A later match this one feeds has a result, so this one can't change (BR-094). */
+  result_locked: boolean;
 }
 
 export interface BracketRound {

@@ -175,6 +175,100 @@ describe("Knockout (screen 9)", () => {
   });
 });
 
+describe("Changing a knockout result (FR-053, BR-094)", () => {
+  it("corrects a played semifinal and clears it again from the bracket", async () => {
+    const user = userEvent.setup();
+    renderAt(at(paths.knockout, DYP_EVENING));
+
+    await user.click(
+      await screen.findByRole("link", { name: "Change result, Semifinal 1" }),
+    );
+    const sheet = await screen.findByRole("dialog", { name: "Semifinal 1" });
+    await user.click(
+      await within(sheet).findByRole("button", { name: "Clear result" }),
+    );
+    const confirm = await screen.findByRole("alertdialog");
+    await user.click(
+      within(confirm).getByRole("button", { name: "Clear result" }),
+    );
+
+    // The match is open again and its winner no longer plays in the final.
+    expect(
+      await screen.findByRole("link", { name: "Enter result, Semifinal 1" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Change result, Semifinal 1" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("locks a semifinal once the final has a result, and says why", async () => {
+    await playFinal(DYP_EVENING);
+    renderAt(at(paths.knockout, DYP_EVENING));
+
+    expect(
+      await screen.findByRole("link", { name: "Change result, Final" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Change result, Semifinal 1" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByText(/^Locked: a later match/)).toHaveLength(2);
+  });
+
+  it("refuses the change when the sheet is opened on a locked match", async () => {
+    await playFinal(DYP_EVENING);
+    const bracket = await provisionalApi.GET(`${root}/bracket`, {
+      params: { path: ids(DYP_EVENING) },
+    });
+    const semifinal = bracket.data?.rounds[0]?.matches[0];
+    renderAt(
+      generatePath(paths.knockoutResult, {
+        leagueId: DEMO_LEAGUE_ID,
+        tournamentId: DYP_EVENING,
+        matchId: semifinal?.match_id ?? "",
+      }),
+    );
+
+    const sheet = await screen.findByRole("dialog", { name: "Semifinal 1" });
+    expect(
+      await within(sheet).findByText("This result is locked"),
+    ).toBeInTheDocument();
+    expect(
+      within(sheet).queryByRole("button", { name: "Clear result" }),
+    ).not.toBeInTheDocument();
+    const refused = await provisionalApi.PUT(
+      `${root}/matches/{match_id}/result`,
+      {
+        params: {
+          path: { ...ids(DYP_EVENING), match_id: semifinal?.match_id ?? "" },
+        },
+        body: { walkover_winner: null, games: [] },
+      },
+    );
+    expect(refused.response.status).toBe(422);
+  });
+
+  it("shows the bracket's seeds in the result sheet, not the setup's (D14)", async () => {
+    const bracket = await provisionalApi.GET(`${root}/bracket`, {
+      params: { path: ids(DYP_EVENING) },
+    });
+    const semifinal = bracket.data?.rounds[0]?.matches[0];
+    renderAt(
+      generatePath(paths.knockoutResult, {
+        leagueId: DEMO_LEAGUE_ID,
+        tournamentId: DYP_EVENING,
+        matchId: semifinal?.match_id ?? "",
+      }),
+    );
+
+    const sheet = await screen.findByRole("dialog", { name: "Semifinal 1" });
+    for (const side of semifinal?.sides ?? []) {
+      expect(
+        await within(sheet).findByText(`Seed ${String(side.seed)}`),
+      ).toBeInTheDocument();
+    }
+  });
+});
+
 describe("Finished (screen 10)", () => {
   it("shows shared places and season points rounded down", async () => {
     await playFinal(DYP_EVENING);

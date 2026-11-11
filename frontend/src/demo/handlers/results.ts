@@ -1,6 +1,7 @@
 // Demo handlers: results (FR-050–FR-053, FR-094, BR-053, BR-090–BR-095,
 // BR-120–BR-124). A result is written whole, every game or the walkover;
 // the empty result clears it (ADR-008).
+import { knockoutLocked } from "../finalsEngine";
 import {
   checkResult,
   findMatch,
@@ -29,6 +30,12 @@ export const resultHandlers = [
       if (groupLocked(t, match)) {
         return apiError(422, "validation_failed", {
           rule: "BR-053",
+          reason: "results_locked",
+        });
+      }
+      if (knockoutLocked(t, match)) {
+        return apiError(422, "validation_failed", {
+          rule: "BR-094",
           reason: "results_locked",
         });
       }
