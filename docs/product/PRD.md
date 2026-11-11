@@ -310,11 +310,10 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | BR-081 | **Seeded pairs** (Monster DYP): with N qualifiers, 1st partners the (N/2 + 1)th, 2nd partners the (N/2 + 2)th, and so on — with 16: #1 + #9, #2 + #10 … #8 + #16. Pairs are seeded by their better player's place. |
 | BR-082 | **Singles** (Monster DYP): qualifiers play 1 vs 1, seeded by their place. |
 | BR-083 | **A little mercy** (Monster DYP): qualifiers are split into a top and a bottom half by place, and each top-half player is drawn a partner from the bottom half. Pairs are seeded by their better player's place. |
-| BR-084 | **Lord have mercy** (Monster DYP): qualifiers are paired completely at random and placed in the bracket by lot, ignoring the standings. The pairs are mixed again after every round (BR-088). |
+| BR-084 | **Lord have mercy** (Monster DYP): qualifiers are paired completely at random and placed in the bracket by lot, ignoring the standings. |
 | BR-085 | After a round robin or Swiss, the qualifying entries play on as they are — players in Singles, pairs in Doubles and DYP — seeded by their place. |
-| BR-086 | Knockout pairs stay together until the end, except in Lord have mercy (BR-088). The knockout follows §7.5, including the optional third-place match, but takes no late entries. |
+| BR-086 | Knockout pairs stay together until the end. The knockout follows §7.5, including the optional third-place match, but takes no late entries. |
 | BR-087 | Deleting the knockout unlocks the group phase — all of a round robin's results, or the newest round of a Swiss or Monster DYP — and the organizer chooses again what comes next (FR-040). |
-| BR-088 | **Lord have mercy** re-mix: once every match of a knockout round has a result, the players of the pairs still in — the winners, and after round 1 also the pairs with a bye — are paired again completely at random and placed in the next round by lot. This happens before every later round, including the final. A player can get a partner they had before. The third-place match is re-mixed too: the four players from the two losing semifinal pairs are paired again completely at random, like the other rounds. Places follow the matches: the winners of the final are 1st and the losers 2nd, the winners of the third-place match 3rd and its losers 4th, and a player knocked out earlier takes the place of the round they were knocked out in (BR-102). A round's results can change until a match of the next round has a result; a change draws the next round again. |
 
 ### 7.12 Results
 
