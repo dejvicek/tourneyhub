@@ -818,7 +818,8 @@ def start_tournament(
 # The summary below is API text (openapi.json) and was left as it is: "until the
 # first result". FR-036 and BR-096 say "while no match in the tournament has a
 # result", which is also true again once every result is cleared (FR-053). The
-# service already refuses on any result, so only the text changes, in issue #59.
+# service already refuses on any result, so only the text changes, in the #48
+# follow-up (issue to open after approval).
 @router.post("/tournaments/{tournament_id}/back-to-setup", responses=_WRITE_ERRORS)
 def back_to_setup(
     league_id: UUID,
