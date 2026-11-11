@@ -73,7 +73,7 @@ export const routes: RouteObject[] = [
                 path: paths.admin,
                 middleware: [requireSession],
                 lazy: async () => ({
-                  Component: (await import("@/features/auth/AdminPage"))
+                  Component: (await import("@/features/admin/AdminPage"))
                     .AdminPage,
                 }),
               },

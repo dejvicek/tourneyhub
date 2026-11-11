@@ -76,9 +76,17 @@ function Account({ onAuthScreen }: { onAuthScreen: boolean }) {
           {t("auth.account.signedInAs", { name })}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild className="text-body-md">
-          <Link to={paths.myLeagues}>{t("auth.account.myLeagues")}</Link>
-        </DropdownMenuItem>
+        {/* ADR-006: until the new password is chosen, only it and log out work. */}
+        {!me.data.must_change_password && (
+          <DropdownMenuItem asChild className="text-body-md">
+            <Link to={paths.myLeagues}>{t("auth.account.myLeagues")}</Link>
+          </DropdownMenuItem>
+        )}
+        {me.data.is_admin && !me.data.must_change_password && (
+          <DropdownMenuItem asChild className="text-body-md">
+            <Link to={paths.admin}>{t("auth.account.administration")}</Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem asChild className="text-body-md">
           <Link to={paths.changePassword}>
             {t("auth.account.changePassword")}
