@@ -66,6 +66,13 @@ class ErrorCode(StrEnum):
     MATCH_NOT_FOUND = "match_not_found"
     MATCH_SIDES_UNKNOWN = "match_sides_unknown"  # BR-091
     GROUP_PHASE_NOT_DONE = "group_phase_not_done"  # FR-040
+    # Fields (FR-090 to FR-094)
+    FIELD_NOT_FOUND = "field_not_found"
+    FIELD_NUMBER_CHANGED = "field_number_changed"  # the expected new number is stale
+    FIELD_NOT_FREE = "field_not_free"  # another match is on it now
+    MATCH_HAS_RESULT = "match_has_result"  # a match placed by hand has a result now
+    LAST_FIELD = "last_field"  # the last field cannot be removed (BR-132)
+    PLAYER_ON_ANOTHER_FIELD = "player_on_another_field"  # BR-131
     # Engine rules (engine/errors.py)
     NOT_ENOUGH_PLAYERS = "not_enough_players"
     NOT_ENOUGH_ENTRIES = "not_enough_entries"  # FR-032
