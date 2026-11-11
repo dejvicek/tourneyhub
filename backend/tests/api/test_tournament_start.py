@@ -300,12 +300,12 @@ def test_adr008_a_stale_draw_counter_does_not_start(
                 "sit_out_points": None,
                 "group_match_format": None,
                 "knockout_match_format": "bo1",
-                "third_place_match": False,
+                "third_place_match": True,
             },
-            4,
-            "format_not_supported",
-            {"format": "single_elimination"},
-            id="knockout-later",
+            3,
+            "not_enough_entries",
+            {"minimum": 4, "given": 3},
+            id="FR-032-third-place",
         ),
         pytest.param(
             {

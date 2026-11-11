@@ -191,10 +191,10 @@ def test_br051_the_preview_names_the_players_who_sit_out_each_round(
                 "sit_out_points": None,
                 "group_match_format": None,
                 "knockout_match_format": "bo1",
-                "third_place_match": False,
+                "third_place_match": True,
             },
-            4,
-            id="knockout",
+            3,
+            id="knockout-third-place-FR-032",
         ),
         pytest.param(
             {
