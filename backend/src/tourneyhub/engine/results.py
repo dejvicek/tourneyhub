@@ -53,6 +53,7 @@ def tiebreak_purpose(completed_rounds: int) -> str:
     """
     return f"tiebreak:after-round-{completed_rounds}"
 
+
 MAX_GAMES = 5
 """BO5 plays at most five games (BR-121)."""
 
