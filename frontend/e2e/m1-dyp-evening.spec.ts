@@ -1,4 +1,3 @@
-/* eslint-disable playwright/expect-expect -- the fixme parts have no body yet; each package that enables one writes its assertions */
 import { expect, type Locator, type Page, test } from "@playwright/test";
 
 import {
@@ -19,9 +18,8 @@ import { setSignupCode } from "./support/stack";
 // API does the bulk setup, such as adding the regulars, to keep the run short.
 //
 // The parts are tests of one serial group, in the order of the evening, and
-// they share one organizer, league and tournament. The steps no package
-// delivers yet are `test.fixme`s that name the package enabling them. When
-// that package lands, drop the `fixme` and fill the step in.
+// they share one organizer, league and tournament. Every step of the M1
+// evening runs.
 
 test.describe.configure({ mode: "serial" });
 
@@ -628,32 +626,37 @@ test("the knockout of the top 4 decides the places (§5.1.6, §5.1.7)", async ({
   });
 });
 
-test("the season standings add the tournament's points (§5.1.7)", async ({
+test("the season standings add the points of both tournaments (§5.1.7)", async ({
   page,
 }) => {
   await logIn(page);
   await page.goto(`/leagues/${evening.leagueId}/standings`);
 
-  await test.step("every player of the finished tournament is on the table", async () => {
+  await test.step("every player of the two finished tournaments is on the table", async () => {
     await expect(
       page.getByRole("heading", { level: 1, name: "Season standings" }),
     ).toBeVisible();
     await expect(
-      page.getByText("after 1 finished tournament", { exact: false }),
+      page.getByText("after 2 finished tournaments", { exact: false }),
     ).toBeVisible();
     await expect(page.getByRole("table")).toBeVisible();
     const rows = await seasonRows(page.getByRole("table"));
     expect(rows).toHaveLength(PLAYERS.length);
-    // Both players of a pair get the entry's points (BR-100): the winning pair
-    // 10 each (the places screen above), nobody more.
-    expect(rows.slice(0, 2)).toEqual([
-      expect.objectContaining({ place: 1, played: 1, wins: 1, points: 10 }),
-      expect.objectContaining({ place: 1, played: 1, wins: 1, points: 10 }),
-    ]);
-    expect(rows.every((row) => row.played === 1)).toBe(true);
-    expect(rows.reduce((sum, row) => sum + row.wins, 0)).toBe(2);
+    // The same twelve play both evenings, the round robin and the knockout
+    // night (BR-112), and each evening has one winning pair whose two players
+    // win it (BR-100).
+    expect(rows.every((row) => row.played === 2)).toBe(true);
+    expect(rows.reduce((sum, row) => sum + row.wins, 0)).toBe(4);
+    // Each evening pays 10, 8, 6, 4 and 2 to a pair, both its players get it,
+    // and a place shared in the knockout (BR-102) or the table only pays
+    // less: the sum cannot pass 2 evenings * 2 players * 30.
     const points = rows.map((row) => row.points);
     expect(points).toEqual([...points].sort((a, b) => b - a));
+    expect(points[0]).toBeGreaterThanOrEqual(10);
+    expect(points.reduce((sum, value) => sum + value, 0)).toBeLessThanOrEqual(
+      4 * (10 + 8 + 6 + 4 + 2),
+    );
+    expect(rows[0]?.place).toBe(1);
   });
 
   await test.step("the tournament counts, and links to its places", async () => {
@@ -754,9 +757,8 @@ test("the shared view also shows the season standings and the final places (§5.
       await expect(standings.getByRole("table")).toBeVisible();
       const rows = await seasonRows(standings.getByRole("table"));
       expect(rows).toHaveLength(PLAYERS.length);
-      expect(rows[0]).toEqual(
-        expect.objectContaining({ place: 1, played: 1, wins: 1, points: 10 }),
-      );
+      expect(rows[0]).toEqual(expect.objectContaining({ place: 1, played: 2 }));
+      expect(rows[0]?.points).toBeGreaterThanOrEqual(10);
     });
 
     await test.step("the tournament page has the standings and the final places", async () => {
