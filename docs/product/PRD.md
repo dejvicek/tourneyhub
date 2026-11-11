@@ -278,7 +278,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | ID | Rule |
 |---|---|
 | BR-060 | Every round, players are grouped in fours by their current standing — in round 1, by the league ranking. In each group, the 1st and 4th play the 2nd and 3rd (#1 + #4 vs #2 + #3). |
-| BR-061 | There are as many top players as matches in a round. In rounds 1 and 2 they are in different groups, and the other players fill the groups in standing order (16 players, top 4: #1 #5 #6 #7 · #2 #8 #9 #10 · #3 #11 #12 #13 · #4 #14 #15 #16). Top players are not exempt from sitting out: those who sit out are picked first (BR-063), and the top players are taken from the players who play. |
+| BR-061 | There are as many top players as matches in a round. In rounds 1 and 2 they are in different groups, and the other players fill the groups in standing order (16 players, top 4: #1 #5 #6 #7 · #2 #8 #9 #10 · #3 #11 #12 #13 · #4 #14 #15 #16). Top players are not exempt from sitting out: those who sit out are picked first (BR-063), and the top players are taken from the players who play, in this order: the players marked by the organizer (FR-041), then the others, each in league-ranking order. A top player who sits out or is disabled is replaced by the next one, so every group has exactly one. The number of top players follows each round's number of matches, so it changes when a late or disabled player changes the number of matches between rounds 1 and 2. |
 | BR-062 | Nobody gets the same partner twice while it can be avoided; the grouping changes as little as needed to avoid it. |
 | BR-063 | When the number of players is not divisible by 4, the extra one to three players sit out the round. The players who have sat out the fewest times sit out; among them, those who did not sit out the round before go first, and remaining ties are decided by lot. Disabled players do not count. |
 
@@ -369,4 +369,4 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 
 ## 8. Open questions
 
-None at the moment.
+1. **More marked top players than matches (BR-061, FR-041).** Round 2 can have fewer matches than round 1, for example after a player is disabled, so more players can be marked than the round has matches. Which marked players count then: the best by league ranking, as BR-061 now says, or the best by current standing?
