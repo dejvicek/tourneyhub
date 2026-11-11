@@ -5,6 +5,7 @@ export const tournaments = {
   // Screens 1-5: the list and the setup steps (src/features/tournaments/setup).
   ...tournamentsSetup,
   header: {
+    menu: "Menu: language and account",
     back: "Back to tournaments",
     tabs: "Views of this tournament",
   },

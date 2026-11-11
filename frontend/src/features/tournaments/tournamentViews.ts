@@ -70,8 +70,8 @@ export interface TournamentTab {
 }
 
 /**
- * The header's tabs; none in setup. A round robin shows Schedule, Fields
- * and Standings; Swiss and Monster DYP show Rounds, Fields, Players and
+ * The header's tabs; none in setup. A round robin shows Fields, Schedule
+ * and Standings (the design's order); Swiss and Monster DYP show Rounds, Fields, Players and
  * Standings. A knockout adds its tab once it exists, a finished tournament
  * its places first, and Fields and Players leave once nothing is played.
  */
@@ -88,6 +88,10 @@ export function tournamentTabs(t: TournamentView): TournamentTab[] {
     tabs.push({ path: "finished", label: "places" });
   }
   if (group === "round_robin") {
+    // The design's order for a round robin: Fields, Schedule, Standings.
+    if (running) {
+      tabs.push({ path: "fields", label: "fields" });
+    }
     tabs.push({ path: "schedule", label: "schedule" });
   } else if (group !== undefined) {
     tabs.push({ path: "betweenRounds", label: "rounds" });
@@ -95,7 +99,7 @@ export function tournamentTabs(t: TournamentView): TournamentTab[] {
   if (hasKnockout) {
     tabs.push({ path: "knockout", label: "knockout" });
   }
-  if (running) {
+  if (running && group !== "round_robin") {
     tabs.push({ path: "fields", label: "fields" });
   }
   if (running && inGroup && group !== undefined && group !== "round_robin") {

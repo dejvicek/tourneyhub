@@ -36,14 +36,11 @@ export function AccountMenu() {
 
 function Account({ onAuthScreen }: { onAuthScreen: boolean }) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const me = useQuery({ ...authQueries.me(), retry: false });
-  const logOut = useMutation(authMutations.logOut(queryClient));
   const layout = useLayout();
 
   if (me.data === undefined) {
-    return me.isPending || onAuthScreen ? null : (
+    return me.isLoading || onAuthScreen ? null : (
       <Button asChild variant="text">
         <Link to={paths.login}>{t("auth.account.logIn")}</Link>
       </Button>
@@ -72,33 +69,62 @@ function Account({ onAuthScreen }: { onAuthScreen: boolean }) {
         )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-56">
-        <DropdownMenuLabel className="text-body-sm font-normal text-muted-foreground">
-          {t("auth.account.signedInAs", { name })}
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild className="text-body-md">
-          <Link to={paths.myLeagues}>{t("auth.account.myLeagues")}</Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild className="text-body-md">
-          <Link to={paths.changePassword}>
-            {t("auth.account.changePassword")}
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          className="text-body-md"
-          onSelect={() => {
-            logOut.mutate(undefined, {
-              onSettled: () => {
-                void navigate(paths.login, { replace: true });
-              },
-            });
-          }}
-        >
-          {t("auth.account.logOut")}
-        </DropdownMenuItem>
+        <AccountMenuItems />
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+/**
+ * The account's entries in a menu: who is signed in, My leagues, Change
+ * password and Log out. The header's account menu and a tournament's
+ * overflow menu on a phone both show them.
+ */
+export function AccountMenuItems() {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const me = useQuery({ ...authQueries.me(), retry: false });
+  // The menu closes, and this component with it, before the answer comes
+  // back, so the redirect is part of the mutation's options, not of `mutate`.
+  const clearSession = authMutations.logOut(queryClient);
+  const logOut = useMutation({
+    ...clearSession,
+    onSettled: (...settled) => {
+      void clearSession.onSettled?.(...settled);
+      void navigate(paths.login, { replace: true });
+    },
+  });
+  const name = me.data?.display_name;
+
+  return (
+    <>
+      {name !== undefined && (
+        <>
+          <DropdownMenuLabel className="text-body-sm font-normal text-muted-foreground">
+            {t("auth.account.signedInAs", { name })}
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+        </>
+      )}
+      <DropdownMenuItem asChild className="text-body-md">
+        <Link to={paths.myLeagues}>{t("auth.account.myLeagues")}</Link>
+      </DropdownMenuItem>
+      <DropdownMenuItem asChild className="text-body-md">
+        <Link to={paths.changePassword}>
+          {t("auth.account.changePassword")}
+        </Link>
+      </DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem
+        className="text-body-md"
+        onSelect={() => {
+          logOut.mutate();
+        }}
+      >
+        {t("auth.account.logOut")}
+      </DropdownMenuItem>
+    </>
   );
 }
 
