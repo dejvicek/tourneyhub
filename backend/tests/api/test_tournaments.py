@@ -437,6 +437,9 @@ _ROUTES: list[tuple[str, str, Json | None]] = [
     ("GET", "/seasons/{season}/tournaments", None),
     ("POST", "/tournaments", {"id": "{new}", **SINGLES_ROUND_ROBIN}),
     ("DELETE", "/tournaments/{t}", None),
+    ("GET", "/tournaments/{t}", None),
+    ("POST", "/tournaments/{t}/start", {"expected_draw_counter": 0}),
+    ("POST", "/tournaments/{t}/back-to-setup", {"expected_state": "in_progress"}),
     ("PUT", "/tournaments/{t}/format", SINGLES_ROUND_ROBIN),
     ("GET", "/tournaments/{t}/setup", None),
     ("PUT", "/tournaments/{t}/setup/players", {"player_ids": []}),
@@ -1631,7 +1634,7 @@ def test_adr008_one_client_id_sent_to_two_leagues_at_once_is_a_conflict(
     committing_settings: Settings,
     committing_engine: Engine,
     now: datetime,
-    auth_header: Callable[..., dict[str, str]],
+    committed_auth_header: Callable[..., dict[str, str]],
     wait_for_a_lock_wait: Callable[[], None],
 ) -> None:
     owner_id, first_league_id, _ = _commit_league_with_players(
@@ -1670,7 +1673,7 @@ def test_adr008_one_client_id_sent_to_two_leagues_at_once_is_a_conflict(
             response = client.post(
                 _url(second_league_id, "/tournaments"),
                 json={"id": str(tournament_id), **SINGLES_ROUND_ROBIN},
-                headers=auth_header(owner_id, issued_at=datetime.now(UTC)),
+                headers=committed_auth_header(owner_id, issued_at=datetime.now(UTC)),
             )
             outcome.append((response.status_code, response.json()))
 
@@ -1712,7 +1715,7 @@ def test_br010_a_season_start_racing_a_create_is_refused_after_the_create(
     committing_settings: Settings,
     committing_engine: Engine,
     now: datetime,
-    auth_header: Callable[..., dict[str, str]],
+    committed_auth_header: Callable[..., dict[str, str]],
     wait_for_a_lock_wait: Callable[[], None],
 ) -> None:
     owner_id, league_id, _ = _commit_league_with_players(
@@ -1743,7 +1746,7 @@ def test_br010_a_season_start_racing_a_create_is_refused_after_the_create(
             response = client.post(
                 _url(league_id, "/seasons"),
                 json={"expected_current_number": 1},
-                headers=auth_header(owner_id, issued_at=datetime.now(UTC)),
+                headers=committed_auth_header(owner_id, issued_at=datetime.now(UTC)),
             )
             outcome.append((response.status_code, response.json()))
 
@@ -1771,7 +1774,7 @@ def test_br010_a_create_racing_a_season_start_lands_in_the_new_season(
     committing_settings: Settings,
     committing_engine: Engine,
     now: datetime,
-    auth_header: Callable[..., dict[str, str]],
+    committed_auth_header: Callable[..., dict[str, str]],
     wait_for_a_lock_wait: Callable[[], None],
 ) -> None:
     owner_id, league_id, _ = _commit_league_with_players(
@@ -1796,7 +1799,7 @@ def test_br010_a_create_racing_a_season_start_lands_in_the_new_season(
             response = client.post(
                 _url(league_id, "/tournaments"),
                 json={"id": str(tournament_id), **SINGLES_ROUND_ROBIN},
-                headers=auth_header(owner_id, issued_at=datetime.now(UTC)),
+                headers=committed_auth_header(owner_id, issued_at=datetime.now(UTC)),
             )
             outcome.append((response.status_code, response.json()))
 
@@ -1821,7 +1824,7 @@ def test_adr008_two_pick_writes_on_one_tournament_apply_one_after_the_other(
     committing_settings: Settings,
     committing_engine: Engine,
     now: datetime,
-    auth_header: Callable[..., dict[str, str]],
+    committed_auth_header: Callable[..., dict[str, str]],
     wait_for_a_lock_wait: Callable[[], None],
 ) -> None:
     owner_id, league_id, player_ids = _commit_league_with_players(
@@ -1847,7 +1850,7 @@ def test_adr008_two_pick_writes_on_one_tournament_apply_one_after_the_other(
             response = client.put(
                 _tournament_url(league_id, str(tournament_id), "/setup/players"),
                 json={"player_ids": [str(p) for p in player_ids[1:]]},
-                headers=auth_header(owner_id, issued_at=datetime.now(UTC)),
+                headers=committed_auth_header(owner_id, issued_at=datetime.now(UTC)),
             )
             outcome.append((response.status_code, response.json()))
 
@@ -1871,7 +1874,7 @@ def test_adr008_of_two_shuffles_with_one_counter_exactly_one_draws(
     committing_settings: Settings,
     committing_engine: Engine,
     now: datetime,
-    auth_header: Callable[..., dict[str, str]],
+    committed_auth_header: Callable[..., dict[str, str]],
     wait_for_a_lock_wait: Callable[[], None],
 ) -> None:
     owner_id, league_id, player_ids = _commit_league_with_players(
@@ -1930,7 +1933,7 @@ def test_adr008_of_two_shuffles_with_one_counter_exactly_one_draws(
             response = client.post(
                 _tournament_url(league_id, str(tournament_id), "/setup/draw"),
                 json={"expected_draw_counter": counter, "target": "seeds"},
-                headers=auth_header(owner_id, issued_at=datetime.now(UTC)),
+                headers=committed_auth_header(owner_id, issued_at=datetime.now(UTC)),
             )
             outcome.append((response.status_code, response.json()))
 
@@ -1950,7 +1953,7 @@ def test_br002_a_removal_racing_the_pick_is_refused_after_the_pick(
     committing_settings: Settings,
     committing_engine: Engine,
     now: datetime,
-    auth_header: Callable[..., dict[str, str]],
+    committed_auth_header: Callable[..., dict[str, str]],
     wait_for_a_lock_wait: Callable[[], None],
 ) -> None:
     owner_id, league_id, player_ids = _commit_league_with_players(
@@ -1991,7 +1994,7 @@ def test_br002_a_removal_racing_the_pick_is_refused_after_the_pick(
             response = client.put(
                 _url(league_id, f"/players/{player_ids[0]}/removed"),
                 json={"removed": True},
-                headers=auth_header(owner_id, issued_at=datetime.now(UTC)),
+                headers=committed_auth_header(owner_id, issued_at=datetime.now(UTC)),
             )
             outcome.append((response.status_code, response.json()))
 

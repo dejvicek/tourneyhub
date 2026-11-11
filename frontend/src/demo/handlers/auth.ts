@@ -121,7 +121,7 @@ export const authHandlers = [
   route("get", "/api/v1/demo/account", () => ({
     email: DEMO_EMAIL,
     password: DEMO_PASSWORD,
-    signup_code: DEMO_SIGNUP_CODE,
+    signup_code: outsideDb().signupCode ?? DEMO_SIGNUP_CODE,
   })),
 
   route("post", "/api/v1/auth/login", ({ body }) => {
@@ -173,7 +173,11 @@ export const authHandlers = [
         return wait;
       }
       // The code first, so a stranger learns no email address (P2b decision 3).
-      if (body.signup_code.trim() !== DEMO_SIGNUP_CODE) {
+      // Sign-up is closed while the admin has cleared the code (FR-005).
+      if (
+        state.signupCode === null ||
+        body.signup_code.trim() !== state.signupCode
+      ) {
         fail(state.signupThrottle, SIGNUP);
         return outsideError(422, "invalid_signup_code");
       }
@@ -189,7 +193,11 @@ export const authHandlers = [
         is_admin: false,
         must_change_password: false,
       };
-      state.accounts.push({ user, password: body.password });
+      state.accounts.push({
+        user,
+        password: body.password,
+        createdAt: new Date().toISOString(),
+      });
       state.signedInUserId = user.id;
       return { access_token: DEMO_ACCESS_TOKEN };
     },

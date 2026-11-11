@@ -1,3 +1,4 @@
+import { admin } from "./cs/admin";
 import { auth } from "./cs/auth";
 import { common } from "./cs/common";
 import { fields } from "./cs/fields";
@@ -16,6 +17,7 @@ export const cs: CsMessages = {
   ...common,
   shell,
   auth,
+  admin,
   leagues,
   players,
   standings,

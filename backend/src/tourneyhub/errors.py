@@ -22,6 +22,10 @@ class ErrorCode(StrEnum):
     EMAIL_TAKEN = "email_taken"
     WRONG_PASSWORD = "wrong_password"  # the current password of a change
     PASSWORD_UNCHANGED = "password_unchanged"
+    # Admin
+    USER_NOT_FOUND = "user_not_found"
+    OWN_ACCOUNT = "own_account"  # an admin resets their own password
+    ADMIN_TARGET = "admin_target"  # the account to reset is an admin's: the CLI
     # Leagues
     LEAGUE_NOT_FOUND = "league_not_found"
     LEAGUE_ID_TAKEN = "league_id_taken"
@@ -49,8 +53,15 @@ class ErrorCode(StrEnum):
     SEED_ORDER_CHANGED = "seed_order_changed"
     DYP_HALVES_INCOMPLETE = "dyp_halves_incomplete"
     NOTHING_TO_PAIR = "nothing_to_pair"  # "pair the rest" with fewer than 2 left
+    # Start and back to setup
+    TOURNAMENT_NOT_IN_PROGRESS = "tournament_not_in_progress"
+    TOURNAMENT_HAS_RESULTS = "tournament_has_results"  # FR-036
+    FORMAT_NOT_SUPPORTED = "format_not_supported"  # until its rounds are served
+    PLAYERS_WITHOUT_PARTNER = "players_without_partner"  # Doubles (BR-030)
+    TOO_MANY_ENTRIES_FOR_ROUND_ROBIN = "too_many_entries_for_round_robin"  # 64
     # Engine rules (engine/errors.py)
     NOT_ENOUGH_PLAYERS = "not_enough_players"
+    NOT_ENOUGH_ENTRIES = "not_enough_entries"  # FR-032
     DYP_HALVES_UNEQUAL = "dyp_halves_unequal"
     TOO_MANY_LEFT_OUT = "too_many_left_out"
 

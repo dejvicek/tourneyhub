@@ -74,11 +74,11 @@ export const auth: CsMessages<Messages["auth"]> = {
     passwordUnchanged: "Nové heslo se musí lišit od současného.",
     generic: "Nepovedlo se. Zkontrolujte připojení a zkuste to znovu.",
   },
-  admin: { title: "Správa" },
   account: {
     menu: "Účet: {{name}}",
     signedInAs: "Přihlášený účet: {{name}}",
     myLeagues: "Moje ligy",
+    administration: "Správa",
     changePassword: "Změnit heslo",
     logOut: "Odhlásit se",
     logIn: "Přihlásit se",

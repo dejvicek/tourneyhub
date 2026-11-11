@@ -5,8 +5,8 @@ import { apiError, route } from "../route";
 import {
   db,
   findTournament,
+  publicTournamentRead,
   seasonStandingsOf,
-  tournamentRead,
 } from "../store";
 
 export const standingsHandlers = [
@@ -37,7 +37,7 @@ export const standingsHandlers = [
         });
       }
       const earnedBy = new Map<string, number>();
-      const places = tournamentRead(t).places ?? [];
+      const places = publicTournamentRead(t).places ?? [];
       for (const row of places) {
         const entry = t.entries.find((e) => e.id === row.entry_id);
         for (const player of entry?.player_ids ?? []) {
@@ -53,7 +53,7 @@ export const standingsHandlers = [
       const before = new Map(
         seasonStandings(
           others.map((other) => ({
-            places: tournamentRead(other).places ?? [],
+            places: publicTournamentRead(other).places ?? [],
             members: new Map(other.entries.map((e) => [e.id, e.player_ids])),
           })),
         ).map((row) => [row.player_id, row.place]),

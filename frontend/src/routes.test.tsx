@@ -49,7 +49,7 @@ const SCREENS: Screen[] = [
   ["login", "Log in", "Přihlášení"],
   ["signUp", "Sign up", "Registrace"],
   ["changePassword", "Change your password", "Změna hesla"],
-  ["admin", "Admin", "Správa"],
+  ["admin", "Administration", "Správa"],
   ["myLeagues", "My leagues", "Moje ligy"],
   ["tournaments", "Tournaments", "Turnaje"],
   ["newTournament", "Choose the format", "Zvolte formát"],

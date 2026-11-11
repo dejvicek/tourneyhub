@@ -20,8 +20,14 @@ def test_main_prints_a_schema_with_function_names_as_operation_ids(
         for operation in path.values()
     }
     assert operation_ids == {
+        "generate_signup_code",
+        "list_organizers",
+        "read_signup_code",
+        "reset_password",
+        "set_signup_code",
         "change_password",
         "add_player",
+        "back_to_setup",
         "create_league",
         "create_tournament",
         "delete_league",
@@ -34,6 +40,8 @@ def test_main_prints_a_schema_with_function_names_as_operation_ids(
         "log_out",
         "read_league",
         "read_me",
+        "read_schedule_preview",
+        "read_tournament",
         "read_tournament_setup",
         "refresh",
         "rename_player",
@@ -48,6 +56,7 @@ def test_main_prints_a_schema_with_function_names_as_operation_ids(
         "set_tournament_players",
         "sign_up",
         "start_season",
+        "start_tournament",
         "update_league",
         "update_me",
     }

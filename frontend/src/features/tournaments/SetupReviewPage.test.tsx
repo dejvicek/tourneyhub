@@ -91,6 +91,49 @@ describe("setup: review and start (screen 5)", () => {
     expect((await tournamentOf(id)).state).toBe("setup");
   });
 
+  it.each([
+    [
+      "too few entries",
+      { type: "singles" as const },
+      1,
+      "Not enough entries: at least 2 are needed.",
+    ],
+    [
+      "a player without a partner",
+      { type: "doubles" as const },
+      3,
+      "3 players have no partner yet.",
+    ],
+  ])(
+    "names the reason and does not offer the start with %s",
+    async (_, format, count, reason) => {
+      const id = await dypWith(count, format);
+      renderAt(reviewPage(id));
+
+      expect(await screen.findByText(reason)).toHaveAttribute("role", "status");
+      expect(row("Matches")).toHaveTextContent("Not available yet");
+      expect(
+        screen.getByRole("button", { name: "Generate and start" }),
+      ).toBeDisabled();
+      expect(screen.queryByText("VS")).not.toBeInTheDocument();
+    },
+  );
+
+  it("keeps the start disabled while the schedule loads, then enables it", async () => {
+    const id = await dypWith(12);
+    renderAt(reviewPage(id));
+
+    expect(
+      await screen.findByRole("button", { name: "Generate and start" }),
+    ).toBeDisabled();
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Generate and start" }),
+      ).toBeEnabled();
+    });
+    expect(screen.queryByText(/have no partner|Not enough/)).toBeNull();
+  });
+
   it("shows the whole schedule on a tablet, and the open rounds of a Swiss", async () => {
     stubViewport(768);
     const id = await dypWith(12);

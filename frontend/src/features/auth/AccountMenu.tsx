@@ -76,8 +76,8 @@ function Account({ onAuthScreen }: { onAuthScreen: boolean }) {
 }
 
 /**
- * The account's entries in a menu: who is signed in, My leagues, Change
- * password and Log out. The header's account menu and a tournament's
+ * The account's entries in a menu: who is signed in, My leagues,
+ * Administration (instance admins), Change password and Log out. The header's account menu and a tournament's
  * overflow menu on a phone both show them.
  */
 export function AccountMenuItems() {
@@ -96,6 +96,9 @@ export function AccountMenuItems() {
     },
   });
   const name = me.data?.display_name;
+  // ADR-006: until the new password is chosen, only it and log out work.
+  const mustChangePassword = me.data?.must_change_password === true;
+  const isAdmin = me.data?.is_admin === true;
 
   return (
     <>
@@ -107,9 +110,16 @@ export function AccountMenuItems() {
           <DropdownMenuSeparator />
         </>
       )}
-      <DropdownMenuItem asChild className="text-body-md">
-        <Link to={paths.myLeagues}>{t("auth.account.myLeagues")}</Link>
-      </DropdownMenuItem>
+      {!mustChangePassword && (
+        <DropdownMenuItem asChild className="text-body-md">
+          <Link to={paths.myLeagues}>{t("auth.account.myLeagues")}</Link>
+        </DropdownMenuItem>
+      )}
+      {isAdmin && !mustChangePassword && (
+        <DropdownMenuItem asChild className="text-body-md">
+          <Link to={paths.admin}>{t("auth.account.administration")}</Link>
+        </DropdownMenuItem>
+      )}
       <DropdownMenuItem asChild className="text-body-md">
         <Link to={paths.changePassword}>
           {t("auth.account.changePassword")}
