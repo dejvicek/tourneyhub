@@ -55,6 +55,7 @@ describe("auth screens", () => {
   });
 
   it("FR-003: a wrong password says so and stays on the login", async () => {
+    outsideDb().signedInUserId = null;
     const user = userEvent.setup();
     renderAt(paths.login);
 
@@ -79,6 +80,7 @@ describe("auth screens", () => {
         ),
       ),
     );
+    outsideDb().signedInUserId = null;
     const user = userEvent.setup();
     renderAt(paths.login);
 
@@ -211,6 +213,86 @@ describe("auth screens", () => {
     });
   });
 
+  it("D08: an empty or invalid login is refused at its fields, without a request", async () => {
+    outsideDb().signedInUserId = null;
+    let requests = 0;
+    server.use(
+      http.post("/api/v1/auth/login", () => {
+        requests += 1;
+        return HttpResponse.json(
+          { code: "not_authenticated", detail: {} },
+          { status: 401 },
+        );
+      }),
+    );
+    const user = userEvent.setup();
+    renderAt(paths.login);
+
+    await user.click(await screen.findByRole("button", { name: "Log in" }));
+    const email = screen.getByLabelText("Email");
+    const password = screen.getByLabelText("Password");
+    expect(email).toHaveAccessibleDescription(
+      "Enter an email address, like name@example.com.",
+    );
+    expect(password).toHaveAccessibleDescription("Enter your password.");
+
+    await user.type(email, "bad");
+    await user.type(password, "something");
+    await user.click(screen.getByRole("button", { name: "Log in" }));
+    expect(email).toHaveAccessibleDescription(
+      "Enter an email address, like name@example.com.",
+    );
+    expect(password).not.toHaveAttribute("aria-invalid");
+    expect(requests).toBe(0);
+    expect(screen.getByRole("alert")).toBeEmptyDOMElement();
+  });
+
+  it("D33: the login of someone who is signed in goes to My leagues", async () => {
+    const view = renderAt(paths.login);
+
+    expect(
+      await screen.findByText("Thursday Foosball", undefined, {
+        timeout: 5000,
+      }),
+    ).toBeInTheDocument();
+    expect(view.state.location.pathname).toBe(paths.myLeagues);
+  });
+
+  it("D09: a password change with an empty current password says so at that field", async () => {
+    const user = userEvent.setup();
+    renderAt(paths.changePassword);
+
+    await user.click(
+      await screen.findByRole("button", { name: "Change password" }),
+    );
+
+    expect(
+      screen.getByLabelText("Current password"),
+    ).toHaveAccessibleDescription("Enter your current password.");
+    expect(screen.getByLabelText("New password")).toHaveAccessibleDescription(
+      /Use at least 15 characters\./,
+    );
+  });
+
+  it("D10: an empty sign-up marks all four fields, the code too", async () => {
+    const user = userEvent.setup();
+    renderAt(paths.signUp);
+
+    await user.click(
+      await screen.findByRole("button", { name: "Create the account" }),
+    );
+
+    expect(screen.getByLabelText("Sign-up code")).toHaveAccessibleDescription(
+      /Enter the sign-up code\./,
+    );
+    for (const label of ["Email", "Your name", "Password"]) {
+      expect(screen.getByLabelText(label)).toHaveAttribute(
+        "aria-invalid",
+        "true",
+      );
+    }
+  });
+
   it("logs out from the account menu and the guard then asks to log in", async () => {
     const user = userEvent.setup();
     const view = renderAt(paths.myLeagues);
@@ -235,6 +317,9 @@ describe("auth screens", () => {
     ["sign-up", paths.signUp, "Sign up"],
     ["change password", paths.changePassword, "Change your password"],
   ])("the %s screen has no axe violations", async (_, path, title) => {
+    if (path !== paths.changePassword) {
+      outsideDb().signedInUserId = null;
+    }
     renderAt(path);
     await screen.findByRole("heading", { level: 1, name: title });
 

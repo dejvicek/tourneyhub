@@ -27,6 +27,7 @@ export function ChangePasswordPage() {
   const change = useMutation(authMutations.changePassword());
   const [show, setShow] = useState(false);
   const [formKey, setFormKey] = useState(0);
+  const [local, setLocal] = useState<{ current?: string; new?: string }>({});
 
   function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -35,10 +36,26 @@ export function ChangePasswordPage() {
       const value = form.get(name);
       return typeof value === "string" ? value : "";
     };
+    const currentPassword = text("currentPassword");
+    const newPassword = text("newPassword");
+    // An empty current password is caught here, together with a new one that
+    // is too short, so both fields say what is wrong at once.
+    if (currentPassword === "") {
+      setLocal({
+        current: t("auth.errors.currentRequired"),
+        new:
+          newPassword.length < MIN_PASSWORD_LENGTH
+            ? t("auth.errors.tooShort", { count: MIN_PASSWORD_LENGTH })
+            : undefined,
+      });
+      change.reset();
+      return;
+    }
+    setLocal({});
     change.mutate(
       {
-        currentPassword: text("currentPassword"),
-        newPassword: text("newPassword"),
+        currentPassword,
+        newPassword,
       },
       {
         onSuccess: () => {
@@ -55,11 +72,13 @@ export function ChangePasswordPage() {
   const code = errorCodeOf(change.error);
   const fields = fieldErrors(t, change.error);
   const currentError =
-    code === "wrong_password" ? t("auth.errors.wrongPassword") : undefined;
+    local.current ??
+    (code === "wrong_password" ? t("auth.errors.wrongPassword") : undefined);
   const newError =
-    code === "password_unchanged"
+    local.new ??
+    (code === "password_unchanged"
       ? t("auth.errors.passwordUnchanged")
-      : fields.new_password;
+      : fields.new_password);
   const failed =
     change.isError &&
     code !== "wrong_password" &&
@@ -84,6 +103,7 @@ export function ChangePasswordPage() {
           name="currentPassword"
           autoComplete="current-password"
           required
+          maxLength={1024}
           error={currentError}
         />
         <FormField
@@ -92,6 +112,7 @@ export function ChangePasswordPage() {
           name="newPassword"
           autoComplete="new-password"
           required
+          maxLength={1024}
           hint={t("auth.password.rule", { count: MIN_PASSWORD_LENGTH })}
           error={newError}
         />

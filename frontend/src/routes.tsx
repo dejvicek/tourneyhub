@@ -14,7 +14,10 @@ import { AppShell } from "@/components/AppShell";
 import { PageFallback } from "@/components/PageFallback";
 import { RouteError } from "@/components/RouteError";
 import { AccountMenu } from "@/features/auth/AccountMenu";
-import { requireSession } from "@/features/auth/requireSession";
+import {
+  redirectIfSignedIn,
+  requireSession,
+} from "@/features/auth/requireSession";
 import { RootWithSession } from "@/features/auth/SessionEndedRedirect";
 import { paths } from "@/lib/paths";
 import type { RouteHandle } from "@/lib/routeHandle";
@@ -44,6 +47,7 @@ export const routes: RouteObject[] = [
             children: [
               {
                 path: paths.login,
+                middleware: [redirectIfSignedIn],
                 lazy: async () => ({
                   Component: (await import("@/features/auth/LoginPage"))
                     .LoginPage,

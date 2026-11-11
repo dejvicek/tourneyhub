@@ -18,6 +18,8 @@ import { MIN_PASSWORD_LENGTH } from "./passwordRules";
 import { ShowPasswords } from "./ShowPasswords";
 import { useWaitUntil } from "./useWaitUntil";
 
+type Field = "signupCode" | "email" | "displayName" | "password";
+
 /** Sign-up with the instance's code (FR-001, FR-002); logs in as a login does. */
 export function SignUpPage() {
   const { t, i18n } = useTranslation();
@@ -26,6 +28,7 @@ export function SignUpPage() {
   const signUp = useMutation(authMutations.signUp(queryClient));
   const wait = useWaitUntil();
   const [show, setShow] = useState(false);
+  const [local, setLocal] = useState<Partial<Record<Field, string>>>({});
 
   function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -34,6 +37,29 @@ export function SignUpPage() {
       const value = form.get(name);
       return typeof value === "string" ? value : "";
     };
+    // Every field is required: an empty form marks all four at once, without
+    // a request that would count toward the throttle (P2b).
+    const empty: Partial<Record<Field, string>> = {
+      ...(text("signupCode").trim() === ""
+        ? { signupCode: t("auth.errors.codeRequired") }
+        : {}),
+      ...(text("email").trim() === ""
+        ? { email: t("auth.errors.emailInvalid") }
+        : {}),
+      ...(text("displayName").trim() === ""
+        ? { displayName: t("auth.errors.nameRequired") }
+        : {}),
+      ...(text("password") === ""
+        ? {
+            password: t("auth.errors.tooShort", { count: MIN_PASSWORD_LENGTH }),
+          }
+        : {}),
+    };
+    setLocal(empty);
+    if (Object.keys(empty).length > 0) {
+      signUp.reset();
+      return;
+    }
     signUp.mutate(
       {
         signupCode: text("signupCode"),
@@ -62,11 +88,13 @@ export function SignUpPage() {
   const code = errorCodeOf(signUp.error);
   const fields = fieldErrors(t, signUp.error);
   const codeError =
-    code === "invalid_signup_code"
+    local.signupCode ??
+    (code === "invalid_signup_code"
       ? t("auth.errors.invalidSignupCode")
-      : undefined;
+      : undefined);
   const emailError =
-    code === "email_taken" ? t("auth.errors.emailTaken") : fields.email;
+    local.email ??
+    (code === "email_taken" ? t("auth.errors.emailTaken") : fields.email);
   const waiting = wait.remaining > 0;
   const message = waiting
     ? t("auth.errors.wait", { count: wait.remaining })
@@ -87,6 +115,7 @@ export function SignUpPage() {
           name="signupCode"
           autoComplete="off"
           required
+          maxLength={256}
           error={codeError}
           hint={isDemoMode(import.meta.env) ? <DemoCodeHint /> : undefined}
         />
@@ -96,6 +125,7 @@ export function SignUpPage() {
           name="email"
           autoComplete="email"
           required
+          maxLength={320}
           error={emailError}
         />
         <FormField
@@ -103,8 +133,9 @@ export function SignUpPage() {
           name="displayName"
           autoComplete="name"
           required
+          maxLength={100}
           hint={t("auth.signUp.displayNameHint")}
-          error={fields.display_name}
+          error={local.displayName ?? fields.display_name}
         />
         <FormField
           label={t("auth.signUp.password")}
@@ -112,8 +143,9 @@ export function SignUpPage() {
           name="password"
           autoComplete="new-password"
           required
+          maxLength={1024}
           hint={t("auth.password.rule", { count: MIN_PASSWORD_LENGTH })}
-          error={fields.password}
+          error={local.password ?? fields.password}
         />
         <ShowPasswords checked={show} onChange={setShow} />
         <p role="alert" className="text-body-md font-bold text-destructive">

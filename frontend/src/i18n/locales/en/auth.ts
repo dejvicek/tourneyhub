@@ -56,6 +56,10 @@ export const auth = {
     invisible:
       "Use visible letters only, without hidden or line-break characters.",
     emailInvalid: "Enter an email address, like name@example.com.",
+    passwordRequired: "Enter your password.",
+    currentRequired: "Enter your current password.",
+    codeRequired: "Enter the sign-up code.",
+    tooLarge: "Use {{count}} or fewer.",
     nameRequired: "Enter a name.",
     nameTooLong: "Use at most {{count}} characters.",
     tooShort_one: "Use at least {{count}} character.",

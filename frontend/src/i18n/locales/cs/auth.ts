@@ -60,6 +60,10 @@ export const auth: CsMessages<Messages["auth"]> = {
     invisible:
       "Použijte jen viditelné znaky, bez skrytých znaků a zalomení řádku.",
     emailInvalid: "Zadejte e-mailovou adresu, například jmeno@example.com.",
+    passwordRequired: "Zadejte heslo.",
+    currentRequired: "Zadejte současné heslo.",
+    codeRequired: "Zadejte kód pro registraci.",
+    tooLarge: "Použijte nejvýš {{count}}.",
     nameRequired: "Zadejte jméno.",
     nameTooLong: "Použijte nejvýš {{count}} znaků.",
     tooShort_one: "Použijte aspoň {{count}} znak.",

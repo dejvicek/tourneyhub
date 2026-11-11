@@ -16,6 +16,9 @@ import { safeNext } from "./loginPath";
 import { ShowPasswords } from "./ShowPasswords";
 import { useWaitUntil } from "./useWaitUntil";
 
+/** The shape P2b's email pattern checks: something, an @, something. */
+const EMAIL = /^[^\s@]+@[^\s@]+$/;
+
 /** Login with email and password (FR-003); returns to where the guard stopped. */
 export function LoginPage() {
   const { t } = useTranslation();
@@ -27,9 +30,23 @@ export function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
+  const [local, setLocal] = useState<{ email?: string; password?: string }>({});
 
   function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
+    // An empty field or an address without an @ is never worth a request,
+    // which would count toward the throttle (P2a).
+    const problems = {
+      email: EMAIL.test(email.trim())
+        ? undefined
+        : t("auth.errors.emailInvalid"),
+      password: password === "" ? t("auth.errors.passwordRequired") : undefined,
+    };
+    setLocal(problems);
+    if (problems.email !== undefined || problems.password !== undefined) {
+      logIn.reset();
+      return;
+    }
     logIn.mutate(
       { email, password },
       {
@@ -82,6 +99,8 @@ export function LoginPage() {
           name="email"
           autoComplete="username"
           required
+          maxLength={320}
+          error={local.email}
           value={email}
           onChange={(event) => {
             setEmail(event.target.value);
@@ -93,6 +112,8 @@ export function LoginPage() {
           name="password"
           autoComplete="current-password"
           required
+          maxLength={1024}
+          error={local.password}
           value={password}
           onChange={(event) => {
             setPassword(event.target.value);
