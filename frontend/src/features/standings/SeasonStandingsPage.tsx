@@ -41,7 +41,7 @@ export function SeasonStandingsPage() {
   const season =
     seasons.data?.find((s) => s.id === picked) ?? active ?? seasons.data?.[0];
   const standings = useQuery(standingsQueries.season(leagueId, season?.id));
-  const players = useQuery(finalsQueries.players(leagueId));
+  const players = useQuery(finalsQueries.namedPlayers(leagueId));
   const tournaments = useQuery(
     tournamentQueries.ofSeason(leagueId, season?.id),
   );

@@ -151,7 +151,11 @@ function SeasonView({
           <p role="status" className="text-body-md text-muted-foreground">
             {t("loading")}
           </p>
-        ) : standings.data === undefined || standings.data.length === 0 ? (
+        ) : standings.data === undefined ? (
+          <p role="alert" className="text-body-md">
+            {t("publicView.tournament.loadFailed")}
+          </p>
+        ) : standings.data.length === 0 ? (
           <EmptyState title={t("publicView.league.noStandings")} />
         ) : (
           <SeasonStandings rows={standings.data} players={players} />

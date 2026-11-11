@@ -1,11 +1,13 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
+import { delay, http, HttpResponse } from "msw";
 import { generatePath } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { provisionalApi } from "@/api/provisional";
 import { DEMO_LEAGUE_ID, demoId } from "@/demo/ids";
+import { db } from "@/demo/store";
 import { i18n } from "@/i18n";
 import { paths } from "@/lib/paths";
 import { stubViewport } from "@/test/media";
@@ -350,6 +352,63 @@ describe("Finished (screen 10)", () => {
     expect(
       screen.getByRole("link", { name: "See the full season standings" }),
     ).toBeInTheDocument();
+  });
+
+  it("still shows the places when the season's effect fails, with a retry of its own", async () => {
+    await playFinal(DYP_EVENING);
+    server.use(
+      http.get(`*${root}/season-effect`, () =>
+        HttpResponse.json({ code: "internal_error" }, { status: 500 }),
+      ),
+    );
+    renderAt(at(paths.finished, DYP_EVENING));
+
+    expect(
+      await screen.findByRole("region", { name: "Final places" }),
+    ).toBeInTheDocument();
+    const season = await screen.findByRole("region", {
+      name: /standings$/,
+    });
+    expect(await within(season).findByRole("alert")).toBeInTheDocument();
+    expect(
+      within(season).getByRole("button", { name: "Try again" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+  });
+
+  it("still shows the places while the season's effect is loading", async () => {
+    await playFinal(DYP_EVENING);
+    server.use(
+      http.get(`*${root}/season-effect`, async () => {
+        await delay("infinite");
+        return HttpResponse.json([]);
+      }),
+    );
+    renderAt(at(paths.finished, DYP_EVENING));
+
+    expect(
+      await screen.findByRole("region", { name: "Final places" }),
+    ).toBeInTheDocument();
+    const season = screen.getByRole("region", { name: /standings$/ });
+    expect(within(season).getByRole("status")).toBeInTheDocument();
+  });
+
+  it("names a removed player on the places and in the season standings", async () => {
+    await playFinal(DYP_EVENING);
+    for (const player of db().players) {
+      player.removed_at = "2026-11-01T10:00:00Z";
+    }
+    renderAt(at(paths.finished, DYP_EVENING));
+
+    const places = await screen.findByRole("region", { name: "Final places" });
+    const season = await screen.findByRole("list", {
+      name: "Season standings after this tournament",
+    });
+    await waitFor(() => {
+      expect(places).not.toHaveTextContent("Unknown");
+    });
+    expect(season).not.toHaveTextContent("Unknown");
+    expect(places).toHaveTextContent(/[A-Z][a-z]+ [A-Z]\./);
   });
 
   it("goes back to the tournament's own screen when it is not finished (D21)", async () => {
@@ -721,6 +780,23 @@ describe("Season standings", () => {
     expect(
       screen.getByRole("link", { name: /DYP evening/ }),
     ).toBeInTheDocument();
+  });
+
+  it("names a removed player, whose results still count (BR-002)", async () => {
+    for (const player of db().players) {
+      player.removed_at = "2026-11-01T10:00:00Z";
+    }
+    renderAt(generatePath(paths.seasonStandings, { leagueId: DEMO_LEAGUE_ID }));
+
+    const table = await screen.findByRole("table", {
+      name: "Season standings",
+    });
+    const [, ...rows] = within(table).getAllByRole("row");
+    expect(rows.length).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(table).not.toHaveTextContent("Unknown");
+    });
+    expect(rows[0]).toHaveTextContent(/[A-Z][a-z]+ [A-Z]\./);
   });
 
   it("is written in Czech with Czech plurals", async () => {

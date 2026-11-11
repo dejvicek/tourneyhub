@@ -1,4 +1,5 @@
 import { screen, within } from "@testing-library/react";
+import { http, HttpResponse } from "msw";
 import { generatePath } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -215,6 +216,24 @@ describe("share-link views outside demo mode", () => {
 
     expect(asked.some((path) => path.endsWith("/tournaments"))).toBe(true);
     expect(asked.some((path) => path.endsWith("/standings"))).toBe(true);
+  });
+
+  it("says that the standings failed to load, not that there are none", async () => {
+    server.use(
+      http.get("*/api/v1/public/:token/seasons/:season/standings", () =>
+        HttpResponse.json({ code: "internal_error" }, { status: 500 }),
+      ),
+    );
+    renderAt(league);
+
+    const heading = await screen.findByRole("heading", { name: "Season standings" });
+    const section = heading.closest("section");
+    expect(
+      await within(section ?? document.body).findByRole("alert"),
+    ).toHaveTextContent("Could not load this.");
+    expect(
+      screen.queryByText("No finished tournament in this season yet."),
+    ).not.toBeInTheDocument();
   });
 
   it("do not ask for the knockout or the ranking, which only the demo serves", async () => {

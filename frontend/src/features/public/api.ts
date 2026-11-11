@@ -44,6 +44,11 @@ export type PublicMatch = PublicTournament["rounds"][number]["matches"][number];
 
 /** Live views refresh on their own, so a viewer sees fields change (FR-070). */
 const LIVE_MS = 15_000;
+/**
+ * The season standings change only when a tournament finishes, and each read
+ * loads every finished tournament of the season, so they refresh more slowly.
+ */
+const SEASON_MS = 60_000;
 
 export const publicQueries = {
   league: (shareToken: string) =>
@@ -86,7 +91,7 @@ export const publicQueries = {
             },
           ),
         ),
-      refetchInterval: LIVE_MS,
+      refetchInterval: SEASON_MS,
     }),
   tournament: (shareToken: string, tournamentId: string) =>
     queryOptions({

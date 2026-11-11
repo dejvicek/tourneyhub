@@ -138,6 +138,25 @@ export const finalsQueries = {
           }),
         ),
     }),
+  /**
+   * Every player of the league, removed ones too, for the names on past
+   * results (BR-002: a removed player keeps their results). Its own key: the
+   * lists under ["leagues", id, "players"] hold the active players only.
+   */
+  namedPlayers: (leagueId: string) =>
+    queryOptions({
+      queryKey: ["leagues", leagueId, "players", "with-removed"],
+      queryFn: ({ signal }) =>
+        dataOf(
+          api.GET("/api/v1/leagues/{league_id}/players", {
+            params: {
+              path: { league_id: leagueId },
+              query: { include_removed: true },
+            },
+            signal,
+          }),
+        ),
+    }),
 };
 
 function settle(queryClient: QueryClient, leagueId: string) {
