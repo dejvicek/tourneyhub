@@ -8,7 +8,9 @@ import {
   fieldsOf,
   matchesOf,
   type Organizer,
+  playBracket,
   playerIdsOf,
+  setUpKnockoutOnly,
   startDypRoundRobin,
 } from "./support/api";
 import { setSignupCode } from "./support/stack";
@@ -778,4 +780,59 @@ test("the shared view also shows the season standings and the final places (§5.
   } finally {
     await viewer.close();
   }
+});
+
+test("a knockout without a group phase opens on its bracket and places by it (FR-031)", async ({
+  page,
+  request,
+}) => {
+  // Six of the regulars, seeded by the league ranking; the API sets it up and
+  // plays the matches, the UI previews, starts and shows the places
+  // (FR-035, FR-037, BR-040–BR-042, BR-102, BR-111).
+  const token = await accessTokenOf(request, organizer);
+  const ids = await playerIdsOf(request, token, evening.leagueId);
+  const tournamentId = await setUpKnockoutOnly(
+    request,
+    token,
+    evening.leagueId,
+    {
+      name: "Cup night",
+      playerIds: PLAYERS.slice(0, 6).map((name) => ids.get(name) ?? ""),
+    },
+  );
+  const tournament = `/leagues/${evening.leagueId}/tournaments/${tournamentId}`;
+  await logIn(page);
+
+  await test.step("the review shows the bracket, with byes for the top two seeds", async () => {
+    await page.goto(`${tournament}/setup/review`);
+    await expect(page.getByText("5 matches, BO1")).toBeVisible();
+    await expect(page.getByText("VS", { exact: true })).toHaveCount(2);
+    await expect(
+      page.getByText(/^Straight to round 2 \(bye\): /),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Generate and start" }).click();
+    await expect(page).toHaveURL(`${tournament}/knockout`);
+  });
+
+  await test.step("the final finishes it, and the knockout alone gives the places", async () => {
+    expect(
+      await playBracket(request, token, evening.leagueId, tournamentId),
+    ).toBe(5);
+    await page.goto(tournament);
+    await expect(page).toHaveURL(`${tournament}/places`);
+    const rows = page
+      .getByRole("region", { name: "Final places" })
+      .getByRole("listitem");
+    // 1st, 2nd, 3rd for both semifinal losers, 5th for both quarterfinal losers
+    await expect(rows).toHaveCount(4);
+    // Singles: each entry is one player, so the points have no "each".
+    await expect(rows.nth(0)).toHaveText(/Won the final 10:6\+10$/);
+    await expect(rows.nth(1)).toHaveText(/\+8$/);
+    await expect(rows.nth(2)).toHaveText(
+      /Shared\. Lost in the semifinals\.\+5$/,
+    );
+    await expect(rows.nth(3)).toHaveText(
+      /Shared\. Lost in the quarterfinals\.\+1$/,
+    );
+  });
 });
