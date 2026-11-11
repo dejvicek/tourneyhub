@@ -8,6 +8,7 @@
 import { newId } from "@/lib/newId";
 
 import type {
+  ErrorResponse,
   FieldRead,
   FormResult,
   MatchFormat,
@@ -21,7 +22,7 @@ import type {
   TournamentStandingRow,
 } from "./contract";
 import { fillFields } from "./engine";
-import { MATCH_POINTS, type RoundRobinTiebreaker, rules } from "./rules";
+import { MATCH_POINTS, rules } from "./rules";
 import type { StoredTournament } from "./seed";
 import { tournamentStandings } from "./store";
 
@@ -285,34 +286,38 @@ export function scoresRequired(phase: PhaseRead): boolean {
 
 const GAMES_TO_WIN = { bo1: 1, bo2: 2, bo3: 2, bo5: 3 } as const;
 
+/** Why the backend would refuse a result: its 422 code and detail (ADR-008). */
+export interface ResultRefusal {
+  code: ErrorResponse["code"];
+  detail: Record<string, string | number>;
+}
+
 /**
  * Checks a whole result against the format, the draw rule and the scores
- * (BR-090, BR-092, BR-121, BR-124); null when it may be saved.
+ * (BR-090, BR-092, BR-121, BR-124) with the backend's codes; null when it
+ * may be saved.
  */
 export function checkResult(
   body: ResultWrite,
   format: MatchFormat,
   phase: PhaseRead,
   drawsAllowed: boolean,
-): PlayRefusal | null {
-  const refuse = (rule: string, reason: string): PlayRefusal => ({
-    status: 422,
-    detail: { rule, reason },
-  });
+): ResultRefusal | null {
   if (body.walkover_winner !== null) {
-    return body.games.length === 0 ? null : refuse("BR-124", "walkover_games");
+    return body.games.length === 0
+      ? null
+      : { code: "validation_failed", detail: { rule: "BR-124" } };
   }
+  const unfit: ResultRefusal = {
+    code: "result_does_not_fit_format",
+    detail: { format, games: body.games.length },
+  };
   const drawAllowed = phase.kind === "group" && drawsAllowed;
   const wins = { side_1: 0, side_2: 0 };
   for (const [index, game] of body.games.entries()) {
     const { score_1: a, score_2: b } = game;
-    if ((a === null) !== (b === null)) {
-      return refuse("BR-092", "one_score");
-    }
+    const gameNo = { game_no: index + 1 };
     if (a !== null && b !== null) {
-      if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || b < 0) {
-        return refuse("BR-092", "not_a_score");
-      }
       const agrees =
         game.winner === "draw"
           ? a === b
@@ -320,42 +325,47 @@ export function checkResult(
             ? a > b
             : b > a;
       if (!agrees) {
-        return refuse("BR-092", "score_disagrees");
+        return { code: "game_score_mismatch", detail: gameNo };
       }
+    } else if (a !== null || b !== null) {
+      return { code: "game_score_mismatch", detail: gameNo };
     } else if (scoresRequired(phase)) {
-      return refuse("BR-092", "scores_required");
+      return { code: "scores_required", detail: gameNo };
     }
+  }
+  for (const game of body.games) {
     if (game.winner === "draw") {
-      if (format !== "bo1" || !drawAllowed) {
-        return refuse("BR-090", "draw_not_allowed");
+      if (format !== "bo1") {
+        return unfit;
       }
       continue;
     }
-    const need = GAMES_TO_WIN[format];
-    if (format !== "bo2" && Math.max(wins.side_1, wins.side_2) >= need) {
-      return refuse("BR-121", "game_after_decided");
+    if (
+      format !== "bo2" &&
+      Math.max(wins.side_1, wins.side_2) >= GAMES_TO_WIN[format]
+    ) {
+      return unfit;
     }
     wins[game.winner] += 1;
-    if (format === "bo2" && index > 1) {
-      return refuse("BR-121", "too_many_games");
-    }
   }
   const played = body.games.length;
+  const draw = { code: "draws_not_allowed", detail: {} } as const;
   switch (format) {
     case "bo1":
-      return played === 1 ? null : refuse("BR-121", "games_count");
+      if (played !== 1) {
+        return unfit;
+      }
+      return body.games[0]?.winner === "draw" && !drawAllowed ? draw : null;
     case "bo2":
       if (played !== 2) {
-        return refuse("BR-121", "games_count");
+        return unfit;
       }
-      return wins.side_1 === wins.side_2 && !drawAllowed
-        ? refuse("BR-090", "draw_not_allowed")
-        : null;
+      return wins.side_1 === wins.side_2 && !drawAllowed ? draw : null;
     case "bo3":
     case "bo5":
       return Math.max(wins.side_1, wins.side_2) === GAMES_TO_WIN[format]
         ? null
-        : refuse("BR-121", "not_decided");
+        : unfit;
   }
 }
 
@@ -406,6 +416,11 @@ function groupMatches(t: StoredTournament): MatchRead[] {
   return scheduleOrder(t).filter(
     (match) => phaseOf(t, match)?.id === group?.id && sidesKnown(match),
   );
+}
+
+/** Group-phase matches without a result (FR-040). */
+export function groupMatchesLeft(t: StoredTournament): number {
+  return groupMatches(t).filter((m) => m.outcome === null).length;
 }
 
 /** Every group-phase match has a result (FR-040). */
@@ -603,7 +618,7 @@ function aheadBy(
   rows: readonly TournamentStandingRow[],
   row: TournamentStandingRow,
   next: TournamentStandingRow | undefined,
-): RoundRobinTiebreaker | null {
+): PlayStandingRow["ahead_by"] {
   if (next?.points !== row.points || next.place === row.place) {
     return null;
   }

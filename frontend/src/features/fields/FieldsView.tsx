@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 
-import type { PlayRead } from "@/demo/contract";
+import type { components } from "@/api/schema";
 import { fieldMutations } from "@/features/fields/api";
 import type { PlayModel } from "@/features/tournaments/play/model";
 import { StandingsPanel } from "@/features/tournaments/play/StandingsPanel";
@@ -11,6 +11,8 @@ import { useNames } from "@/features/tournaments/play/useNames";
 import { FieldCard } from "./FieldCard";
 import { useFieldError } from "./useFieldError";
 import { waitingReason } from "./waitingReason";
+
+type PlayRead = components["schemas"]["PlayRead"];
 
 interface FieldsViewProps {
   leagueId: string;

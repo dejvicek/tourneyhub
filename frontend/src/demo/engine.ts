@@ -160,7 +160,9 @@ export function roundRobinStandings(
   );
   const played: MatchRead[] = [];
   for (const round of rounds) {
-    for (const entryId of round.sitting_out) {
+    // A sit-out counts once its round is played, as in the backend (P8).
+    const over = round.matches.every((match) => match.outcome !== null);
+    for (const entryId of over ? round.sitting_out : []) {
       const row = rows.get(entryId);
       if (row) {
         row.sat_out += 1;

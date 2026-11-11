@@ -109,6 +109,9 @@ export const results: CsMessages<Messages["results"]> = {
   errors: {
     draw: "Remízy tu nejsou povolené.",
     scores: "Zadejte góly obou stran v každé hře.",
+    mismatch:
+      "Ve hře {{game}} góly neodpovídají vítězi: vítěz dá víc gólů, remíza stejně.",
+    format: "Tyto hry nedávají výsledek v tomto formátu zápasu.",
     locked: "Po vylosování vyřazovací fáze jsou výsledky skupiny zamčené.",
     lockedKnockout: "Pozdější zápas už má výsledek. Nejdřív smažte ten.",
     changed: "Zápas se mezitím změnil. Byl znovu načten.",

@@ -6,7 +6,7 @@ import {
   skipToken,
 } from "@tanstack/react-query";
 
-import { dataOf } from "@/api/client";
+import { api, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
 import type {
   DisabledWrite,
@@ -19,7 +19,7 @@ import type { MonsterKnockoutMode } from "@/demo/rules";
 import { tournamentQueries } from "@/features/tournaments/api";
 
 // Provisional routes of the demo's contract, "finals" section
-// (src/demo/contract.ts). Keys start with the entity (docs/frontend-style.md §8.1).
+// (src/demo/contract.ts), except the places, which the backend serves (P8). Keys start with the entity (docs/frontend-style.md §8.1).
 const tournamentKey = (leagueId: string, tournamentId: string) =>
   ["leagues", leagueId, "tournaments", tournamentId] as const;
 
@@ -51,7 +51,7 @@ export const finalsQueries = {
       queryKey: [...tournamentKey(leagueId, tournamentId), "places"],
       queryFn: ({ signal }) =>
         dataOf(
-          provisionalApi.GET(
+          api.GET(
             "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/places",
             { params: pathOf(leagueId, tournamentId), signal },
           ),

@@ -93,6 +93,9 @@ export const results = {
   errors: {
     draw: "Draws aren't allowed here.",
     scores: "Enter both sides' goals for every game.",
+    mismatch:
+      "In game {{game}} the goals don't fit the winner: the winner scores more, a draw the same.",
+    format: "These games don't make a result in this match format.",
     locked: "Round robin results are locked once the knockout is drawn.",
     lockedKnockout:
       "A later match already has a result. Clear that result first.",

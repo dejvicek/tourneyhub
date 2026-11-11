@@ -1,12 +1,13 @@
 import { mutationOptions, queryOptions } from "@tanstack/react-query";
 
-import { dataOf } from "@/api/client";
+import { api, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
 import type { PlacementWrite } from "@/demo/contract";
 
-// Provisional routes of the demo's contract (src/demo/contract.ts, "play").
-// The play screens' read lives here with the field writes: the lint rules
-// let only a feature's top-level api.ts call the API.
+// The play screens' read and the league's players come from the generated
+// API; the field writes are still provisional routes of the demo's contract
+// (src/demo/contract.ts, "play", P9). The read lives here with the field
+// writes: the lint rules let only a feature's top-level api.ts call the API.
 
 interface TournamentPath {
   league_id: string;
@@ -24,7 +25,7 @@ export const playQueries = {
       queryKey: ["leagues", leagueId, "tournaments", tournamentId, "play"],
       queryFn: ({ signal }) =>
         dataOf(
-          provisionalApi.GET(
+          api.GET(
             "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/play",
             { params: { path: path(leagueId, tournamentId) }, signal },
           ),
@@ -36,7 +37,7 @@ export const playQueries = {
       queryKey: ["leagues", leagueId, "players"],
       queryFn: ({ signal }) =>
         dataOf(
-          provisionalApi.GET("/api/v1/leagues/{league_id}/players", {
+          api.GET("/api/v1/leagues/{league_id}/players", {
             params: { path: { league_id: leagueId } },
             signal,
           }),

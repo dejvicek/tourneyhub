@@ -2,7 +2,8 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { ApiError } from "@/api/client";
+import type { ApiError, ErrorCode } from "@/api/client";
+import type { components } from "@/api/schema";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,7 +16,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import type { PlayRead } from "@/demo/contract";
 import { finalsQueries } from "@/features/finals/api";
 import { leagueQueries } from "@/features/leagues/api";
 import { resultMutations } from "@/features/results/api";
@@ -29,6 +29,8 @@ import { drawsAllowed, scoresRequired } from "./resultDraft";
 import { SimpleResultForm } from "./SimpleResultForm";
 import { WalkoverForm } from "./WalkoverForm";
 
+type PlayRead = components["schemas"]["PlayRead"];
+
 interface ResultEntryProps {
   leagueId: string;
   model: PlayModel;
@@ -37,27 +39,37 @@ interface ResultEntryProps {
   onDone: () => void;
 }
 
+/** The 422 codes of a result and their texts (ADR-008). */
+const CODE_TEXTS = {
+  draws_not_allowed: "results.errors.draw",
+  scores_required: "results.errors.scores",
+  game_score_mismatch: "results.errors.mismatch",
+  result_does_not_fit_format: "results.errors.format",
+  match_sides_unknown: "results.unknownSides",
+} as const satisfies Partial<Record<ErrorCode, string>>;
+
+function hasText(code: ErrorCode | undefined): code is keyof typeof CODE_TEXTS {
+  return code !== undefined && code in CODE_TEXTS;
+}
+
 function useResultError(error: ApiError | null): string | null {
   const { t } = useTranslation();
   if (error === null) {
     return null;
   }
+  if (hasText(error.code)) {
+    return t(CODE_TEXTS[error.code], { game: Number(error.detail.game_no) });
+  }
+  // The demo's knockout locks (BR-053, BR-094) until the backend serves the knockout (P10).
   if (error.detail.rule === "BR-094") {
     return t("results.errors.lockedKnockout");
   }
-  switch (error.detail.reason) {
-    case "draw_not_allowed":
-      return t("results.errors.draw");
-    case "scores_required":
-    case "one_score":
-      return t("results.errors.scores");
-    case "results_locked":
-      return t("results.errors.locked");
-    default:
-      return error.status === 404 || error.status === 409
-        ? t("results.errors.changed")
-        : t("results.errors.generic");
+  if (error.detail.reason === "results_locked") {
+    return t("results.errors.locked");
   }
+  return error.status === 404 || error.status === 409
+    ? t("results.errors.changed")
+    : t("results.errors.generic");
 }
 
 /**

@@ -24,7 +24,6 @@ import {
   findLeague,
   findTournament,
   tournamentRead,
-  tournamentStandings,
   tournamentSummary,
 } from "../store";
 
@@ -53,17 +52,6 @@ export const tournamentHandlers = [
     ({ params }) => {
       const t = findTournament(params.league_id, params.tournament_id);
       return t ? tournamentRead(t) : notFound(params);
-    },
-  ),
-
-  route(
-    "get",
-    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/standings",
-    ({ params }) => {
-      const t = findTournament(params.league_id, params.tournament_id);
-      return t
-        ? tournamentStandings(t)
-        : apiError(404, "not_found", { tournament_id: params.tournament_id });
     },
   ),
 
