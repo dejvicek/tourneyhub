@@ -141,12 +141,13 @@ class TournamentPhase(Base):
             name="round_robin_legs",
         ),
         CheckConstraint(
-            "(kind = 'group') = (sit_out_points IS NOT NULL)"
+            "(format IN ('swiss', 'monster_dyp')) = (sit_out_points IS NOT NULL)"
             " AND (sit_out_points IS NULL OR sit_out_points IN (0, 1, 2))",
             name="sit_out_points",
         ),
+        # BR-071: sit-out points only in Swiss and Monster DYP, not in a round robin.
         CheckConstraint(
-            "NOT sit_out_points_set_by_hand OR kind = 'group'",
+            "NOT sit_out_points_set_by_hand OR format IN ('swiss', 'monster_dyp')",
             name="sit_out_points_set_by_hand",
         ),
         # The helper is created by the migration: a subset of the three, no repeat.
