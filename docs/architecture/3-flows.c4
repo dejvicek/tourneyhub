@@ -332,7 +332,7 @@ views "III. Flows" {
     tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "a known id: the same one back or 409; else a new one with the league's defaults, its phase, fields and seed"
     organizer -> tourneyhub.spa.organizerUi "picks 13 players"
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "PUT the picked players"
-    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the league, then the tournament; a removed player: 422"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the league, then the tournament; a removed player: 409"
     tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "league ranking, halves (one left out by lot), partners, seeds"
     tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "picks, halves, pairs and seeds; draw counter + 1"
     tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "the setup with the draw counter"
@@ -340,7 +340,7 @@ views "III. Flows" {
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "POST draw with the expected counter"
     alt {
       when "the counter is current" {
-        tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "partners from the next counter's lot"
+        tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "partners from the next counter's lot; with ranking halves and an odd count, the left-out player is drawn again too"
         tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: the new pairs"
       }
       when "stale or repeated" {
