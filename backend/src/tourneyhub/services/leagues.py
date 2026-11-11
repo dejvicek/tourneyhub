@@ -7,12 +7,19 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from tourneyhub.db.models.leagues import League, Season
+from tourneyhub.db.models.tournaments import Tournament
 from tourneyhub.engine.leagues import (
     DEFAULT_PLACEMENT_POINTS,
     DefaultMatchFormat,
     SeasonState,
 )
-from tourneyhub.errors import ConflictError, ErrorCode, NotFoundError
+from tourneyhub.engine.tournaments import TournamentState
+from tourneyhub.errors import (
+    ConflictError,
+    ErrorCode,
+    NotFoundError,
+    RuleViolationError,
+)
 
 
 def list_leagues(session: Session, *, user_id: UUID) -> list[League]:
@@ -157,7 +164,8 @@ def _season_of(league: League, season_id: UUID) -> Season:
     return season
 
 
-def _active_season(league: League) -> Season:
+def active_season(league: League) -> Season:
+    """The league's one active season (ADR-002)."""
     # Every league has exactly one: Season 1 comes with it, and a new season
     # closes the active one in the same transaction.
     season = next(
@@ -233,14 +241,28 @@ def start_season(
     repeated or stale request finds a newer active season under the league lock
     and gets a conflict, so two starts with one number cannot both succeed. The
     new season starts with a copy of the closed season's table (DATA-MODEL
-    §4.2). BR-010, no unfinished tournament, joins these checks together with
-    the tournaments.
+    §4.2). A season with a tournament that is not finished stays open (BR-010):
+    422 `season_has_unfinished_tournaments` with their ids, checked under the
+    league lock that every tournament write takes first (ADR-008).
     """
     league = lock_league(session, league_id=league_id, user_id=user_id)
-    current = _active_season(league)
+    current = active_season(league)
     if current.number != expected_current_number:
         raise ConflictError(
             ErrorCode.SEASON_NUMBER_CHANGED, current_number=current.number
+        )
+    unfinished = session.scalars(
+        select(Tournament.id)
+        .where(
+            Tournament.season_id == current.id,
+            Tournament.state != TournamentState.FINISHED,
+        )
+        .order_by(Tournament.date, Tournament.id)
+    ).all()
+    if unfinished:
+        raise RuleViolationError(
+            ErrorCode.SEASON_HAS_UNFINISHED_TOURNAMENTS,
+            tournament_ids=[str(tournament_id) for tournament_id in unfinished],
         )
     current.state = SeasonState.CLOSED
     current.closed_at = now

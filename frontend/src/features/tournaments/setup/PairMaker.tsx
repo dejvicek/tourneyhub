@@ -15,12 +15,12 @@ import { entryName } from "./summary";
 /** Doubles: the organizer puts the players into pairs (FR-033, BR-003, BR-030). */
 export function PairMaker({ data }: { data: SetupData }) {
   const { t } = useTranslation();
-  const { leagueId, tournamentId, tournament, setup, ranking, nameOf } = data;
+  const { leagueId, tournamentId, setup, ranking, nameOf } = data;
   const [selected, setSelected] = useState<string[]>([]);
   const save = useMutation(setupMutations.pairs(leagueId, tournamentId));
   const draw = useMutation(setupMutations.draw(leagueId, tournamentId));
 
-  const pairs = tournament.entries
+  const pairs = setup.entries
     .filter((entry) => entry.stage === "main")
     .map((entry): [string, string] => [
       entry.player_ids[0] ?? "",

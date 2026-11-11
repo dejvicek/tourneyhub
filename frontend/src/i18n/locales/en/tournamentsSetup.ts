@@ -318,15 +318,14 @@ export const tournamentsSetup = {
     load: "The tournament could not be loaded.",
     rules: {
       name_required: "Give the tournament a name.",
-      positive_numbers: "Goals per game and fields must be at least 1.",
-      too_large: "Use at most 99 goals per game and 32 fields.",
-      fr031: "This type does not allow that group phase.",
       fr032: "Not enough players: at least {{min}} are needed.",
       br121: "BO2 is offered only in leagues that allow draws.",
-      br002: "A removed player cannot be picked.",
-      br003: "A player can be in one pair only.",
+      fr033: "Nobody is left to pair.",
+      br032Unequal:
+        "Both halves need the same number of players: {{top}} at the top, {{bottom}} at the bottom.",
+      br032LeftOut: "Only one player can be left out.",
+      br032Incomplete: "Put every player in a half first.",
       fr036: "Going back to setup is possible only until the first result.",
-      fr038: "A tournament in a closed season cannot be deleted.",
     },
   },
 };

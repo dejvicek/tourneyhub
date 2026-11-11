@@ -1,7 +1,4 @@
 // Demo handlers: tournaments, their setup and progress (FR-030–FR-048).
-import { HttpResponse } from "msw";
-
-import type { SetupConflictCode } from "../contract";
 import { apiError, route } from "../route";
 import {
   applyFormat,
@@ -9,8 +6,7 @@ import {
   createTournament,
   deleteTournament,
   drawAgain,
-  formatProblem,
-  leagueRanking,
+  pickedCount,
   preview,
   setHalves,
   setPairs,
@@ -43,7 +39,12 @@ export const tournamentHandlers = [
             t.league_id === params.league_id &&
             t.season_id === params.season_id,
         )
-        .map(tournamentSummary),
+        .map((t) =>
+          // Setup counts the picked players, who have no entry yet.
+          t.state === "setup"
+            ? { ...tournamentSummary(t), player_count: pickedCount(t) }
+            : tournamentSummary(t),
+        ),
   ),
 
   route(
@@ -71,12 +72,6 @@ export const tournamentHandlers = [
   // ---------------------------------------------------------- setup
   // Screens 1-5: create, format, players, draws, start (src/demo/setupEngine.ts).
 
-  route("get", "/api/v1/leagues/{league_id}/ranking", ({ params }) =>
-    findLeague(params.league_id)
-      ? leagueRanking(params.league_id)
-      : leagueMissing(params.league_id),
-  ),
-
   route(
     "post",
     "/api/v1/leagues/{league_id}/tournaments",
@@ -87,21 +82,15 @@ export const tournamentHandlers = [
         return leagueMissing(params.league_id);
       }
       // ADR-008: a repeated create returns the tournament it made, if it is
-      // the same league and type; any other tournament with that id is a 409.
+      // in the active season and of the same type; any other is a 409.
       const existing = db().tournaments.find((t) => t.id === body.id);
       if (existing) {
-        return existing.league_id === params.league_id &&
-          existing.type === body.type
-          ? tournamentRead(existing)
-          : conflict("tournament_id_taken", { id: body.id });
+        return existing.season_id === season.id && existing.type === body.type
+          ? setupRead(existing)
+          : apiError(409, "tournament_id_taken");
       }
-      const problem = formatProblem(body, league.draws_allowed);
-      if (problem) {
-        return apiError(422, problem.code, problem.detail);
-      }
-      return tournamentRead(
-        createTournament(body.id, params.league_id, season.id, body),
-      );
+      const created = createTournament(body, league, season.id);
+      return "status" in created ? failure(created) : setupRead(created);
     },
     201,
   ),
@@ -120,14 +109,7 @@ export const tournamentHandlers = [
     "put",
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/format",
     ({ params, body }) =>
-      inSetup(params, (t, league) => {
-        const problem = formatProblem(body, league.draws_allowed);
-        if (problem) {
-          return apiError(422, problem.code, problem.detail);
-        }
-        applyFormat(t, body);
-        return tournamentRead(t);
-      }),
+      inSetup(params, (t, league) => answer(t, applyFormat(t, body, league))),
   ),
 
   route(
@@ -233,23 +215,16 @@ const leagueMissing = (leagueId: string) =>
   apiError(404, "league_not_found", { league_id: leagueId });
 
 const notFound = (params: TournamentParams) =>
-  apiError(404, "not_found", { tournament_id: params.tournament_id });
+  findLeague(params.league_id)
+    ? apiError(404, "tournament_not_found")
+    : leagueMissing(params.league_id);
 
-/** A 409 of setup (ADR-008): the screen reloads and shows what changed. */
-function conflict(
-  code: SetupConflictCode,
-  detail: Record<string, string> = {},
-) {
-  return HttpResponse.json({ code, detail }, { status: 409 });
-}
-
+function failure(result: SetupFailure): Response;
+function failure(result: SetupFailure | null): Response | undefined;
 function failure(result: SetupFailure | null): Response | undefined {
-  if (result === null) {
-    return undefined;
-  }
-  return result.status === 409
-    ? conflict(result.code)
-    : apiError(422, result.code, result.detail);
+  return result === null
+    ? undefined
+    : apiError(result.status, result.code, result.detail);
 }
 
 /** Runs a setup write on a tournament that is still in setup. */
@@ -267,7 +242,7 @@ function inSetup<T>(
   }
   return t.state === "setup"
     ? write(t, league)
-    : conflict("tournament_not_in_setup");
+    : apiError(409, "tournament_not_in_setup", { state: t.state });
 }
 
 /** The setup of `t` after a write, or the write's failure. */

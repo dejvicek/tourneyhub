@@ -2,7 +2,7 @@ import functools
 import os
 import time
 from collections.abc import Callable, Iterator
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from uuid import UUID, uuid7
 
@@ -18,10 +18,21 @@ from sqlalchemy.orm import Session, sessionmaker
 from tourneyhub.api.deps import get_clock, get_now, get_session, get_session_factory
 from tourneyhub.app import create_app
 from tourneyhub.db.models.accounts import InstanceSettings, User
-from tourneyhub.db.models.leagues import League, Season
+from tourneyhub.db.models.leagues import League, Player, Season
+from tourneyhub.db.models.tournaments import Field, Tournament, TournamentPhase
 from tourneyhub.db.session import create_db_engine
 from tourneyhub.engine.accounts import Language
 from tourneyhub.engine.leagues import DEFAULT_PLACEMENT_POINTS, SeasonState
+from tourneyhub.engine.tournaments import (
+    DEFAULT_TIEBREAKERS,
+    HalvesMethod,
+    MatchFormat,
+    PhaseFormat,
+    PhaseKind,
+    SeedingMethod,
+    TournamentState,
+    TournamentType,
+)
 from tourneyhub.services import auth as auth_service
 from tourneyhub.settings import Settings
 
@@ -95,6 +106,52 @@ def assert_invariants(session: Session) -> None:
         select(League.id).where(active_seasons != 1)
     ).all()
     assert without_one_active == []
+    for name, query in _TOURNAMENT_INVARIANTS.items():
+        assert session.execute(text(query)).all() == [], name
+
+
+# DATA-MODEL §5: each query returns the rows that break one rule.
+_TOURNAMENT_INVARIANTS = {
+    "players of another league": """
+        SELECT x.tournament_id, x.player_id FROM (
+            SELECT tournament_id, player_id FROM tournament_players
+            UNION ALL SELECT tournament_id, player_id FROM entry_members
+            UNION ALL SELECT tournament_id, player_id FROM dyp_halves
+        ) AS x
+        JOIN tournaments t ON t.id = x.tournament_id
+        JOIN seasons s ON s.id = t.season_id
+        JOIN players p ON p.id = x.player_id
+        WHERE p.league_id <> s.league_id
+    """,
+    "entries of the wrong size (BR-030)": """
+        SELECT e.id FROM entries e
+        WHERE (SELECT count(*) FROM entry_members m WHERE m.entry_id = e.id)
+            <> CASE e.kind WHEN 'player' THEN 1 ELSE 2 END
+    """,
+    "a knockout at a position that does not fit the group phase (D9)": """
+        SELECT k.id FROM tournament_phases k
+        WHERE k.kind = 'knockout' AND (k.position = 2) <> EXISTS (
+            SELECT FROM tournament_phases g
+            WHERE g.tournament_id = k.tournament_id AND g.kind = 'group'
+        )
+    """,
+    "Monster DYP without its own group phase, or another type with one (FR-031)": """
+        SELECT t.id FROM tournaments t
+        WHERE (t.type = 'monster_dyp') <> EXISTS (
+            SELECT FROM tournament_phases p
+            WHERE p.tournament_id = t.id AND p.format = 'monster_dyp'
+        )
+    """,
+    "a tournament without a field (FR-090)": """
+        SELECT t.id FROM tournaments t
+        WHERE NOT EXISTS (SELECT FROM fields f WHERE f.tournament_id = t.id)
+    """,
+    "DYP halves outside a DYP tournament": """
+        SELECT h.tournament_id FROM dyp_halves h
+        JOIN tournaments t ON t.id = h.tournament_id
+        WHERE t.type <> 'dyp'
+    """,
+}
 
 
 @pytest.fixture
@@ -232,6 +289,74 @@ def make_league(
         return league
 
     return make_league
+
+
+@pytest.fixture
+def make_player(session: Session, now: datetime) -> Callable[..., Player]:
+    def make_player(*, league: League, name: str | None = None) -> Player:
+        player = Player(
+            league_id=league.id, name=name or f"Player {uuid7()}", created_at=now
+        )
+        session.add(player)
+        session.flush()
+        return player
+
+    return make_player
+
+
+@pytest.fixture
+def make_tournament(
+    session: Session, make_league: Callable[..., League], now: datetime
+) -> Callable[..., Tournament]:
+    """A tournament in setup in the league's active season, with a round robin
+    (Monster DYP: its own group phase) and one field; nothing picked."""
+
+    def make_tournament(
+        *,
+        league: League | None = None,
+        tournament_type: TournamentType = TournamentType.SINGLES,
+        state: TournamentState = TournamentState.SETUP,
+    ) -> Tournament:
+        league = league or make_league()
+        season = next(s for s in league.seasons if s.state is SeasonState.ACTIVE)
+        monster = tournament_type is TournamentType.MONSTER_DYP
+        tournament = Tournament(
+            id=uuid7(),
+            season_id=season.id,
+            name="Thursday",
+            date=date(2026, 11, 5),
+            type=tournament_type,
+            state=state,
+            seeding_method=SeedingMethod.RANKING,
+            halves_method=HalvesMethod.RANKING,
+            rng_seed=bytes(range(16)),
+            draw_counter=0,
+            goals_per_game=10,
+            created_at=now,
+            phases=[
+                TournamentPhase(
+                    position=1,
+                    kind=PhaseKind.GROUP,
+                    format=PhaseFormat.MONSTER_DYP
+                    if monster
+                    else PhaseFormat.ROUND_ROBIN,
+                    round_robin_legs=None if monster else 1,
+                    sit_out_points=0,
+                    tiebreakers=list(DEFAULT_TIEBREAKERS) if monster else None,
+                    match_format=MatchFormat.BO1,
+                    created_at=now,
+                )
+            ],
+            fields=[Field(number=1, created_at=now)],
+            players=[],
+            halves=[],
+            entries=[],
+        )
+        session.add(tournament)
+        session.flush()
+        return tournament
+
+    return make_tournament
 
 
 @pytest.fixture

@@ -106,8 +106,33 @@ function currentPhase(
   };
 }
 
+/** How far a running tournament is (screen 1); null outside play. */
+function progressOf(t: StoredTournament): TournamentSummary["progress"] {
+  if (t.state !== "in_progress" || t.rounds.length === 0) {
+    return null;
+  }
+  const matches = t.rounds.flatMap((round) => round.matches);
+  const group = t.phases.find((phase) => phase.kind === "group");
+  const knockout = t.phases.find((phase) => phase.kind === "knockout");
+  const groupRounds = t.rounds.filter((round) => round.phase_id === group?.id);
+  const current =
+    groupRounds.find((round) =>
+      round.matches.some((match) => match.outcome === null),
+    ) ?? groupRounds.at(-1);
+  return {
+    round_no: current?.round_no ?? 1,
+    round_count: groupRounds.length,
+    matches_played: matches.filter((match) => match.outcome !== null).length,
+    match_count: matches.length,
+    in_knockout:
+      knockout !== undefined &&
+      t.rounds.some((round) => round.phase_id === knockout.id),
+  };
+}
+
 export function tournamentSummary(t: StoredTournament): TournamentSummary {
   syncBracket(t); // finals: the last knockout result finishes the tournament (FR-037)
+  const winners = places(t)?.filter((row) => row.place === 1);
   return {
     id: t.id,
     season_id: t.season_id,
@@ -122,6 +147,16 @@ export function tournamentSummary(t: StoredTournament): TournamentSummary {
       format,
     })),
     ...currentPhase(t),
+    player_count: t.entries
+      .filter((entry) => entry.stage === "main")
+      .reduce((sum, entry) => sum + entry.player_ids.length, 0),
+    progress: progressOf(t),
+    winner_player_ids:
+      winners === undefined
+        ? null
+        : t.entries
+            .filter((entry) => winners.some((row) => row.entry_id === entry.id))
+            .flatMap((entry) => entry.player_ids),
   };
 }
 

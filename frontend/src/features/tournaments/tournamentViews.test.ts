@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import type {
-  PhaseSummary,
-  TournamentState,
-  TournamentSummary,
-} from "@/demo/contract";
+import type { PhaseSummary, TournamentState } from "@/demo/contract";
 
-import { tournamentHome, tournamentTabs } from "./tournamentViews";
+import {
+  tournamentHome,
+  tournamentTabs,
+  type TournamentView,
+} from "./tournamentViews";
 
 const group = (format: PhaseSummary["format"]): PhaseSummary => ({
   id: "group",
@@ -26,7 +26,7 @@ function tournament(
   phases: PhaseSummary[],
   current: string | null,
   done = false,
-): TournamentSummary {
+): TournamentView {
   return {
     id: "t",
     season_id: "s",
@@ -98,7 +98,7 @@ describe("tournamentHome", () => {
 });
 
 describe("tournamentTabs", () => {
-  const labels = (t: TournamentSummary) =>
+  const labels = (t: TournamentView) =>
     tournamentTabs(t).map((tab) => tab.label);
 
   it("shows no tabs in setup", () => {

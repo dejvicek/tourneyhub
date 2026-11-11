@@ -5,27 +5,28 @@ import {
   skipToken,
 } from "@tanstack/react-query";
 
-import { dataOf } from "@/api/client";
+import { api, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
-import type {
-  DypHalfWrite,
-  HalvesMethod,
-  SeedingMethod,
-  TournamentCreate,
-  TournamentFormatWrite,
-  TournamentState,
-} from "@/demo/contract";
+import type { components } from "@/api/schema";
+import type { TournamentState } from "@/demo/contract";
 
-// ---- setup (screens 1-5): provisional routes, see the "setup" section of
-// src/demo/contract.ts. Every write sends the target state (ADR-008).
+type Schemas = components["schemas"];
+
+// ---- setup (screens 1-5). The backend serves the setup; the preview, the
+// top players, "Generate and start" and "Back to setup" are still
+// provisional routes (the "setup" section of src/demo/contract.ts). Every
+// write sends the target state (ADR-008).
 
 const tournamentPath = (leagueId: string, tournamentId: string) => ({
   params: { path: { league_id: leagueId, tournament_id: tournamentId } },
 });
 
 export const setupQueries = {
-  /** What setup knows beyond the tournament: picked players, halves, counter. */
-  /** Waits while the tournament is not known yet (a new one has no id). */
+  /**
+   * What setup knows: the format, the picks, the halves, the entries, the
+   * league ranking and the draw counter. Waits while the tournament is not
+   * known yet (a new one has no id).
+   */
   detail: (leagueId: string, tournamentId: string | undefined) =>
     queryOptions({
       queryKey: ["leagues", leagueId, "tournaments", tournamentId, "setup"],
@@ -34,7 +35,7 @@ export const setupQueries = {
           ? skipToken
           : ({ signal }) =>
               dataOf(
-                provisionalApi.GET(
+                api.GET(
                   "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup",
                   { ...tournamentPath(leagueId, tournamentId), signal },
                 ),
@@ -52,24 +53,13 @@ export const setupQueries = {
           ),
         ),
     }),
-  /** BR-020: the league ranking, with the season points shown beside it. */
-  ranking: (leagueId: string) =>
-    queryOptions({
-      queryKey: ["leagues", leagueId, "ranking"],
-      queryFn: ({ signal }) =>
-        dataOf(
-          provisionalApi.GET("/api/v1/leagues/{league_id}/ranking", {
-            params: { path: { league_id: leagueId } },
-            signal,
-          }),
-        ),
-    }),
+  /** The league's players on the list, for their names. */
   players: (leagueId: string) =>
     queryOptions({
       queryKey: ["leagues", leagueId, "players"],
       queryFn: ({ signal }) =>
         dataOf(
-          provisionalApi.GET("/api/v1/leagues/{league_id}/players", {
+          api.GET("/api/v1/leagues/{league_id}/players", {
             params: { path: { league_id: leagueId } },
             signal,
           }),
@@ -92,18 +82,18 @@ function leagueWrite<Variables, Result>(
 
 export const setupMutations = {
   create: (leagueId: string) =>
-    leagueWrite(leagueId, (body: TournamentCreate) =>
+    leagueWrite(leagueId, (body: Schemas["TournamentCreate"]) =>
       dataOf(
-        provisionalApi.POST("/api/v1/leagues/{league_id}/tournaments", {
+        api.POST("/api/v1/leagues/{league_id}/tournaments", {
           params: { path: { league_id: leagueId } },
           body,
         }),
       ),
     ),
   format: (leagueId: string, tournamentId: string) =>
-    leagueWrite(leagueId, (body: TournamentFormatWrite) =>
+    leagueWrite(leagueId, (body: Schemas["TournamentFormatWrite"]) =>
       dataOf(
-        provisionalApi.PUT(
+        api.PUT(
           "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/format",
           { ...tournamentPath(leagueId, tournamentId), body },
         ),
@@ -112,7 +102,7 @@ export const setupMutations = {
   players: (leagueId: string, tournamentId: string) =>
     leagueWrite(leagueId, (playerIds: string[]) =>
       dataOf(
-        provisionalApi.PUT(
+        api.PUT(
           "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/players",
           {
             ...tournamentPath(leagueId, tournamentId),
@@ -122,20 +112,18 @@ export const setupMutations = {
       ),
     ),
   halves: (leagueId: string, tournamentId: string) =>
-    leagueWrite(
-      leagueId,
-      (body: { method: HalvesMethod; halves: DypHalfWrite[] }) =>
-        dataOf(
-          provisionalApi.PUT(
-            "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/halves",
-            { ...tournamentPath(leagueId, tournamentId), body },
-          ),
+    leagueWrite(leagueId, (body: Schemas["HalvesWrite"]) =>
+      dataOf(
+        api.PUT(
+          "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/halves",
+          { ...tournamentPath(leagueId, tournamentId), body },
         ),
+      ),
     ),
   pairs: (leagueId: string, tournamentId: string) =>
     leagueWrite(leagueId, (pairs: [string, string][]) =>
       dataOf(
-        provisionalApi.PUT(
+        api.PUT(
           "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/pairs",
           { ...tournamentPath(leagueId, tournamentId), body: { pairs } },
         ),
@@ -154,9 +142,9 @@ export const setupMutations = {
       ),
     ),
   seeding: (leagueId: string, tournamentId: string) =>
-    leagueWrite(leagueId, (method: SeedingMethod) =>
+    leagueWrite(leagueId, (method: Schemas["SeedingMethod"]) =>
       dataOf(
-        provisionalApi.PUT(
+        api.PUT(
           "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/seeding",
           { ...tournamentPath(leagueId, tournamentId), body: { method } },
         ),
@@ -165,7 +153,7 @@ export const setupMutations = {
   seedOrder: (leagueId: string, tournamentId: string) =>
     leagueWrite(leagueId, (entryIds: string[]) =>
       dataOf(
-        provisionalApi.PUT(
+        api.PUT(
           "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/seed-order",
           {
             ...tournamentPath(leagueId, tournamentId),
@@ -176,15 +164,13 @@ export const setupMutations = {
     ),
   /** "Draw again" and "Shuffle again": carry the draw counter the screen showed. */
   draw: (leagueId: string, tournamentId: string) =>
-    leagueWrite(
-      leagueId,
-      (body: { expected_draw_counter: number; target: "pairs" | "seeds" }) =>
-        dataOf(
-          provisionalApi.POST(
-            "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/draw",
-            { ...tournamentPath(leagueId, tournamentId), body },
-          ),
+    leagueWrite(leagueId, (body: Schemas["DrawWrite"]) =>
+      dataOf(
+        api.POST(
+          "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/draw",
+          { ...tournamentPath(leagueId, tournamentId), body },
         ),
+      ),
     ),
   start: (leagueId: string, tournamentId: string) =>
     leagueWrite(leagueId, (expectedDrawCounter: number) =>
@@ -215,7 +201,7 @@ export const setupMutations = {
   remove: (leagueId: string, tournamentId: string) =>
     leagueWrite(leagueId, () =>
       dataOf(
-        provisionalApi.DELETE(
+        api.DELETE(
           "/api/v1/leagues/{league_id}/tournaments/{tournament_id}",
           tournamentPath(leagueId, tournamentId),
         ),
@@ -223,9 +209,8 @@ export const setupMutations = {
     ),
 };
 
-// Provisional routes of the demo's contract (src/demo/contract.ts).
 export const tournamentQueries = {
-  /** Waits while the season is not known yet. */
+  /** A season's tournaments with their progress (screen 1). Waits while the season is not known yet. */
   ofSeason: (leagueId: string, seasonId: string | undefined) =>
     queryOptions({
       queryKey: ["leagues", leagueId, "seasons", seasonId, "tournaments"],
@@ -234,7 +219,7 @@ export const tournamentQueries = {
           ? skipToken
           : ({ signal }) =>
               dataOf(
-                provisionalApi.GET(
+                api.GET(
                   "/api/v1/leagues/{league_id}/seasons/{season_id}/tournaments",
                   {
                     params: {
@@ -245,6 +230,7 @@ export const tournamentQueries = {
                 ),
               ),
     }),
+  /** The whole tournament with its rounds: still a provisional route (P7b, P8). */
   detail: (leagueId: string, tournamentId: string) =>
     queryOptions({
       queryKey: ["leagues", leagueId, "tournaments", tournamentId],

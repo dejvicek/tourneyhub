@@ -33,6 +33,26 @@ class ErrorCode(StrEnum):
     PLAYER_NOT_FOUND = "player_not_found"
     PLAYER_NAME_TAKEN = "player_name_taken"  # also a removed player's name (BR-001)
     PLAYER_LIMIT_REACHED = "player_limit_reached"  # 500 players, removed included
+    PLAYER_IN_UNFINISHED_TOURNAMENT = "player_in_unfinished_tournament"  # BR-002
+    # Tournaments
+    TOURNAMENT_NOT_FOUND = "tournament_not_found"
+    TOURNAMENT_ID_TAKEN = "tournament_id_taken"
+    TOURNAMENT_NOT_IN_SETUP = "tournament_not_in_setup"
+    TOURNAMENT_TYPE_CHANGED = "tournament_type_changed"
+    SEASON_HAS_UNFINISHED_TOURNAMENTS = "season_has_unfinished_tournaments"  # BR-010
+    DRAWS_NOT_ALLOWED = "draws_not_allowed"  # BO2 in a league without draws (BR-121)
+    # Setup
+    PLAYER_REMOVED = "player_removed"  # a removed player cannot be picked (BR-002)
+    PLAYER_NOT_PICKED = "player_not_picked"
+    DRAW_COUNTER_CHANGED = "draw_counter_changed"
+    SEEDING_METHOD_CHANGED = "seeding_method_changed"
+    SEED_ORDER_CHANGED = "seed_order_changed"
+    DYP_HALVES_INCOMPLETE = "dyp_halves_incomplete"
+    NOTHING_TO_PAIR = "nothing_to_pair"  # "pair the rest" with fewer than 2 left
+    # Engine rules (engine/errors.py)
+    NOT_ENOUGH_PLAYERS = "not_enough_players"
+    DYP_HALVES_UNEQUAL = "dyp_halves_unequal"
+    TOO_MANY_LEFT_OUT = "too_many_left_out"
 
 
 class AppError(Exception):

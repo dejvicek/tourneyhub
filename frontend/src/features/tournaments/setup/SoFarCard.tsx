@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { TournamentFormatWrite } from "@/demo/contract";
 
+import type { FormatForm } from "./format";
 import {
   formatLabel,
   groupPhaseLabel,
@@ -12,7 +12,7 @@ import {
 import { SummaryRow } from "./SummaryRow";
 
 interface SoFarCardProps {
-  format: TournamentFormatWrite;
+  format: FormatForm;
   /** The picked players, once step 2 has them. */
   players?: number;
 }

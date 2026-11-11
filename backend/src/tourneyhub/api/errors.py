@@ -33,9 +33,13 @@ _STATUS_BY_ERROR: dict[type[AppError], HTTPStatus] = {
 }
 
 # Constraint name -> the 409 code of a violation (DATA-MODEL §2). Only constraints
-# that a race can reach belong here: creating a league locks nothing (§4.4).
+# that a race can reach belong here: creating a league locks nothing, and the league
+# locks of two leagues do not exclude each other (§4.4).
 _CONFLICT_BY_CONSTRAINT: dict[str, ErrorCode] = {
     "pk_leagues": ErrorCode.LEAGUE_ID_TAKEN,
+    # One client id sent to two leagues of one organizer: each holds its own league
+    # lock, and the lookup of the id before the insert saw neither row.
+    "pk_tournaments": ErrorCode.TOURNAMENT_ID_TAKEN,
     # Two parallel sign-ups with one email: the check before the insert saw neither.
     "uq_users_lower_email": ErrorCode.EMAIL_TAKEN,
     # Adding or renaming to a name that another request is inserting at the same time.

@@ -41,8 +41,7 @@ function PlayersForm({ data }: { data: SetupData }) {
   const layout = useLayout();
   const navigate = useNavigate();
   const searchId = useId();
-  const { leagueId, tournamentId, tournament, setup, ranking } = data;
-  const format = setup.format;
+  const { leagueId, tournamentId, setup, format, ranking } = data;
   const [picked, setPicked] = useState(() => new Set(setup.player_ids));
   const [query, setQuery] = useState("");
   const save = useMutation(setupMutations.players(leagueId, tournamentId));
@@ -51,7 +50,7 @@ function PlayersForm({ data }: { data: SetupData }) {
     plain(row.name).includes(plain(query.trim())),
   );
   const count = picked.size;
-  const type = tournament.type;
+  const type = format.type;
   const noGroup = format.group_phase === "none";
   const minimum = minimumPlayers(type, format.third_place_match, noGroup);
   const oddDoubles = type === "doubles" && count % 2 === 1;
@@ -288,7 +287,7 @@ function PickRow({
 }
 
 interface PlayersNoticeProps {
-  type: SetupData["tournament"]["type"];
+  type: SetupData["format"]["type"];
   players: number;
   entries: number;
   enough: boolean;

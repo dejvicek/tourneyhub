@@ -1,8 +1,8 @@
 import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import type { components } from "@/api/schema";
 import { Button } from "@/components/ui/button";
-import type { DypHalfWrite, HalvesMethod } from "@/demo/contract";
 import { setupMutations } from "@/features/tournaments/api";
 
 import { describeError, isChanged } from "./errors";
@@ -11,7 +11,8 @@ import { Notice } from "./Notice";
 import { SegmentedControl } from "./SegmentedControl";
 import type { SetupData } from "./SetupPage";
 
-type Choice = DypHalfWrite["half"] | "unset";
+type Half = components["schemas"]["DypHalf"];
+type Choice = Half | "unset";
 
 /** DYP: the halves by the league ranking or by hand, and the draw of the pairs (FR-033, BR-031-BR-033). */
 export function HalvesSection({ data }: { data: SetupData }) {
@@ -25,12 +26,12 @@ export function HalvesSection({ data }: { data: SetupData }) {
   );
   const halfOf = (id: string): Choice =>
     setup.halves.find((row) => row.player_id === id)?.half ?? "unset";
-  const inHalf = (half: DypHalfWrite["half"]) =>
+  const inHalf = (half: Half) =>
     picked.filter((row) => halfOf(row.player_id) === half);
   const top = inHalf("top");
   const bottom = inHalf("bottom");
   const leftOut = inHalf("left_out");
-  const method: HalvesMethod = halves.isPending
+  const method: components["schemas"]["HalvesMethod"] = halves.isPending
     ? halves.variables.method
     : setup.halves_method;
   const odd = picked.length % 2 === 1;

@@ -73,6 +73,8 @@ describe("setup: format (screen 2)", () => {
       group_phase: "round_robin",
       sit_out_points: 1,
       group_match_format: "bo3",
+      knockout_match_format: null,
+      third_place_match: null,
       field_count: 2,
     });
     expect(view.state.location.pathname).toContain(created?.id);
@@ -83,7 +85,18 @@ describe("setup: format (screen 2)", () => {
     renderAt(newTournament);
     await screen.findByRole("textbox", { name: "Name" });
 
+    // A knockout after a group phase is set up when it starts (FR-045).
+    expect(
+      screen.queryByRole("radiogroup", { name: "Knockout matches" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("radiogroup", { name: "Final" }),
+    ).not.toBeInTheDocument();
+
     await user.click(screen.getByRole("radio", { name: "None" }));
+    expect(
+      screen.getByRole("radiogroup", { name: "Knockout matches" }),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("switch", { name: "Points for sitting out" }),
     ).not.toBeInTheDocument();

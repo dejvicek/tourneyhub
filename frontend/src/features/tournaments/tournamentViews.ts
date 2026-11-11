@@ -1,8 +1,17 @@
 // Which screen a tournament opens on and which tabs its header shows, from
 // its state, current phase and format (the Figma file's "Tournament
 // lifecycle" page, src/lib/paths.ts).
-import type { TournamentSummary } from "@/demo/contract";
+import type { components } from "@/api/schema";
 import type { paths } from "@/lib/paths";
+
+/**
+ * What decides a tournament's screens: the season list's summary, or the
+ * whole tournament the running screens read.
+ */
+export type TournamentView = Omit<
+  components["schemas"]["TournamentSummary"],
+  "player_count" | "progress" | "winner_player_ids"
+>;
 
 /** A screen of one tournament, without a match: a key of `paths`. */
 export type TournamentScreen = keyof typeof paths &
@@ -19,16 +28,16 @@ export type TournamentScreen = keyof typeof paths &
     | "lateAndDisabled"
   );
 
-function currentPhase(t: TournamentSummary) {
+function currentPhase(t: TournamentView) {
   return t.phases.find((phase) => phase.id === t.current_phase_id);
 }
 
-function groupFormat(t: TournamentSummary) {
+function groupFormat(t: TournamentView) {
   return t.phases.find((phase) => phase.kind === "group")?.format;
 }
 
 /** The screen that `tournament`, the tournament's own path, redirects to. */
-export function tournamentHome(t: TournamentSummary): TournamentScreen {
+export function tournamentHome(t: TournamentView): TournamentScreen {
   if (t.state === "setup") {
     return "setupPlayers";
   }
@@ -66,7 +75,7 @@ export interface TournamentTab {
  * Standings. A knockout adds its tab once it exists, a finished tournament
  * its places first, and Fields and Players leave once nothing is played.
  */
-export function tournamentTabs(t: TournamentSummary): TournamentTab[] {
+export function tournamentTabs(t: TournamentView): TournamentTab[] {
   if (t.state === "setup") {
     return [];
   }

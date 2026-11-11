@@ -9,12 +9,6 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import type {
-  KnockoutMatchFormat,
-  MatchFormat,
-  TournamentFormatWrite,
-  TournamentType,
-} from "@/demo/contract";
 import { leagueQueries } from "@/features/leagues/api";
 import { setupMutations, setupQueries } from "@/features/tournaments/api";
 import { useLayout } from "@/hooks/useLayout";
@@ -23,6 +17,14 @@ import { paths } from "@/lib/paths";
 
 import { dayAndMonth, today } from "./setup/dates";
 import { describeError } from "./setup/errors";
+import {
+  type FormatForm,
+  formOf,
+  type KnockoutMatchFormat,
+  type MatchFormat,
+  type TournamentType,
+  writeOf,
+} from "./setup/format";
 import { Notice } from "./setup/Notice";
 import { OptionCard } from "./setup/OptionCard";
 import { SegmentedControl } from "./setup/SegmentedControl";
@@ -38,7 +40,7 @@ type GroupChoice = "round_robin" | "twice" | "swiss" | "none";
 const GROUP_CHOICES = ["round_robin", "twice", "swiss", "none"] as const;
 
 function choiceOf(
-  format: Pick<TournamentFormatWrite, "group_phase" | "round_robin_legs">,
+  format: Pick<FormatForm, "group_phase" | "round_robin_legs">,
 ): GroupChoice {
   switch (format.group_phase) {
     case "round_robin":
@@ -80,7 +82,7 @@ export function SetupFormatPage() {
     );
   }
 
-  const defaults: TournamentFormatWrite = {
+  const defaults: FormatForm = {
     name: "",
     date: today(),
     type: "dyp",
@@ -99,7 +101,11 @@ export function SetupFormatPage() {
       key={editingId ?? "new"}
       leagueId={leagueId}
       tournamentId={editingId}
-      initial={existing.data?.format ?? defaults}
+      initial={
+        existing.data === undefined
+          ? defaults
+          : formOf(existing.data.format, settings.data.default_match_format)
+      }
       drawsAllowed={settings.data.draws_allowed}
     />
   );
@@ -109,7 +115,7 @@ interface FormatFormProps {
   leagueId: string;
   /** Set when the tournament exists and the form changes it. */
   tournamentId: string | undefined;
-  initial: TournamentFormatWrite;
+  initial: FormatForm;
   drawsAllowed: boolean;
 }
 
@@ -145,12 +151,13 @@ function FormatForm({
         type: typeLabel(t, form.type),
         date: dayAndMonth(form.date),
       });
-  const payload: TournamentFormatWrite = { ...form, name };
+  const shown: FormatForm = { ...form, name };
+  const payload = writeOf(shown);
   const noGroup = form.group_phase === "none";
   const monster = form.type === "monster_dyp";
   const groupChoice = choiceOf(form);
 
-  const patch = (changes: Partial<TournamentFormatWrite>) => {
+  const patch = (changes: Partial<FormatForm>) => {
     setForm((current) => ({ ...current, ...changes }));
   };
   const chooseType = (type: TournamentType) => {
@@ -343,27 +350,37 @@ function FormatForm({
             }}
           />
         )}
-        <SegmentedControl
-          label={t("tournaments.setup.format.knockoutMatches")}
-          hint={t("tournaments.setup.format.knockoutMatchesHint")}
-          value={form.knockout_match_format}
-          options={formatOptions(knockoutFormats)}
-          onValueChange={(format) => {
-            patch({ knockout_match_format: format });
-          }}
-        />
-        <SegmentedControl
-          label={t("tournaments.setup.format.final")}
-          value={finalChoice}
-          options={[
-            { value: "same", label: t("tournaments.setup.format.finalSame") },
-            { value: "bo3", label: t("tournaments.setup.matchFormat.bo3") },
-            { value: "bo5", label: t("tournaments.setup.matchFormat.bo5") },
-          ]}
-          onValueChange={(choice) => {
-            patch({ final_match_format: choice === "same" ? null : choice });
-          }}
-        />
+        {/* A knockout after a group phase is set up when it starts (FR-045). */}
+        {noGroup && (
+          <>
+            <SegmentedControl
+              label={t("tournaments.setup.format.knockoutMatches")}
+              hint={t("tournaments.setup.format.knockoutMatchesHint")}
+              value={form.knockout_match_format}
+              options={formatOptions(knockoutFormats)}
+              onValueChange={(format) => {
+                patch({ knockout_match_format: format });
+              }}
+            />
+            <SegmentedControl
+              label={t("tournaments.setup.format.final")}
+              value={finalChoice}
+              options={[
+                {
+                  value: "same",
+                  label: t("tournaments.setup.format.finalSame"),
+                },
+                { value: "bo3", label: t("tournaments.setup.matchFormat.bo3") },
+                { value: "bo5", label: t("tournaments.setup.matchFormat.bo5") },
+              ]}
+              onValueChange={(choice) => {
+                patch({
+                  final_match_format: choice === "same" ? null : choice,
+                });
+              }}
+            />
+          </>
+        )}
         {noGroup && (
           <SwitchRow
             label={t("tournaments.setup.format.thirdPlace")}
@@ -455,7 +472,7 @@ function FormatForm({
       {layout === "desktop" ? (
         <div className="grid grid-cols-[1fr_20rem] items-start gap-8">
           {content}
-          <SoFarCard format={payload} />
+          <SoFarCard format={shown} />
         </div>
       ) : (
         content

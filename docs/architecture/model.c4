@@ -166,7 +166,7 @@ model {
         link https://github.com/dejvicek/tourneyhub/blob/docs/data-model-mvp/DATA-MODEL.md#42-leagues-players-and-seasons "DATA-MODEL §4.2"
       }
       tournaments = tableGroup "Tournaments and entries" {
-        description "tournaments, tournament_phases, entries, entry_members, dyp_halves"
+        description "tournaments, tournament_phases, fields, tournament_players, entries, entry_members, dyp_halves"
         link https://github.com/dejvicek/tourneyhub/blob/docs/data-model-mvp/DATA-MODEL.md#43-tournaments-and-phases "DATA-MODEL §4.3"
         link https://github.com/dejvicek/tourneyhub/blob/docs/data-model-mvp/DATA-MODEL.md#44-entries "DATA-MODEL §4.4"
       }

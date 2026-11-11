@@ -1,8 +1,8 @@
 import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import type { components } from "@/api/schema";
 import { Button } from "@/components/ui/button";
-import type { SeedingMethod } from "@/demo/contract";
 import { setupMutations } from "@/features/tournaments/api";
 
 import { seededEntries } from "./entries";
@@ -20,7 +20,7 @@ export function SeedingSection({ data }: { data: SetupData }) {
   const order = useMutation(setupMutations.seedOrder(leagueId, tournamentId));
   const shuffle = useMutation(setupMutations.draw(leagueId, tournamentId));
   const entries = seededEntries(data);
-  const shown: SeedingMethod = method.isPending
+  const shown: components["schemas"]["SeedingMethod"] = method.isPending
     ? method.variables
     : setup.seeding_method;
 

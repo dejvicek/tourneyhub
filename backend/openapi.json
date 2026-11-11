@@ -30,9 +30,166 @@
         "minLength": 1,
         "type": "string"
       },
+      "DrawTarget": {
+        "description": "What \"draw again\" draws: the pairs (DYP, Doubles) or the seeds (shuffle).",
+        "enum": [
+          "pairs",
+          "seeds"
+        ],
+        "title": "DrawTarget",
+        "type": "string"
+      },
+      "DrawWrite": {
+        "additionalProperties": false,
+        "description": "A new draw, with the draw counter the screen showed (ADR-008, ADR-010).",
+        "properties": {
+          "expected_draw_counter": {
+            "maximum": 2147483647.0,
+            "minimum": 0.0,
+            "title": "Expected Draw Counter",
+            "type": "integer"
+          },
+          "target": {
+            "$ref": "#/components/schemas/DrawTarget"
+          }
+        },
+        "required": [
+          "expected_draw_counter",
+          "target"
+        ],
+        "title": "DrawWrite",
+        "type": "object"
+      },
+      "DypHalf": {
+        "description": "Where a DYP player stands before the draw (DATA-MODEL `dyp_halves.half`).",
+        "enum": [
+          "top",
+          "bottom",
+          "left_out"
+        ],
+        "title": "DypHalf",
+        "type": "string"
+      },
+      "DypHalfRead": {
+        "properties": {
+          "half": {
+            "$ref": "#/components/schemas/DypHalf"
+          },
+          "player_id": {
+            "format": "uuid",
+            "title": "Player Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "player_id",
+          "half"
+        ],
+        "title": "DypHalfRead",
+        "type": "object"
+      },
+      "DypHalfWrite": {
+        "additionalProperties": false,
+        "properties": {
+          "half": {
+            "$ref": "#/components/schemas/DypHalf"
+          },
+          "player_id": {
+            "format": "uuid",
+            "title": "Player Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "player_id",
+          "half"
+        ],
+        "title": "DypHalfWrite",
+        "type": "object"
+      },
       "Email": {
         "maxLength": 320,
         "pattern": "^[^@\\s]+@[^@\\s.]+(\\.[^@\\s.]+)+$",
+        "type": "string"
+      },
+      "EntryIds": {
+        "items": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "maxItems": 500,
+        "type": "array"
+      },
+      "EntryKind": {
+        "description": "An entry is one player or a pair (glossary \"Entry\", BR-030).",
+        "enum": [
+          "player",
+          "pair"
+        ],
+        "title": "EntryKind",
+        "type": "string"
+      },
+      "EntryRead": {
+        "description": "An entry: one player, or a pair with its better-ranked player first.\n\nA DYP pair names its top-half player first. `seed` is null in Monster DYP.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_disabled": {
+            "title": "Is Disabled",
+            "type": "boolean"
+          },
+          "is_top_player": {
+            "title": "Is Top Player",
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/EntryKind"
+          },
+          "player_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Player Ids",
+            "type": "array"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/EntryStage"
+          }
+        },
+        "required": [
+          "id",
+          "stage",
+          "kind",
+          "seed",
+          "player_ids",
+          "is_disabled",
+          "is_top_player"
+        ],
+        "title": "EntryRead",
+        "type": "object"
+      },
+      "EntryStage": {
+        "description": "Which phase an entry plays: the first (`main`) or a later knockout (D4).",
+        "enum": [
+          "main",
+          "knockout"
+        ],
+        "title": "EntryStage",
         "type": "string"
       },
       "ErrorCode": {
@@ -59,7 +216,24 @@
           "season_number_changed",
           "player_not_found",
           "player_name_taken",
-          "player_limit_reached"
+          "player_limit_reached",
+          "player_in_unfinished_tournament",
+          "tournament_not_found",
+          "tournament_id_taken",
+          "tournament_not_in_setup",
+          "tournament_type_changed",
+          "season_has_unfinished_tournaments",
+          "draws_not_allowed",
+          "player_removed",
+          "player_not_picked",
+          "draw_counter_changed",
+          "seeding_method_changed",
+          "seed_order_changed",
+          "dyp_halves_incomplete",
+          "nothing_to_pair",
+          "not_enough_players",
+          "dyp_halves_unequal",
+          "too_many_left_out"
         ],
         "title": "ErrorCode",
         "type": "string"
@@ -85,7 +259,70 @@
         "title": "ErrorResponse",
         "type": "object"
       },
+      "FieldCount": {
+        "maximum": 32.0,
+        "minimum": 1.0,
+        "type": "integer"
+      },
+      "GoalsPerGame": {
+        "maximum": 99.0,
+        "minimum": 1.0,
+        "type": "integer"
+      },
+      "GroupPhase": {
+        "description": "The group phase chosen in setup, or none (FR-031).\n\nMonster DYP always plays `monster_dyp`, and the other types never do.",
+        "enum": [
+          "round_robin",
+          "swiss",
+          "monster_dyp",
+          "none"
+        ],
+        "title": "GroupPhase",
+        "type": "string"
+      },
+      "HalvesMethod": {
+        "description": "How a DYP tournament's halves are made (FR-033, BR-032).",
+        "enum": [
+          "ranking",
+          "by_hand"
+        ],
+        "title": "HalvesMethod",
+        "type": "string"
+      },
+      "HalvesWrite": {
+        "additionalProperties": false,
+        "description": "How a DYP tournament's halves are made (FR-033, BR-032).\n\n`ranking` ignores `halves`. `by_hand` sets them as the target state; a\npicked player without a row has no half yet.",
+        "properties": {
+          "halves": {
+            "items": {
+              "$ref": "#/components/schemas/DypHalfWrite"
+            },
+            "maxItems": 500,
+            "title": "Halves",
+            "type": "array"
+          },
+          "method": {
+            "$ref": "#/components/schemas/HalvesMethod"
+          }
+        },
+        "required": [
+          "method",
+          "halves"
+        ],
+        "title": "HalvesWrite",
+        "type": "object"
+      },
       "JsonValue": {},
+      "KnockoutMatchFormat": {
+        "description": "A match format a knockout and its final can play: never BO2 (BR-121).",
+        "enum": [
+          "bo1",
+          "bo3",
+          "bo5"
+        ],
+        "title": "KnockoutMatchFormat",
+        "type": "string"
+      },
       "Language": {
         "description": "The UI language an account remembers (FR-081, DATA-MODEL \u00a74.1).",
         "enum": [
@@ -300,12 +537,54 @@
         "title": "LoginRequest",
         "type": "object"
       },
+      "MatchFormat": {
+        "description": "Best of how many games a match is (BR-120); BO2 only in group phases (BR-121).",
+        "enum": [
+          "bo1",
+          "bo2",
+          "bo3",
+          "bo5"
+        ],
+        "title": "MatchFormat",
+        "type": "string"
+      },
       "NewPassword": {
         "format": "password",
         "maxLength": 1024,
         "minLength": 15,
         "type": "string",
         "writeOnly": true
+      },
+      "PairsWrite": {
+        "additionalProperties": false,
+        "description": "A Doubles tournament's pairs, the target state (FR-033, BR-003, BR-030).\n\nNo player twice (`given_twice`); picked players left out have no partner yet.",
+        "properties": {
+          "pairs": {
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            },
+            "maxItems": 250,
+            "title": "Pairs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "pairs"
+        ],
+        "title": "PairsWrite",
+        "type": "object"
       },
       "PasswordChange": {
         "additionalProperties": false,
@@ -327,6 +606,53 @@
           "new_password"
         ],
         "title": "PasswordChange",
+        "type": "object"
+      },
+      "PhaseFormat": {
+        "description": "How a phase is played: one of the group formats, or the knockout's.",
+        "enum": [
+          "round_robin",
+          "swiss",
+          "monster_dyp",
+          "single_elimination"
+        ],
+        "title": "PhaseFormat",
+        "type": "string"
+      },
+      "PhaseKind": {
+        "description": "A phase is a group phase or a knockout (DATA-MODEL \u00a74.3, D9).",
+        "enum": [
+          "group",
+          "knockout"
+        ],
+        "title": "PhaseKind",
+        "type": "string"
+      },
+      "PhaseSummary": {
+        "properties": {
+          "format": {
+            "$ref": "#/components/schemas/PhaseFormat"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PhaseKind"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "position",
+          "kind",
+          "format"
+        ],
+        "title": "PhaseSummary",
         "type": "object"
       },
       "PlacementPoints": {
@@ -366,6 +692,14 @@
         ],
         "title": "PlayerCreate",
         "type": "object"
+      },
+      "PlayerIds": {
+        "items": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "maxItems": 500,
+        "type": "array"
       },
       "PlayerName": {
         "maxLength": 100,
@@ -434,6 +768,20 @@
         "title": "PlayerRename",
         "type": "object"
       },
+      "PlayersWrite": {
+        "additionalProperties": false,
+        "description": "The players picked for the tournament, the target state (FR-032).",
+        "properties": {
+          "player_ids": {
+            "$ref": "#/components/schemas/PlayerIds"
+          }
+        },
+        "required": [
+          "player_ids"
+        ],
+        "title": "PlayersWrite",
+        "type": "object"
+      },
       "ProfileUpdate": {
         "additionalProperties": false,
         "description": "The fields to change; a field left out or null stays as it is.",
@@ -460,6 +808,31 @@
           }
         },
         "title": "ProfileUpdate",
+        "type": "object"
+      },
+      "RankingRow": {
+        "description": "A player's place in the league ranking this tournament uses (BR-020).",
+        "properties": {
+          "player_id": {
+            "format": "uuid",
+            "title": "Player Id",
+            "type": "string"
+          },
+          "points": {
+            "title": "Points",
+            "type": "integer"
+          },
+          "rank": {
+            "title": "Rank",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rank",
+          "player_id",
+          "points"
+        ],
+        "title": "RankingRow",
         "type": "object"
       },
       "SeasonName": {
@@ -577,6 +950,43 @@
         "title": "SeasonState",
         "type": "string"
       },
+      "SeedOrderWrite": {
+        "additionalProperties": false,
+        "description": "Every main entry, seed 1 first: the full order, never a move (ADR-008).",
+        "properties": {
+          "entry_ids": {
+            "$ref": "#/components/schemas/EntryIds"
+          }
+        },
+        "required": [
+          "entry_ids"
+        ],
+        "title": "SeedOrderWrite",
+        "type": "object"
+      },
+      "SeedingMethod": {
+        "description": "How the first phase is seeded (FR-034, BR-021, BR-022).",
+        "enum": [
+          "ranking",
+          "random"
+        ],
+        "title": "SeedingMethod",
+        "type": "string"
+      },
+      "SeedingWrite": {
+        "additionalProperties": false,
+        "description": "Seed by league ranking or by random shuffle (FR-034, BR-021, BR-022).",
+        "properties": {
+          "method": {
+            "$ref": "#/components/schemas/SeedingMethod"
+          }
+        },
+        "required": [
+          "method"
+        ],
+        "title": "SeedingWrite",
+        "type": "object"
+      },
       "SignUpRequest": {
         "additionalProperties": false,
         "description": "A new account and the instance's sign-up code (FR-001); the throttle reads it.",
@@ -610,6 +1020,595 @@
         ],
         "title": "SignUpRequest",
         "type": "object"
+      },
+      "TournamentCreate": {
+        "additionalProperties": false,
+        "description": "A new tournament in the league's active season (FR-030).\n\n`id` is a UUIDv7 made by the client; a repeat gets the same tournament back\n(ADR-008). A setting left out or null takes the league's default: goals per\ngame, the number of fields and the match format of the phase (FR-011); one\nround robin leg, no sit-out points (FR-039) and no third-place match.",
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "field_count": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FieldCount"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "final_match_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KnockoutMatchFormat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "goals_per_game": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GoalsPerGame"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "group_match_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MatchFormat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "group_phase": {
+            "$ref": "#/components/schemas/GroupPhase"
+          },
+          "id": {
+            "format": "uuid7",
+            "title": "Id",
+            "type": "string"
+          },
+          "knockout_match_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KnockoutMatchFormat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "$ref": "#/components/schemas/TournamentName"
+          },
+          "round_robin_legs": {
+            "anyOf": [
+              {
+                "enum": [
+                  1,
+                  2
+                ],
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Round Robin Legs"
+          },
+          "sit_out_points": {
+            "anyOf": [
+              {
+                "enum": [
+                  0,
+                  1
+                ],
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sit Out Points"
+          },
+          "third_place_match": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Third Place Match"
+          },
+          "type": {
+            "$ref": "#/components/schemas/TournamentType"
+          }
+        },
+        "required": [
+          "name",
+          "date",
+          "type",
+          "group_phase",
+          "id"
+        ],
+        "title": "TournamentCreate",
+        "type": "object"
+      },
+      "TournamentFormatRead": {
+        "description": "The format as stored; settings that do not apply are null (FR-031).",
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "field_count": {
+            "title": "Field Count",
+            "type": "integer"
+          },
+          "final_match_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KnockoutMatchFormat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "goals_per_game": {
+            "title": "Goals Per Game",
+            "type": "integer"
+          },
+          "group_match_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MatchFormat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "group_phase": {
+            "$ref": "#/components/schemas/GroupPhase"
+          },
+          "knockout_match_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KnockoutMatchFormat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "round_robin_legs": {
+            "anyOf": [
+              {
+                "enum": [
+                  1,
+                  2
+                ],
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Round Robin Legs"
+          },
+          "sit_out_points": {
+            "anyOf": [
+              {
+                "enum": [
+                  0,
+                  1
+                ],
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sit Out Points"
+          },
+          "third_place_match": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Third Place Match"
+          },
+          "type": {
+            "$ref": "#/components/schemas/TournamentType"
+          }
+        },
+        "required": [
+          "name",
+          "date",
+          "type",
+          "group_phase",
+          "round_robin_legs",
+          "sit_out_points",
+          "group_match_format",
+          "knockout_match_format",
+          "final_match_format",
+          "third_place_match",
+          "goals_per_game",
+          "field_count"
+        ],
+        "title": "TournamentFormatRead",
+        "type": "object"
+      },
+      "TournamentFormatWrite": {
+        "additionalProperties": false,
+        "description": "The whole format of a tournament in setup, the target state (FR-030, FR-031).\n\nWith a group phase (`round_robin`, `swiss`, `monster_dyp`) its settings are\ngiven and the knockout's are null: a knockout after a group phase is set up\nwhen it starts (FR-045). With `none` the knockout's settings are given and\nthe group phase's are null. `round_robin_legs` is only for a round robin.\nA setting that does not apply is 422 `validation_failed` with\n`setting_not_applicable`; one that applies and is missing, `setting_missing`.",
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "field_count": {
+            "$ref": "#/components/schemas/FieldCount"
+          },
+          "final_match_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KnockoutMatchFormat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "goals_per_game": {
+            "$ref": "#/components/schemas/GoalsPerGame"
+          },
+          "group_match_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MatchFormat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "group_phase": {
+            "$ref": "#/components/schemas/GroupPhase"
+          },
+          "knockout_match_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KnockoutMatchFormat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "$ref": "#/components/schemas/TournamentName"
+          },
+          "round_robin_legs": {
+            "anyOf": [
+              {
+                "enum": [
+                  1,
+                  2
+                ],
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Round Robin Legs"
+          },
+          "sit_out_points": {
+            "anyOf": [
+              {
+                "enum": [
+                  0,
+                  1
+                ],
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sit Out Points"
+          },
+          "third_place_match": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Third Place Match"
+          },
+          "type": {
+            "$ref": "#/components/schemas/TournamentType"
+          }
+        },
+        "required": [
+          "name",
+          "date",
+          "type",
+          "group_phase",
+          "round_robin_legs",
+          "sit_out_points",
+          "group_match_format",
+          "knockout_match_format",
+          "final_match_format",
+          "third_place_match",
+          "goals_per_game",
+          "field_count"
+        ],
+        "title": "TournamentFormatWrite",
+        "type": "object"
+      },
+      "TournamentName": {
+        "maxLength": 100,
+        "minLength": 1,
+        "type": "string"
+      },
+      "TournamentProgress": {
+        "description": "How far a running tournament is: rounds and matches with results.",
+        "properties": {
+          "in_knockout": {
+            "title": "In Knockout",
+            "type": "boolean"
+          },
+          "match_count": {
+            "title": "Match Count",
+            "type": "integer"
+          },
+          "matches_played": {
+            "title": "Matches Played",
+            "type": "integer"
+          },
+          "round_count": {
+            "title": "Round Count",
+            "type": "integer"
+          },
+          "round_no": {
+            "title": "Round No",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "round_no",
+          "round_count",
+          "matches_played",
+          "match_count",
+          "in_knockout"
+        ],
+        "title": "TournamentProgress",
+        "type": "object"
+      },
+      "TournamentSetupRead": {
+        "description": "What the setup screens show (FR-030 to FR-034).\n\n`draw_counter` goes back in \"draw again\" (ADR-008). `player_ids` are the\npicked players in league-ranking order; `ranking` lists every player on the\nleague's list. `entries` are the main entries by seed.",
+        "properties": {
+          "draw_counter": {
+            "title": "Draw Counter",
+            "type": "integer"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/EntryRead"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "format": {
+            "$ref": "#/components/schemas/TournamentFormatRead"
+          },
+          "halves": {
+            "items": {
+              "$ref": "#/components/schemas/DypHalfRead"
+            },
+            "title": "Halves",
+            "type": "array"
+          },
+          "halves_method": {
+            "$ref": "#/components/schemas/HalvesMethod"
+          },
+          "player_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Player Ids",
+            "type": "array"
+          },
+          "ranking": {
+            "items": {
+              "$ref": "#/components/schemas/RankingRow"
+            },
+            "title": "Ranking",
+            "type": "array"
+          },
+          "seeding_method": {
+            "$ref": "#/components/schemas/SeedingMethod"
+          },
+          "state": {
+            "$ref": "#/components/schemas/TournamentState"
+          },
+          "top_player_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Top Player Ids",
+            "type": "array"
+          },
+          "tournament_id": {
+            "format": "uuid",
+            "title": "Tournament Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tournament_id",
+          "state",
+          "format",
+          "seeding_method",
+          "draw_counter",
+          "player_ids",
+          "halves_method",
+          "halves",
+          "top_player_ids",
+          "entries",
+          "ranking"
+        ],
+        "title": "TournamentSetupRead",
+        "type": "object"
+      },
+      "TournamentState": {
+        "description": "Where a tournament is in its life (ADR-009, DATA-MODEL \u00a74.3).",
+        "enum": [
+          "setup",
+          "in_progress",
+          "finished"
+        ],
+        "title": "TournamentState",
+        "type": "string"
+      },
+      "TournamentSummary": {
+        "description": "A tournament in its season's list (screen 1).\n\n`player_count` counts the picked players in setup, and the players in the\nentries afterwards. `current_phase_id` and `progress` are null, and\n`winner_player_ids` too, until the tournament is generated and finished.",
+        "properties": {
+          "current_phase_done": {
+            "title": "Current Phase Done",
+            "type": "boolean"
+          },
+          "current_phase_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Phase Id"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "phases": {
+            "items": {
+              "$ref": "#/components/schemas/PhaseSummary"
+            },
+            "title": "Phases",
+            "type": "array"
+          },
+          "player_count": {
+            "title": "Player Count",
+            "type": "integer"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TournamentProgress"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "season_id": {
+            "format": "uuid",
+            "title": "Season Id",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/TournamentState"
+          },
+          "type": {
+            "$ref": "#/components/schemas/TournamentType"
+          },
+          "winner_player_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Winner Player Ids"
+          }
+        },
+        "required": [
+          "id",
+          "season_id",
+          "name",
+          "date",
+          "type",
+          "state",
+          "phases",
+          "current_phase_id",
+          "current_phase_done",
+          "player_count",
+          "progress",
+          "winner_player_ids"
+        ],
+        "title": "TournamentSummary",
+        "type": "object"
+      },
+      "TournamentType": {
+        "description": "What a tournament plays (FR-030).",
+        "enum": [
+          "singles",
+          "doubles",
+          "dyp",
+          "monster_dyp"
+        ],
+        "title": "TournamentType",
+        "type": "string"
       },
       "UserRead": {
         "description": "The caller's account.",
@@ -1951,6 +2950,1032 @@
         "summary": "Set Placement Points",
         "tags": [
           "leagues"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/seasons/{season_id}/tournaments": {
+      "get": {
+        "description": "List a season's tournaments, newest date first; closed seasons too (FR-022).\n\nAnother league's season is 404 `season_not_found`.",
+        "operationId": "list_tournaments",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "season_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Season Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TournamentSummary"
+                  },
+                  "title": "Response List Tournaments",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Tournaments",
+        "tags": [
+          "tournaments"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/tournaments": {
+      "post": {
+        "description": "Create a tournament in setup in the league's active season (FR-030).\n\nA repeat gets the tournament back. An id that another tournament has, in\nanother season or with another type, is 409 `tournament_id_taken`. BO2 in a\nleague without draws is 422 `draws_not_allowed` (BR-121).",
+        "operationId": "create_tournament",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TournamentCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TournamentSetupRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Tournament",
+        "tags": [
+          "tournaments"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}": {
+      "delete": {
+        "description": "Delete a tournament with everything in it, in any state (FR-038).\n\nThe UI asks first. A tournament of a closed season is 409 `season_closed`;\na repeated delete is 404 `tournament_not_found`, which means it is gone.",
+        "operationId": "delete_tournament",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Tournament",
+        "tags": [
+          "tournaments"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/format": {
+      "put": {
+        "description": "Set the format of a tournament in setup (FR-030, FR-031, FR-039).\n\nA new type keeps the picked players and makes the entries again. A started\ntournament is 409 `tournament_not_in_setup`, as for every setup write.",
+        "operationId": "set_tournament_format",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TournamentFormatWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TournamentSetupRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Tournament Format",
+        "tags": [
+          "tournaments"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup": {
+      "get": {
+        "description": "Return a tournament's setup; another league's tournament is 404.",
+        "operationId": "read_tournament_setup",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TournamentSetupRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Read Tournament Setup",
+        "tags": [
+          "tournaments"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/draw": {
+      "post": {
+        "description": "Draw again: a new DYP draw, the rest of Doubles paired, or a shuffle (ADR-010).\n\nA stale `expected_draw_counter` is 409 `draw_counter_changed` with the\ncurrent `draw_counter`. Shuffling seeds that come from the ranking is 409\n`seeding_method_changed`. A DYP draw needs complete, valid halves: 422\n`dyp_halves_incomplete`, `dyp_halves_unequal`, `too_many_left_out` or\n`not_enough_players`. Pairing the rest of Doubles with fewer than two\nunpaired players is 422 `nothing_to_pair`; nothing changes.",
+        "operationId": "draw_again",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DrawWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TournamentSetupRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Draw Again",
+        "tags": [
+          "tournaments"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/halves": {
+      "put": {
+        "description": "Make a DYP tournament's halves by ranking or by hand (FR-033, BR-032).\n\nOnce every picked player has a half and the halves are equal, with at most\none left out, the partners are drawn (BR-033). 409 `player_not_picked` and\n`tournament_type_changed` as for pairs.",
+        "operationId": "set_dyp_halves",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HalvesWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TournamentSetupRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Dyp Halves",
+        "tags": [
+          "tournaments"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/pairs": {
+      "put": {
+        "description": "Set a Doubles tournament's pairs (FR-033, BR-003, BR-030).\n\nA player who is not picked is 409 `player_not_picked`; a tournament of\nanother type is 409 `tournament_type_changed`. Reload on both.",
+        "operationId": "set_doubles_pairs",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PairsWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TournamentSetupRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Doubles Pairs",
+        "tags": [
+          "tournaments"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/players": {
+      "put": {
+        "description": "Pick the tournament's players (FR-032).\n\nAn id that is not a player of the league is 404 `player_not_found`; a\nremoved player is 409 `player_removed` (BR-002): reload. A change makes the entries\nand draws again, and increments the draw counter (ADR-010).",
+        "operationId": "set_tournament_players",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayersWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TournamentSetupRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Tournament Players",
+        "tags": [
+          "tournaments"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/seed-order": {
+      "put": {
+        "description": "Reorder the seeds by hand (FR-034).\n\nAn order that does not list exactly the current entries is 409\n`seed_order_changed`: reload.",
+        "operationId": "set_seed_order",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeedOrderWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TournamentSetupRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Seed Order",
+        "tags": [
+          "tournaments"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/seeding": {
+      "put": {
+        "description": "Seed by league ranking or by random shuffle (FR-034).\n\nMonster DYP has no seeds: 409 `tournament_type_changed`.",
+        "operationId": "set_seeding_method",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeedingWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TournamentSetupRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Seeding Method",
+        "tags": [
+          "tournaments"
         ]
       }
     },
