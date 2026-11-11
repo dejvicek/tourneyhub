@@ -1,16 +1,35 @@
 """Results, the play read, finishing and the places (FR-040, FR-050 to FR-060)."""
 
+import threading
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid7
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
+from tourneyhub.app import create_app
+from tourneyhub.db.models.accounts import User
 from tourneyhub.db.models.leagues import League, Player, Season
+from tourneyhub.db.models.matches import Match, MatchGame
+from tourneyhub.db.models.tournaments import Tournament
+from tourneyhub.engine.accounts import Language
 from tourneyhub.engine.leagues import SeasonState
+from tourneyhub.engine.results import Game
+from tourneyhub.engine.tournaments import (
+    GroupPhase,
+    Outcome,
+    SeedingMethod,
+    TournamentState,
+    TournamentType,
+)
+from tourneyhub.services import leagues as league_service
+from tourneyhub.services import players as player_service
+from tourneyhub.services import tournaments as tournament_service
+from tourneyhub.settings import Settings
 
 type Json = dict[str, Any]
 
@@ -795,3 +814,366 @@ def test_fr040_a_tournament_in_progress_has_no_places_yet(
     tournament = start(players[:2])
 
     assert read(tournament, "/places") == {"complete": False, "rows": []}
+
+
+# ---------------------------------------------------------------- authorization
+
+
+@pytest.fixture
+def other_league(league: League, make_league: Callable[..., League]) -> UUID:
+    """A second league of the same organizer."""
+    return make_league(owner_user_id=league.owner_user_id).id
+
+
+READS_AND_WRITES = [
+    pytest.param("GET", "/play", None, id="play"),
+    pytest.param("GET", "/places", None, id="places"),
+    pytest.param("POST", "/finish", {"expected_state": "in_progress"}, id="finish"),
+    pytest.param("PUT", "/matches/{match_id}/result", S1_WINS, id="result"),
+]
+
+
+@pytest.mark.parametrize(("method", "rest", "body"), READS_AND_WRITES)
+def test_owasp_api1_another_organizer_finds_neither_league_nor_tournament(
+    start: Callable[..., Json],
+    read: Callable[[Json, str], Json],
+    client: TestClient,
+    league_id: UUID,
+    auth_header: Callable[..., dict[str, str]],
+    make_user: Callable[..., User],
+    players: list[str],
+    method: str,
+    rest: str,
+    body: Json | None,
+) -> None:
+    tournament = start(players[:2])
+    stranger = auth_header(make_user().id)
+
+    response = client.request(
+        method,
+        _t_url(
+            league_id,
+            tournament["id"],
+            rest.format(match_id=matches_of(tournament)[0]["id"]),
+        ),
+        json=body,
+        headers=stranger,
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"code": "league_not_found", "detail": {}}
+    assert read(tournament, "") == tournament
+
+
+@pytest.mark.parametrize(("method", "rest", "body"), READS_AND_WRITES)
+def test_owasp_api1_a_tournament_of_another_league_is_not_found(
+    start: Callable[..., Json],
+    client: TestClient,
+    headers: dict[str, str],
+    other_league: UUID,
+    players: list[str],
+    method: str,
+    rest: str,
+    body: Json | None,
+) -> None:
+    tournament = start(players[:2])
+    rest = rest.format(match_id=matches_of(tournament)[0]["id"])
+
+    response = client.request(
+        method, _t_url(other_league, tournament["id"], rest), json=body, headers=headers
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"code": "tournament_not_found", "detail": {}}
+
+
+@pytest.mark.parametrize(("method", "rest", "body"), READS_AND_WRITES)
+def test_owasp_api1_an_unknown_tournament_is_not_found(
+    client: TestClient,
+    headers: dict[str, str],
+    league_id: UUID,
+    method: str,
+    rest: str,
+    body: Json | None,
+) -> None:
+    response = client.request(
+        method,
+        _t_url(league_id, str(uuid7()), rest.format(match_id=uuid7())),
+        json=body,
+        headers=headers,
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"code": "tournament_not_found", "detail": {}}
+
+
+# ---------------------------------------------------------------- races
+
+
+def _commit_started(
+    engine: Engine, now: datetime, *, player_count: int, field_count: int
+) -> tuple[UUID, UUID, UUID]:
+    """A committed league with a started round robin; its owner, league and tournament."""
+    with Session(engine) as setup:
+        owner = User(
+            email="results@example.test",
+            display_name="Racer",
+            password_hash="!",
+            language=Language.EN,
+            created_at=now,
+        )
+        setup.add(owner)
+        setup.flush()
+        league = league_service.create_league(
+            setup, league_id=uuid7(), owner_user_id=owner.id, name="Race", now=now
+        )
+        player_ids = [
+            player_service.add_player(
+                setup,
+                league_id=league.id,
+                user_id=owner.id,
+                name=f"P{n}",
+                clock=lambda: now,
+            ).id
+            for n in range(player_count)
+        ]
+        tournament_id = uuid7()
+        tournament_service.create_tournament(
+            setup,
+            league_id=league.id,
+            user_id=owner.id,
+            tournament_id=tournament_id,
+            request=tournament_service.FormatRequest(
+                name="Race",
+                date=now.date(),
+                type=TournamentType.SINGLES,
+                group_phase=GroupPhase.ROUND_ROBIN,
+                field_count=field_count,
+            ),
+            clock=lambda: now,
+        )
+        tournament_service.set_tournament_players(
+            setup,
+            league_id=league.id,
+            tournament_id=tournament_id,
+            user_id=owner.id,
+            player_ids=player_ids,
+            clock=lambda: now,
+        )
+        counter = tournament_service.set_seeding_method(
+            setup,
+            league_id=league.id,
+            tournament_id=tournament_id,
+            user_id=owner.id,
+            method=SeedingMethod.RANDOM,
+            clock=lambda: now,
+        ).draw_counter
+        tournament_service.start_tournament(
+            setup,
+            league_id=league.id,
+            tournament_id=tournament_id,
+            user_id=owner.id,
+            expected_draw_counter=counter,
+            clock=lambda: now,
+        )
+        setup.commit()
+        return owner.id, league.id, tournament_id
+
+
+_WIN = tournament_service.MatchResult(
+    walkover_winner=None, games=(Game(winner=Outcome.SIDE_1, score_1=10, score_2=7),)
+)
+_CLEAR = tournament_service.MatchResult(walkover_winner=None, games=())
+
+
+def _enter(
+    session: Session,
+    ids: tuple[UUID, UUID, UUID],
+    match_id: UUID,
+    result: tournament_service.MatchResult,
+    now: datetime,
+) -> None:
+    owner_id, league_id, tournament_id = ids
+    tournament_service.set_match_result(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        match_id=match_id,
+        user_id=owner_id,
+        result=result,
+        clock=lambda: now,
+    )
+
+
+def _view(
+    engine: Engine, ids: tuple[UUID, UUID, UUID]
+) -> tournament_service.TournamentView:
+    owner_id, league_id, tournament_id = ids
+    with Session(engine) as check:
+        return tournament_service.read_tournament(
+            check, league_id=league_id, tournament_id=tournament_id, user_id=owner_id
+        )
+
+
+@pytest.mark.concurrency
+def test_adr008_results_on_two_fields_at_once_leave_each_field_one_match(
+    committing_settings: Settings,
+    committing_engine: Engine,
+    now: datetime,
+    committed_auth_header: Callable[..., dict[str, str]],
+    wait_for_a_lock_wait: Callable[[], None],
+) -> None:
+    ids = _commit_started(committing_engine, now, player_count=4, field_count=2)
+    owner_id, league_id, tournament_id = ids
+    started = _view(committing_engine, ids)
+    on_fields = [
+        f.match_id
+        for f in sorted(started.fields, key=lambda f: f.number)
+        if f.match_id is not None
+    ]
+    assert len(on_fields) == 2
+    outcome: list[tuple[int, object]] = []
+
+    with (
+        Session(committing_engine) as first,
+        TestClient(create_app(committing_settings)) as client,
+    ):
+        _enter(first, ids, on_fields[0], _WIN, now)
+
+        def second_result() -> None:
+            response = client.put(
+                _t_url(
+                    league_id, str(tournament_id), f"/matches/{on_fields[1]}/result"
+                ),
+                json=S1_WINS,
+                headers=committed_auth_header(owner_id, issued_at=datetime.now(UTC)),
+            )
+            outcome.append((response.status_code, response.json()["id"]))
+
+        second = threading.Thread(target=second_result)
+        second.start()
+        wait_for_a_lock_wait()  # it waits for the league lock the first one holds
+        first.commit()
+        second.join()
+
+    assert outcome == [(200, str(on_fields[1]))]
+    after = _view(committing_engine, ids)
+    placed = [f.match_id for f in sorted(after.fields, key=lambda f: f.number)]
+    # Both results are in, so the fields hold the first two waiting matches and the
+    # rest keep their order (BR-130).
+    assert placed == list(started.waiting[:2])
+    assert after.waiting == started.waiting[2:]
+    assert len(set(placed)) == 2
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize(
+    "finish_first", [True, False], ids=["finish-first", "clear-first"]
+)
+def test_br095_finishing_racing_a_clear_ends_in_one_consistent_state(
+    committing_settings: Settings,
+    committing_engine: Engine,
+    now: datetime,
+    committed_auth_header: Callable[..., dict[str, str]],
+    wait_for_a_lock_wait: Callable[[], None],
+    finish_first: bool,
+) -> None:
+    ids = _commit_started(committing_engine, now, player_count=2, field_count=1)
+    owner_id, league_id, tournament_id = ids
+    match_id = _view(committing_engine, ids).rounds[0].matches[0].id
+    with Session(committing_engine) as setup:
+        _enter(setup, ids, match_id, _WIN, now)
+        setup.commit()
+    outcome: list[tuple[int, object]] = []
+
+    with (
+        Session(committing_engine) as first,
+        TestClient(create_app(committing_settings)) as client,
+    ):
+        if finish_first:
+            tournament_service.finish_tournament(
+                first,
+                league_id=league_id,
+                tournament_id=tournament_id,
+                user_id=owner_id,
+                clock=lambda: now,
+            )
+        else:
+            _enter(first, ids, match_id, _CLEAR, now)
+
+        def racing() -> None:
+            headers = committed_auth_header(owner_id, issued_at=datetime.now(UTC))
+            if finish_first:
+                response = client.put(
+                    _t_url(
+                        league_id, str(tournament_id), f"/matches/{match_id}/result"
+                    ),
+                    json=EMPTY,
+                    headers=headers,
+                )
+            else:
+                response = client.post(
+                    _t_url(league_id, str(tournament_id), "/finish"),
+                    json={"expected_state": "in_progress"},
+                    headers=headers,
+                )
+            outcome.append((response.status_code, response.json()))
+
+        second = threading.Thread(target=racing)
+        second.start()
+        wait_for_a_lock_wait()
+        first.commit()
+        second.join()
+
+    if finish_first:
+        # The clear waited, saw the finished tournament and put it back in progress.
+        assert [status for status, _ in outcome] == [200]
+    else:
+        # The finish waited and saw the match without a result.
+        assert outcome == [
+            (422, {"code": "group_phase_not_done", "detail": {"matches_left": 1}})
+        ]
+    with Session(committing_engine) as check:
+        assert check.scalars(select(Tournament.state)).all() == [
+            TournamentState.IN_PROGRESS
+        ]
+        assert check.scalars(select(Match.outcome)).all() == [None]
+
+
+@pytest.mark.concurrency
+def test_adr008_the_same_result_sent_twice_at_once_is_written_once(
+    committing_settings: Settings,
+    committing_engine: Engine,
+    now: datetime,
+    committed_auth_header: Callable[..., dict[str, str]],
+    wait_for_a_lock_wait: Callable[[], None],
+) -> None:
+    ids = _commit_started(committing_engine, now, player_count=2, field_count=1)
+    owner_id, league_id, tournament_id = ids
+    match_id = _view(committing_engine, ids).rounds[0].matches[0].id
+    outcome: list[tuple[int, object]] = []
+
+    with (
+        Session(committing_engine) as first,
+        TestClient(create_app(committing_settings)) as client,
+    ):
+        _enter(first, ids, match_id, _WIN, now)
+
+        def same_again() -> None:
+            response = client.put(
+                _t_url(league_id, str(tournament_id), f"/matches/{match_id}/result"),
+                json=S1_WINS,  # the real clock of the request is later than `now`
+                headers=committed_auth_header(owner_id, issued_at=datetime.now(UTC)),
+            )
+            outcome.append((response.status_code, response.json()["result_entered_at"]))
+
+        second = threading.Thread(target=same_again)
+        second.start()
+        wait_for_a_lock_wait()
+        first.commit()
+        second.join()
+
+    assert outcome == [(200, now.isoformat().replace("+00:00", "Z"))]
+    with Session(committing_engine) as check:
+        assert check.scalar(select(Match.result_entered_at)) == now
+        assert check.scalar(select(func.count()).select_from(MatchGame)) == 1
