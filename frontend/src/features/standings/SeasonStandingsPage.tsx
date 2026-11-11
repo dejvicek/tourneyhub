@@ -56,9 +56,16 @@ export function SeasonStandingsPage() {
       />
     );
   }
-  if (season === undefined || standings.data === undefined) {
+  // The standings are served with P10; until then there are none to show.
+  const standingsLater =
+    standings.data === undefined && standings.fetchStatus === "idle";
+  if (
+    season === undefined ||
+    (standings.data === undefined && !standingsLater)
+  ) {
     return <Loading />;
   }
+  const rows = standings.data ?? [];
 
   const names = new Map(
     (players.data ?? []).map((p) => [p.id, shortName(p.name)] as const),
@@ -108,7 +115,11 @@ export function SeasonStandingsPage() {
         </div>
       )}
 
-      {standings.data.length === 0 ? (
+      {standingsLater ? (
+        <p className="text-body-md text-muted-foreground">
+          {t("standings.season.later")}
+        </p>
+      ) : rows.length === 0 ? (
         <Notice tone="info" title={t("standings.season.emptyTitle")}>
           {t("standings.season.emptyBody")}
         </Notice>
@@ -139,7 +150,7 @@ export function SeasonStandingsPage() {
               </tr>
             </thead>
             <tbody>
-              {standings.data.map((row) => (
+              {rows.map((row) => (
                 <tr key={row.player_id} className="border-t border-border">
                   <td className="py-2.5 pr-2 font-display text-score-m">
                     {row.place}

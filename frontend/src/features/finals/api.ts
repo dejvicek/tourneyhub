@@ -17,6 +17,7 @@ import type {
 } from "@/demo/contract";
 import type { MonsterKnockoutMode } from "@/demo/rules";
 import { tournamentQueries } from "@/features/tournaments/api";
+import { providesProvisionalRoutes } from "@/lib/demoMode";
 
 // Provisional routes of the demo's contract, "finals" section
 // (src/demo/contract.ts), except the places, which the backend serves (P8). Keys start with the entity (docs/frontend-style.md §8.1).
@@ -60,6 +61,8 @@ export const finalsQueries = {
   seasonEffect: (leagueId: string, tournamentId: string) =>
     queryOptions({
       queryKey: [...tournamentKey(leagueId, tournamentId), "season-effect"],
+      // The backend serves this with P10; outside demo mode it stays off.
+      enabled: providesProvisionalRoutes(),
       queryFn: ({ signal }) =>
         dataOf(
           provisionalApi.GET(

@@ -127,7 +127,21 @@ function FinishedContent() {
     </section>
   );
 
-  const seasonSection = (
+  // The season's effect is served with P10; until then there is none to show.
+  const seasonLater =
+    effect.data === undefined && effect.fetchStatus === "idle";
+  const seasonSection = seasonLater ? (
+    <section aria-labelledby="season-after" className="space-y-3">
+      <h2 id="season-after" className="font-display text-display-section">
+        {t("finals.finished.seasonTitle", {
+          season: season === undefined ? "" : seasonName(season),
+        })}
+      </h2>
+      <p className="text-body-md text-muted-foreground">
+        {t("finals.finished.seasonLater")}
+      </p>
+    </section>
+  ) : (
     <section aria-labelledby="season-after" className="space-y-3">
       <div>
         <h2 id="season-after" className="font-display text-display-section">
