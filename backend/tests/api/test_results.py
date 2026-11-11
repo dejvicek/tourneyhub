@@ -682,10 +682,7 @@ def test_br071_a_round_robin_stores_no_sit_out_points(
     tournament = start(players[:3], group_match_format="bo3")
 
     phase = tournament["phases"][0]
-    assert (phase["sit_out_points"], phase["sit_out_points_set_by_hand"]) == (
-        None,
-        False,
-    )
+    assert phase["sit_out_points"] is None
 
 
 def test_br131_a_waiting_match_names_the_field_its_players_are_on(

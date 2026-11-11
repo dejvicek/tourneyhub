@@ -438,7 +438,6 @@ _PUBLIC_PROPERTIES: dict[str, set[str]] = {
         "qualifiers",
         "round_robin_legs",
         "sit_out_points",
-        "sit_out_points_set_by_hand",
         "third_place_match",
         "tiebreakers",
     },

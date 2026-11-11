@@ -7,18 +7,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from tourneyhub.db.models.leagues import League, Season
-from tourneyhub.db.models.matches import Match, Round
-from tourneyhub.db.models.tournaments import Tournament, TournamentPhase
+from tourneyhub.db.models.tournaments import Tournament
 from tourneyhub.engine.leagues import (
     DEFAULT_PLACEMENT_POINTS,
     DefaultMatchFormat,
     SeasonState,
 )
-from tourneyhub.engine.tournaments import (
-    PhaseFormat,
-    TournamentState,
-    default_sit_out_points,
-)
+from tourneyhub.engine.tournaments import TournamentState
 from tourneyhub.errors import (
     ConflictError,
     ErrorCode,
@@ -147,47 +142,7 @@ def update_league(
     if changed:
         league.updated_at = now
     session.flush()
-    if draws_allowed is not None:
-        _refresh_sit_out_defaults(session, league)
     return league
-
-
-def _refresh_sit_out_defaults(session: Session, league: League) -> None:
-    """Move the sit-out default until the group phase's first result (BR-071).
-
-    Only Swiss and Monster DYP phases score a sit-out; a round robin has no value.
-
-    The default depends on the league's draw setting, so a group phase that
-    follows it (not set by hand) is recomputed in the same transaction. That
-    covers a tournament in setup and one in progress whose group phase has no
-    result yet, the same boundary as the format change of FR-054. After the first
-    result the value is fixed (BR-071, as reviewed in #46). The first result is
-    the first match of the phase with an outcome (`matches.outcome`), found with
-    an EXISTS on the phase's rounds.
-    """
-    has_result = (
-        select(Match.id)
-        .join(Round, Match.round_id == Round.id)
-        .where(Round.phase_id == TournamentPhase.id, Match.outcome.is_not(None))
-        .exists()
-    )
-    phases = session.scalars(
-        select(TournamentPhase)
-        .join(Tournament, TournamentPhase.tournament_id == Tournament.id)
-        .join(Season, Tournament.season_id == Season.id)
-        .where(
-            Season.league_id == league.id,
-            Tournament.state.in_((TournamentState.SETUP, TournamentState.IN_PROGRESS)),
-            ~has_result,
-            TournamentPhase.format.in_((PhaseFormat.SWISS, PhaseFormat.MONSTER_DYP)),
-            TournamentPhase.sit_out_points_set_by_hand.is_(False),
-        )
-    ).all()
-    for phase in phases:
-        phase.sit_out_points = default_sit_out_points(
-            phase.match_format, draws_allowed=league.draws_allowed
-        )
-    session.flush()
 
 
 def delete_league(session: Session, *, league_id: UUID, user_id: UUID) -> None:
