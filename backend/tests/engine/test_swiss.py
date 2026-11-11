@@ -454,6 +454,38 @@ def test_br057_a_forced_repeat_prefers_pairs_that_met_once_to_pairs_met_twice() 
     assert all(pair.is_repeat for pair in draw.pairs)
 
 
+def test_br057_one_pair_that_met_twice_beats_two_pairs_that_met_once() -> None:
+    # 1 v 2 and 3 v 4 repeat two pairs, 1 v 3 and 2 v 4 one pair (twice met).
+    history = met((1, 2), (3, 4), (1, 3), (1, 3), (1, 4), (2, 3))
+
+    draw = draw_next_swiss_round(table(1, 2, 3, 4), history)
+
+    assert draw.method is PairingMethod.MATCHING
+    assert pairs(draw) == [(1, 3), (2, 4)]
+    assert [pair.is_repeat for pair in draw.pairs] == [True, False]
+
+
+def test_br057_with_as_many_repeat_pairs_fewer_meetings_beat_closer_pairs() -> None:
+    # Every pairing repeats one pair; 1 v 2 is the closest but met twice.
+    history = met((1, 2), (1, 2), (1, 3), (1, 4))
+
+    draw = draw_next_swiss_round(table(1, 2, 3, 4), history)
+
+    assert pairs(draw) == [(1, 3), (2, 4)]
+    assert [pair.is_repeat for pair in draw.pairs] == [True, False]
+
+
+def test_adr011_a_forced_repeat_keeps_the_other_pairs_close_in_the_standings() -> None:
+    # 1 has met everyone, 2 twice: 1 v 3 repeats least, the rest pair by distance.
+    history = met((1, 2), (1, 2), (1, 3), (1, 4), (1, 5), (1, 6))
+
+    draw = draw_next_swiss_round(table(1, 2, 3, 4, 5, 6), history)
+
+    assert draw.method is PairingMethod.MATCHING
+    assert pairs(draw) == [(1, 3), (2, 4), (5, 6)]
+    assert [pair.is_repeat for pair in draw.pairs] == [True, False, False]
+
+
 def test_br058_the_lowest_placed_of_those_with_fewest_sit_outs_sits_out() -> None:
     lines = [*table(1, 2, 3, 4), line(5, 5, sat_out=1)]
 
@@ -738,18 +770,20 @@ def meetings(rounds: Iterable[SwissRound]) -> Counter[frozenset[EntryId]]:
 
 def cheapest_cost(
     positions: Sequence[int], count: int, met: Counter[tuple[int, int]]
-) -> tuple[int, int]:
-    """The least (meetings, distance cost) of any perfect matching, by brute force.
+) -> tuple[int, int, int]:
+    """The least (repeat pairs, meetings, distance cost) of any perfect matching.
 
-    A pair of positions `top < bottom` costs `(bottom - top) ** 2 * (count - top)`.
+    By brute force. A pair of positions `top < bottom` costs
+    `(bottom - top) ** 2 * (count - top)`.
     """
     if not positions:
-        return (0, 0)
+        return (0, 0, 0)
     top, *rest = positions
     return min(
         (
-            met[(top, bottom)] + sub[0],
-            (bottom - top) ** 2 * (count - top) + sub[1],
+            (met[(top, bottom)] > 0) + sub[0],
+            met[(top, bottom)] + sub[1],
+            (bottom - top) ** 2 * (count - top) + sub[2],
         )
         for bottom in rest
         for sub in [cheapest_cost([p for p in rest if p != bottom], count, met)]
@@ -758,7 +792,7 @@ def cheapest_cost(
 
 @settings(deadline=None)
 @given(draws(max_entries=10))
-def test_adr011_the_fallback_is_the_cheapest_matching_by_meetings_then_distance(
+def test_adr011_the_fallback_is_cheapest_by_repeats_meetings_then_distance(
     case: tuple[list[SwissStanding], list[SwissRound], list[EntryId], SwissDraw],
 ) -> None:
     lines, rounds, disabled, result = case
@@ -780,6 +814,7 @@ def test_adr011_the_fallback_is_the_cheapest_matching_by_meetings_then_distance(
     ]
 
     assert (
+        sum(met[(top, bottom)] > 0 for top, bottom in chosen),
         sum(met[(top, bottom)] for top, bottom in chosen),
         sum((bottom - top) ** 2 * (count - top) for top, bottom in chosen),
     ) == cheapest_cost(list(range(count)), count, met)
