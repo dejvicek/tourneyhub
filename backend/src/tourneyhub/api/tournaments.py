@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from http import HTTPStatus
 from typing import Annotated, Literal, Self
 from uuid import UUID
@@ -22,9 +22,13 @@ from tourneyhub.engine.tournaments import (
     HalvesMethod,
     KnockoutMatchFormat,
     MatchFormat,
+    MatchKind,
+    MonsterKnockoutMode,
+    Outcome,
     PhaseFormat,
     PhaseKind,
     SeedingMethod,
+    Tiebreaker,
     TournamentState,
     TournamentType,
 )
@@ -333,6 +337,113 @@ class TournamentSummary(ResponseModel):
     winner_player_ids: list[UUID] | None
 
 
+class PhaseRead(ResponseModel):
+    """A phase with every setting; those that do not apply are null (FR-031)."""
+
+    id: UUID
+    position: int
+    kind: PhaseKind
+    format: PhaseFormat
+    round_robin_legs: Literal[1, 2] | None
+    sit_out_points: Literal[0, 1] | None
+    tiebreakers: list[Tiebreaker] | None
+    qualifiers: int | None
+    third_place_match: bool | None
+    monster_knockout_mode: MonsterKnockoutMode | None
+    match_format: MatchFormat
+    final_match_format: KnockoutMatchFormat | None
+
+
+class GameRead(ResponseModel):
+    """One game of a result: its winner and, if entered, its score (D11)."""
+
+    game_no: int
+    winner: Outcome
+    score_1: int | None
+    score_2: int | None
+
+
+class MatchSideRead(ResponseModel):
+    """A side: its entry (null for a Monster DYP team or a bye) and its players.
+
+    A pair's players come in the entry's order.
+    """
+
+    entry_id: UUID | None
+    player_ids: list[UUID]
+    is_bye: bool
+
+
+class MatchRead(ResponseModel):
+    """A match with its two sides and its result; no result yet is null (D11)."""
+
+    id: UUID
+    round_id: UUID
+    position: int
+    kind: MatchKind
+    sides: tuple[MatchSideRead, MatchSideRead]
+    outcome: Outcome | None
+    is_walkover: bool
+    games: list[GameRead]
+    result_entered_at: datetime | None
+
+
+class RoundRead(ResponseModel):
+    """A round in play order, with the entries that sit it out (BR-051)."""
+
+    id: UUID
+    phase_id: UUID
+    round_no: int
+    matches: list[MatchRead]
+    sitting_out: list[UUID]
+
+
+class FieldRead(ResponseModel):
+    """A field and the match being played on it, null while it is free (D10)."""
+
+    id: UUID
+    number: int
+    match_id: UUID | None
+
+
+class TournamentRead(ResponseModel):
+    """The whole tournament: settings, entries, rounds and fields (FR-035, FR-092).
+
+    `current_phase_id` is the last phase with rounds; `current_phase_done` says
+    whether all its matches so far have results. `waiting` lists the matches
+    waiting for a field, in the order they will get one, computed on read.
+    `entries` are the main entries by seed, as setup shows them. A tournament in
+    setup has no rounds.
+    """
+
+    id: UUID
+    season_id: UUID
+    name: str
+    date: date
+    type: TournamentType
+    state: TournamentState
+    current_phase_id: UUID | None
+    current_phase_done: bool
+    goals_per_game: int
+    phases: list[PhaseRead]
+    entries: list[EntryRead]
+    rounds: list[RoundRead]
+    fields: list[FieldRead]
+    waiting: list[UUID]
+
+
+class StartWrite(RequestModel):
+    """Generate and start, with the draw counter the review screen showed (ADR-008)."""
+
+    expected_draw_counter: Annotated[int, Field(ge=0, le=INT_MAX)]
+
+
+class BackToSetupWrite(RequestModel):
+    """Back to setup, from the state the screen showed (FR-036, ADR-008)."""
+
+    expected_state: Literal["in_progress"]
+
+
 @router.get("/seasons/{season_id}/tournaments")
 def list_tournaments(
     league_id: UUID, season_id: UUID, session: SessionDep, user: CurrentUserDep
@@ -388,6 +499,75 @@ def delete_tournament(
     tournament_service.delete_tournament(
         session, league_id=league_id, tournament_id=tournament_id, user_id=user.id
     )
+
+
+@router.get("/tournaments/{tournament_id}")
+def read_tournament(
+    league_id: UUID, tournament_id: UUID, session: SessionDep, user: CurrentUserDep
+) -> TournamentRead:
+    """Return the whole tournament with its rounds and fields (FR-035, FR-092).
+
+    Another league's tournament is 404 `tournament_not_found`.
+    """
+    tournament = tournament_service.read_tournament(
+        session, league_id=league_id, tournament_id=tournament_id, user_id=user.id
+    )
+    return TournamentRead.model_validate(tournament)
+
+
+@router.post("/tournaments/{tournament_id}/start", responses=_WRITE_ERRORS)
+def start_tournament(
+    league_id: UUID,
+    tournament_id: UUID,
+    body: StartWrite,
+    session: SessionDep,
+    user: CurrentUserDep,
+    clock: ClockDep,
+) -> TournamentRead:
+    """Generate the schedule and start the tournament (FR-035).
+
+    A round robin gets all its rounds (BR-050 to BR-052), and the first
+    matches take the fields (BR-130). A started tournament is 409
+    `tournament_not_in_setup`; a stale `expected_draw_counter` is 409
+    `draw_counter_changed`. Another format is 422 `format_not_supported` for
+    now. An incomplete setup is 422: `players_without_partner` (Doubles),
+    `not_enough_players`, `dyp_halves_incomplete`, `dyp_halves_unequal`,
+    `too_many_left_out` (DYP) or `not_enough_entries` (FR-032).
+    """
+    tournament = tournament_service.start_tournament(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user.id,
+        expected_draw_counter=body.expected_draw_counter,
+        clock=clock,
+    )
+    return TournamentRead.model_validate(tournament)
+
+
+@router.post("/tournaments/{tournament_id}/back-to-setup", responses=_WRITE_ERRORS)
+def back_to_setup(
+    league_id: UUID,
+    tournament_id: UUID,
+    body: BackToSetupWrite,  # noqa: ARG001  (only "in_progress" validates)
+    session: SessionDep,
+    user: CurrentUserDep,
+    clock: ClockDep,
+) -> TournamentRead:
+    """Take a started tournament back to setup until the first result (FR-036).
+
+    A tournament that is not in progress is 409 `tournament_not_in_progress`;
+    one with a result is 422 `tournament_has_results`. The schedule goes; the
+    entries, seeds and draws stay.
+    """
+    tournament = tournament_service.back_to_setup(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user.id,
+        clock=clock,
+    )
+    return TournamentRead.model_validate(tournament)
 
 
 @router.put("/tournaments/{tournament_id}/format", responses=_WRITE_ERRORS)
