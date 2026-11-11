@@ -9,8 +9,34 @@ class EngineError(Exception):
     """
 
 
+class QualifierCountError(EngineError):
+    """The organizer picked too few or too many knockout qualifiers (BR-080).
+
+    `maximum` is the most that can qualify, the entries that are not disabled;
+    it can be below `minimum`, and then no knockout is possible.
+    """
+
+    def __init__(self, *, minimum: int, maximum: int, given: int) -> None:
+        super().__init__(minimum, maximum, given)
+        self.minimum = minimum
+        self.maximum = maximum
+        self.given = given
+
+
+class OddQualifierCountError(EngineError):
+    """A Monster DYP pair knockout needs an even number of qualifiers (BR-080)."""
+
+    def __init__(self, *, given: int) -> None:
+        super().__init__(given)
+        self.given = given
+
+
 class NotEnoughPlayersError(EngineError):
-    """A DYP tournament has fewer players than it needs (BR-031)."""
+    """A DYP or Monster DYP tournament has fewer players than it needs.
+
+    DYP needs 4 players (BR-031); a Monster DYP round needs 4 players who are
+    not disabled (FR-032, BR-063, BR-064).
+    """
 
     def __init__(self, *, minimum: int, given: int) -> None:
         super().__init__(minimum, given)
