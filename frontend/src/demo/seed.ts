@@ -373,7 +373,9 @@ export function createSeed(today: Date = new Date()): DemoState {
       email: DEMO_EMAIL,
       display_name: "Alex Organizer",
       language: "en",
-      is_admin: false,
+      // The demo account is the instance's admin too (ADR-007), so that the
+      // admin screens open.
+      is_admin: true,
       must_change_password: false,
     },
     leagues: [

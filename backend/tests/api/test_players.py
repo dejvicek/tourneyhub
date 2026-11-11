@@ -689,7 +689,7 @@ def test_br001_an_add_racing_a_rename_to_the_same_name_is_a_conflict(
     committing_settings: Settings,
     committing_engine: Engine,
     now: datetime,
-    auth_header: Callable[..., dict[str, str]],
+    committed_auth_header: Callable[..., dict[str, str]],
     wait_for_a_lock_wait: Callable[[], None],
 ) -> None:
     owner_id, league_id = _commit_league(committing_engine, now, "add@example.test")
@@ -717,7 +717,7 @@ def test_br001_an_add_racing_a_rename_to_the_same_name_is_a_conflict(
                 _players_url(league_id),
                 json={"name": "ANA"},
                 # The app reads the system clock here, not the test's `now`.
-                headers=auth_header(owner_id, issued_at=datetime.now(UTC)),
+                headers=committed_auth_header(owner_id, issued_at=datetime.now(UTC)),
             )
             outcome.append((response.status_code, response.json()))
 
@@ -737,7 +737,7 @@ def test_br001_a_rename_racing_a_rename_to_the_same_name_is_a_conflict(
     committing_settings: Settings,
     committing_engine: Engine,
     now: datetime,
-    auth_header: Callable[..., dict[str, str]],
+    committed_auth_header: Callable[..., dict[str, str]],
     wait_for_a_lock_wait: Callable[[], None],
 ) -> None:
     owner_id, league_id = _commit_league(committing_engine, now, "rename@example.test")
@@ -763,7 +763,7 @@ def test_br001_a_rename_racing_a_rename_to_the_same_name_is_a_conflict(
             response = client.put(
                 f"{_players_url(league_id)}/{bob_id}/name",
                 json={"name": "ana"},
-                headers=auth_header(owner_id, issued_at=datetime.now(UTC)),
+                headers=committed_auth_header(owner_id, issued_at=datetime.now(UTC)),
             )
             outcome.append((response.status_code, response.json()))
 
@@ -784,7 +784,7 @@ def test_adr008_two_adds_of_one_name_under_the_league_lock_leave_one_player(
     committing_settings: Settings,
     committing_engine: Engine,
     now: datetime,
-    auth_header: Callable[..., dict[str, str]],
+    committed_auth_header: Callable[..., dict[str, str]],
     wait_for_a_lock_wait: Callable[[], None],
 ) -> None:
     owner_id, league_id = _commit_league(committing_engine, now, "lock@example.test")
@@ -802,7 +802,7 @@ def test_adr008_two_adds_of_one_name_under_the_league_lock_leave_one_player(
             response = client.post(
                 _players_url(league_id),
                 json={"name": "ana"},
-                headers=auth_header(owner_id, issued_at=datetime.now(UTC)),
+                headers=committed_auth_header(owner_id, issued_at=datetime.now(UTC)),
             )
             outcome.append((response.status_code, response.json()))
 
@@ -829,7 +829,7 @@ def test_br011_a_rename_racing_a_removal_applies_after_the_removal(
     committing_settings: Settings,
     committing_engine: Engine,
     now: datetime,
-    auth_header: Callable[..., dict[str, str]],
+    committed_auth_header: Callable[..., dict[str, str]],
     wait_for_a_lock_wait: Callable[[], None],
 ) -> None:
     owner_id, league_id = _commit_league(committing_engine, now, "remove@example.test")
@@ -858,7 +858,7 @@ def test_br011_a_rename_racing_a_removal_applies_after_the_removal(
             response = client.put(
                 f"{_players_url(league_id)}/{ana_id}/name",
                 json={"name": "Anna"},
-                headers=auth_header(owner_id, issued_at=datetime.now(UTC)),
+                headers=committed_auth_header(owner_id, issued_at=datetime.now(UTC)),
             )
             outcome.append((response.status_code, response.json()))
 

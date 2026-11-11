@@ -14,7 +14,7 @@ import jwt
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 from pydantic import SecretStr
-from sqlalchemy import func, select, update
+from sqlalchemy import exists, func, select, update
 from sqlalchemy.orm import Session
 
 from tourneyhub.db.models.accounts import AuthAttempt, RefreshToken, User
@@ -337,6 +337,28 @@ def refresh_session(
     )
 
 
+def require_live_family(session: Session, *, claims: AccessClaims) -> None:
+    """Refuse an access token whose refresh-token family has no unrevoked row.
+
+    A reset, a logout, a password change on another device and a detected reuse
+    revoke families; their access tokens stop working at once, not when they
+    expire (ADR-006). The answer is the one for an expired token, so the SPA
+    refreshes once, fails and logs out. One indexed lookup
+    (`ix_refresh_tokens_live_family_id`). A rotation revokes nothing, and adds a
+    row, so the family stays live.
+    """
+    live = session.scalar(
+        select(
+            exists().where(
+                RefreshToken.family_id == claims.family_id,
+                RefreshToken.revoked_at.is_(None),
+            )
+        )
+    )
+    if not live:
+        raise NotAuthenticatedError(ErrorCode.TOKEN_EXPIRED)
+
+
 def _revoke(family: Sequence[RefreshToken], *, now: datetime) -> None:
     for token in family:
         if token.revoked_at is None:
@@ -363,7 +385,21 @@ def log_out(session: Session, *, refresh_token: str | None, now: datetime) -> No
 def revoke_other_families(
     session: Session, *, user_id: UUID, keep_family_id: UUID, now: datetime
 ) -> None:
-    """Revoke every family of the user but one: a password change (ADR-006).
+    """Revoke every family of the user but one: a password change (ADR-006)."""
+    _revoke_user_families(
+        session, user_id=user_id, keep_family_id=keep_family_id, now=now
+    )
+
+
+def revoke_all_families(session: Session, *, user_id: UUID, now: datetime) -> None:
+    """Revoke every family of the user: an admin's password reset (ADR-006)."""
+    _revoke_user_families(session, user_id=user_id, keep_family_id=None, now=now)
+
+
+def _revoke_user_families(
+    session: Session, *, user_id: UUID, keep_family_id: UUID | None, now: datetime
+) -> None:
+    """Revoke the user's families, all but `keep_family_id` if there is one.
 
     The rows are locked in id order, the order in which `_lock_family` takes
     them, so that a refresh holding one family cannot deadlock with this. A
@@ -371,14 +407,13 @@ def revoke_other_families(
     the first pass does not see it, so a second pass, with a new snapshot,
     revokes it too (see `_lock_family`).
     """
+    conditions = [RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None)]
+    if keep_family_id is not None:
+        conditions.append(RefreshToken.family_id != keep_family_id)
     for _ in range(2):
         token_ids = session.scalars(
             select(RefreshToken.id)
-            .where(
-                RefreshToken.user_id == user_id,
-                RefreshToken.family_id != keep_family_id,
-                RefreshToken.revoked_at.is_(None),
-            )
+            .where(*conditions)
             .order_by(RefreshToken.id)
             .with_for_update()
         ).all()

@@ -716,7 +716,7 @@ def test_adr008_of_two_starts_with_one_counter_exactly_one_starts(
     committing_settings: Settings,
     committing_engine: Engine,
     now: datetime,
-    auth_header: Callable[..., dict[str, str]],
+    committed_auth_header: Callable[..., dict[str, str]],
     wait_for_a_lock_wait: Callable[[], None],
 ) -> None:
     owner_id, league_id, tournament_id, counter = _commit_setup(committing_engine, now)
@@ -739,7 +739,7 @@ def test_adr008_of_two_starts_with_one_counter_exactly_one_starts(
             response = client.post(
                 _t_url(league_id, str(tournament_id), "/start"),
                 json={"expected_draw_counter": counter},
-                headers=auth_header(owner_id, issued_at=datetime.now(UTC)),
+                headers=committed_auth_header(owner_id, issued_at=datetime.now(UTC)),
             )
             outcome.append((response.status_code, response.json()))
 
@@ -761,7 +761,7 @@ def test_fr036_back_to_setup_racing_a_start_waits_and_deletes_its_schedule(
     committing_settings: Settings,
     committing_engine: Engine,
     now: datetime,
-    auth_header: Callable[..., dict[str, str]],
+    committed_auth_header: Callable[..., dict[str, str]],
     wait_for_a_lock_wait: Callable[[], None],
 ) -> None:
     owner_id, league_id, tournament_id, counter = _commit_setup(committing_engine, now)
@@ -784,7 +784,7 @@ def test_fr036_back_to_setup_racing_a_start_waits_and_deletes_its_schedule(
             response = client.post(
                 _t_url(league_id, str(tournament_id), "/back-to-setup"),
                 json={"expected_state": "in_progress"},
-                headers=auth_header(owner_id, issued_at=datetime.now(UTC)),
+                headers=committed_auth_header(owner_id, issued_at=datetime.now(UTC)),
             )
             outcome.append((response.status_code, response.json()["state"]))
 
@@ -806,7 +806,7 @@ def test_adr008_a_start_racing_a_setup_write_has_exactly_one_winner(
     committing_settings: Settings,
     committing_engine: Engine,
     now: datetime,
-    auth_header: Callable[..., dict[str, str]],
+    committed_auth_header: Callable[..., dict[str, str]],
     wait_for_a_lock_wait: Callable[[], None],
     winner: str,
 ) -> None:
@@ -843,7 +843,7 @@ def test_adr008_a_start_racing_a_setup_write_has_exactly_one_winner(
             response = client.post(
                 _t_url(league_id, str(tournament_id), path),
                 json={"expected_draw_counter": counter, **body},
-                headers=auth_header(owner_id, issued_at=datetime.now(UTC)),
+                headers=committed_auth_header(owner_id, issued_at=datetime.now(UTC)),
             )
             outcome.append((response.status_code, response.json()))
 

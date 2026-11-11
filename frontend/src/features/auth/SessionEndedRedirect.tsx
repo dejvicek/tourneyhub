@@ -1,10 +1,11 @@
 import { useEffect } from "react";
-import { Outlet, useLocation, useMatch, useNavigate } from "react-router";
+import { Outlet, useLocation, useNavigate } from "react-router";
 
 import { onSessionEnded } from "@/api/token";
-import { paths } from "@/lib/paths";
 
 import { loginPath } from "./loginPath";
+import { PasswordChangeRedirect } from "./PasswordChangeRedirect";
+import { useOutsideArea } from "./useOutsideArea";
 
 /**
  * When the session ends mid-visit (a refresh that failed, ADR-006), an
@@ -14,14 +15,7 @@ import { loginPath } from "./loginPath";
 function SessionEndedRedirect() {
   const navigate = useNavigate();
   const location = useLocation();
-  const publicLeague = useMatch(paths.publicLeague);
-  const publicTournament = useMatch(paths.publicTournament);
-  const outside =
-    publicLeague !== null ||
-    publicTournament !== null ||
-    location.pathname === paths.login ||
-    location.pathname === paths.signUp ||
-    location.pathname === paths.home;
+  const outside = useOutsideArea();
   const here = `${location.pathname}${location.search}`;
 
   useEffect(() => {
@@ -41,6 +35,7 @@ export function RootWithSession() {
   return (
     <>
       <SessionEndedRedirect />
+      <PasswordChangeRedirect />
       <Outlet />
     </>
   );

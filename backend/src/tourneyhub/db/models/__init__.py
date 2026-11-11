@@ -1,4 +1,5 @@
 from tourneyhub.db.models.accounts import (
+    AdminAction,
     AuthAttempt,
     InstanceSettings,
     RefreshToken,
@@ -22,6 +23,7 @@ from tourneyhub.db.models.tournaments import (
 )
 
 __all__ = [
+    "AdminAction",
     "AuthAttempt",
     "Entry",
     "EntryMember",
