@@ -160,7 +160,14 @@ def default_sit_out_points(match_format: MatchFormat) -> int:
 
     BO1 and BO2 matches can end level, so a sit-out is worth a draw: 1. BO3 and
     BO5 matches cannot, so a sit-out is worth a win: 2. The league's draw setting
-    plays no part.
+    plays no part here.
+
+    The PRD rule (BR-071 as reviewed in #46, FR-039) is wider: the default is 1
+    when a group-phase match can be drawn (BR-090, so the league must allow
+    draws), otherwise 2, and it follows the format and the league's draw
+    setting until the phase's first result. This function ignores the draw
+    setting and the value is fixed at generate. The change is tracked in
+    issue #59.
     """
     return 1 if match_format in {MatchFormat.BO1, MatchFormat.BO2} else 2
 

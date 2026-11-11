@@ -64,13 +64,21 @@ export const rules: Readonly<Rules> = {
   /** BR-051. Issue #24 proposes "top_seeds_last". */
   roundRobinOrder: "circle",
 
-  /** BR-058, BR-063. Issue #24 proposes "fewest_sit_outs_not_twice_in_a_row". */
+  /**
+   * BR-058, BR-063. Issue #24 proposed "fewest_sit_outs_not_twice_in_a_row".
+   * The PRD (BR-058, BR-063 as reviewed in #46) picks first those who did not
+   * sit out the round before, then the fewest sit-outs; this demo still orders
+   * by the fewest sit-outs only. Sit-out points follow BR-071 (the default is 1
+   * when a group-phase match can be drawn, BR-090, otherwise 2, fixed at the
+   * phase's first result). The behaviour change is tracked in issue #59.
+   */
   sitOuts: "fewest_sit_outs",
 
   /**
    * FR-041, BR-061, BR-063: whether top players are exempt from the sit-out
-   * lot in rounds 1 and 2. BR-063 as written exempts nobody; issue #24
-   * proposes the same and closes the open question.
+   * lot in rounds 1 and 2. They are not exempt: BR-061 and BR-063 (as
+   * reviewed in #46) pick the sit-outs first and take the top players from
+   * those who play.
    */
   topPlayersSitOutExempt: false,
 
