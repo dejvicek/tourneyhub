@@ -1,10 +1,12 @@
 import { configure, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { i18n } from "@/i18n";
 import { onField, paths, playPath, runningDyp } from "@/test/play";
 import { renderAt } from "@/test/renderApp";
+import { server } from "@/test/server";
 
 // The first screen of a file loads its lazy route, slowly under a full run.
 configure({ asyncUtilTimeout: 3000 });
@@ -210,4 +212,45 @@ describe("result entry (screens 7 and 7b)", () => {
       score_2: 6,
     });
   });
+
+  it.each([
+    [
+      "en",
+      "This season was closed meanwhile. Its results can no longer change.",
+    ],
+    ["cs", "Sezóna byla mezitím uzavřena. Její výsledky už nejdou změnit."],
+  ])(
+    "says a closed season is closed, not that the match changed (BR-011, %s)",
+    async (language, text) => {
+      await i18n.changeLanguage(language);
+      server.use(
+        http.put(
+          "/api/v1/leagues/:leagueId/tournaments/:tournamentId/matches/:matchId/result",
+          () =>
+            HttpResponse.json(
+              { code: "season_closed", detail: {} },
+              { status: 409 },
+            ),
+        ),
+      );
+      const user = userEvent.setup();
+      const { match } = onField(1);
+      renderAt(playPath(paths.scheduleResult, { matchId: match.id }));
+
+      const sheet = await screen.findByRole("dialog");
+      const beads = await within(sheet).findAllByRole("radio", {
+        name: /^10 goals for|^10 gólů/,
+      });
+      await user.click(beads[1] ?? sheet);
+      await user.click(
+        within(sheet).getByRole("button", {
+          name: language === "en" ? "Save result" : /^Uložit výsledek/,
+        }),
+      );
+
+      await waitFor(() => {
+        expect(within(sheet).getByRole("alert")).toHaveTextContent(text);
+      });
+    },
+  );
 });

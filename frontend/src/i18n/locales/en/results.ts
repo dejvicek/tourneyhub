@@ -99,6 +99,8 @@ export const results = {
     locked: "Round robin results are locked once the knockout is drawn.",
     lockedKnockout:
       "A later match already has a result. Clear that result first.",
+    seasonClosed:
+      "This season was closed meanwhile. Its results can no longer change.",
     changed: "The match changed elsewhere. It was reloaded.",
     generic: "The result could not be saved. Check it and try again.",
   },

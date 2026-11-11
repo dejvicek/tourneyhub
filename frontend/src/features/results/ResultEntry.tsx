@@ -39,8 +39,9 @@ interface ResultEntryProps {
   onDone: () => void;
 }
 
-/** The 422 codes of a result and their texts (ADR-008). */
+/** The codes of a result with a text of their own (ADR-008). */
 const CODE_TEXTS = {
+  season_closed: "results.errors.seasonClosed",
   draws_not_allowed: "results.errors.draw",
   scores_required: "results.errors.scores",
   game_score_mismatch: "results.errors.mismatch",

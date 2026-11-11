@@ -114,6 +114,8 @@ export const results: CsMessages<Messages["results"]> = {
     format: "Tyto hry nedávají výsledek v tomto formátu zápasu.",
     locked: "Po vylosování vyřazovací fáze jsou výsledky skupiny zamčené.",
     lockedKnockout: "Pozdější zápas už má výsledek. Nejdřív smažte ten.",
+    seasonClosed:
+      "Sezóna byla mezitím uzavřena. Její výsledky už nejdou změnit.",
     changed: "Zápas se mezitím změnil. Byl znovu načten.",
     generic:
       "Výsledek se nepodařilo uložit. Zkontrolujte ho a zkuste to znovu.",
