@@ -296,6 +296,8 @@
           "field_number_changed",
           "field_not_free",
           "match_has_result",
+          "placement_changed",
+          "placement_not_allowed",
           "last_field",
           "player_on_another_field",
           "not_enough_players",
@@ -1387,7 +1389,7 @@
       },
       "PlacementWrite": {
         "additionalProperties": false,
-        "description": "A match on a field, or back to waiting when `field_id` is null (FR-093).",
+        "description": "A match on a field, or back to waiting when `field_id` is null (FR-093).\n\n`from_field_id` is the field the screen saw the match on, null when it\nsaw it waiting. A match that is elsewhere now is 409 `placement_changed`.",
         "properties": {
           "field_id": {
             "anyOf": [
@@ -1401,6 +1403,18 @@
             ],
             "title": "Field Id"
           },
+          "from_field_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Field Id"
+          },
           "match_id": {
             "format": "uuid",
             "title": "Match Id",
@@ -1409,14 +1423,15 @@
         },
         "required": [
           "match_id",
-          "field_id"
+          "field_id",
+          "from_field_id"
         ],
         "title": "PlacementWrite",
         "type": "object"
       },
       "PlacementsWrite": {
         "additionalProperties": false,
-        "description": "Where matches are to be played, the target state (FR-093, ADR-008).\n\nOne placement puts a waiting match on a free field, moves a match to a\nfree field, or sends it back to waiting. A swap is two placements: both\nmatches with their new fields. A match or a field named twice is 422\n`validation_failed` (`given_twice`).",
+        "description": "Where matches are to be played, the target state (FR-093, ADR-008).\n\nOne placement puts a waiting match on a free field, moves a match to a\nfree field, or sends it back to waiting. A swap is two placements: both\nmatches, on fields, with each other's field. Nothing else is allowed\n(422 `placement_not_allowed`). A match or a field named twice is 422\n`validation_failed` (`given_twice`).",
         "properties": {
           "placements": {
             "items": {
@@ -5332,7 +5347,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/fields/placements": {
       "put": {
-        "description": "Place, move, swap or take off matches by hand (FR-093, BR-133).\n\nEach named match ends on its named field, or waiting; a repeat changes\nnothing. A placement by hand holds until the match has a result. A field\na match leaves takes the next waiting match, but not one this request\nsends back to waiting, which waits in schedule order. Returns the whole\ntournament with its fields and waiting list.\n\nAn unknown match is 404 `match_not_found`, an unknown field 404\n`field_not_found`. A stale screen gets 409: `tournament_not_in_progress`,\n`match_has_result` (detail `match_id`) or `field_not_free` (another match\nis on the field now; detail `field_id`, `match_id`). A match whose sides\nare not both known, or with a bye, is 422 `match_sides_unknown` (BR-091).\nA player who would be on two fields at once is 422\n`player_on_another_field` (BR-131; detail `player_ids`, and `field_ids`,\nthe fields that would hold them, lowest number first).",
+        "description": "Place, move, swap or take off matches by hand (FR-093, BR-133).\n\nEach named match ends on its named field, or waiting, from the field the\nscreen saw it on (`from_field_id`). A placement by hand holds until the\nmatch has a result. A field a match leaves takes the next waiting match,\nbut not one this request sends back to waiting, which waits in schedule\norder. Returns the whole\ntournament with its fields and waiting list.\n\nAn unknown match is 404 `match_not_found`, an unknown field 404\n`field_not_found`. A stale screen gets 409: `tournament_not_in_progress`,\n`match_has_result` (detail `match_id`), `placement_changed` (a match is not\non the `from_field_id` any more) or `field_not_free` (another match is on\nthe field now; detail `field_id`, `match_id`). A match whose sides are not\nboth known, or with a bye, is 422 `match_sides_unknown` (BR-091). Anything\nbut the four operations of FR-093 (replacing the match on a field, a\nrotation) is 422 `placement_not_allowed`.\nA player who would be on two fields at once is 422\n`player_on_another_field` (BR-131; detail `player_ids`, and `field_ids`,\nthe fields that would hold them, lowest number first).",
         "operationId": "place_matches",
         "parameters": [
           {

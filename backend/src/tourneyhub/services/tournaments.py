@@ -2354,10 +2354,14 @@ def read_play(
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class FieldPlacement:
-    """A match placed by hand: on a field, or back to waiting with no field (FR-093)."""
+    """A match placed by hand: on a field, or back to waiting with no field (FR-093).
+
+    `from_field_id` is the field the screen saw the match on, None for waiting.
+    """
 
     match_id: UUID
     field_id: UUID | None
+    from_field_id: UUID | None
 
 
 def _lock_running(
@@ -2448,11 +2452,13 @@ def remove_field(
 def _check_placements(
     tournament: Tournament, placements: Sequence[FieldPlacement]
 ) -> None:
-    """Refuse placements the current state does not allow (ADR-008).
+    """Refuse placements the current state does not allow (ADR-008, FR-093).
 
-    Unknown ids are 404. A match with a result, or a field that holds a match
-    the request does not name, only reaches here from a stale screen: 409. A
-    side not known yet, or a bye, is 422 `match_sides_unknown` (BR-091).
+    Unknown ids are 404. A match with a result, a match that is not where the
+    screen saw it (`from_field_id`) or a field that holds a match the request
+    does not name only reach here from a stale screen: 409. A side not known
+    yet, or a bye, is 422 `match_sides_unknown` (BR-091). Of what is left,
+    only the four operations of FR-093 are allowed (`_refuse_other_operations`).
     """
     fields = {field.id: field for field in tournament.fields}
     named = {placement.match_id for placement in placements}
@@ -2462,11 +2468,15 @@ def _check_placements(
     ]
     if any(p.field_id is not None and p.field_id not in fields for p in placements):
         raise NotFoundError(ErrorCode.FIELD_NOT_FOUND)
-    for match, placement in found:
+    for match, _ in found:
         if match.outcome is not None:
             raise ConflictError(ErrorCode.MATCH_HAS_RESULT, match_id=str(match.id))
         if _known_players(match) is None or any(side.is_bye for side in match.sides):
             raise RuleViolationError(ErrorCode.MATCH_SIDES_UNKNOWN)
+    seen = {f.match_id: f.id for f in tournament.fields if f.match_id is not None}
+    if any(seen.get(p.match_id) != p.from_field_id for p in placements):
+        raise ConflictError(ErrorCode.PLACEMENT_CHANGED)
+    for placement in placements:
         if placement.field_id is None:
             continue
         held = fields[placement.field_id].match_id
@@ -2476,6 +2486,32 @@ def _check_placements(
                 field_id=str(placement.field_id),
                 match_id=str(held),
             )
+    _refuse_other_operations(placements)
+
+
+def _refuse_other_operations(placements: Sequence[FieldPlacement]) -> None:
+    """Allow only the four operations of FR-093, else 422 `placement_not_allowed`.
+
+    A waiting match on a free field, a match from its field to a free field,
+    a match back to waiting, and a swap of two matches that are both on
+    fields. Replacing the match on a field and a rotation are not allowed
+    until the PRD decides whether they should exist. A free target field is
+    checked before (`field_not_free`), so a single placement only has to
+    change something.
+    """
+    if len(placements) == 1:
+        (only,) = placements
+        allowed = only.field_id != only.from_field_id
+    else:
+        first, second = placements
+        allowed = (
+            first.from_field_id is not None
+            and second.from_field_id is not None
+            and first.field_id == second.from_field_id
+            and second.field_id == first.from_field_id
+        )
+    if not allowed:
+        raise RuleViolationError(ErrorCode.PLACEMENT_NOT_ALLOWED)
 
 
 def _store_fields(
@@ -2517,8 +2553,7 @@ def place_matches(
     """Place, move, swap or take off matches by hand, the target state (FR-093).
 
     Each named match ends on its named field, or waiting without one; a swap
-    names both matches with their new fields, so a repeat changes nothing
-    (ADR-008). A field that a match leaves and that is not named takes the
+    names both matches with their new fields (ADR-008). A field that a match leaves and that is not named takes the
     next waiting match, but not one this request sends back to waiting: that
     one waits in schedule order (DATA-MODEL §4.6). The filling never moves a
     match on a field, so a placement by hand holds until its result (BR-133).

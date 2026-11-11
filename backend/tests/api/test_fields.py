@@ -169,12 +169,20 @@ def send(
 
 @pytest.fixture
 def place(send: Callable[..., tuple[int, Json]]) -> Callable[..., tuple[int, Json]]:
-    """PUT …/fields/placements with (match id, field id or None) pairs."""
+    """PUT …/fields/placements with (match id, field id or None) pairs.
+
+    The `from_field_id` of each is the field `tournament`, the screen the
+    request comes from, shows the match on.
+    """
 
     def place(tournament: Json, *pairs: tuple[str, str | None]) -> tuple[int, Json]:
         body = {
             "placements": [
-                {"match_id": match_id, "field_id": field_id}
+                {
+                    "match_id": match_id,
+                    "field_id": field_id,
+                    "from_field_id": seen_on(tournament, match_id),
+                }
                 for match_id, field_id in pairs
             ]
         }
@@ -203,6 +211,13 @@ def round_matches(tournament: Json, round_no: int) -> list[str]:
 def on_fields(tournament: Json) -> dict[int, str | None]:
     """Each field's number with its match."""
     return {f["number"]: f["match_id"] for f in tournament["fields"]}
+
+
+def seen_on(tournament: Json, match_id: str) -> str | None:
+    """The id of the field a match is on in a read, None while it waits."""
+    return next(
+        (f["id"] for f in tournament["fields"] if f["match_id"] == match_id), None
+    )
 
 
 def field_id(tournament: Json, number: int) -> str:
@@ -443,9 +458,10 @@ def test_adr008_a_field_that_is_not_there_is_404(
 # ---------------------------------------------------------------- by hand
 
 
-def test_fr093_a_match_moves_to_a_free_field_and_a_repeat_changes_nothing(
+def test_fr093_a_match_moves_to_a_free_field_and_a_repeat_is_409(
     start: Callable[..., Json],
     place: Callable[..., tuple[int, Json]],
+    read: Callable[..., Json],
     players: list[str],
 ) -> None:
     tournament = start(players[:4], field_count=3)
@@ -458,13 +474,15 @@ def test_fr093_a_match_moves_to_a_free_field_and_a_repeat_changes_nothing(
     assert status == 200
     # Field 1 stays free: every waiting match has a player on a field (BR-131).
     assert on_fields(moved) == {1: None, 2: second, 3: first}
-    assert again == 200
-    assert repeated == moved
+    # The repeat comes from the screen that saw the match on Field 1.
+    assert (again, repeated["code"]) == (409, "placement_changed")
+    assert read(tournament) == moved
 
 
-def test_fr093_a_swap_names_both_matches_and_a_repeat_changes_nothing(
+def test_fr093_a_swap_names_both_matches_and_a_repeat_is_409(
     start: Callable[..., Json],
     place: Callable[..., tuple[int, Json]],
+    read: Callable[..., Json],
     players: list[str],
 ) -> None:
     tournament = start(players)
@@ -477,8 +495,8 @@ def test_fr093_a_swap_names_both_matches_and_a_repeat_changes_nothing(
     assert status == 200
     assert on_fields(swapped) == {1: second, 2: first}
     assert swapped["waiting"] == tournament["waiting"]
-    assert again == 200
-    assert repeated == swapped
+    assert (again, repeated["code"]) == (409, "placement_changed")
+    assert read(tournament) == swapped
 
 
 def test_fr093_a_match_sent_back_waits_and_its_field_takes_the_next_one(
@@ -524,9 +542,9 @@ def test_fr093_a_waiting_match_goes_on_a_free_field(
 ) -> None:
     tournament = start(players[:4], field_count=3)
     first, second = round_matches(tournament, 1)
-    assert place(tournament, (first, None))[0] == 200
+    sent_back = place(tournament, (first, None))[1]
 
-    status, after = place(tournament, (first, field_id(tournament, 3)))
+    status, after = place(sent_back, (first, field_id(tournament, 3)))
 
     assert status == 200
     assert on_fields(after) == {1: None, 2: second, 3: first}
@@ -542,8 +560,8 @@ def test_br133_a_match_placed_by_hand_stays_until_its_result(
 ) -> None:
     tournament = start(players[:4], field_count=3)
     first, second = round_matches(tournament, 1)
-    place(tournament, (first, None))
-    place(tournament, (first, field_id(tournament, 3)))
+    sent_back = place(tournament, (first, None))[1]
+    place(sent_back, (first, field_id(tournament, 3)))
 
     put_result(tournament, second)
 
@@ -613,6 +631,164 @@ def test_adr008_a_match_with_a_result_is_409(
     assert body == {"code": "match_has_result", "detail": {"match_id": first}}
 
 
+def test_adr008_a_match_that_is_not_where_the_screen_saw_it_is_409(
+    start: Callable[..., Json],
+    send: Callable[..., tuple[int, Json]],
+    read: Callable[..., Json],
+    players: list[str],
+) -> None:
+    tournament = start(players[:4], field_count=3)
+    first, _ = round_matches(tournament, 1)
+
+    # The screen saw the first match waiting; it is on Field 1.
+    status, body = send(
+        "PUT",
+        tournament,
+        "/fields/placements",
+        {
+            "placements": [
+                {
+                    "match_id": first,
+                    "field_id": field_id(tournament, 3),
+                    "from_field_id": None,
+                }
+            ]
+        },
+    )
+
+    assert status == 409
+    assert body == {"code": "placement_changed", "detail": {}}
+    assert read(tournament) == tournament
+
+
+def test_adr008_a_match_where_the_screen_saw_it_is_placed(
+    start: Callable[..., Json],
+    send: Callable[..., tuple[int, Json]],
+    players: list[str],
+) -> None:
+    tournament = start(players[:4], field_count=3)
+    first, second = round_matches(tournament, 1)
+    one, three = field_id(tournament, 1), field_id(tournament, 3)
+
+    status, moved = send(
+        "PUT",
+        tournament,
+        "/fields/placements",
+        {"placements": [{"match_id": first, "field_id": three, "from_field_id": one}]},
+    )
+
+    assert status == 200
+    assert on_fields(moved) == {1: None, 2: second, 3: first}
+
+
+def test_adr008_from_field_id_is_required(
+    start: Callable[..., Json],
+    send: Callable[..., tuple[int, Json]],
+    players: list[str],
+) -> None:
+    tournament = start(players[:4], field_count=3)
+    first, _ = round_matches(tournament, 1)
+
+    status, body = send(
+        "PUT",
+        tournament,
+        "/fields/placements",
+        {"placements": [{"match_id": first, "field_id": field_id(tournament, 3)}]},
+    )
+
+    assert (status, body["code"]) == (422, "validation_failed")
+
+
+def test_adr008_a_swap_with_one_stale_match_is_409_and_changes_nothing(
+    start: Callable[..., Json],
+    send: Callable[..., tuple[int, Json]],
+    read: Callable[..., Json],
+    players: list[str],
+) -> None:
+    tournament = start(players)
+    first, second, _ = round_matches(tournament, 1)
+    one, two = field_id(tournament, 1), field_id(tournament, 2)
+
+    status, body = send(
+        "PUT",
+        tournament,
+        "/fields/placements",
+        {
+            "placements": [
+                {"match_id": first, "field_id": two, "from_field_id": one},
+                {"match_id": second, "field_id": one, "from_field_id": one},
+            ]
+        },
+    )
+
+    assert (status, body["code"]) == (409, "placement_changed")
+    assert read(tournament) == tournament
+
+
+def test_fr093_a_waiting_match_cannot_replace_the_match_on_a_field(
+    start: Callable[..., Json],
+    place: Callable[..., tuple[int, Json]],
+    read: Callable[..., Json],
+    players: list[str],
+) -> None:
+    tournament = start(players)
+    first, _, third = round_matches(tournament, 1)
+
+    # The third match takes Field 1 and sends the first back to waiting.
+    status, body = place(tournament, (third, field_id(tournament, 1)), (first, None))
+
+    assert status == 422
+    assert body == {"code": "placement_not_allowed", "detail": {}}
+    assert read(tournament) == tournament
+
+
+def test_fr093_matches_cannot_rotate_onto_a_free_field(
+    start: Callable[..., Json],
+    place: Callable[..., tuple[int, Json]],
+    read: Callable[..., Json],
+    players: list[str],
+) -> None:
+    tournament = start(players[:4], field_count=3)
+    first, second = round_matches(tournament, 1)
+
+    # The first match takes Field 2 while the second leaves it for Field 3.
+    status, body = place(
+        tournament,
+        (first, field_id(tournament, 2)),
+        (second, field_id(tournament, 3)),
+    )
+
+    assert status == 422
+    assert body["code"] == "placement_not_allowed"
+    assert read(tournament) == tournament
+
+
+def test_fr093_two_changes_in_one_request_that_are_no_swap_are_422(
+    start: Callable[..., Json],
+    place: Callable[..., tuple[int, Json]],
+    players: list[str],
+) -> None:
+    tournament = start(players[:4], field_count=3)
+    first, second = round_matches(tournament, 1)
+
+    status, body = place(tournament, (first, None), (second, None))
+
+    assert (status, body["code"]) == (422, "placement_not_allowed")
+
+
+def test_fr093_a_match_placed_where_it_already_is_is_422(
+    start: Callable[..., Json],
+    place: Callable[..., tuple[int, Json]],
+    players: list[str],
+) -> None:
+    tournament = start(players)
+    first, *_ = round_matches(tournament, 1)
+
+    status, body = place(tournament, (first, field_id(tournament, 1)))
+
+    assert (status, body["code"]) == (422, "placement_not_allowed")
+
+
 @pytest.mark.parametrize("which", ["match", "field", "match-of-another-tournament"])
 def test_adr008_unknown_ids_in_a_placement_are_404(
     start: Callable[..., Json],
@@ -674,7 +850,11 @@ ROUTES = [
     pytest.param(
         "PUT",
         "/fields/placements",
-        {"placements": [{"match_id": "{match_id}", "field_id": None}]},
+        {
+            "placements": [
+                {"match_id": "{match_id}", "field_id": None, "from_field_id": None}
+            ]
+        },
         id="place",
     ),
 ]
@@ -689,7 +869,11 @@ def _fill_in(rest: str, body: Json | None, tournament: Json) -> tuple[str, Json 
         "match_id": matches[0] if matches else str(uuid7()),
     }
     if body is not None and "placements" in body:
-        body = {"placements": [{"match_id": ids["match_id"], "field_id": None}]}
+        body = {
+            "placements": [
+                {"match_id": ids["match_id"], "field_id": None, "from_field_id": None}
+            ]
+        }
     return rest.format(**ids), body
 
 
@@ -990,17 +1174,25 @@ def _race(
     return result
 
 
-def _placements_body(*pairs: tuple[UUID, UUID | None]) -> Json:
+def _placements_body(*triples: tuple[UUID, UUID | None, UUID | None]) -> Json:
+    """Placements as (match, new field, field the screen saw it on)."""
     return {
         "placements": [
-            {"match_id": str(m), "field_id": None if f is None else str(f)}
-            for m, f in pairs
+            {
+                "match_id": str(m),
+                "field_id": None if f is None else str(f),
+                "from_field_id": None if seen is None else str(seen),
+            }
+            for m, f, seen in triples
         ]
     }
 
 
 def _place_in(
-    session: Session, ids: Ids, now: datetime, *pairs: tuple[UUID, UUID | None]
+    session: Session,
+    ids: Ids,
+    now: datetime,
+    *triples: tuple[UUID, UUID | None, UUID | None],
 ) -> None:
     owner_id, league_id, tournament_id = ids
     tournament_service.place_matches(
@@ -1009,7 +1201,10 @@ def _place_in(
         tournament_id=tournament_id,
         user_id=owner_id,
         placements=[
-            tournament_service.FieldPlacement(match_id=m, field_id=f) for m, f in pairs
+            tournament_service.FieldPlacement(
+                match_id=m, field_id=f, from_field_id=seen
+            )
+            for m, f, seen in triples
         ],
         clock=lambda: now,
     )
@@ -1049,11 +1244,11 @@ def test_adr008_two_moves_to_one_free_field_at_once_place_one_match(
         committing_settings,
         committing_engine,
         ids,
-        lambda session: _place_in(session, ids, now, (first, free)),
+        lambda session: _place_in(session, ids, now, (first, free, _field(started, 1))),
         lambda client, headers: _response(
             client.put(
                 _t(ids, "/fields/placements"),
-                json=_placements_body((second, free)),
+                json=_placements_body((second, free, _field(started, 2))),
                 headers=headers,
             )
         ),
@@ -1098,7 +1293,7 @@ def test_adr008_a_move_racing_a_result_ends_in_one_consistent_state(
             lambda client, headers: _response(
                 client.put(
                     _t(ids, "/fields/placements"),
-                    json=_placements_body((first, free)),
+                    json=_placements_body((first, free, _field(started, 1))),
                     headers=headers,
                 )
             ),
@@ -1112,7 +1307,9 @@ def test_adr008_a_move_racing_a_result_ends_in_one_consistent_state(
             committing_settings,
             committing_engine,
             ids,
-            lambda session: _place_in(session, ids, now, (first, free)),
+            lambda session: _place_in(
+                session, ids, now, (first, free, _field(started, 1))
+            ),
             lambda client, headers: _response(
                 client.put(
                     _t(ids, f"/matches/{first}/result"), json=S1_WINS, headers=headers
@@ -1193,3 +1390,180 @@ def test_br132_removing_a_field_racing_its_result_ends_consistent(
     assert first not in after.waiting
     with Session(committing_engine) as check:
         assert check.scalar(select(Match.requeued_at).where(Match.id == first)) is None
+
+
+_CLEAR = tournament_service.MatchResult(walkover_winner=None, games=())
+
+
+@pytest.mark.concurrency
+def test_br132_two_adds_at_once_give_distinct_numbers(
+    committing_settings: Settings,
+    committing_engine: Engine,
+    now: datetime,
+    committed_auth_header: Callable[..., dict[str, str]],
+    wait_for_a_lock_wait: Callable[[], None],
+) -> None:
+    ids = _commit_started(committing_engine, now, player_count=4, field_count=2)
+    owner_id, league_id, tournament_id = ids
+
+    def add(session: Session) -> None:
+        tournament_service.add_field(
+            session,
+            league_id=league_id,
+            tournament_id=tournament_id,
+            user_id=owner_id,
+            number=3,
+            clock=lambda: now,
+        )
+
+    status, body = _race(
+        committing_settings,
+        committing_engine,
+        ids,
+        add,
+        lambda client, headers: _response(
+            client.post(_t(ids, "/fields"), json={"number": 3}, headers=headers)
+        ),
+        committed_auth_header,
+        wait_for_a_lock_wait,
+    )
+
+    # The second add expected Field 3 too: it gets the number that is next now.
+    assert (status, body["code"], body["detail"]) == (
+        409,
+        "field_number_changed",
+        {"number": 4},
+    )
+    after = _assert_consistent(committing_engine, ids)
+    assert sorted(f.number for f in after.fields) == [1, 2, 3]
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize(
+    "clear_first", [True, False], ids=["clear-first", "move-first"]
+)
+def test_fr094_clearing_a_result_while_a_move_runs_ends_consistent(
+    committing_settings: Settings,
+    committing_engine: Engine,
+    now: datetime,
+    committed_auth_header: Callable[..., dict[str, str]],
+    wait_for_a_lock_wait: Callable[[], None],
+    clear_first: bool,
+) -> None:
+    ids = _commit_started(committing_engine, now, player_count=4, field_count=3)
+    started = _view(committing_engine, ids)
+    first, second = _match_ids(started, 1)
+    field_2, field_3 = _field(started, 2), _field(started, 3)
+    with Session(committing_engine) as setup:
+        _result_in(setup, ids, now, first)
+        setup.commit()
+    move = (second, field_3, field_2)
+
+    if clear_first:
+        status, body = _race(
+            committing_settings,
+            committing_engine,
+            ids,
+            lambda session: tournament_service.set_match_result(
+                session,
+                league_id=ids[1],
+                tournament_id=ids[2],
+                match_id=first,
+                user_id=ids[0],
+                result=_CLEAR,
+                clock=lambda: now,
+            ),
+            lambda client, headers: _response(
+                client.put(
+                    _t(ids, "/fields/placements"),
+                    json=_placements_body(move),
+                    headers=headers,
+                )
+            ),
+            committed_auth_header,
+            wait_for_a_lock_wait,
+        )
+        assert status == 200, body
+    else:
+        status, body = _race(
+            committing_settings,
+            committing_engine,
+            ids,
+            lambda session: _place_in(session, ids, now, move),
+            lambda client, headers: _response(
+                client.put(
+                    _t(ids, f"/matches/{first}/result"),
+                    json={"walkover_winner": None, "games": []},
+                    headers=headers,
+                )
+            ),
+            committed_auth_header,
+            wait_for_a_lock_wait,
+        )
+        assert (status, body["id"]) == (200, str(first))
+
+    after = _assert_consistent(committing_engine, ids)
+    # The cleared match waits again and took the free Field 1; the move held.
+    assert {f.number: f.match_id for f in after.fields} == {
+        1: first,
+        2: None,
+        3: second,
+    }
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize("swap_first", [True, False], ids=["swap-first", "move-first"])
+def test_adr008_a_swap_racing_a_move_of_one_of_its_matches_is_409(
+    committing_settings: Settings,
+    committing_engine: Engine,
+    now: datetime,
+    committed_auth_header: Callable[..., dict[str, str]],
+    wait_for_a_lock_wait: Callable[[], None],
+    swap_first: bool,
+) -> None:
+    ids = _commit_started(committing_engine, now, player_count=4, field_count=3)
+    started = _view(committing_engine, ids)
+    first, second = _match_ids(started, 1)
+    field_1, field_2, field_3 = (_field(started, n) for n in (1, 2, 3))
+    swap = ((first, field_2, field_1), (second, field_1, field_2))
+    move = (first, field_3, field_1)
+
+    if swap_first:
+        status, body = _race(
+            committing_settings,
+            committing_engine,
+            ids,
+            lambda session: _place_in(session, ids, now, *swap),
+            lambda client, headers: _response(
+                client.put(
+                    _t(ids, "/fields/placements"),
+                    json=_placements_body(move),
+                    headers=headers,
+                )
+            ),
+            committed_auth_header,
+            wait_for_a_lock_wait,
+        )
+        expected = {1: second, 2: first, 3: None}
+    else:
+        status, body = _race(
+            committing_settings,
+            committing_engine,
+            ids,
+            lambda session: _place_in(session, ids, now, move),
+            lambda client, headers: _response(
+                client.put(
+                    _t(ids, "/fields/placements"),
+                    json=_placements_body(*swap),
+                    headers=headers,
+                )
+            ),
+            committed_auth_header,
+            wait_for_a_lock_wait,
+        )
+        expected = {1: None, 2: second, 3: first}
+
+    # The second request comes from a screen that saw the first match elsewhere.
+    assert (status, body["code"]) == (409, "placement_changed")
+    after = _assert_consistent(committing_engine, ids)
+    assert {f.number: f.match_id for f in after.fields} == expected

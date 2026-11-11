@@ -595,10 +595,15 @@ class FieldCreate(RequestModel):
 
 
 class PlacementWrite(RequestModel):
-    """A match on a field, or back to waiting when `field_id` is null (FR-093)."""
+    """A match on a field, or back to waiting when `field_id` is null (FR-093).
+
+    `from_field_id` is the field the screen saw the match on, null when it
+    saw it waiting. A match that is elsewhere now is 409 `placement_changed`.
+    """
 
     match_id: UUID
     field_id: UUID | None
+    from_field_id: UUID | None
 
 
 def _distinct_placements(placements: list[PlacementWrite]) -> list[PlacementWrite]:
@@ -612,7 +617,8 @@ class PlacementsWrite(RequestModel):
 
     One placement puts a waiting match on a free field, moves a match to a
     free field, or sends it back to waiting. A swap is two placements: both
-    matches with their new fields. A match or a field named twice is 422
+    matches, on fields, with each other's field. Nothing else is allowed
+    (422 `placement_not_allowed`). A match or a field named twice is 422
     `validation_failed` (`given_twice`).
     """
 
@@ -1168,17 +1174,21 @@ def place_matches(
 ) -> TournamentRead:
     """Place, move, swap or take off matches by hand (FR-093, BR-133).
 
-    Each named match ends on its named field, or waiting; a repeat changes
-    nothing. A placement by hand holds until the match has a result. A field
-    a match leaves takes the next waiting match, but not one this request
-    sends back to waiting, which waits in schedule order. Returns the whole
+    Each named match ends on its named field, or waiting, from the field the
+    screen saw it on (`from_field_id`). A placement by hand holds until the
+    match has a result. A field a match leaves takes the next waiting match,
+    but not one this request sends back to waiting, which waits in schedule
+    order. Returns the whole
     tournament with its fields and waiting list.
 
     An unknown match is 404 `match_not_found`, an unknown field 404
     `field_not_found`. A stale screen gets 409: `tournament_not_in_progress`,
-    `match_has_result` (detail `match_id`) or `field_not_free` (another match
-    is on the field now; detail `field_id`, `match_id`). A match whose sides
-    are not both known, or with a bye, is 422 `match_sides_unknown` (BR-091).
+    `match_has_result` (detail `match_id`), `placement_changed` (a match is not
+    on the `from_field_id` any more) or `field_not_free` (another match is on
+    the field now; detail `field_id`, `match_id`). A match whose sides are not
+    both known, or with a bye, is 422 `match_sides_unknown` (BR-091). Anything
+    but the four operations of FR-093 (replacing the match on a field, a
+    rotation) is 422 `placement_not_allowed`.
     A player who would be on two fields at once is 422
     `player_on_another_field` (BR-131; detail `player_ids`, and `field_ids`,
     the fields that would hold them, lowest number first).
@@ -1189,7 +1199,11 @@ def place_matches(
         tournament_id=tournament_id,
         user_id=user.id,
         placements=[
-            FieldPlacement(match_id=p.match_id, field_id=p.field_id)
+            FieldPlacement(
+                match_id=p.match_id,
+                field_id=p.field_id,
+                from_field_id=p.from_field_id,
+            )
             for p in body.placements
         ],
         clock=clock,
