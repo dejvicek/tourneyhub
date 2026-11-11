@@ -12,6 +12,8 @@ interface StepperProps {
   value: string;
   onChange: (value: string) => void;
   min?: number;
+  /** The most the API accepts; the + stops here. */
+  max?: number;
 }
 
 /**
@@ -25,6 +27,7 @@ export function Stepper({
   value,
   onChange,
   min = 1,
+  max = Number.MAX_SAFE_INTEGER,
 }: StepperProps) {
   const { t } = useTranslation();
   const id = useId();
@@ -76,8 +79,9 @@ export function Stepper({
           aria-label={t("leagues.settings.league.increase", { label })}
           size="icon"
           className="rounded-lg"
+          disabled={current >= max}
           onClick={() => {
-            onChange(String(current + 1));
+            onChange(String(Math.min(max, current + 1)));
           }}
         >
           <span aria-hidden="true" className="text-display-section">

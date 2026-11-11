@@ -6,6 +6,7 @@ import { ApiError } from "@/api/client";
 const RULE_TEXTS = {
   name_required: "tournaments.errors.rules.name_required",
   positive_numbers: "tournaments.errors.rules.positive_numbers",
+  too_large: "tournaments.errors.rules.too_large",
   "FR-031": "tournaments.errors.rules.fr031",
   "BR-121": "tournaments.errors.rules.br121",
   "BR-002": "tournaments.errors.rules.br002",

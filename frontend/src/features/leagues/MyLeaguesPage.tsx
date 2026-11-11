@@ -113,6 +113,9 @@ function LeagueCard({ id, name }: { id: string; name: string }) {
   );
 }
 
+/** The API's longest league name, in characters (LeagueName). */
+const MAX_NAME_LENGTH = 100;
+
 /** "New league": a name, then the league opens on its tournaments. */
 function CreateLeague() {
   const { t } = useTranslation();
@@ -122,12 +125,20 @@ function CreateLeague() {
   const [open, setOpen] = useState(false);
   // One id per dialog, so a repeated submit finds the same league (ADR-008).
   const [id, setId] = useState(uuidv7);
+  const [tooLong, setTooLong] = useState(false);
 
   function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const value = new FormData(event.currentTarget).get("name");
+    const name = typeof value === "string" ? value : "";
+    // The API's LeagueName allows 100 characters (a paste can pass maxLength).
+    setTooLong(name.trim().length > MAX_NAME_LENGTH);
+    if (name.trim().length > MAX_NAME_LENGTH) {
+      create.reset();
+      return;
+    }
     create.mutate(
-      { id, name: typeof value === "string" ? value : "" },
+      { id, name },
       {
         onSuccess: (league) => {
           void navigate(
@@ -139,6 +150,9 @@ function CreateLeague() {
   }
 
   const errors = fieldErrors(t, create.error);
+  const nameError = tooLong
+    ? t("auth.errors.nameTooLong", { count: MAX_NAME_LENGTH })
+    : errors.name;
   const failed = create.isError && errors.name === undefined;
 
   return (
@@ -146,6 +160,7 @@ function CreateLeague() {
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
+        setTooLong(false);
         if (next) {
           setId(uuidv7());
           create.reset();
@@ -170,9 +185,9 @@ function CreateLeague() {
             name="name"
             autoComplete="off"
             required
-            maxLength={100}
+            maxLength={MAX_NAME_LENGTH}
             placeholder={t("leagues.create.namePlaceholder")}
-            error={errors.name}
+            error={nameError}
           />
           <p role="alert" className="text-body-md font-bold text-destructive">
             {failed ? t("leagues.settings.generic") : undefined}

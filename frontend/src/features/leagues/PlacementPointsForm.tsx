@@ -11,6 +11,9 @@ import { leagueMutations } from "./api";
 import { SettingsSection } from "./SettingsSection";
 import { useSeasonName } from "./useSeasonName";
 
+/** The most places the API accepts (backend/openapi.json: PlacementPoints). */
+const MAX_PLACES = 256;
+
 interface PointsError {
   /** The place (1-based) the message is about; none for the whole table. */
   place?: number;
@@ -24,9 +27,17 @@ interface PointsError {
 export function PlacementPointsForm({
   leagueId,
   season,
+  saved,
+  onStart,
+  onSaved,
 }: {
   leagueId: string;
   season: SeasonRead;
+  /** Whether this form's save is the last thing that happened on the page. */
+  saved: boolean;
+  /** A new action starts: the page forgets the last one's news. */
+  onStart: () => void;
+  onSaved: () => void;
 }) {
   const { t } = useTranslation();
   const seasonName = useSeasonName();
@@ -41,6 +52,8 @@ export function PlacementPointsForm({
 
   function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
+    onStart();
+    save.reset();
     // Parsing is the browser's; the table's rule is the server's (ADR-008).
     const bad = points.findIndex((value) => !/^\d+$/.test(value.trim()));
     if (bad !== -1) {
@@ -51,7 +64,10 @@ export function PlacementPointsForm({
       return;
     }
     setLocal(null);
-    save.mutate({ seasonId: season.id, points: points.map(Number) });
+    save.mutate(
+      { seasonId: season.id, points: points.map(Number) },
+      { onSuccess: onSaved },
+    );
   }
 
   const error = local ?? serverError(save.error);
@@ -132,6 +148,7 @@ export function PlacementPointsForm({
           <Button
             type="button"
             variant="outline"
+            disabled={points.length >= MAX_PLACES}
             onClick={() => {
               setPoints((rows) => [...rows, "0"]);
             }}
@@ -156,7 +173,7 @@ export function PlacementPointsForm({
         >
           {error?.message}
         </p>
-        {save.isSuccess && (
+        {saved && (
           <p role="status" className="text-body-md font-bold text-primary">
             {t("leagues.settings.points.saved")}
           </p>

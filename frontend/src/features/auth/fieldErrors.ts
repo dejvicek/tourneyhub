@@ -13,6 +13,8 @@ export function problemMessage(t: TFunction, problem: ValidationProblem) {
         : t("auth.errors.tooShort", { count: min });
     case "string_too_long":
       return t("auth.errors.nameTooLong", { count: max ?? 100 });
+    case "less_than_equal":
+      return t("auth.errors.tooLarge", { count: problem.context.le ?? 0 });
     case "string_pattern_mismatch":
       return t("auth.errors.emailInvalid");
     case "invisible_characters":

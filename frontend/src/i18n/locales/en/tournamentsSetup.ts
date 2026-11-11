@@ -319,6 +319,7 @@ export const tournamentsSetup = {
     rules: {
       name_required: "Give the tournament a name.",
       positive_numbers: "Goals per game and fields must be at least 1.",
+      too_large: "Use at most 99 goals per game and 32 fields.",
       fr031: "This type does not allow that group phase.",
       fr032: "Not enough players: at least {{min}} are needed.",
       br121: "BO2 is offered only in leagues that allow draws.",

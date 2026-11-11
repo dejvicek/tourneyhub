@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { generatePath, Link } from "react-router";
 
@@ -30,6 +31,8 @@ export function LeagueSettingsPage() {
     throwOnError: true,
   });
   const active = league.data?.seasons.find((s) => s.state === "active");
+  // Only the newest save is news: a new action or a failure clears it.
+  const [saved, setSaved] = useState<"league" | "points" | null>(null);
 
   return (
     <section className="space-y-6">
@@ -47,7 +50,17 @@ export function LeagueSettingsPage() {
       ) : (
         <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
           <div className="space-y-4">
-            <LeagueDetailsForm key={league.data.id} league={league.data} />
+            <LeagueDetailsForm
+              key={league.data.id}
+              league={league.data}
+              saved={saved === "league"}
+              onStart={() => {
+                setSaved(null);
+              }}
+              onSaved={() => {
+                setSaved("league");
+              }}
+            />
             <SettingsSection
               id="share-link"
               title={t("leagues.settings.share.heading")}
@@ -71,6 +84,13 @@ export function LeagueSettingsPage() {
                 key={active.id}
                 leagueId={leagueId}
                 season={active}
+                saved={saved === "points"}
+                onStart={() => {
+                  setSaved(null);
+                }}
+                onSaved={() => {
+                  setSaved("points");
+                }}
               />
             )}
             <SeasonsSection leagueId={leagueId} seasons={league.data.seasons} />

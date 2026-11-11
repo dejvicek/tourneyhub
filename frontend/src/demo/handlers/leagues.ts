@@ -63,10 +63,15 @@ function placementProblem(points: unknown[]): Problem | undefined {
     : { loc, type: "placement_points_increase", place: increase + 1 };
 }
 
-/** P5a's count rule for the field and goal defaults: 1 or more. */
+/** The most fields and goals per game P5a accepts (backend/openapi.json). */
+const MAX_FIELDS = 32;
+const MAX_GOALS = 99;
+
+/** P5a's count rule for the field and goal defaults: 1 up to `max`. */
 function countProblem(
   value: number | null | undefined,
   field: string,
+  max: number,
 ): Problem | undefined {
   if (value === null || value === undefined) {
     return undefined;
@@ -74,8 +79,11 @@ function countProblem(
   if (!Number.isInteger(value)) {
     return { loc: ["body", field], type: "int_from_float" };
   }
-  return value < 1
-    ? { loc: ["body", field], type: "greater_than_equal", ge: 1 }
+  if (value < 1) {
+    return { loc: ["body", field], type: "greater_than_equal", ge: 1 };
+  }
+  return value > max
+    ? { loc: ["body", field], type: "less_than_equal", le: max }
     : undefined;
 }
 
@@ -165,8 +173,12 @@ export const leagueHandlers = [
       typeof body.name === "string"
         ? nameProblem(body.name, ["body", "name"])
         : undefined,
-      countProblem(body.default_field_count, "default_field_count"),
-      countProblem(body.default_goals_per_game, "default_goals_per_game"),
+      countProblem(body.default_field_count, "default_field_count", MAX_FIELDS),
+      countProblem(
+        body.default_goals_per_game,
+        "default_goals_per_game",
+        MAX_GOALS,
+      ),
     ].filter((problem) => problem !== undefined);
     if (problems.length > 0) {
       return validationFailed(problems);

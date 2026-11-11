@@ -130,6 +130,9 @@ function SeasonRow({
   );
 }
 
+/** The API's longest season name, in characters (SeasonName). */
+const MAX_NAME_LENGTH = 100;
+
 function RenameSeason({
   leagueId,
   season,
@@ -145,12 +148,19 @@ function RenameSeason({
     leagueMutations.renameSeason(queryClient, leagueId),
   );
   const [open, setOpen] = useState(false);
+  const [tooLong, setTooLong] = useState(false);
   const defaultName = t("shell.seasonName", { number: season.number });
 
   function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const value = new FormData(event.currentTarget).get("name");
     const text = typeof value === "string" ? value.trim() : "";
+    // The API's SeasonName allows 100 characters (a paste can pass maxLength).
+    setTooLong(text.length > MAX_NAME_LENGTH);
+    if (text.length > MAX_NAME_LENGTH) {
+      rename.reset();
+      return;
+    }
     rename.mutate(
       // FR-020: empty restores the default name.
       { seasonId: season.id, name: text === "" ? null : text },
@@ -168,6 +178,7 @@ function RenameSeason({
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
+        setTooLong(false);
         rename.reset();
       }}
     >
@@ -192,11 +203,14 @@ function RenameSeason({
             label={t("leagues.settings.seasons.name")}
             name="name"
             autoComplete="off"
-            maxLength={100}
+            maxLength={MAX_NAME_LENGTH}
             defaultValue={season.name ?? ""}
             placeholder={defaultName}
             hint={t("leagues.settings.seasons.nameHint", { defaultName })}
             error={
+              (tooLong
+                ? t("auth.errors.nameTooLong", { count: MAX_NAME_LENGTH })
+                : undefined) ??
               errors.name ??
               (rename.isError ? t("leagues.settings.generic") : undefined)
             }

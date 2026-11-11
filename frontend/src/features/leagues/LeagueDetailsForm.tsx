@@ -17,6 +17,11 @@ import { Stepper } from "./Stepper";
 type DefaultMatchFormat = components["schemas"]["DefaultMatchFormat"];
 type LeagueRead = components["schemas"]["LeagueRead"];
 
+/** The API's bounds (backend/openapi.json: LeagueName, LeagueUpdate). */
+const MAX_NAME_LENGTH = 100;
+const MAX_FIELDS = 32;
+const MAX_GOALS = 99;
+
 const FORMATS = ["bo1", "bo3", "bo5"] as const satisfies DefaultMatchFormat[];
 
 function isFormat(value: string): value is DefaultMatchFormat {
@@ -27,7 +32,19 @@ function isFormat(value: string): value is DefaultMatchFormat {
  * FR-011: the league's name, draws and the defaults of new tournaments, saved
  * together as target states (P5a's PATCH, ADR-008).
  */
-export function LeagueDetailsForm({ league }: { league: LeagueRead }) {
+export function LeagueDetailsForm({
+  league,
+  saved,
+  onStart,
+  onSaved,
+}: {
+  league: LeagueRead;
+  /** Whether this form's save is the last thing that happened on the page. */
+  saved: boolean;
+  /** A new action starts: the page forgets the last one's news. */
+  onStart: () => void;
+  onSaved: () => void;
+}) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const update = useMutation(leagueMutations.update(queryClient, league.id));
@@ -38,20 +55,34 @@ export function LeagueDetailsForm({ league }: { league: LeagueRead }) {
   const [goals, setGoals] = useState(String(league.default_goals_per_game));
   const [local, setLocal] = useState<Partial<Record<string, string>>>({});
 
-  /** A count of 1 or more, or the message why not (browser-only parsing). */
-  function count(value: string): number | string {
+  /** A count from 1 to `max`, or the message why not (browser-only parsing). */
+  function count(value: string, max: number): number | string {
     if (!/^\d+$/.test(value.trim())) {
       return t("leagues.settings.league.wholeNumber");
     }
     const number = Number(value);
-    return number >= 1 ? number : t("leagues.settings.league.atLeastOne");
+    if (number < 1) {
+      return t("leagues.settings.league.atLeastOne");
+    }
+    return number > max ? t("auth.errors.tooLarge", { count: max }) : number;
   }
 
   function submit() {
-    const fieldCount = count(fields);
-    const goalCount = count(goals);
-    if (typeof fieldCount === "string" || typeof goalCount === "string") {
+    onStart();
+    update.reset();
+    const fieldCount = count(fields, MAX_FIELDS);
+    const goalCount = count(goals, MAX_GOALS);
+    const nameProblem =
+      name.trim().length > MAX_NAME_LENGTH
+        ? t("auth.errors.nameTooLong", { count: MAX_NAME_LENGTH })
+        : undefined;
+    if (
+      nameProblem !== undefined ||
+      typeof fieldCount === "string" ||
+      typeof goalCount === "string"
+    ) {
       setLocal({
+        name: nameProblem,
         default_field_count:
           typeof fieldCount === "string" ? fieldCount : undefined,
         default_goals_per_game:
@@ -60,13 +91,16 @@ export function LeagueDetailsForm({ league }: { league: LeagueRead }) {
       return;
     }
     setLocal({});
-    update.mutate({
-      name,
-      draws_allowed: draws,
-      default_field_count: fieldCount,
-      default_match_format: format,
-      default_goals_per_game: goalCount,
-    });
+    update.mutate(
+      {
+        name,
+        draws_allowed: draws,
+        default_field_count: fieldCount,
+        default_match_format: format,
+        default_goals_per_game: goalCount,
+      },
+      { onSuccess: onSaved },
+    );
   }
 
   const server = fieldErrors(t, update.error);
@@ -87,7 +121,7 @@ export function LeagueDetailsForm({ league }: { league: LeagueRead }) {
           name="name"
           autoComplete="off"
           required
-          maxLength={100}
+          maxLength={MAX_NAME_LENGTH}
           value={name}
           error={errors.name}
           onChange={(event) => {
@@ -120,12 +154,14 @@ export function LeagueDetailsForm({ league }: { league: LeagueRead }) {
               label={t("leagues.settings.league.fields")}
               hint={t("leagues.settings.league.fieldsHint")}
               value={fields}
+              max={MAX_FIELDS}
               error={errors.default_field_count}
               onChange={setFields}
             />
             <Stepper
               label={t("leagues.settings.league.goals")}
               value={goals}
+              max={MAX_GOALS}
               error={errors.default_goals_per_game}
               onChange={setGoals}
             />
@@ -168,7 +204,7 @@ export function LeagueDetailsForm({ league }: { league: LeagueRead }) {
           {failed ? t("leagues.settings.generic") : undefined}
         </p>
         {/* Rendered only with its message: the desktop sidebar has a status too. */}
-        {update.isSuccess && (
+        {saved && (
           <p role="status" className="text-body-md font-bold text-primary">
             {t("leagues.settings.league.saved")}
           </p>

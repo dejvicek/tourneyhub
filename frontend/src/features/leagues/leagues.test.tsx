@@ -261,4 +261,70 @@ describe("leagues", () => {
 
     expect(await axeViolations()).toEqual([]);
   });
+
+  it("D34: fields stop at 32 and goals at 99, as the API's limits say", async () => {
+    const user = userEvent.setup();
+    renderAt(settings);
+
+    const fields = await screen.findByLabelText("Fields");
+    await user.clear(fields);
+    await user.type(fields, "33");
+    await user.click(
+      screen.getByRole("button", { name: "Save league settings" }),
+    );
+
+    expect(fields).toHaveAccessibleDescription(/Use 32 or fewer\./);
+    expect(
+      db().leagues.find((row) => row.id === DEMO_LEAGUE_ID)
+        ?.default_field_count,
+    ).toBe(2);
+
+    await user.clear(fields);
+    await user.type(fields, "32");
+    expect(screen.getByRole("button", { name: "More: Fields" })).toBeDisabled();
+
+    const goals = screen.getByLabelText("Goals per game");
+    await user.clear(goals);
+    await user.type(goals, "99");
+    expect(
+      screen.getByRole("button", { name: "More: Goals per game" }),
+    ).toBeDisabled();
+  });
+
+  it("D34: the points table stops at 256 places", async () => {
+    const season = activeSeason(DEMO_LEAGUE_ID);
+    if (season === undefined) {
+      throw new Error("The league has an active season");
+    }
+    season.placement_points = Array.from({ length: 256 }, () => 0);
+    renderAt(settings);
+
+    expect(
+      await screen.findByRole("button", { name: "Add a place" }),
+    ).toBeDisabled();
+  });
+
+  it("D11: a saved message goes when the next save fails", async () => {
+    const user = userEvent.setup();
+    renderAt(settings);
+
+    await user.click(
+      await screen.findByRole("button", { name: "Save league settings" }),
+    );
+    expect(
+      await screen.findByText("League settings saved."),
+    ).toBeInTheDocument();
+
+    const third = screen.getByLabelText("Points for place 3");
+    await user.clear(third);
+    await user.type(third, "9");
+    await user.click(screen.getByRole("button", { name: "Save points" }));
+
+    await waitFor(() => {
+      expect(third).toHaveAttribute("aria-invalid", "true");
+    });
+    expect(
+      screen.queryByText("League settings saved."),
+    ).not.toBeInTheDocument();
+  });
 });
