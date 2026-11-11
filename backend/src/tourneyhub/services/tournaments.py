@@ -15,6 +15,7 @@ from datetime import date, datetime
 from enum import StrEnum
 from uuid import UUID, uuid7
 
+from pydantic import JsonValue
 from sqlalchemy import Select, insert, select
 from sqlalchemy.orm import Session, selectinload
 
@@ -1574,11 +1575,14 @@ def read_tournament(
 def _check_ready(tournament: Tournament, phase: TournamentPhase) -> None:
     """Refuse a start whose setup is not complete (FR-032, FR-033, BR-030 to BR-032).
 
-    Doubles needs every picked player in a pair (422 `players_without_partner`);
+    Only a round robin is generated so far; another format is 422
+    `format_not_supported`. Doubles needs every picked player in a pair (422 `players_without_partner`);
     DYP needs its halves and pairs (the 422s of a new DYP draw); every type
     needs FR-032's minimum of entries (422 `not_enough_entries`); a round robin
     takes at most `MAX_ROUND_ROBIN_ENTRIES` (422 `too_many_entries_for_round_robin`).
     """
+    if phase.format is not PhaseFormat.ROUND_ROBIN:
+        raise RuleViolationError(ErrorCode.FORMAT_NOT_SUPPORTED, format=phase.format)
     if tournament.type is TournamentType.DOUBLES:
         paired = {m.player_id for entry in tournament.entries for m in entry.members}
         unpaired = sum(row.player_id not in paired for row in tournament.players)
@@ -1597,10 +1601,27 @@ def _check_ready(tournament: Tournament, phase: TournamentPhase) -> None:
         )
     except EngineError as err:
         raise to_app_error(err) from err
-    if phase.format is PhaseFormat.ROUND_ROBIN and given > MAX_ROUND_ROBIN_ENTRIES:
+    if given > MAX_ROUND_ROBIN_ENTRIES:
         raise RuleViolationError(
             ErrorCode.TOO_MANY_ENTRIES_FOR_ROUND_ROBIN, limit=MAX_ROUND_ROBIN_ENTRIES
         )
+
+
+def _main_entries(tournament: Tournament) -> list[Entry]:
+    return [entry for entry in tournament.entries if entry.stage is EntryStage.MAIN]
+
+
+def _round_robin_of(
+    main: Sequence[Entry], phase: TournamentPhase
+) -> tuple[ScheduledRound, ...]:
+    """The round robin of the main entries by seed (BR-050 to BR-052).
+
+    Start writes it and the preview shows it, so both come from this one call.
+    """
+    return round_robin(
+        seed_order((EntryId(entry.id), entry.seed) for entry in main),
+        legs=phase.round_robin_legs or 1,  # the CHECK sets it for a round robin
+    )
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -1766,17 +1787,12 @@ def start_tournament(
             ErrorCode.DRAW_COUNTER_CHANGED, draw_counter=tournament.draw_counter
         )
     phase = tournament.phases[0]  # setup holds exactly one phase (D9)
-    if phase.format is not PhaseFormat.ROUND_ROBIN:
-        raise RuleViolationError(ErrorCode.FORMAT_NOT_SUPPORTED, format=phase.format)
     _check_ready(tournament, phase)
-    main = [entry for entry in tournament.entries if entry.stage is EntryStage.MAIN]
+    main = _main_entries(tournament)
     members = {
         entry.id: sorted(member.player_id for member in entry.members) for entry in main
     }
-    schedule = round_robin(
-        seed_order((EntryId(entry.id), entry.seed) for entry in main),
-        legs=phase.round_robin_legs or 1,  # the CHECK sets it for a round robin
-    )
+    schedule = _round_robin_of(main, phase)
     now = clock()
     rows = _schedule_rows(phase, schedule, members, now)
     _insert_schedule(session, rows)  # the matches exist before a field references one
@@ -1786,6 +1802,115 @@ def start_tournament(
     session.flush()
     return read_tournament(
         session, league_id=league_id, tournament_id=tournament.id, user_id=user_id
+    )
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class StartProblem:
+    """Why "Generate and start" would be refused: the code and detail of its 422."""
+
+    code: ErrorCode
+    detail: dict[str, JsonValue]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class PreviewMatch:
+    """A match of the preview: the players of each side, a pair in entry order."""
+
+    sides: tuple[tuple[UUID, ...], tuple[UUID, ...]]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class PreviewRound:
+    """A round of the preview; `sitting_out` lists the players of each entry out."""
+
+    round_no: int
+    matches: tuple[PreviewMatch, ...]
+    sitting_out: tuple[tuple[UUID, ...], ...]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class SchedulePreview:
+    """What "Generate and start" would create, or why it would not (FR-035).
+
+    With a `problem` there are no rounds and no counts. `draw_counter` is the
+    one the start must carry (ADR-008). `bracket_size` waits for the knockout.
+    """
+
+    draw_counter: int
+    problem: StartProblem | None
+    rounds: tuple[PreviewRound, ...]
+    match_count: int | None
+    round_count: int | None
+    bracket_size: int | None
+
+    @property
+    def can_start(self) -> bool:
+        return self.problem is None
+
+
+def _start_problem(tournament: Tournament) -> StartProblem | None:
+    """The refusal `start_tournament` would answer after its draw counter check."""
+    if tournament.state is not TournamentState.SETUP:
+        return StartProblem(
+            code=ErrorCode.TOURNAMENT_NOT_IN_SETUP, detail={"state": tournament.state}
+        )
+    try:
+        _check_ready(tournament, tournament.phases[0])
+    except RuleViolationError as err:
+        return StartProblem(code=err.code, detail=err.detail)
+    return None
+
+
+def preview_schedule(
+    session: Session, *, league_id: UUID, tournament_id: UUID, user_id: UUID
+) -> SchedulePreview:
+    """Return what `start_tournament` would create, writing nothing (FR-035).
+
+    Read without a lock, like the setup. The checks and the round robin are the
+    start's own (`_check_ready`, `_round_robin_of`), so a preview that can start
+    is the schedule the start writes for the same draw counter. A refusal comes
+    back as the `problem`, not as an error: the review screen shows it.
+    """
+    league = get_league(session, league_id=league_id, user_id=user_id)
+    tournament = session.scalars(_tournament_query(league, tournament_id)).one_or_none()
+    if tournament is None:
+        raise NotFoundError(ErrorCode.TOURNAMENT_NOT_FOUND)
+    problem = _start_problem(tournament)
+    if problem is not None:
+        return SchedulePreview(
+            draw_counter=tournament.draw_counter,
+            problem=problem,
+            rounds=(),
+            match_count=None,
+            round_count=None,
+            bracket_size=None,
+        )
+    setup = _setup_of(
+        tournament, _ranking(session, league=league, tournament=tournament)
+    )
+    players = {entry.id: entry.player_ids for entry in setup.entries}
+    schedule = _round_robin_of(_main_entries(tournament), tournament.phases[0])
+    rounds = tuple(
+        PreviewRound(
+            round_no=scheduled.round_no,
+            matches=tuple(
+                PreviewMatch(sides=(players[m.side_1], players[m.side_2]))
+                for m in scheduled.matches
+            ),
+            sitting_out=()
+            if scheduled.sitting_out is None
+            else (players[scheduled.sitting_out],),
+        )
+        for scheduled in schedule
+    )
+    return SchedulePreview(
+        draw_counter=tournament.draw_counter,
+        problem=None,
+        rounds=rounds,
+        match_count=sum(len(r.matches) for r in rounds),
+        round_count=len(rounds),
+        bracket_size=None,
     )
 
 

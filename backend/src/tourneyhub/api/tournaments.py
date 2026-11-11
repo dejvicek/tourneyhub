@@ -4,7 +4,14 @@ from typing import Annotated, Literal, Self
 from uuid import UUID
 
 from fastapi import APIRouter
-from pydantic import UUID7, AfterValidator, Field, StringConstraints, model_validator
+from pydantic import (
+    UUID7,
+    AfterValidator,
+    Field,
+    JsonValue,
+    StringConstraints,
+    model_validator,
+)
 from pydantic_core import PydanticCustomError
 
 from tourneyhub.api.deps import ClockDep, CurrentUserDep, SessionDep
@@ -32,6 +39,7 @@ from tourneyhub.engine.tournaments import (
     TournamentState,
     TournamentType,
 )
+from tourneyhub.errors import ErrorCode
 from tourneyhub.services import tournaments as tournament_service
 from tourneyhub.services.tournaments import DrawTarget, FormatRequest
 
@@ -433,6 +441,46 @@ class TournamentRead(ResponseModel):
     waiting: list[UUID]
 
 
+class StartProblemRead(ResponseModel):
+    """The refusal "Generate and start" would answer: the 422's code and detail."""
+
+    code: ErrorCode
+    detail: dict[str, JsonValue]
+
+
+class PreviewMatchRead(ResponseModel):
+    """A match of the preview: the players of each side, a pair in entry order."""
+
+    sides: tuple[list[UUID], list[UUID]]
+
+
+class PreviewRoundRead(ResponseModel):
+    """A round of the preview, with the players of each entry that sits it out."""
+
+    round_no: int
+    matches: list[PreviewMatchRead]
+    sitting_out: list[list[UUID]]
+
+
+class SchedulePreviewRead(ResponseModel):
+    """What "Generate and start" would create, or why it would not (FR-035).
+
+    `can_start` is false exactly when `problem` is set: the same code and detail
+    as the 422 of `POST /start` (the 409s of a stale draw counter apart). Then
+    `rounds` is empty and the counts are null. A round robin lists all its
+    rounds; `bracket_size` is null until a knockout can start. `draw_counter`
+    goes back in the start (ADR-008).
+    """
+
+    draw_counter: int
+    can_start: bool
+    problem: StartProblemRead | None
+    rounds: list[PreviewRoundRead]
+    match_count: int | None
+    round_count: int | None
+    bracket_size: int | None
+
+
 class StartWrite(RequestModel):
     """Generate and start, with the draw counter the review screen showed (ADR-008)."""
 
@@ -733,6 +781,25 @@ def set_seed_order(
         clock=clock,
     )
     return TournamentSetupRead.model_validate(setup)
+
+
+@router.get("/tournaments/{tournament_id}/setup/preview")
+def read_schedule_preview(
+    league_id: UUID, tournament_id: UUID, session: SessionDep, user: CurrentUserDep
+) -> SchedulePreviewRead:
+    """Return what "Generate and start" would create, and write nothing (FR-035).
+
+    A tournament that cannot start is still 200 with `can_start` false and the
+    `problem`: `players_without_partner`, `not_enough_entries`,
+    `too_many_entries_for_round_robin` (detail `limit`: 64),
+    `format_not_supported`, the DYP codes of a draw that cannot be made, or
+    `tournament_not_in_setup` for a started tournament. Another league's
+    tournament is 404.
+    """
+    preview = tournament_service.preview_schedule(
+        session, league_id=league_id, tournament_id=tournament_id, user_id=user.id
+    )
+    return SchedulePreviewRead.model_validate(preview)
 
 
 @router.post("/tournaments/{tournament_id}/setup/draw", responses=_WRITE_ERRORS)

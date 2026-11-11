@@ -35,6 +35,7 @@ def test_main_prints_a_schema_with_function_names_as_operation_ids(
         "log_out",
         "read_league",
         "read_me",
+        "read_schedule_preview",
         "read_tournament",
         "read_tournament_setup",
         "refresh",

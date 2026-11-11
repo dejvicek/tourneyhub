@@ -1152,6 +1152,72 @@
         "title": "PlayersWrite",
         "type": "object"
       },
+      "PreviewMatchRead": {
+        "description": "A match of the preview: the players of each side, a pair in entry order.",
+        "properties": {
+          "sides": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Sides",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sides"
+        ],
+        "title": "PreviewMatchRead",
+        "type": "object"
+      },
+      "PreviewRoundRead": {
+        "description": "A round of the preview, with the players of each entry that sits it out.",
+        "properties": {
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewMatchRead"
+            },
+            "title": "Matches",
+            "type": "array"
+          },
+          "round_no": {
+            "title": "Round No",
+            "type": "integer"
+          },
+          "sitting_out": {
+            "items": {
+              "items": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Sitting Out",
+            "type": "array"
+          }
+        },
+        "required": [
+          "round_no",
+          "matches",
+          "sitting_out"
+        ],
+        "title": "PreviewRoundRead",
+        "type": "object"
+      },
       "ProfileUpdate": {
         "additionalProperties": false,
         "description": "The fields to change; a field left out or null stays as it is.",
@@ -1246,6 +1312,80 @@
           "sitting_out"
         ],
         "title": "RoundRead",
+        "type": "object"
+      },
+      "SchedulePreviewRead": {
+        "description": "What \"Generate and start\" would create, or why it would not (FR-035).\n\n`can_start` is false exactly when `problem` is set: the same code and detail\nas the 422 of `POST /start` (the 409s of a stale draw counter apart). Then\n`rounds` is empty and the counts are null. A round robin lists all its\nrounds; `bracket_size` is null until a knockout can start. `draw_counter`\ngoes back in the start (ADR-008).",
+        "properties": {
+          "bracket_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bracket Size"
+          },
+          "can_start": {
+            "title": "Can Start",
+            "type": "boolean"
+          },
+          "draw_counter": {
+            "title": "Draw Counter",
+            "type": "integer"
+          },
+          "match_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Match Count"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StartProblemRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "round_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Round Count"
+          },
+          "rounds": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewRoundRead"
+            },
+            "title": "Rounds",
+            "type": "array"
+          }
+        },
+        "required": [
+          "draw_counter",
+          "can_start",
+          "problem",
+          "rounds",
+          "match_count",
+          "round_count",
+          "bracket_size"
+        ],
+        "title": "SchedulePreviewRead",
         "type": "object"
       },
       "SeasonName": {
@@ -1432,6 +1572,27 @@
           "password"
         ],
         "title": "SignUpRequest",
+        "type": "object"
+      },
+      "StartProblemRead": {
+        "description": "The refusal \"Generate and start\" would answer: the 422's code and detail.",
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode"
+          },
+          "detail": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "title": "Detail",
+            "type": "object"
+          }
+        },
+        "required": [
+          "code",
+          "detail"
+        ],
+        "title": "StartProblemRead",
         "type": "object"
       },
       "StartWrite": {
@@ -4496,6 +4657,85 @@
           }
         ],
         "summary": "Set Tournament Players",
+        "tags": [
+          "tournaments"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/preview": {
+      "get": {
+        "description": "Return what \"Generate and start\" would create, and write nothing (FR-035).\n\nA tournament that cannot start is still 200 with `can_start` false and the\n`problem`: `players_without_partner`, `not_enough_entries`,\n`too_many_entries_for_round_robin` (detail `limit`: 64),\n`format_not_supported`, the DYP codes of a draw that cannot be made, or\n`tournament_not_in_setup` for a started tournament. Another league's\ntournament is 404.",
+        "operationId": "read_schedule_preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchedulePreviewRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Read Schedule Preview",
         "tags": [
           "tournaments"
         ]

@@ -360,7 +360,10 @@ views "III. Flows" {
     variant sequence
     title "19. Generate and start, back to setup"
     order 23
-    description "FR-035, FR-036, BR-050 to BR-052, BR-130, ADR-008 and ADR-010: starting carries the draw counter the review showed. The engine makes the round robin from the seeds and fills the fields; the schedule is stored in one transaction. Back to setup deletes the schedule until the first result and keeps the draws. Only the round robin is generated so far."
+    description "FR-035, FR-036, BR-050 to BR-052, BR-130, ADR-008 and ADR-010: the review screen reads the preview first, which runs the same checks and the same round robin without writing and returns the draw counter. Starting carries that counter. The engine makes the round robin from the seeds and fills the fields; the schedule is stored in one transaction. Back to setup deletes the schedule until the first result and keeps the draws. Only the round robin is generated so far."
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "GET setup/preview"
+    tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "same checks and round robin as the start, nothing written"
+    tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: rounds and counts, or the reason it cannot start; the draw counter"
     organizer -> tourneyhub.spa.organizerUi "Generate and start"
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "POST start with the expected draw counter"
     tourneyhub.api.tournamentsApi -> tourneyhub.db.leagues "locks the league"
