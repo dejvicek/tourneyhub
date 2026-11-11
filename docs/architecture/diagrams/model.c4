@@ -41,7 +41,7 @@ model {
         Runs in the user's browser; served by the Vite dev server (development) or Caddy (production), and /api goes through the same origin.
       "
       link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-003--frontend-react-vite-typescript-tailwind-shadcnui "ADR-003"
-      link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#69-language-and-devices "PRD §6.9 Language and devices (FR-080 to FR-082)"
+      link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#69-language-and-devices "PRD §6.9 Language and devices (FR-080 to FR-083)"
 
       organizerUi = component "Organizer screens" {
         description "Leagues, players, seasons, tournament setup, draws, rounds, results and the knockout."
@@ -109,7 +109,7 @@ model {
       }
       leaguesApi = component "API: leagues, players, seasons" {
         summary "Create a league with Season 1, settings, player list, new season, closed seasons read-only (FR-010 to FR-022)."
-        description "FR-010 to FR-022. The client sends the new league's id (UUIDv7); Season 1 is created with it. Starting a new season carries the current season's number, otherwise 409. The placement points table is edited on the active season; a closed season's table is 409. Player names are unique in a league ignoring case, removed players included: a taken name is 422 player_name_taken, and a removed player is restored explicitly. Players belong to the league, so closed seasons change nothing for them."
+        description "FR-010 to FR-022. The client sends the new league's id (UUIDv7); Season 1 is created with it. Starting a new season carries the current season's number, otherwise 409. The placement points table is edited on the active season; a closed season's table is 409. Player names may repeat in a league (BR-001): a name another player has, ignoring case and removed players included, is 422 player_name_taken until the request confirms it, and a removed player is restored explicitly. Players belong to the league, so closed seasons change nothing for them."
         link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#62-leagues-and-players "PRD §6.2 and §6.3"
       }
       tournamentsApi = component "API: tournaments" {
