@@ -259,10 +259,10 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | ID | Rule |
 |---|---|
 | BR-050 | Every entry plays every other entry once, or twice if the organizer chose twice. |
-| BR-051 | Matches are grouped into rounds, and no entry plays twice in a round. With an odd number of entries, one sits out each round, and every entry sits out the same number of times. Seeds 1 and 2 meet in the last round, as the last match of that round; when played twice, the same holds in each half (BR-052). Rescheduling for a late entry (BR-054) keeps this while it can. |
+| BR-051 | Matches are grouped into rounds, and no entry plays twice in a round. With an odd number of entries, one sits out each round, and every entry sits out the same number of times. Seeds 1 and 2 meet in the last round, as the last match of that round; when played twice, the same holds in each half (BR-052). A reschedule for a late entry keeps this only where BR-054 allows it: even sit-outs come first. |
 | BR-052 | When played twice, the second half repeats the first half's pairings, round by round. |
 | BR-053 | A round robin's results lock when the knockout is drawn. |
-| BR-054 | A late entry in a round robin plays every other entry as often as everyone else does. The matches not yet played are rescheduled to fit its matches in, keeping sit-outs as even as possible; results already entered stay. |
+| BR-054 | A late entry in a round robin plays every other entry as often as everyone else does. The matches not yet played are rescheduled to fit its matches in; results already entered stay. The reschedule is chosen in this order: first as few rounds as possible; then sit-outs as even as possible, so that the longest run of rounds any entry sits out in a row, counting the rounds already played, is as short as it can be; only then seeds 1 and 2 in the last match of the last round (BR-051), if they have not met yet. With 4 entries and a 5th joining after round 2, four more rounds are needed, and with 1 v 2 last some entry would sit out two rounds in a row, so 1 v 2 is played earlier. |
 
 ### 7.7 Swiss
 
