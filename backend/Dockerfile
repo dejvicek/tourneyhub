@@ -3,7 +3,7 @@
 # The api image (ADR-014) and its development variant (ADR-004), built from backend/.
 # The last stage, runtime, is the default target; compose.override.yaml builds dev.
 
-FROM python:3.15.2-slim-trixie AS base
+FROM python:3.16.0a1-slim-trixie AS base
 # The venv comes first on PATH. Logs go to stderr unbuffered (§4.6). Nothing writes
 # .pyc files at runtime: the venv is read-only for the app user, and in development
 # the source is mounted from the host.
