@@ -43,12 +43,17 @@ type Team = tuple[PlayerId, PlayerId]
 
 
 class TopPlayerOrder(StrEnum):
-    """Which players count as top players first (FR-041, BR-061; a PRD question).
+    """Which players count as top players first (FR-041, BR-061).
 
     Players marked by the organizer come first, then the others; the first as
     many as the round has matches are its top players. The unmarked ones are
     always taken from the league ranking (FR-041); this order only sorts the
     marked ones.
+
+    The PRD has settled it: the marked players who play count in league-ranking
+    order (BR-061, FR-041), so `LEAGUE_RANKING` is the only rule and there is no
+    setting. This enum and `MonsterDypOptions.top_player_order` stay until
+    issue #60 removes them.
     """
 
     LEAGUE_RANKING = "league_ranking"
@@ -74,9 +79,17 @@ class GroupingMethod(StrEnum):
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class MonsterDypOptions:
-    """Rules the PRD leaves open, as parameters (BR-061, BR-063, issue #24).
+    """Rules once left open, as parameters (BR-061, BR-063, issue #24).
 
-    The defaults follow the PRD as written; the PRD team decides the rest.
+    The PRD has since settled all three (BR-061, BR-063 as reviewed in #46):
+    top players are not exempt from the sit-out lot, the marked players count in
+    league-ranking order, and players who did not sit out the round before are
+    picked to sit out first, before the fewest sit-outs. So the options are
+    obsolete: the first two are always off and `LEAGUE_RANKING`, and
+    `avoids_sitting_out_twice_in_a_row` is always on, with that priority (the
+    code below puts the fewest sit-outs first). Issue #60 removes the options and
+    follows BR-063, including a missed round counting as a sit-out for the order
+    (BR-064, BR-067).
 
     Attributes:
         are_top_players_exempt: In rounds 1 and 2, the top players never sit
@@ -158,7 +171,8 @@ class MonsterStanding:
         drawn: Matches drawn.
         lost: Matches lost.
         sat_out: Rounds the player sat out (BR-063); missed rounds of a
-            disabled or late player do not count (BR-064, BR-067).
+            disabled or late player do not count here (BR-064, BR-067, FR-060).
+            BR-063 counts them for the sit-out order only; issue #60 adds that.
         is_decided_by_lot: The player shares their place, so the lot decided
             their position (ADR-009).
     """
@@ -751,7 +765,14 @@ def _choose_sit_outs(
     purpose: str,
     avoids_twice_in_a_row: bool,
 ) -> tuple[tuple[PlayerId, ...], bool]:
-    """Choose who sits out, and whether the lot decided it (BR-063, ADR-009)."""
+    """Choose who sits out, and whether the lot decided it (BR-063, ADR-009).
+
+    BR-063 picks first the players who did not sit out the round before, then
+    those with the fewest sit-outs (a missed round counts as one), then a lot.
+    This code puts the fewest sit-outs first and the round before second, only
+    when `avoids_twice_in_a_row` is set, and counts no missed round. Issue #60
+    changes it.
+    """
     if count == 0:
         return (), False
     sat_out = Counter(player for round_ in rounds for player in round_.sat_out)
