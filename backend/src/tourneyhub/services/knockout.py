@@ -531,9 +531,10 @@ def delete_knockout(
     group phase before it, is 422 `phase_not_deletable`: going back to setup
     or deleting a round does that (FR-036, FR-046).
 
-    The knockout's matches and entries go, the fields let go of its matches,
-    and the group phase is unlocked: the organizer chooses again what comes
-    next (BR-087). A finished tournament is back in progress.
+    The knockout's matches and entries go, the fields let go of its matches
+    and take the next ones that can be played (BR-130), and the group phase
+    is unlocked: the organizer chooses again what comes next (BR-087). A
+    finished tournament is back in progress.
     """
     league, tournament = _lock_tournament(
         session,
@@ -561,6 +562,8 @@ def delete_knockout(
     if tournament.state is TournamentState.FINISHED:
         tournament.state = TournamentState.IN_PROGRESS
     tournament.updated_at = now
+    session.flush()  # the matches are gone before the free fields take the next ones
+    _fill_fields(tournament, _match_slots(tournament), now)
     session.flush()
 
 

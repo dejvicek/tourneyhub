@@ -200,7 +200,7 @@ class PublicBracketSideRead(ResponseModel):
 
 
 class PublicBracketMatchRead(ResponseModel):
-    """A bracket match for viewers (FR-072)."""
+    """A bracket match for viewers (FR-072); `result_locked` is the organizer's."""
 
     match_id: UUID
     number: int | None
@@ -215,7 +215,6 @@ class PublicBracketMatchRead(ResponseModel):
     match_format: MatchFormat
     field_number: int | None
     next_number: int | None
-    result_locked: bool
 
 
 class PublicBracketRoundRead(ResponseModel):

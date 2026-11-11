@@ -1209,7 +1209,6 @@ PUBLIC_MATCH = {
     "match_format",
     "field_number",
     "next_number",
-    "result_locked",
 }
 PUBLIC_SIDE = {"entry_id", "seed", "is_bye"}
 
@@ -1243,6 +1242,22 @@ def test_fr070_a_public_bracket_needs_a_knockout_and_a_known_token(
     assert none.json() == {"code": "knockout_not_found", "detail": {}}
     assert unknown.json() == {"code": "share_link_not_found", "detail": {}}
     assert unknown.headers["cache-control"] == "no-store"
+
+
+def test_fr070_the_bracket_of_another_leagues_tournament_is_not_found(
+    drawn: Json,
+    client: TestClient,
+    make_league: Callable[..., League],
+) -> None:
+    other = make_league()
+
+    foreign = client.get(_public(other.share_token, drawn["id"], "/bracket"))
+    unknown = client.get(_public(other.share_token, str(uuid7()), "/bracket"))
+
+    assert foreign.status_code == 404
+    assert foreign.json() == {"code": "tournament_not_found", "detail": {}}
+    assert foreign.json() == unknown.json()
+    assert foreign.headers["cache-control"] == "no-store"
 
 
 def test_fr070_a_tournament_in_setup_has_no_public_bracket(
