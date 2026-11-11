@@ -13,9 +13,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from tourneyhub.db.models.leagues import League, Player, Season
+from tourneyhub.engine.season_standings import SeasonStandingRow
+from tourneyhub.engine.standings import StandingRow
 from tourneyhub.errors import ErrorCode, NotFoundError
+from tourneyhub.services import standings as standings_service
 from tourneyhub.services import tournaments as tournament_service
-from tourneyhub.services.tournaments import TournamentSummary, TournamentView
+from tourneyhub.services.tournaments import (
+    PlacesView,
+    TournamentSummary,
+    TournamentView,
+)
 
 MAX_SHARE_TOKEN_LENGTH = 128
 """Longer than any token the app issues (22 characters for 128 bits)."""
@@ -90,5 +97,46 @@ def read_shared_tournament(
     """
     league = _shared_league(session, share_token=share_token)
     return tournament_service.view_tournament(
+        session, league=league, tournament_id=tournament_id, past_setup=True
+    )
+
+
+def read_shared_season_standings(
+    session: Session, *, share_token: str, season_id: UUID
+) -> tuple[SeasonStandingRow, ...]:
+    """Return a season's standings, from its finished tournaments (FR-070, FR-061).
+
+    A season of another league is 404 `season_not_found`.
+    """
+    league = _shared_league(session, share_token=share_token)
+    return standings_service.view_season_standings(
+        session, league=league, season_id=season_id
+    )
+
+
+def read_shared_standings(
+    session: Session, *, share_token: str, tournament_id: UUID
+) -> tuple[StandingRow, ...]:
+    """Return a round robin's standings now, none for other formats (FR-060, FR-070).
+
+    A tournament in setup, of another league or unknown is 404
+    `tournament_not_found`, the same answer for all three.
+    """
+    league = _shared_league(session, share_token=share_token)
+    return tournament_service.view_group_standings(
+        session, league=league, tournament_id=tournament_id, past_setup=True
+    )
+
+
+def read_shared_places(
+    session: Session, *, share_token: str, tournament_id: UUID
+) -> PlacesView:
+    """Return the places and season points of a tournament past setup (FR-070).
+
+    Before the tournament finishes there are none. A tournament in setup, of
+    another league or unknown is 404 `tournament_not_found`.
+    """
+    league = _shared_league(session, share_token=share_token)
+    return tournament_service.view_places(
         session, league=league, tournament_id=tournament_id, past_setup=True
     )

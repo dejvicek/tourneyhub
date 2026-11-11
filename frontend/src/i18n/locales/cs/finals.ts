@@ -120,7 +120,6 @@ export const finals: CsMessages<Messages["finals"]> = {
     seasonTitle: "Pořadí: {{season}}",
     seasonLead:
       "Doplněno o body z tohoto turnaje. Prvních {{shown}} z {{total}}.",
-    seasonLater: "Pořadí sezóny přibude v pozdější verzi.",
     seasonChange: "{{change}}",
     changePoints: "+{{points}}",
     changeUp: "{{points}}, o {{count}} výš",

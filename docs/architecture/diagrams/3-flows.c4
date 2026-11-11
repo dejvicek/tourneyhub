@@ -153,17 +153,17 @@ views "III. Flows" {
     variant sequence
     title "12. Viewer through the share link"
     order 14
-    description "FR-070 to FR-072: no account, read-only. The league, a season's tournaments and a tournament (P11); standings, places and the bracket follow with P8 and P10, computed on every read (ADR-009). Every answer carries Cache-Control: no-store and Referrer-Policy: no-referrer, and the api logs the path as /public/***."
+    description "FR-070 to FR-072: no account, read-only. The league, a season's tournaments and a tournament (P11); the season standings, a round robin's standings and the places (P10a), computed on every read (ADR-009); the bracket follows with P10b. Every answer carries Cache-Control: no-store and Referrer-Policy: no-referrer, and the api logs the path as /public/***."
     viewer -> tourneyhub.spa.publicUi "opens the link from the organizer"
-    tourneyhub.spa.publicUi -> tourneyhub.api.publicApi "GET /api/v1/public/{share_token}, …/seasons/{season_id}/tournaments, …/tournaments/{tournament_id}"
+    tourneyhub.spa.publicUi -> tourneyhub.api.publicApi "GET /api/v1/public/{share_token}, …/seasons/{season_id}/tournaments, …/seasons/{season_id}/standings, …/tournaments/{tournament_id}, …/tournaments/{tournament_id}/standings, …/tournaments/{tournament_id}/places"
     tourneyhub.api.publicApi -> tourneyhub.db.leagues "finds the league by share token: one lookup on the unique index"
     opt "an unknown token" {
       tourneyhub.spa.publicUi <- tourneyhub.api.publicApi "404 share_link_not_found, empty detail, on every route"
     }
     tourneyhub.api.publicApi -> tourneyhub.db.tournaments "tournaments past setup; one in setup is 404 tournament_not_found"
     tourneyhub.api.publicApi -> tourneyhub.db.play "rounds, results and fields"
-    tourneyhub.api.publicApi -> tourneyhub.api.engine "waiting order now; standings, places and season points later"
-    tourneyhub.spa.publicUi <- tourneyhub.api.publicApi "league, schedule, fields and waiting matches"
+    tourneyhub.api.publicApi -> tourneyhub.api.engine "waiting order, standings, places and season points"
+    tourneyhub.spa.publicUi <- tourneyhub.api.publicApi "league, season standings, schedule, fields, waiting matches, standings and places"
   }
 
   dynamic view adminReset {
@@ -425,9 +425,9 @@ views "III. Flows" {
 
   dynamic view roundRobinFinish {
     variant sequence
-    title "20. Standings and finishing a round robin"
+    title "20. Standings, finishing a round robin and the season standings"
     order 24
-    description "FR-040, FR-060, BR-070, BR-071, BR-101, BR-103, BR-110, BR-111 and ADR-009: the play read computes the waiting list and the round robin's standings from the stored results; a sit-out counts once its round is played. When every match has a result, the organizer confirms in the UI and finishes. The places and season points are computed on read, from the standings and the season's placement points table; nothing derived is stored. A knockout after the round robin is P10."
+    description "FR-040, FR-060, BR-070, BR-071, BR-101, BR-103, BR-110, BR-111 and ADR-009: the play read computes the waiting list and the round robin's standings from the stored results; a sit-out counts once its round is played. When every match has a result, the organizer confirms in the UI and finishes. The places and season points are computed on read, from the standings and the season's placement points table; nothing derived is stored. The season standings sum the points of the season's finished tournaments on read (BR-112, BR-113). A knockout after the round robin is P10."
     organizer -> tourneyhub.spa.organizerUi "opens the schedule or the Standings tab"
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "GET …/play"
     tourneyhub.api.tournamentsApi -> tourneyhub.db.play "loads the rounds, results, games and participation"
@@ -450,6 +450,10 @@ views "III. Flows" {
     tourneyhub.api.tournamentsApi -> tourneyhub.db.leagues "the season's placement points table"
     tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "standings to places, places to points per player, shared places split and rounded down"
     tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: places with points per player"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "GET …/seasons/{season_id}/standings, then …/tournaments/{tournament_id}/season-effect"
+    tourneyhub.api.leaguesApi -> tourneyhub.db.play "the season's finished tournaments with their rounds and results"
+    tourneyhub.api.leaguesApi -> tourneyhub.api.engine "places per tournament, points summed per player (BR-112), ranked by points then wins, level players share the place (BR-113); the effect compares with and without the tournament"
+    tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "200: season standings; the effect is empty until the tournament is finished"
   }
 
   dynamic view fieldsDuringPlay {

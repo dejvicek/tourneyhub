@@ -5,7 +5,6 @@ import {
 } from "@tanstack/react-query";
 
 import { api, dataOf } from "@/api/client";
-import { provisionalApi } from "@/api/provisional";
 import type { components } from "@/api/schema";
 
 type LeagueUpdate = components["schemas"]["LeagueUpdate"];
@@ -38,13 +37,13 @@ export const leagueQueries = {
       queryFn: ({ signal }) => league(leagueId, signal),
       select: (data) => data.seasons,
     }),
-  /** The active season's tournaments (provisional), for BR-010 before a new season. */
+  /** The active season's tournaments, for BR-010 before a new season. */
   tournaments: (leagueId: string, seasonId: string) =>
     queryOptions({
       queryKey: ["leagues", leagueId, "seasons", seasonId, "tournaments"],
       queryFn: ({ signal }) =>
         dataOf(
-          provisionalApi.GET(
+          api.GET(
             "/api/v1/leagues/{league_id}/seasons/{season_id}/tournaments",
             {
               params: { path: { league_id: leagueId, season_id: seasonId } },

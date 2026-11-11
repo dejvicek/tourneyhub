@@ -43,13 +43,9 @@ export interface DemoAccount {
 
 // ---------------------------------------------------------------- seasons and standings
 
-export interface SeasonStandingRow {
-  place: number;
-  player_id: Uuid;
-  points: number;
-  tournaments_played: number;
-  tournament_wins: number;
-}
+// The season standings and a tournament's effect on them (P10a): generated.
+export type SeasonStandingRow = components["schemas"]["SeasonStandingRead"];
+export type SeasonEffectRow = components["schemas"]["SeasonEffectRead"];
 
 // ---------------------------------------------------------------- tournaments
 
@@ -75,17 +71,8 @@ export interface PlaceRow {
   points_per_player: number;
 }
 
-export interface TournamentStandingRow {
-  place: number;
-  entry_id: Uuid;
-  played: number;
-  won: number;
-  drawn: number;
-  lost: number;
-  sat_out: number;
-  points: number;
-  score_difference: number;
-}
+/** A round robin's standings as the share link answers them (P10a): generated. */
+export type TournamentStandingRow = components["schemas"]["PublicStandingRow"];
 
 // ---------------------------------------------------------------- results
 // A whole result, every game or a walkover (ADR-008, P8): generated. The
@@ -131,46 +118,24 @@ interface Put<P, B, R> {
   responses: { 200: Json<R> } & Errors;
 }
 
-type Season = Params<{ league_id: Uuid; season_id: Uuid }>;
 type Tournament = Params<{ league_id: Uuid; tournament_id: Uuid }>;
 
 /** Routes the demo serves that the generated schema does not have yet. */
 export interface ProvisionalPaths {
-  // season standings
-  "/api/v1/leagues/{league_id}/seasons/{season_id}/standings": {
-    get: Get<Season, SeasonStandingRow[]>;
-  };
-
   // players: the unfinished tournaments a player is in, which block a removal (BR-002)
   "/api/v1/leagues/{league_id}/players/{player_id}/tournaments": {
     get: Get<Params<{ league_id: Uuid; player_id: Uuid }>, TournamentSummary[]>;
   };
 
-  // public: the league, a season's tournaments and a tournament are
-  // generated (P11); the standings wait for the results (P8, P10)
-  "/api/v1/public/{share_token}/seasons/{season_id}/standings": {
-    get: Get<
-      Params<{ share_token: string; season_id: Uuid }>,
-      SeasonStandingRow[]
-    >;
-  };
-  "/api/v1/public/{share_token}/tournaments/{tournament_id}/standings": {
-    get: Get<
-      Params<{ share_token: string; tournament_id: Uuid }>,
-      TournamentStandingRow[]
-    >;
-  };
-
-  // public: the knockout, the Swiss and Monster DYP ranking and the places
-  // (the same reads as the organizer's, without an account)
+  // public: the league, a season's tournaments, a tournament, the season
+  // standings, a round robin's standings and the places are generated (P11,
+  // P10a); the knockout and the Swiss and Monster DYP ranking wait for P10b
+  // and P12 (the same reads as the organizer's, without an account)
   "/api/v1/public/{share_token}/tournaments/{tournament_id}/bracket": {
     get: Get<Params<{ share_token: string; tournament_id: Uuid }>, BracketRead>;
   };
   "/api/v1/public/{share_token}/tournaments/{tournament_id}/ranking": {
     get: Get<Params<{ share_token: string; tournament_id: Uuid }>, RankingRead>;
-  };
-  "/api/v1/public/{share_token}/tournaments/{tournament_id}/places": {
-    get: Get<Params<{ share_token: string; tournament_id: Uuid }>, PlacesRead>;
   };
 
   // demo only: the backend never has this route
@@ -318,17 +283,6 @@ export type PlaceReason = components["schemas"]["PlaceReasonRead"];
 export type PlaceDetail = components["schemas"]["PlaceRead"];
 export type PlacesRead = components["schemas"]["PlacesRead"];
 
-/** One player's change in the season standings after a tournament (screen 10). */
-export interface SeasonEffectRow {
-  player_id: Uuid;
-  place: number;
-  points: number;
-  /** Placement points earned in this tournament. */
-  earned: number;
-  /** The place before this tournament; null if the player had none. */
-  previous_place: number | null;
-}
-
 export interface SwissRankingRow {
   place: number;
   entry_id: Uuid;
@@ -461,9 +415,6 @@ export interface KnockoutPreviewParams {
 export interface ProvisionalPaths {
   "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/bracket": {
     get: Get<Tournament, BracketRead>;
-  };
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/season-effect": {
-    get: Get<Tournament, SeasonEffectRow[]>;
   };
   "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/ranking": {
     get: Get<Tournament, RankingRead>;
