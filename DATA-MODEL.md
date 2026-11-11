@@ -439,7 +439,7 @@ Fields change nothing the engine computes for standings, places, points or sit-o
 | Repeated and stale requests (FR-021, FR-040, FR-046, FR-093, BR-132, new draws, creating a league or a tournament) | Application: expected state checked under the lock, 409 on a mismatch; client-supplied ids for creates (§2) |
 | Entries in `round_participation` and `match_sides` belong to the same tournament and have the phase's stage; `source_entry_id` stays in the tournament; a field's match belongs to the field's tournament; players in entries, DYP halves and sides belong to the tournament's league | Application: every id in a request is loaded through the league and tournament the operation locked |
 | A side's players equal its entry's members (D2); a bye side has no players | Application, checked by invariant queries |
-| Entry sizes per kind (BR-030), DYP half sizes (BR-032), minimum entries (FR-032) | Application; entry sizes checked by an invariant query |
+| Entry sizes per kind (BR-030), DYP half sizes (BR-032), minimum entries (FR-032), at most 64 entries in a round robin (422 `too_many_entries_for_round_robin`; the schedule has n(n-1)/2 matches per leg) | Application; entry sizes checked by an invariant query |
 | A DYP half only for a picked player | Composite FK `dyp_halves` → `tournament_players` |
 | An entry member is a picked player | Composite deferred FK `entry_members` → `tournament_players` |
 | `halves_method` other than `ranking` only for DYP; only a knockout entry has a `source_entry_id` | CHECKs on `tournaments` and `entries` |
@@ -448,6 +448,8 @@ Fields change nothing the engine computes for standings, places, points or sit-o
 | Deleting a knockout's entries together with the knockout phase (BR-087) | Application, in the same transaction |
 
 Loading every id through the locked league and tournament also stops an organizer from reaching another league with an id that never reaches these tables, for example when disabling an entry (FR-044). A database-only check would need `tournament_id` and the stage copied into `tournament_phases`, `rounds`, `matches`, `round_participation` and `match_sides`, and would still not cover that case.
+
+**Accepted for the MVP: no database check across tournaments.** A side's `entry_id` can point to an entry of another tournament, and `fields.match_id` to a match of another tournament; no foreign key or CHECK stops either. Only the service code, which loads every id through the locked league and tournament, and the invariant queries below keep them apart. This is on purpose: a composite key would copy `tournament_id` into `rounds`, `matches` and `match_sides`, for one organizer per league and every write under the lock. A second writer, or an import tool, would have to add the database check first.
 
 **Invariant queries.** Every integration test ends with a set of SQL queries, each returning the rows that break one rule; all of them must return nothing:
 
@@ -460,6 +462,7 @@ Loading every id through the locked league and tournament also stops an organize
 - bye sides with players;
 - group rounds without exactly one `round_participation` row per `main` entry, and a row that says `played` while the entry has no side in the round's matches, or another status while it has one;
 - a group-phase match or a first-round bracket match without two stored sides;
+- an entry on a side of two matches of one round (BR-051);
 - games on a match without a result or on a walkover, a result that is not a walkover and has no games, game numbers with a gap, and games that do not fit the format or the outcome (§4.5; the last with the results, P8);
 - a phase at a position that does not fit its kind and the tournament's other phase (D9);
 - a tournament without a field, a field whose match is in another tournament or has a result, a requeued match on a field, and two fields whose matches share a player, for matches with stored sides.
