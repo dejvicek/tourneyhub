@@ -2,6 +2,7 @@
 // the backend's service (backend/src/tourneyhub/services/players.py).
 // BR-002 (no removal from an unfinished tournament) is the demo's own: P7 adds it.
 import type { components } from "@/api/schema";
+import { newId } from "@/lib/newId";
 
 import { nameProblem, type Problem, validationFailed } from "../outsideErrors";
 import { apiError, route } from "../route";
@@ -116,7 +117,7 @@ export const playerHandlers = [
         return apiError(422, "player_limit_reached", { limit: MAX_PLAYERS });
       }
       const player = {
-        id: crypto.randomUUID(),
+        id: newId(),
         league_id: params.league_id,
         name,
         removed_at: null,

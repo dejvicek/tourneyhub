@@ -7,6 +7,7 @@ import { DEMO_LEAGUE_ID } from "@/demo/ids";
 import { db } from "@/demo/store";
 import { axeViolations } from "@/features/auth/axeCheck";
 import { i18n } from "@/i18n";
+import { newId } from "@/lib/newId";
 import { paths } from "@/lib/paths";
 import { renderAt } from "@/test/renderApp";
 
@@ -175,7 +176,7 @@ describe("PlayersPage", () => {
     ).length;
     for (let i = count; i < 500; i++) {
       db().players.push({
-        id: crypto.randomUUID(),
+        id: newId(),
         league_id: DEMO_LEAGUE_ID,
         name: `Removed ${String(i)}`,
         removed_at: "2026-10-01T18:00:00Z",

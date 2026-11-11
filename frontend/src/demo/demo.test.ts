@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { api, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
+import { newId } from "@/lib/newId";
 
 import {
   DEMO_LEAGUE_ID,
@@ -106,7 +107,7 @@ describe("the demo's fake API", () => {
     await expect(
       dataOf(
         api.PUT("/api/v1/leagues/{league_id}/players/{player_id}/name", {
-          params: { path: { ...league, player_id: crypto.randomUUID() } },
+          params: { path: { ...league, player_id: newId() } },
           body: { name: "X" },
         }),
       ),

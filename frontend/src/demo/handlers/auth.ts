@@ -4,6 +4,8 @@
 // stood in for by outsideDb().signedInUserId; the tokens are placeholders.
 import { http, HttpResponse } from "msw";
 
+import { newId } from "@/lib/newId";
+
 import type { UserRead } from "../contract";
 import { DEMO_EMAIL } from "../ids";
 import {
@@ -180,7 +182,7 @@ export const authHandlers = [
         return outsideError(422, "email_taken");
       }
       const user: UserRead = {
-        id: crypto.randomUUID(),
+        id: newId(),
         email: body.email.trim(),
         display_name: body.display_name.trim(),
         language: body.language,

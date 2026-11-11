@@ -2,6 +2,8 @@
 // FR-020, FR-021, FR-070). The backend serves these routes; the handlers
 // follow its schema (src/api/schema.d.ts) so the demo and the tests still
 // answer them.
+import { newId } from "@/lib/newId";
+
 import { nameProblem, type Problem, validationFailed } from "../outsideErrors";
 import { apiError, route } from "../route";
 import { DEFAULT_PLACEMENT_POINTS } from "../rules";
@@ -122,7 +124,7 @@ export const leagueHandlers = [
         default_field_count: 1,
         default_match_format: "bo1" as const,
         default_goals_per_game: 10,
-        share_token: crypto.randomUUID().replaceAll("-", ""),
+        share_token: newId().replaceAll("-", ""),
         created_at: createdAt,
         updated_at: null,
         owner_id: userId,
@@ -130,7 +132,7 @@ export const leagueHandlers = [
       state.leagues.push(league);
       // FR-010: creating a league starts Season 1.
       state.seasons.push({
-        id: crypto.randomUUID(),
+        id: newId(),
         league_id: league.id,
         number: 1,
         name: null,
@@ -229,7 +231,7 @@ export const leagueHandlers = [
       current.state = "closed";
       current.closed_at = at;
       const season = {
-        id: crypto.randomUUID(),
+        id: newId(),
         league_id: params.league_id,
         number: current.number + 1,
         name: null,

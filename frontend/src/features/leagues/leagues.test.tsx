@@ -8,6 +8,7 @@ import { DEMO_LEAGUE_ID } from "@/demo/ids";
 import { activeSeason, db } from "@/demo/store";
 import { axeViolations } from "@/features/auth/axeCheck";
 import { i18n } from "@/i18n";
+import { newId } from "@/lib/newId";
 import { paths } from "@/lib/paths";
 import { renderAt } from "@/test/renderApp";
 
@@ -178,7 +179,7 @@ describe("leagues", () => {
     first.closed_at = new Date().toISOString();
     db().seasons.push({
       ...first,
-      id: crypto.randomUUID(),
+      id: newId(),
       number: 2,
       state: "active",
       closed_at: null,
