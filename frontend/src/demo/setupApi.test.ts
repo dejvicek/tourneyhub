@@ -201,7 +201,15 @@ describe("the fake API for tournament setup", () => {
   it("answers with the backend's codes: a removed player, a stale pair, incomplete halves", async () => {
     const dyp = await createDraft();
     const ranking = (await setupOf(dyp)).ranking.map((row) => row.player_id);
-    const removedId = nth(ranking, 0);
+    // BR-002: a player picked for an unfinished tournament cannot be removed,
+    // so the one who is removed here is new.
+    const added = await dataOf(
+      api.POST("/api/v1/leagues/{league_id}/players", {
+        params: { path: league },
+        body: { name: "Removed Rita" },
+      }),
+    );
+    const removedId = added.id;
     await dataOf(
       api.PUT("/api/v1/leagues/{league_id}/players/{player_id}/removed", {
         params: { path: { ...league, player_id: removedId } },
