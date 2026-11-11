@@ -192,12 +192,18 @@ export async function startDypRoundRobin(
     data: { player_ids: playerIds },
   });
   expect(picked.status(), "picking the players").toBe(200);
-  const { draw_counter: drawCounter } = (await picked.json()) as {
+  const setup = (await picked.json()) as {
     draw_counter: number;
+    entries: { id: string; seed: number | null }[];
   };
   const started = await request.post(`${base}/${tournamentId}/start`, {
     headers,
-    data: { expected_draw_counter: drawCounter },
+    data: {
+      expected_draw_counter: setup.draw_counter,
+      expected_seed_order: setup.entries
+        .toSorted((a, b) => (a.seed ?? 0) - (b.seed ?? 0))
+        .map((entry) => entry.id),
+    },
   });
   expect(started.status(), "starting the tournament").toBe(200);
   return tournamentId;
