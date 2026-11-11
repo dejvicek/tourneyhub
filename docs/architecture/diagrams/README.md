@@ -1,6 +1,6 @@
 # TourneyHub architecture in LikeC4
 
-A LikeC4 model of the TourneyHub architecture for a visual overview. The sources of truth are `ADR.md` and `DATA-MODEL.md` beside it and `docs/product/PRD.md`; the model is only their picture and can fall behind.
+A LikeC4 model of the TourneyHub architecture for a visual overview. The sources of truth are `docs/architecture/ADR.md`, `docs/architecture/DATA-MODEL.md` and `docs/product/PRD.md`; the model is only their picture and can fall behind.
 
 ## Files
 
@@ -66,24 +66,24 @@ All commands run from the repository root.
 Live preview that re-renders after every change to a `.c4` file:
 
 ```sh
-npx likec4@1.60.0 start docs/architecture
+npx likec4@1.60.0 start docs/architecture/diagrams
 ```
 
-Offline version in one file (just open it in a browser; rebuild it after changing the model). The output goes to `docs/architecture/dist`, which is git-ignored:
+Offline version in one file (just open it in a browser; rebuild it after changing the model). The output goes to `docs/architecture/diagrams/dist`, which is git-ignored:
 
 ```sh
-npx likec4@1.60.0 build docs/architecture --output-single-file --title TourneyHub -o docs/architecture/dist
-open docs/architecture/dist/index.html
+npx likec4@1.60.0 build docs/architecture/diagrams --output-single-file --title TourneyHub -o docs/architecture/diagrams/dist
+open docs/architecture/diagrams/dist/index.html
 ```
 
 Syntax check after an edit:
 
 ```sh
-npx likec4@1.60.0 validate docs/architecture
+npx likec4@1.60.0 validate docs/architecture/diagrams
 ```
 
 ## Other options
 
 - The LikeC4 extension for VS Code: a diagram preview next to the editor and completion in `.c4` files.
-- `npx likec4@1.60.0 mcp docs/architecture` starts an MCP server through which an agent can query the model.
-- `npx likec4@1.60.0 export png docs/architecture` exports images (it downloads a browser for Playwright).
+- `npx likec4@1.60.0 mcp docs/architecture/diagrams` starts an MCP server through which an agent can query the model.
+- `npx likec4@1.60.0 export png docs/architecture/diagrams` exports images (it downloads a browser for Playwright).

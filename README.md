@@ -1,6 +1,6 @@
 # TourneyHub
 
-TourneyHub lets an organizer run a league in seasons, play tournaments inside each season (alone, in pairs or with drawn partners), enter results from a phone and share read-only standings with the group. What it does is in [PRD.md](docs/product/PRD.md), how it is built in [ADR.md](docs/architecture/ADR.md), the database in [DATA-MODEL.md](docs/architecture/DATA-MODEL.md) and the backend's code style in [docs/python-style.md](docs/python-style.md); [docs/architecture](docs/architecture) pictures it in LikeC4.
+TourneyHub lets an organizer run a league in seasons, play tournaments inside each season (alone, in pairs or with drawn partners), enter results from a phone and share read-only standings with the group. What it does is in [PRD.md](docs/product/PRD.md), how it is built in [ADR.md](docs/architecture/ADR.md), the database in [DATA-MODEL.md](docs/architecture/DATA-MODEL.md) and the backend's code style in [docs/python-style.md](docs/python-style.md); [docs/architecture/diagrams](docs/architecture/diagrams) pictures it in LikeC4.
 
 ## Prerequisites
 
