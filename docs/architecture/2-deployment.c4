@@ -9,7 +9,7 @@ deployment {
       Docker Compose on the developer's machine, and a phone on the same Wi-Fi. The services share the Compose network 172.30.0.0/24 from compose.yaml, as in production.
       Plain HTTP on localhost and on the machine's LAN address, so .env sets TOURNEYHUB_ENV=development and TOURNEYHUB_COOKIE_SECURE=false. The API refuses to start with TOURNEYHUB_COOKIE_SECURE=false unless TOURNEYHUB_ENV=development.
     "
-    link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-004--repository-layout-and-local-development-in-docker "ADR-004"
+    link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-004--repository-layout-and-local-development-in-docker "ADR-004"
 
     laptop = machine "Developer's machine" {
       technology "macOS, Docker"
@@ -66,7 +66,7 @@ deployment {
   prod = environment "Production" {
     technology "compose.yaml + compose.prod.yaml"
     description "COMPOSE_FILE in .env, no source code on the VPS. Updating: docker compose pull && docker compose up -d. Hosting in the EU is decided before the pilot."
-    link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-014--deployment-images-in-ghcr-manual-pull-on-the-vps "ADR-014"
+    link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-014--deployment-images-in-ghcr-manual-pull-on-the-vps "ADR-014"
 
     client = device "User's phone or computer" {
       description "Organizer, admin and viewer alike. The SPA runs in the browser."
@@ -83,7 +83,7 @@ deployment {
       // The fixed range from compose.yaml; uvicorn trusts X-Forwarded-For only from it (ADR-006)
       net = network "Compose network 172.30.0.0/24" {
         description "The default network of compose.yaml, with a fixed range so that uvicorn's FORWARDED_ALLOW_IPS (set in compose.prod.yaml) can trust X-Forwarded-For only from it, where Caddy is. Only web publishes ports on the VPS; api and db have none."
-        link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-006--authentication-jwt-access-token-and-rotating-refresh-token "ADR-006"
+        link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-006--authentication-jwt-access-token-and-rotating-refresh-token "ADR-006"
 
         web = dockerContainer "web: Caddy with the SPA build" {
           technology "Caddy 2.11, HTTPS from Let's Encrypt"
@@ -94,8 +94,8 @@ deployment {
             Sets security headers (a Content-Security-Policy, nosniff, Referrer-Policy); HSTS comes in the deployment phase (ADR-014).
             HTTPS from Let's Encrypt for the domain on the VPS; with SITE_ADDRESS=localhost (end-to-end tests) from Caddy's internal CA. Certificates and the CA live in the caddy-data volume.
           "
-          link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-005--one-origin-behind-caddy "ADR-005"
-          link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-004--repository-layout-and-local-development-in-docker "ADR-004"
+          link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-005--one-origin-behind-caddy "ADR-005"
+          link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-004--repository-layout-and-local-development-in-docker "ADR-004"
         }
         api = instanceOf tourneyhub.api {
           title "api: uvicorn"
@@ -105,7 +105,7 @@ deployment {
             Image from GHCR that passed Playwright. tourneyhub migrate runs the Alembic migrations on start, then uvicorn listens on port 8000 and trusts X-Forwarded-For only from 172.30.0.0/24. No host port.
             The same container also runs the tourneyhub CLI: migrate on start, and the admin commands of ADR-007.
           "
-          link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-014--deployment-images-in-ghcr-manual-pull-on-the-vps "ADR-014"
+          link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-014--deployment-images-in-ghcr-manual-pull-on-the-vps "ADR-014"
         }
         db = instanceOf tourneyhub.db {
           title "db: PostgreSQL 17"
@@ -116,7 +116,7 @@ deployment {
 
     backup = machine "Backups off the VPS" {
       description "Scheduled pg_dump and a tested restore. A precondition for the pilot; the details are designed before deployment."
-      link https://github.com/dejvicek/tourneyhub/blob/main/ADR.md#adr-014--deployment-images-in-ghcr-manual-pull-on-the-vps "ADR-014"
+      link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-014--deployment-images-in-ghcr-manual-pull-on-the-vps "ADR-014"
     }
 
     client.browser -> vps.net.web "HTTPS 443: / and /api; HTTP 80 redirects"

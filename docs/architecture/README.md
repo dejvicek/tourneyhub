@@ -1,6 +1,6 @@
 # TourneyHub architecture in LikeC4
 
-A LikeC4 model of the TourneyHub architecture for a visual overview. The sources of truth are `ADR.md` and `PRD.md` in the repository root and `DATA-MODEL.md` (currently PR #3); the model is only their picture and can fall behind.
+A LikeC4 model of the TourneyHub architecture for a visual overview. The sources of truth are `ADR.md` and `DATA-MODEL.md` beside it and `docs/product/PRD.md`; the model is only their picture and can fall behind.
 
 ## Files
 
@@ -13,12 +13,6 @@ A LikeC4 model of the TourneyHub architecture for a visual overview. The sources
 | `3-flows.c4` | folder III. Flows, views 9 to 21: login and refresh (9), sign-up (9b), password change (9c), result entry, next round, viewer, password reset (13a admin, 13b first login), release, the DYP evening from PRD §5.1 (15a setup, 15b play and viewers), league and seasons (16), players of a league (17), tournament setup (18), generate and start, back to setup (19), standings and finishing a round robin (20), fields during play (21) |
 
 Elements link to the relevant ADRs, data model sections and PRD sections on GitHub (the anchors match the headings in the documents).
-
-Links to `DATA-MODEL.md` point at branch `docs/data-model-mvp` (PR #3). After PR #3 merges, switch them to `main`:
-
-```sh
-sed -i '' 's#blob/docs/data-model-mvp/#blob/main/#g' docs/architecture/model.c4
-```
 
 ## View order and folders
 
