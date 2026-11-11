@@ -97,7 +97,7 @@ Each of these is on the roadmap (`ROADMAP.md`).
 
 1. 14 players come. The organizer creates a Monster DYP and is shown a recommendation of at least 4 rounds. Points for sitting out stay at their default, 1, because the league allows draws and the rounds are BO1 (FR-039).
 2. Round 1: 12 players play in 3 matches and 2 sit out. The 3 best-ranked of the 12 who play are in different matches.
-3. After round 1 a late player arrives. The organizer adds them, and they play from round 2, starting on 0 points.
+3. After round 1 a late player arrives. The organizer adds them, and they join from round 2, starting on 0 points.
 4. Whenever every match of a round has a result, the organizer adds the next round. A win is worth 2 points, a draw 1.
 5. After round 3 one player leaves for a while. The organizer disables them, and re-enables them before round 5.
 6. After round 5 the organizer decides the group phase is over and starts a "Seeded pairs" knockout for the top 8: #1 + #5, #2 + #6, #3 + #7 and #4 + #8.
