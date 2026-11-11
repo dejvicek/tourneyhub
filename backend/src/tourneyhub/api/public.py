@@ -13,6 +13,7 @@ from fastapi import APIRouter
 
 from tourneyhub.api.deps import SessionDep
 from tourneyhub.api.leagues import SeasonRead
+from tourneyhub.api.public_headers import PUBLIC_PREFIX
 from tourneyhub.api.schemas import ErrorResponse, ResponseModel
 from tourneyhub.api.tournaments import (
     EntryRead,
@@ -23,8 +24,6 @@ from tourneyhub.api.tournaments import (
 )
 from tourneyhub.engine.tournaments import TournamentState, TournamentType
 from tourneyhub.services import public as public_service
-
-PUBLIC_PREFIX = "/public"
 
 router = APIRouter(
     prefix=PUBLIC_PREFIX + "/{share_token}",
@@ -54,9 +53,10 @@ class PublicLeagueRead(ResponseModel):
 class PublicTournamentRead(ResponseModel):
     """A tournament through the share link: entries, rounds and fields (FR-070).
 
-    The same view as the organizer's whole tournament, without anything only the
-    organizer uses. `waiting` lists the matches waiting for a field, in the
-    order they will get one.
+    A separate allowlist of fields, not a copy of the organizer's whole
+    tournament: a field added to TournamentRead must not reach viewers until it
+    is added here on purpose. `waiting` lists the matches waiting for a field,
+    in the order they will get one.
     """
 
     id: UUID

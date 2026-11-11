@@ -360,6 +360,7 @@ def test_owasp_api1_a_valid_token_does_not_open_another_leagues_tournament(
         pytest.param("/seasons/{season}/tournaments", id="tournaments"),
         pytest.param("/tournaments/{tournament}", id="unknown-tournament"),
         pytest.param("/tournaments/not-a-uuid", id="validation-error"),
+        pytest.param("/seasons/not-a-uuid/tournaments", id="invalid-season-422"),
         pytest.param("/no-such-route", id="router-404"),
     ],
 )

@@ -11,15 +11,13 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from tourneyhub.api import admin, auth, leagues, me, players, public, tournaments
 from tourneyhub.api.errors import install_error_handlers
+from tourneyhub.api.public_headers import API_PREFIX, PUBLIC_HEADERS, is_public_path
 from tourneyhub.api.schemas import ErrorResponse
 from tourneyhub.db.session import create_db_engine, create_session_factory
 from tourneyhub.logging_config import LOGGING_CONFIG, request_id
 from tourneyhub.settings import Settings
 
 logger = logging.getLogger(__name__)
-
-API_PREFIX = "/api/v1"
-_PUBLIC_PATH = API_PREFIX + public.PUBLIC_PREFIX
 
 
 class _RequestIdMiddleware:
@@ -34,10 +32,10 @@ class _RequestIdMiddleware:
 
 
 class _PublicHeadersMiddleware:
-    """Headers for every answer under /api/v1/public, errors included (ADR-005).
+    """Headers for every answer under /api/v1/public that passes through (ADR-005).
 
-    The path carries the share token: no cache may keep the answer, and no
-    request from it names the address (FR-071).
+    An unhandled exception's 500 does not: the handler of `Exception` answers
+    outside this middleware and sets the same headers itself (api/errors.py).
     """
 
     def __init__(self, app: ASGIApp) -> None:
@@ -45,15 +43,15 @@ class _PublicHeadersMiddleware:
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         path = scope.get("path", "") if scope["type"] == "http" else ""
-        if path != _PUBLIC_PATH and not path.startswith(_PUBLIC_PATH + "/"):
+        if not is_public_path(path):
             await self.app(scope, receive, send)
             return
 
         async def send_with_headers(message: Message) -> None:
             if message["type"] == "http.response.start":
                 headers = MutableHeaders(scope=message)
-                headers["Cache-Control"] = "no-store"
-                headers["Referrer-Policy"] = "no-referrer"
+                for name, value in PUBLIC_HEADERS.items():
+                    headers[name] = value
             await send(message)
 
         await self.app(scope, receive, send_with_headers)
