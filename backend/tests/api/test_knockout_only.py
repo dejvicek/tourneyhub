@@ -15,9 +15,10 @@ from sqlalchemy.orm import Session
 
 from tourneyhub.app import create_app
 from tourneyhub.db.models.accounts import User
+from tourneyhub.db.models.entries import Entry
 from tourneyhub.db.models.leagues import League, Player
 from tourneyhub.db.models.matches import Match, Round
-from tourneyhub.db.models.tournaments import Tournament
+from tourneyhub.db.models.tournaments import Field, Tournament
 from tourneyhub.engine.accounts import Language
 from tourneyhub.engine.tournaments import (
     GroupPhase,
@@ -49,6 +50,11 @@ KNOCKOUT: Json = {
 }
 
 
+def _seed_order(setup: Json) -> list[str]:
+    """The entries of a setup in seed order, as the review's start carries them."""
+    return [e["id"] for e in sorted(setup["entries"], key=lambda e: e["seed"] or 0)]
+
+
 def win(side: str, score: tuple[int, int] = (10, 5)) -> Json:
     winner, loser = score
     scores = (winner, loser) if side == "side_1" else (loser, winner)
@@ -76,6 +82,14 @@ def by_key(bracket: Json) -> dict[Key, Json]:
         for round_ in bracket["rounds"]
         for m in round_["matches"]
     }
+
+
+def _first_round(tournament: Json) -> list[list[str | None]]:
+    """The entries on the sides of round 1, match by match, byes as None."""
+    return [
+        [side["entry_id"] for side in match["sides"]]
+        for match in tournament["rounds"][0]["matches"]
+    ]
 
 
 def seeds(match: Json) -> list[int | None]:
@@ -157,7 +171,10 @@ def start(
     def start(setup: Json) -> tuple[int, Json]:
         response = client.post(
             _t_url(league_id, setup["tournament_id"], "/start"),
-            json={"expected_draw_counter": setup["draw_counter"]},
+            json={
+                "expected_draw_counter": setup["draw_counter"],
+                "expected_seed_order": _seed_order(setup),
+            },
             headers=headers,
         )
         result: Json = response.json()
@@ -435,6 +452,7 @@ def test_fr035_the_preview_describes_the_bracket(
     _, tournament = start(setup)
 
     assert preview["can_start"] is True
+    assert preview["seed_order"] == _seed_order(setup)  # ADR-008: the start carries it
     assert preview["bracket_size"] == 8
     assert preview["round_count"] == 3
     assert preview["match_count"] == 5 + int(third_place_match)
@@ -452,6 +470,65 @@ def test_fr035_the_preview_describes_the_bracket(
         for m in started["matches"]
         if not any(s["is_bye"] for s in m["sides"])
     ] == [m["sides"] for m in first["matches"]]
+
+
+@pytest.mark.parametrize("change", ["swapped", "missing", "unknown"])
+def test_adr008_a_knockout_start_from_a_seed_order_the_review_did_not_show_is_stale(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    set_up: Callable[..., Json],
+    read: Callable[..., Json],
+    session: Session,
+    change: str,
+) -> None:
+    setup = set_up(6)
+    shown = read(setup["tournament_id"], "/setup/preview")
+    # another tab reorders the seeds; the draw counter does not change (ADR-010)
+    order = [*shown["seed_order"]]
+    order[0], order[1] = order[1], order[0]
+    reordered = client.put(
+        _t_url(league_id, setup["tournament_id"], "/setup/seed-order"),
+        json={"entry_ids": order},
+        headers=headers,
+    )
+    assert reordered.status_code == 200, reordered.text
+    assert reordered.json()["draw_counter"] == shown["draw_counter"]
+    previewed = {
+        "swapped": shown["seed_order"],
+        "missing": shown["seed_order"][:-1],
+        "unknown": [*shown["seed_order"][:-1], str(uuid7())],
+    }[change]
+    if change != "swapped":  # the other tab left the order as the review showed it
+        client.put(
+            _t_url(league_id, setup["tournament_id"], "/setup/seed-order"),
+            json={"entry_ids": shown["seed_order"]},
+            headers=headers,
+        )
+
+    response = client.post(
+        _t_url(league_id, setup["tournament_id"], "/start"),
+        json={
+            "expected_draw_counter": shown["draw_counter"],
+            "expected_seed_order": previewed,
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 409, response.text
+    assert response.json() == {"code": "seed_order_changed", "detail": {}}
+    assert session.scalar(select(func.count()).select_from(Match)) == 0
+    assert read(setup["tournament_id"], "")["state"] == "setup"
+    fresh = read(setup["tournament_id"], "/setup/preview")
+    again = client.post(
+        _t_url(league_id, setup["tournament_id"], "/start"),
+        json={
+            "expected_draw_counter": fresh["draw_counter"],
+            "expected_seed_order": fresh["seed_order"],
+        },
+        headers=headers,
+    )
+    assert again.status_code == 200, again.text
 
 
 def test_fr035_a_round_robin_preview_has_no_byes(
@@ -698,10 +775,14 @@ def test_fr036_back_to_setup_deletes_the_bracket_and_keeps_the_format(
     fmt = read(tournament["id"], "/setup")["format"]
     assert (fmt["group_phase"], fmt["third_place_match"]) == ("none", True)
     assert fmt["knockout_match_format"] == KnockoutMatchFormat.BO3
+    assert all(field["match_id"] is None for field in response.json()["fields"])
     setup = read(tournament["id"], "/setup")
     status, again = start(setup)
     assert status == 200, again
     assert sum(len(r["matches"]) for r in again["rounds"]) == 8
+    # ADR-010: the lots are deterministic, so the same setup draws the same round
+    assert _first_round(again) == _first_round(tournament)
+    assert again["fields"][0]["match_id"] is not None
 
 
 def test_fr036_back_to_setup_ends_with_the_first_result(
@@ -786,7 +867,9 @@ def test_fr070_the_share_link_shows_the_bracket_and_the_places(
 # ---------------------------------------------------------------- races
 
 
-def _commit_setup(engine: Engine, now: datetime) -> tuple[UUID, UUID, UUID, int]:
+def _commit_setup(
+    engine: Engine, now: datetime
+) -> tuple[UUID, UUID, UUID, int, list[UUID]]:
     """A committed league with a Singles knockout of six players in setup."""
     with Session(engine) as setup:
         owner = User(
@@ -834,16 +917,17 @@ def _commit_setup(engine: Engine, now: datetime) -> tuple[UUID, UUID, UUID, int]
             player_ids=player_ids,
             clock=lambda: now,
         )
-        counter = tournament_service.set_seeding_method(  # a draw has seeds to shuffle
+        seeded = tournament_service.set_seeding_method(  # a draw has seeds to shuffle
             setup,
             league_id=league.id,
             tournament_id=tournament_id,
             user_id=owner.id,
             method=SeedingMethod.RANDOM,
             clock=lambda: now,
-        ).draw_counter
+        )
         setup.commit()
-        return owner.id, league.id, tournament_id, counter
+        seeds = [e.id for e in sorted(seeded.entries, key=lambda e: e.seed or 0)]
+        return owner.id, league.id, tournament_id, seeded.draw_counter, seeds
 
 
 @pytest.mark.concurrency
@@ -856,7 +940,9 @@ def test_adr008_a_knockout_start_racing_a_new_seed_draw_has_one_winner(
     wait_for_a_lock_wait: Callable[[], None],
     winner: str,
 ) -> None:
-    owner_id, league_id, tournament_id, counter = _commit_setup(committing_engine, now)
+    owner_id, league_id, tournament_id, counter, seeds = _commit_setup(
+        committing_engine, now
+    )
     outcome: list[tuple[int, object]] = []
 
     with (
@@ -870,9 +956,11 @@ def test_adr008_a_knockout_start_racing_a_new_seed_draw_has_one_winner(
                 tournament_id=tournament_id,
                 user_id=owner_id,
                 expected_draw_counter=counter,
+                expected_seed_order=seeds,
                 clock=lambda: now,
             )
-            path, body = "/setup/draw", {"target": "seeds"}
+            path = "/setup/draw"
+            body: Json = {"target": "seeds"}
         else:
             tournament_service.draw_again(
                 first,
@@ -883,7 +971,8 @@ def test_adr008_a_knockout_start_racing_a_new_seed_draw_has_one_winner(
                 expected_draw_counter=counter,
                 clock=lambda: now,
             )
-            path, body = "/start", {}
+            path = "/start"
+            body = {"expected_seed_order": [str(s) for s in seeds]}
 
         def second_request() -> None:
             response = client.post(
@@ -925,3 +1014,173 @@ def test_adr008_a_knockout_start_racing_a_new_seed_draw_has_one_winner(
                 counter + 1,
                 0,
             )
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize("winner", ["start", "back"])
+def test_fr036_a_knockout_start_racing_back_to_setup_leaves_one_consistent_state(
+    committing_settings: Settings,
+    committing_engine: Engine,
+    now: datetime,
+    committed_auth_header: Callable[..., dict[str, str]],
+    wait_for_a_lock_wait: Callable[[], None],
+    winner: str,
+) -> None:
+    owner_id, league_id, tournament_id, counter, seeds = _commit_setup(
+        committing_engine, now
+    )
+    outcome: list[tuple[int, object]] = []
+
+    if winner == "back":  # the tournament runs; back-to-setup holds the lock
+        with Session(committing_engine) as begin:
+            tournament_service.start_tournament(
+                begin,
+                league_id=league_id,
+                tournament_id=tournament_id,
+                user_id=owner_id,
+                expected_draw_counter=counter,
+                expected_seed_order=seeds,
+                clock=lambda: now,
+            )
+            begin.commit()
+    with (
+        Session(committing_engine) as first,
+        TestClient(create_app(committing_settings)) as client,
+    ):
+        if winner == "start":
+            tournament_service.start_tournament(
+                first,
+                league_id=league_id,
+                tournament_id=tournament_id,
+                user_id=owner_id,
+                expected_draw_counter=counter,
+                expected_seed_order=seeds,
+                clock=lambda: now,
+            )
+            path = "/back-to-setup"
+            body: Json = {"expected_state": "in_progress"}
+        else:
+            tournament_service.back_to_setup(
+                first,
+                league_id=league_id,
+                tournament_id=tournament_id,
+                user_id=owner_id,
+                clock=lambda: now,
+            )
+            path = "/start"
+            body = {
+                "expected_draw_counter": counter,
+                "expected_seed_order": [str(seed) for seed in seeds],
+            }
+
+        def second_request() -> None:
+            response = client.post(
+                _t_url(league_id, str(tournament_id), path),
+                json=body,
+                headers=committed_auth_header(owner_id, issued_at=datetime.now(UTC)),
+            )
+            outcome.append((response.status_code, response.json()["state"]))
+
+        second = threading.Thread(target=second_request)
+        second.start()
+        wait_for_a_lock_wait()  # it waits for the league lock the first one holds
+        first.commit()
+        second.join()
+
+    # Either way the second request runs on the state the first one left, and
+    # the bracket is never drawn twice: the same setup draws the same seeds.
+    state = {"start": "setup", "back": "in_progress"}[winner]
+    assert outcome == [(200, state)]
+    with Session(committing_engine) as check:
+        matches = check.scalar(select(func.count()).select_from(Match))
+        rounds = check.scalar(select(func.count()).select_from(Round))
+        on_fields = check.scalars(select(Field.match_id)).all()
+        assert check.get_one(Tournament, tournament_id).state == state
+        if winner == "start":
+            assert (matches, rounds) == (0, 0)
+            assert all(match_id is None for match_id in on_fields)
+        else:
+            assert (matches, rounds) == (8, 3)
+            assert on_fields[0] is not None  # BR-130: the first match has a field
+
+
+@pytest.mark.concurrency
+@pytest.mark.parametrize("winner", ["start", "reorder"])
+def test_adr008_a_knockout_start_racing_a_seed_reorder_has_exactly_one_winner(
+    committing_settings: Settings,
+    committing_engine: Engine,
+    now: datetime,
+    committed_auth_header: Callable[..., dict[str, str]],
+    wait_for_a_lock_wait: Callable[[], None],
+    winner: str,
+) -> None:
+    owner_id, league_id, tournament_id, counter, seeds = _commit_setup(
+        committing_engine, now
+    )
+    reversed_seeds = seeds[::-1]
+    outcome: list[tuple[int, object]] = []
+
+    with (
+        Session(committing_engine) as first,
+        TestClient(create_app(committing_settings)) as client,
+    ):
+        if winner == "start":
+            tournament_service.start_tournament(
+                first,
+                league_id=league_id,
+                tournament_id=tournament_id,
+                user_id=owner_id,
+                expected_draw_counter=counter,
+                expected_seed_order=seeds,
+                clock=lambda: now,
+            )
+            request = client.put, "/setup/seed-order"
+            body: Json = {"entry_ids": [str(e) for e in reversed_seeds]}
+        else:
+            tournament_service.set_seed_order(
+                first,
+                league_id=league_id,
+                tournament_id=tournament_id,
+                user_id=owner_id,
+                entry_ids=reversed_seeds,
+                clock=lambda: now,
+            )
+            request = client.post, "/start"
+            body = {
+                "expected_draw_counter": counter,
+                "expected_seed_order": [str(e) for e in seeds],
+            }
+
+        def second_request() -> None:
+            send, path = request
+            response = send(
+                _t_url(league_id, str(tournament_id), path),
+                json=body,
+                headers=committed_auth_header(owner_id, issued_at=datetime.now(UTC)),
+            )
+            outcome.append((response.status_code, response.json()))
+
+        second = threading.Thread(target=second_request)
+        second.start()
+        wait_for_a_lock_wait()  # it waits for the league lock the first one holds
+        first.commit()
+        second.join()
+
+    stale = {
+        "start": {
+            "code": "tournament_not_in_setup",
+            "detail": {"state": "in_progress"},
+        },
+        "reorder": {"code": "seed_order_changed", "detail": {}},
+    }
+    assert outcome == [(409, stale[winner])]
+    with Session(committing_engine) as check:
+        tournament = check.get_one(Tournament, tournament_id)
+        matches = check.scalar(select(func.count()).select_from(Match))
+        by_seed = {e.id: e.seed for e in check.scalars(select(Entry))}
+        order = sorted(by_seed, key=lambda entry_id: by_seed[entry_id] or 0)
+        if winner == "start":
+            assert (tournament.state, matches, order) == ("in_progress", 8, seeds)
+        else:
+            # the start drew nothing from the setup the review showed
+            assert (tournament.state, matches, order) == ("setup", 0, reversed_seeds)

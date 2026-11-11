@@ -55,6 +55,11 @@ S1_WINS: Json = {
 EMPTY: Json = {"walkover_winner": None, "games": []}
 
 
+def _seed_order(setup: Json) -> list[str]:
+    """The entries of a setup in seed order, as the review's start carries them."""
+    return [e["id"] for e in sorted(setup["entries"], key=lambda e: e["seed"] or 0)]
+
+
 def game(winner: str, score_1: int | None = None, score_2: int | None = None) -> Json:
     return {"winner": winner, "score_1": score_1, "score_2": score_2}
 
@@ -116,7 +121,10 @@ def start(
         assert picked.status_code == 200, picked.text
         started = client.post(
             _t_url(league_id, tournament_id, "/start"),
-            json={"expected_draw_counter": picked.json()["draw_counter"]},
+            json={
+                "expected_draw_counter": picked.json()["draw_counter"],
+                "expected_seed_order": _seed_order(picked.json()),
+            },
             headers=headers,
         )
         assert started.status_code == 200, started.text
@@ -999,20 +1007,23 @@ def _commit_started(
             player_ids=player_ids,
             clock=lambda: now,
         )
-        counter = tournament_service.set_seeding_method(
+        seeded = tournament_service.set_seeding_method(
             setup,
             league_id=league.id,
             tournament_id=tournament_id,
             user_id=owner.id,
             method=SeedingMethod.RANDOM,
             clock=lambda: now,
-        ).draw_counter
+        )
         tournament_service.start_tournament(
             setup,
             league_id=league.id,
             tournament_id=tournament_id,
             user_id=owner.id,
-            expected_draw_counter=counter,
+            expected_draw_counter=seeded.draw_counter,
+            expected_seed_order=[
+                e.id for e in sorted(seeded.entries, key=lambda e: e.seed or 0)
+            ],
             clock=lambda: now,
         )
         setup.commit()

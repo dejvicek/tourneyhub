@@ -440,7 +440,11 @@ _ROUTES: list[tuple[str, str, Json | None]] = [
     ("POST", "/tournaments", {"id": "{new}", **SINGLES_ROUND_ROBIN}),
     ("DELETE", "/tournaments/{t}", None),
     ("GET", "/tournaments/{t}", None),
-    ("POST", "/tournaments/{t}/start", {"expected_draw_counter": 0}),
+    (
+        "POST",
+        "/tournaments/{t}/start",
+        {"expected_draw_counter": 0, "expected_seed_order": []},
+    ),
     ("POST", "/tournaments/{t}/back-to-setup", {"expected_state": "in_progress"}),
     ("PUT", "/tournaments/{t}/format", SINGLES_ROUND_ROBIN),
     ("GET", "/tournaments/{t}/setup", None),

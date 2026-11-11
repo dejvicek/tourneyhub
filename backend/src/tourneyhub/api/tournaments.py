@@ -510,10 +510,13 @@ class SchedulePreviewRead(ResponseModel):
     its first round with its matches and byes (BR-040 to BR-042);
     `match_count` counts every match of the bracket, the third-place match
     too and no bye, `round_count` its rounds and `bracket_size` its
-    first-round spots. `draw_counter` goes back in the start (ADR-008).
+    first-round spots. `draw_counter` and `seed_order` go back in the start
+    (ADR-008): `seed_order` is the entries the preview was drawn from, seed 1
+    first, empty with a `problem`.
     """
 
     draw_counter: int
+    seed_order: list[UUID]
     can_start: bool
     problem: StartProblemRead | None
     rounds: list[PreviewRoundRead]
@@ -523,9 +526,14 @@ class SchedulePreviewRead(ResponseModel):
 
 
 class StartWrite(RequestModel):
-    """Generate and start, with the draw counter the review screen showed (ADR-008)."""
+    """Generate and start, from the setup the review screen showed (ADR-008).
+
+    The draw counter does not change when the organizer reorders the seeds by
+    hand, so the request also carries the seed order the preview showed.
+    """
 
     expected_draw_counter: Annotated[int, Field(ge=0, le=INT_MAX)]
+    expected_seed_order: EntryIds
 
 
 class BackToSetupWrite(RequestModel):
@@ -814,8 +822,10 @@ def start_tournament(
     a group phase gets its whole bracket from the setup seeds, the byes for
     the top seeds (BR-040 to BR-044). The first matches take the fields
     (BR-130). A started tournament is 409 `tournament_not_in_setup`; a stale
-    `expected_draw_counter` is 409 `draw_counter_changed`. Swiss and Monster
-    DYP are 422 `format_not_supported` for now. An incomplete setup is 422:
+    `expected_draw_counter` is 409 `draw_counter_changed`, and an
+    `expected_seed_order` that is not the entries' current order, seed 1
+    first, 409 `seed_order_changed`: the review shows the new setup. Swiss and
+    Monster DYP are 422 `format_not_supported` for now. An incomplete setup is 422:
     `players_without_partner` (Doubles), `not_enough_players`,
     `dyp_halves_incomplete`, `dyp_halves_unequal`, `too_many_left_out` (DYP),
     `not_enough_entries` (FR-032: 2, or 4 with a third-place match),
@@ -828,6 +838,7 @@ def start_tournament(
         tournament_id=tournament_id,
         user_id=user.id,
         expected_draw_counter=body.expected_draw_counter,
+        expected_seed_order=body.expected_seed_order,
         clock=clock,
     )
     return TournamentRead.model_validate(tournament)

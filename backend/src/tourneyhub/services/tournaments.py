@@ -2066,13 +2066,19 @@ def start_tournament(
     tournament_id: UUID,
     user_id: UUID,
     expected_draw_counter: int,
+    expected_seed_order: Sequence[UUID],
     clock: Clock,
 ) -> TournamentView:
     """Generate the schedule and start the tournament (FR-035).
 
-    The request carries the draw counter the review screen showed: a started
-    tournament is 409 `tournament_not_in_setup`, a stale counter 409
-    `draw_counter_changed`, so a repeat never starts twice (ADR-008). A round
+    The request carries the draw counter and the seed order the review screen
+    showed: a started tournament is 409 `tournament_not_in_setup`, a stale
+    counter 409 `draw_counter_changed`, so a repeat never starts twice
+    (ADR-008). A hand reordering of the seeds leaves the counter (ADR-010), so
+    a seed order that is not the entries' current one, seed 1 first, is 409
+    `seed_order_changed`: the schedule is never drawn from a setup the
+    organizer did not see. The seeds follow the entries, so the same check
+    covers a change to the players or to their pairs. A round
     robin and a knockout without a group phase are generated so far; Swiss and
     Monster DYP are 422 `format_not_supported`. An incomplete setup is a 422
     (`_check_ready`).
@@ -2101,6 +2107,8 @@ def start_tournament(
     phase = tournament.phases[0]  # setup holds exactly one phase (D9)
     _check_ready(tournament, phase)
     main = _main_entries(tournament)
+    if list(expected_seed_order) != _seed_order_of(main):
+        raise ConflictError(ErrorCode.SEED_ORDER_CHANGED)
     if phase.kind is PhaseKind.KNOCKOUT:
         now = clock()
         bracket = _bracket_from_seeds(main, phase)
@@ -2129,6 +2137,11 @@ def start_tournament(
     return read_tournament(
         session, league_id=league_id, tournament_id=tournament.id, user_id=user_id
     )
+
+
+def _seed_order_of(main: Sequence[Entry]) -> list[UUID]:
+    """The main entries' ids, seed 1 first: what the preview and the start agree on."""
+    return list[UUID](seed_order((EntryId(entry.id), entry.seed) for entry in main))
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -2164,14 +2177,16 @@ class PreviewRound:
 class SchedulePreview:
     """What "Generate and start" would create, or why it would not (FR-035).
 
-    With a `problem` there are no rounds and no counts. `draw_counter` is the
-    one the start must carry (ADR-008). A round robin lists all its rounds. A
+    With a `problem` there are no rounds, no counts and no `seed_order`.
+    `draw_counter` and `seed_order`, the main entries with seed 1 first, are
+    the ones the start must carry (ADR-008). A round robin lists all its rounds. A
     knockout without a group phase lists its first round, with the byes, and
     counts every match of the bracket (the third-place match too, no byes)
     and its rounds; `bracket_size` is its number of first-round spots.
     """
 
     draw_counter: int
+    seed_order: tuple[UUID, ...]
     problem: StartProblem | None
     rounds: tuple[PreviewRound, ...]
     match_count: int | None
@@ -2214,6 +2229,7 @@ def preview_schedule(
     if problem is not None:
         return SchedulePreview(
             draw_counter=tournament.draw_counter,
+            seed_order=(),
             problem=problem,
             rounds=(),
             match_count=None,
@@ -2245,6 +2261,7 @@ def preview_schedule(
     )
     return SchedulePreview(
         draw_counter=tournament.draw_counter,
+        seed_order=tuple(_seed_order_of(_main_entries(tournament))),
         problem=None,
         rounds=rounds,
         match_count=sum(len(r.matches) for r in rounds),
@@ -2270,6 +2287,7 @@ def _bracket_preview(
     first = bracket.first_round
     return SchedulePreview(
         draw_counter=draw_counter,
+        seed_order=tuple(seeds),
         problem=None,
         rounds=(
             PreviewRound(

@@ -3098,7 +3098,7 @@
         "type": "string"
       },
       "SchedulePreviewRead": {
-        "description": "What \"Generate and start\" would create, or why it would not (FR-035).\n\n`can_start` is false exactly when `problem` is set: the same code and detail\nas the 422 of `POST /start` (the 409s of a stale draw counter apart). Then\n`rounds` is empty and the counts are null. A round robin lists all its\nrounds, and `bracket_size` is null. A knockout without a group phase lists\nits first round with its matches and byes (BR-040 to BR-042);\n`match_count` counts every match of the bracket, the third-place match\ntoo and no bye, `round_count` its rounds and `bracket_size` its\nfirst-round spots. `draw_counter` goes back in the start (ADR-008).",
+        "description": "What \"Generate and start\" would create, or why it would not (FR-035).\n\n`can_start` is false exactly when `problem` is set: the same code and detail\nas the 422 of `POST /start` (the 409s of a stale draw counter apart). Then\n`rounds` is empty and the counts are null. A round robin lists all its\nrounds, and `bracket_size` is null. A knockout without a group phase lists\nits first round with its matches and byes (BR-040 to BR-042);\n`match_count` counts every match of the bracket, the third-place match\ntoo and no bye, `round_count` its rounds and `bracket_size` its\nfirst-round spots. `draw_counter` and `seed_order` go back in the start\n(ADR-008): `seed_order` is the entries the preview was drawn from, seed 1\nfirst, empty with a `problem`.",
         "properties": {
           "bracket_size": {
             "anyOf": [
@@ -3157,10 +3157,19 @@
             },
             "title": "Rounds",
             "type": "array"
+          },
+          "seed_order": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Seed Order",
+            "type": "array"
           }
         },
         "required": [
           "draw_counter",
+          "seed_order",
           "can_start",
           "problem",
           "rounds",
@@ -3523,17 +3532,21 @@
       },
       "StartWrite": {
         "additionalProperties": false,
-        "description": "Generate and start, with the draw counter the review screen showed (ADR-008).",
+        "description": "Generate and start, from the setup the review screen showed (ADR-008).\n\nThe draw counter does not change when the organizer reorders the seeds by\nhand, so the request also carries the seed order the preview showed.",
         "properties": {
           "expected_draw_counter": {
             "maximum": 2147483647.0,
             "minimum": 0.0,
             "title": "Expected Draw Counter",
             "type": "integer"
+          },
+          "expected_seed_order": {
+            "$ref": "#/components/schemas/EntryIds"
           }
         },
         "required": [
-          "expected_draw_counter"
+          "expected_draw_counter",
+          "expected_seed_order"
         ],
         "title": "StartWrite",
         "type": "object"
@@ -8423,7 +8436,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/start": {
       "post": {
-        "description": "Generate the schedule and start the tournament (FR-035).\n\nA round robin gets all its rounds (BR-050 to BR-052); a knockout without\na group phase gets its whole bracket from the setup seeds, the byes for\nthe top seeds (BR-040 to BR-044). The first matches take the fields\n(BR-130). A started tournament is 409 `tournament_not_in_setup`; a stale\n`expected_draw_counter` is 409 `draw_counter_changed`. Swiss and Monster\nDYP are 422 `format_not_supported` for now. An incomplete setup is 422:\n`players_without_partner` (Doubles), `not_enough_players`,\n`dyp_halves_incomplete`, `dyp_halves_unequal`, `too_many_left_out` (DYP),\n`not_enough_entries` (FR-032: 2, or 4 with a third-place match),\n`too_many_entries_for_round_robin` (detail `limit`: 64) or\n`too_many_entries_for_knockout` (detail `limit`: 256).",
+        "description": "Generate the schedule and start the tournament (FR-035).\n\nA round robin gets all its rounds (BR-050 to BR-052); a knockout without\na group phase gets its whole bracket from the setup seeds, the byes for\nthe top seeds (BR-040 to BR-044). The first matches take the fields\n(BR-130). A started tournament is 409 `tournament_not_in_setup`; a stale\n`expected_draw_counter` is 409 `draw_counter_changed`, and an\n`expected_seed_order` that is not the entries' current order, seed 1\nfirst, 409 `seed_order_changed`: the review shows the new setup. Swiss and\nMonster DYP are 422 `format_not_supported` for now. An incomplete setup is 422:\n`players_without_partner` (Doubles), `not_enough_players`,\n`dyp_halves_incomplete`, `dyp_halves_unequal`, `too_many_left_out` (DYP),\n`not_enough_entries` (FR-032: 2, or 4 with a third-place match),\n`too_many_entries_for_round_robin` (detail `limit`: 64) or\n`too_many_entries_for_knockout` (detail `limit`: 256).",
         "operationId": "start_tournament",
         "parameters": [
           {

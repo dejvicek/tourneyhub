@@ -42,6 +42,11 @@ DRAW: Json = {
 }
 
 
+def _seed_order(setup: Json) -> list[str]:
+    """The entries of a setup in seed order, as the review's start carries them."""
+    return [e["id"] for e in sorted(setup["entries"], key=lambda e: e["seed"] or 0)]
+
+
 class Evening:
     """One league with its organizer, and the calls an evening needs."""
 
@@ -91,7 +96,10 @@ class Evening:
         setup = self.create(player_ids, **values)
         started = self.client.post(
             self.url(f"/tournaments/{setup['tournament_id']}/start"),
-            json={"expected_draw_counter": setup["draw_counter"]},
+            json={
+                "expected_draw_counter": setup["draw_counter"],
+                "expected_seed_order": _seed_order(setup),
+            },
             headers=self.headers,
         )
         assert started.status_code == 200, started.text
