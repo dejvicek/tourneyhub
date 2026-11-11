@@ -16,5 +16,5 @@ export const shell: CsMessages<Messages["shell"]> = {
   copyShareLink: "Kopírovat odkaz ke sdílení",
   shareLinkCopied: "Odkaz ke sdílení je zkopírovaný",
   shareLinkFailed: "Odkaz se nepodařilo zkopírovat",
-  signedInAs: "Přihlášen(a) jako {{name}}",
+  signedInAs: "Přihlášený účet: {{name}}",
 };

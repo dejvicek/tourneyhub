@@ -57,7 +57,7 @@ export const finals: CsMessages<Messages["finals"]> = {
     played: "Odehráno",
     ready: "Připraveno ke hře",
     waiting: "Čeká",
-    onField: "Na stole {{field}}",
+    onField: "Na hřišti {{field}}",
     bye: "Volný los",
     byeFor: "{{name}}, volný los",
     tbd: "Bude určeno",
@@ -70,7 +70,7 @@ export const finals: CsMessages<Messages["finals"]> = {
     locked:
       "Zamčeno: pozdější zápas už má výsledek. Nejdřív smažte ten, pak jde změnit tento.",
     walkover: "Kontumace",
-    formatAndField: "{{format}}, stůl {{field}}",
+    formatAndField: "{{format}}, hřiště {{field}}",
     placesSoFar: "Dosavadní umístění",
     placesNone: "Zatím není rozhodnuté žádné místo.",
     placesLine: "{{place}}: {{names}}",
@@ -85,7 +85,7 @@ export const finals: CsMessages<Messages["finals"]> = {
   finished: {
     title: "Dohráno",
     winners: "Vítězové",
-    wonFinal: "Vyhráli finále {{score}} proti {{opponent}}",
+    wonFinal: "Finále {{score}}, soupeř: {{opponent}}",
     wonStandings: "První v tabulce",
     earnsEach_one: "Oba dostanou {{count}} bod do sezóny.",
     earnsEach_few: "Oba dostanou {{count}} body do sezóny.",
@@ -97,12 +97,17 @@ export const finals: CsMessages<Messages["finals"]> = {
     earnsOwn_other: "Dostane {{count}} bodů do sezóny.",
     places: "Konečné pořadí",
     reason: {
-      won_final: "Vyhráli finále {{score}}",
-      won_final_noscore: "Vyhráli finále",
-      lost_final: "Prohráli finále",
-      won_third_place: "Vyhráli zápas o 3. místo",
-      lost_third_place: "Prohráli zápas o 3. místo",
-      lost_in_round: "Vypadli v kole: {{round}}",
+      won_final: "Výhra ve finále {{score}}",
+      won_final_noscore: "Výhra ve finále",
+      lost_final: "Prohra ve finále",
+      won_third_place: "Výhra v zápase o 3. místo",
+      lost_third_place: "Prohra v zápase o 3. místo",
+      lostIn: {
+        round_of_16: "Konec v osmifinále",
+        quarterfinal: "Konec ve čtvrtfinále",
+        semifinal: "Konec v semifinále",
+        final: "Konec ve finále",
+      },
       group_round_robin: "{{place}} místo ve hře každý s každým",
       group_standings: "{{place}} místo v tabulce",
       shared: "Společné místo. {{reason}}.",
@@ -127,14 +132,7 @@ export const finals: CsMessages<Messages["finals"]> = {
   },
   rounds: {
     title: "Kola",
-    summary_one:
-      "{{date, datetime(day: numeric; month: long)}}, {{count}} hráč",
-    summary_few:
-      "{{date, datetime(day: numeric; month: long)}}, {{count}} hráči",
-    summary_many:
-      "{{date, datetime(day: numeric; month: long)}}, {{count}} hráče",
-    summary_other:
-      "{{date, datetime(day: numeric; month: long)}}, {{count}} hráčů",
+    summary: "{{date, datetime(day: numeric; month: long)}}, {{entries}}",
     roundChips: "Kolo",
     chip: "{{round}}",
     matches: "Zápasy kola {{round}}",

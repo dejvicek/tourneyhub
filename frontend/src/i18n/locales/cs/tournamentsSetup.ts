@@ -120,7 +120,7 @@ export const tournamentsSetup: CsMessages<typeof english> = {
       matches: "Zápasy",
       final: "Finále",
       goals: "Branek ve hře",
-      fields: "Hrací pole",
+      fields: "Hřiště",
       draws: "Remízy",
       sitOut: "Body za volno",
       knockout: "Vyřazovací fáze",
@@ -139,7 +139,7 @@ export const tournamentsSetup: CsMessages<typeof english> = {
         title: "Monster DYP hraje vlastní kola",
         body: "Skupinovou fázi nevybíráte. Každé kolo vytvoří nové týmy po dvou, o vyřazovací fázi rozhodnete později.",
       },
-      matchesAndFields: "Zápasy a hrací pole",
+      matchesAndFields: "Zápasy a hřiště",
       groupMatches: {
         round_robin: "Zápasy každý s každým",
         swiss: "Zápasy švýcarského systému",
@@ -163,11 +163,11 @@ export const tournamentsSetup: CsMessages<typeof english> = {
         "Určuje počet korálků na počítadle skóre. Jiné skóre lze stále zadat.",
       goalsLess: "Méně branek ve hře",
       goalsMore: "Více branek ve hře",
-      fields: "Hrací pole",
+      fields: "Hřiště",
       fieldsHint:
-        "Zápasy začínají jen na volném poli. Pole můžete během turnaje přidat nebo ubrat.",
-      fieldsLess: "Méně hracích polí",
-      fieldsMore: "Více hracích polí",
+        "Zápasy začínají jen na volném hřišti. Hřiště můžete během turnaje přidat nebo ubrat.",
+      fieldsLess: "Méně hřišť",
+      fieldsMore: "Více hřišť",
       sitOut: "Body za volno",
       sitOutHint:
         "Vypnuto: volno je za 0 bodů. Zapnuto: za 1 bod. Záleží jen při lichém počtu dvojic.",

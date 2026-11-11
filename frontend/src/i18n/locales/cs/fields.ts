@@ -26,13 +26,13 @@ export const fields: CsMessages<Messages["fields"]> = {
     reasonFree:
       "{{round}}. kolo. Hráči jsou volní: dostane další volné hřiště.",
     reasonBusy_one:
-      "{{round}}. kolo. Čeká na {{names}}, který hraje na hřišti {{field}}.",
+      "{{round}}. kolo. Čeká: {{names}}. Hraje na hřišti {{field}}.",
     reasonBusy_other:
-      "{{round}}. kolo. Čeká na {{names}}, kteří hrají na hřišti {{field}}.",
+      "{{round}}. kolo. Čeká: {{names}}. Hrají na hřišti {{field}}.",
     reasonBusy_few:
-      "{{round}}. kolo. Čeká na {{names}}, kteří hrají na hřišti {{field}}.",
+      "{{round}}. kolo. Čeká: {{names}}. Hrají na hřišti {{field}}.",
     reasonBusy_many:
-      "{{round}}. kolo. Čeká na {{names}}, kteří hrají na hřišti {{field}}.",
+      "{{round}}. kolo. Čeká: {{names}}. Hrají na hřišti {{field}}.",
     reasonBoth: "{{round}}. kolo. Obě strany ještě hrají na hřišti.",
   },
   move: {
@@ -62,7 +62,7 @@ export const fields: CsMessages<Messages["fields"]> = {
     title: "Hřiště: přidat nebo odebrat",
     heading: "Hřiště",
     description:
-      "Zápasy začínají jen na hřišti. Přidejte ho, když se v herně uvolní další stůl.",
+      "Zápasy začínají jen na hřišti. Přidejte ho, když se v herně uvolní další hřiště.",
     removeField: "Odebrat hřiště {{number}}",
     remove: "Odebrat",
     lastField: "Poslední hřiště nejde odebrat.",

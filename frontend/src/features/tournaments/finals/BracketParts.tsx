@@ -145,7 +145,8 @@ const BOX_STATE = {
   ready: "border-team-a bg-card text-card-foreground",
   waiting: "border-dashed border-input bg-transparent text-foreground",
   bye: "border-dashed border-input bg-transparent text-muted-foreground",
-  on_field: "border-field bg-field text-field-foreground",
+  // A match on a field is a ready match: one style for both.
+  on_field: "border-team-a bg-card text-card-foreground",
 } as const satisfies Record<BracketMatch["state"], string>;
 
 interface MatchBoxProps {
@@ -192,12 +193,16 @@ export function MatchBox({
       {match.is_walkover && (
         <p className="mt-1 text-caption">{t("finals.knockout.walkover")}</p>
       )}
+      {match.state !== "played" && match.field_number !== null && (
+        <p className="mt-1 text-caption font-bold">
+          {t("finals.knockout.onField", { field: match.field_number })}
+        </p>
+      )}
       {href !== null && (
         <ResultLink
           href={href}
           match={match}
           title={title}
-          inverse={match.state === "on_field"}
           className="mt-2 w-full"
         />
       )}
@@ -285,8 +290,7 @@ export function MatchCard({ ctx, round, match }: MatchBoxProps) {
   const { t } = useTranslation();
   const title = ctx.matchTitle(round, match);
   const href = ctx.resultHref(match);
-  const boxState =
-    BOX_STATE[match.state === "on_field" ? "ready" : match.state];
+  const boxState = BOX_STATE[match.state];
   const status =
     match.state === "played"
       ? t("finals.knockout.played")

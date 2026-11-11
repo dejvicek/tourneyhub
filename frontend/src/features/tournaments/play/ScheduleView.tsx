@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import type { PlayModel, RoundData } from "./model";
 import { ScheduleMatch } from "./ScheduleMatch";
+import { useNames } from "./useNames";
 
 interface ScheduleViewProps {
   model: PlayModel;
@@ -22,6 +23,11 @@ function roundOrder(rounds: readonly RoundData[]): RoundData[] {
  */
 export function ScheduleView({ model, resultHref }: ScheduleViewProps) {
   const { t, i18n } = useTranslation();
+  const names = useNames(model);
+  const list = new Intl.ListFormat(i18n.resolvedLanguage, {
+    style: "long",
+    type: "conjunction",
+  });
   const parts = new Intl.ListFormat(i18n.resolvedLanguage, {
     style: "short",
     type: "unit",
@@ -79,6 +85,7 @@ export function ScheduleView({ model, resultHref }: ScheduleViewProps) {
               <p className="text-body-sm text-muted-foreground">
                 {t("roundRobin.schedule.sittingOut", {
                   count: round.sitting_out.length,
+                  names: list.format(round.sitting_out.map(names.entry)),
                 })}
               </p>
             )}

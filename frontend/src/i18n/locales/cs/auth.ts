@@ -77,7 +77,7 @@ export const auth: CsMessages<Messages["auth"]> = {
   admin: { title: "Správa" },
   account: {
     menu: "Účet: {{name}}",
-    signedInAs: "Přihlášen(a) jako {{name}}",
+    signedInAs: "Přihlášený účet: {{name}}",
     myLeagues: "Moje ligy",
     changePassword: "Změnit heslo",
     logOut: "Odhlásit se",
