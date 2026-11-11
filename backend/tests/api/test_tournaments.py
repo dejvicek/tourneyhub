@@ -1547,6 +1547,65 @@ def _commit_league_with_players(
 
 
 @pytest.mark.concurrency
+def test_adr008_one_client_id_sent_to_two_leagues_at_once_is_a_conflict(
+    committing_settings: Settings,
+    committing_engine: Engine,
+    now: datetime,
+    auth_header: Callable[..., dict[str, str]],
+    wait_for_a_lock_wait: Callable[[], None],
+) -> None:
+    owner_id, first_league_id, _ = _commit_league_with_players(
+        committing_engine, now, "twice@example.test", 0
+    )
+    with Session(committing_engine) as setup:
+        second_league_id = league_service.create_league(
+            setup, league_id=uuid7(), owner_user_id=owner_id, name="Other", now=now
+        ).id
+        setup.commit()
+    tournament_id = uuid7()
+    request = tournament_service.FormatRequest(
+        name="Race",
+        date=now.date(),
+        type=TournamentType.SINGLES,
+        group_phase=GroupPhase.NONE,
+    )
+    outcome: list[tuple[int, object]] = []
+
+    with (
+        Session(committing_engine) as first,
+        TestClient(create_app(committing_settings)) as client,
+    ):
+        # The league lock of the first league does not stop the second league's
+        # request, and its lookup of the id sees nothing yet.
+        tournament_service.create_tournament(
+            first,
+            league_id=first_league_id,
+            user_id=owner_id,
+            tournament_id=tournament_id,
+            request=request,
+            clock=lambda: now,
+        )
+
+        def create_second() -> None:
+            response = client.post(
+                _url(second_league_id, "/tournaments"),
+                json={"id": str(tournament_id), **SINGLES_ROUND_ROBIN},
+                headers=auth_header(owner_id, issued_at=datetime.now(UTC)),
+            )
+            outcome.append((response.status_code, response.json()))
+
+        second = threading.Thread(target=create_second)
+        second.start()
+        wait_for_a_lock_wait()  # its INSERT waits on the first one's row
+        first.commit()
+        second.join()
+
+    assert outcome == [(409, {"code": "tournament_id_taken", "detail": {}})]
+    with Session(committing_engine) as check:
+        assert check.scalars(select(Tournament.id)).all() == [tournament_id]
+
+
+@pytest.mark.concurrency
 def test_adr008_of_two_shuffles_with_one_counter_exactly_one_draws(
     committing_settings: Settings,
     committing_engine: Engine,
