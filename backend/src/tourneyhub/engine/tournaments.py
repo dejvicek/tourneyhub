@@ -118,6 +118,30 @@ class EntryKind(StrEnum):
     PAIR = "pair"
 
 
+class MatchKind(StrEnum):
+    """A bracket has one third-place match; every other match is standard (BR-044)."""
+
+    STANDARD = "standard"
+    THIRD_PLACE = "third_place"
+
+
+class Outcome(StrEnum):
+    """A match's result, or a game's winner: one side, or a draw (BR-090, D11)."""
+
+    SIDE_1 = "side_1"
+    SIDE_2 = "side_2"
+    DRAW = "draw"
+
+
+class Participation(StrEnum):
+    """Why an entry did or did not play a group-phase round (D5, BR-064, BR-067)."""
+
+    PLAYED = "played"
+    SAT_OUT = "sat_out"
+    DISABLED = "disabled"
+    NOT_JOINED = "not_joined"
+
+
 def group_phase_format(choice: GroupPhase) -> PhaseFormat | None:
     """Return the group phase's format for a setup choice; None without one (FR-031)."""
     return None if choice is GroupPhase.NONE else PhaseFormat(choice.value)

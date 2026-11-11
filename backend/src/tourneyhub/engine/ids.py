@@ -8,6 +8,12 @@ PlayerId = NewType("PlayerId", UUID)
 EntryId = NewType("EntryId", UUID)
 """A tournament entry's stable id: one player or one pair (DATA-MODEL §4.4)."""
 
+MatchId = NewType("MatchId", UUID)
+"""A match's stable id (DATA-MODEL §4.5)."""
+
+FieldId = NewType("FieldId", UUID)
+"""A tournament field's stable id (DATA-MODEL §4.6)."""
+
 
 def ensure_distinct(ids: Iterable[UUID]) -> None:
     """Refuse an id given twice: a caller bug, never an organizer's (ADR-009).
