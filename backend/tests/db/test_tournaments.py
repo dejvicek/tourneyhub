@@ -93,6 +93,13 @@ def _entry(
     return entry
 
 
+def _entry_and_check(
+    session: Session, tournament: Tournament, players: list[Player], now: datetime
+) -> None:
+    _entry(session, tournament, players, now, seed=1)  # the flush checks nothing
+    _check_now(session)
+
+
 @pytest.mark.parametrize(
     ("assignments", "constraint"),
     [
@@ -317,6 +324,11 @@ def test_fr043_the_check_keeps_the_tiebreakers_a_subset_without_repeats(
             id="ADR-010-negative-counter",
         ),
         pytest.param(
+            "UPDATE tournaments SET halves_method = 'by_hand'",
+            "ck_tournaments_halves_method_type",
+            id="FR-033-hand-halves-outside-dyp",
+        ),
+        pytest.param(
             "UPDATE fields SET number = 33",
             "ck_fields_number",
             id="FR-090-field-33",
@@ -335,6 +347,53 @@ def test_fr030_the_checks_refuse_impossible_tournament_values(
         session.execute(text(statement))
 
     assert constraint in str(raised.value)
+
+
+def test_fr033_a_dyp_tournament_may_have_hand_set_halves(
+    session: Session, make_tournament: Callable[..., Tournament]
+) -> None:
+    make_tournament(tournament_type=TournamentType.DYP)
+
+    session.execute(text("UPDATE tournaments SET halves_method = 'by_hand'"))
+
+    session.flush()
+
+
+def test_br082_only_a_knockout_entry_has_a_source_entry(
+    session: Session,
+    make_tournament: Callable[..., Tournament],
+    make_player: Callable[..., Player],
+    now: datetime,
+) -> None:
+    tournament = make_tournament()
+    league = session.get_one(League, _league_id(session, tournament))
+    ana = make_player(league=league)
+    _pick(session, tournament, [ana], now)
+    source = _entry(session, tournament, [ana], now, seed=1)
+
+    knockout_of_main = Entry(
+        id=uuid7(),
+        tournament_id=tournament.id,
+        stage=EntryStage.MAIN,
+        kind=EntryKind.PLAYER,
+        source_entry_id=source.id,
+        created_at=now,
+    )
+
+    with pytest.raises(IntegrityError) as raised, session.begin_nested():
+        _append(session, tournament.entries, knockout_of_main)
+
+    assert "ck_entries_source_entry_stage" in str(raised.value)
+
+
+def test_br082_a_source_entry_is_found_by_a_partial_index(session: Session) -> None:
+    definition = session.scalar(
+        text("SELECT indexdef FROM pg_indexes WHERE indexname = :name"),
+        {"name": "ix_entries_source_entry_id"},
+    )
+
+    assert definition is not None
+    assert "WHERE (source_entry_id IS NOT NULL)" in definition
 
 
 def test_fr090_field_numbers_are_unique_per_tournament(
@@ -385,6 +444,45 @@ def test_fr034_seeds_can_be_swapped_and_are_unique_at_commit(
     with pytest.raises(IntegrityError) as raised, session.begin_nested():
         _set_seed(session, first, 1)
     assert "uq_entries_tournament_id_stage_seed" in str(raised.value)
+
+
+def test_adr010_an_entry_member_without_a_pick_is_refused_at_commit(
+    session: Session,
+    make_tournament: Callable[..., Tournament],
+    make_player: Callable[..., Player],
+    now: datetime,
+) -> None:
+    tournament = make_tournament()
+    league = session.get_one(League, _league_id(session, tournament))
+    ana = make_player(league=league)
+
+    with pytest.raises(IntegrityError) as raised, session.begin_nested():
+        _entry_and_check(session, tournament, [ana], now)
+
+    assert "fk_entry_members_tournament_id_tournament_players" in str(raised.value)
+
+
+def test_adr010_unpicking_a_member_is_refused_at_commit_unless_the_entry_goes(
+    session: Session,
+    make_tournament: Callable[..., Tournament],
+    make_player: Callable[..., Player],
+    now: datetime,
+) -> None:
+    tournament = make_tournament()
+    league = session.get_one(League, _league_id(session, tournament))
+    ana, bob = make_player(league=league), make_player(league=league)
+    _pick(session, tournament, [ana, bob], now)
+    ana_entry = _entry(session, tournament, [ana], now, seed=1)
+    _entry(session, tournament, [bob], now, seed=2)
+    unpick = "DELETE FROM tournament_players WHERE player_id = :id"
+
+    with pytest.raises(IntegrityError) as raised, session.begin_nested():
+        _execute_and_check(session, unpick, id=ana.id)
+    session.execute(text(unpick), {"id": ana.id})  # setup unpicks first ...
+    session.execute(text("DELETE FROM entries WHERE id = :id"), {"id": ana_entry.id})
+    _check_now(session)  # ... and removes the entry before the commit
+
+    assert "fk_entry_members_tournament_id_tournament_players" in str(raised.value)
 
 
 def test_d6_a_picked_player_is_not_deleted_on_their_own(

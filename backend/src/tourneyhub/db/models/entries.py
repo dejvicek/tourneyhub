@@ -5,8 +5,10 @@ from sqlalchemy import (
     CheckConstraint,
     ForeignKey,
     ForeignKeyConstraint,
+    Index,
     UniqueConstraint,
     false,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -31,6 +33,16 @@ class Entry(Base):
         # The target of entry_members' composite reference; stage never changes.
         UniqueConstraint("id", "tournament_id", "stage"),
         CheckConstraint("seed IS NULL OR seed >= 1", name="seed"),
+        # Only a knockout entry continues another entry (BR-082, BR-085).
+        CheckConstraint(
+            "source_entry_id IS NULL OR stage = 'knockout'", name="source_entry_stage"
+        ),
+        # The cascade from a deleted source entry finds its knockout entries here.
+        Index(
+            "ix_entries_source_entry_id",
+            "source_entry_id",
+            postgresql_where=text("source_entry_id IS NOT NULL"),
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
@@ -76,6 +88,15 @@ class EntryMember(Base):
             deferrable=True,
             initially="DEFERRED",
         ),
+        # A member is a picked player. Deferred, because setup removes the picks
+        # before it makes the entries again (ADR-010).
+        ForeignKeyConstraint(
+            ["tournament_id", "player_id"],
+            ["tournament_players.tournament_id", "tournament_players.player_id"],
+            name="fk_entry_members_tournament_id_tournament_players",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
         UniqueConstraint("tournament_id", "stage", "player_id"),
     )
 
@@ -92,6 +113,7 @@ class PlayerHalf(Base):
     """A DYP player's half before the pairs are drawn (DATA-MODEL `dyp_halves`).
 
     Only picked players have one: the row goes with the pick (BR-031 to BR-033).
+    It has no reference to `players` of its own; the pick has one.
     """
 
     __tablename__ = "dyp_halves"
@@ -101,14 +123,6 @@ class PlayerHalf(Base):
             ["tournament_players.tournament_id", "tournament_players.player_id"],
             name="fk_dyp_halves_tournament_id_tournament_players",
             ondelete="CASCADE",
-        ),
-        # The deferred reference of DATA-MODEL §2.
-        ForeignKeyConstraint(
-            ["player_id"],
-            ["players.id"],
-            name="fk_dyp_halves_player_id_players",
-            deferrable=True,
-            initially="DEFERRED",
         ),
     )
 

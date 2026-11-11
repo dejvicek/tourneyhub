@@ -2,8 +2,9 @@
 
 DATA-MODEL §4.3, §4.4 and §4.6: tournaments with their ordered phases (D9),
 their fields, the players picked for them, their entries and entry members,
-and the DYP halves. The references to players are NO ACTION DEFERRABLE
-INITIALLY DEFERRED (§2); the tie-breakers are checked by the SQL helper
+and the DYP halves. The references to players (picks and entry members) and an
+entry member's reference to its pick are NO ACTION DEFERRABLE INITIALLY
+DEFERRED (§2); the tie-breakers are checked by the SQL helper
 tiebreakers_valid(). A field's match arrives with the matches.
 
 Revision ID: 2df115cf6eb5
@@ -97,6 +98,11 @@ def upgrade() -> None:
         ),
         sa.CheckConstraint(
             "octet_length(rng_seed) = 16", name=op.f("ck_tournaments_rng_seed")
+        ),
+        # Halves are used by DYP only (FR-033); every other type keeps 'ranking'.
+        sa.CheckConstraint(
+            "halves_method = 'ranking' OR type = 'dyp'",
+            name=op.f("ck_tournaments_halves_method_type"),
         ),
         sa.ForeignKeyConstraint(
             ["season_id"],
@@ -289,6 +295,11 @@ def upgrade() -> None:
         ),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.CheckConstraint("seed IS NULL OR seed >= 1", name=op.f("ck_entries_seed")),
+        # Only a knockout entry continues another entry (BR-082, BR-085).
+        sa.CheckConstraint(
+            "source_entry_id IS NULL OR stage = 'knockout'",
+            name=op.f("ck_entries_source_entry_stage"),
+        ),
         sa.ForeignKeyConstraint(
             ["source_entry_id"],
             ["entries.id"],
@@ -318,6 +329,14 @@ def upgrade() -> None:
             initially="DEFERRED",
         ),
     )
+    # The cascade from a deleted source entry finds its knockout entries here.
+    op.create_index(
+        op.f("ix_entries_source_entry_id"),
+        "entries",
+        ["source_entry_id"],
+        unique=False,
+        postgresql_where=sa.text("source_entry_id IS NOT NULL"),
+    )
     op.create_table(
         "entry_members",
         sa.Column("entry_id", sa.Uuid(), nullable=False),
@@ -336,6 +355,15 @@ def upgrade() -> None:
             ondelete="CASCADE",
         ),
         _deferred_player_fk("entry_members"),
+        # A member is a picked player. Deferred, because setup removes the picks
+        # before it makes the entries again (ADR-010).
+        sa.ForeignKeyConstraint(
+            ["tournament_id", "player_id"],
+            ["tournament_players.tournament_id", "tournament_players.player_id"],
+            name=op.f("fk_entry_members_tournament_id_tournament_players"),
+            deferrable=True,
+            initially="DEFERRED",
+        ),
         sa.PrimaryKeyConstraint("entry_id", "player_id", name=op.f("pk_entry_members")),
         # BR-003: a player is in at most one entry per stage.
         sa.UniqueConstraint(
@@ -356,7 +384,7 @@ def upgrade() -> None:
             "half", _enum("top", "bottom", "left_out", name="dyp_half"), nullable=False
         ),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        _deferred_player_fk("dyp_halves"),
+        # No reference to players of its own: the pick has one.
         sa.ForeignKeyConstraint(
             ["tournament_id", "player_id"],
             ["tournament_players.tournament_id", "tournament_players.player_id"],
@@ -373,6 +401,7 @@ def downgrade() -> None:
     op.drop_table("dyp_halves")
     op.drop_index(op.f("ix_entry_members_player_id"), table_name="entry_members")
     op.drop_table("entry_members")
+    op.drop_index(op.f("ix_entries_source_entry_id"), table_name="entries")
     op.drop_table("entries")
     op.drop_index(
         op.f("ix_tournament_players_player_id"), table_name="tournament_players"

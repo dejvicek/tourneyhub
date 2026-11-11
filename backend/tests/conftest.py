@@ -123,13 +123,6 @@ _TOURNAMENT_INVARIANTS = {
         JOIN players p ON p.id = x.player_id
         WHERE p.league_id <> s.league_id
     """,
-    "main entry members who are not picked": """
-        SELECT m.entry_id, m.player_id FROM entry_members m
-        WHERE m.stage = 'main' AND NOT EXISTS (
-            SELECT FROM tournament_players tp
-            WHERE tp.tournament_id = m.tournament_id AND tp.player_id = m.player_id
-        )
-    """,
     "entries of the wrong size (BR-030)": """
         SELECT e.id FROM entries e
         WHERE (SELECT count(*) FROM entry_members m WHERE m.entry_id = e.id)

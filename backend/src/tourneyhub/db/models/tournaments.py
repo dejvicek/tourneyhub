@@ -38,6 +38,10 @@ class Tournament(Base):
     __table_args__ = (
         CheckConstraint(f"octet_length(rng_seed) = {RNG_SEED_SIZE}", name="rng_seed"),
         CheckConstraint("draw_counter >= 0", name="draw_counter"),
+        # Halves are used by DYP only (FR-033); every other type keeps 'ranking'.
+        CheckConstraint(
+            "halves_method = 'ranking' OR type = 'dyp'", name="halves_method_type"
+        ),
         CheckConstraint(
             f"goals_per_game >= 1 AND goals_per_game <= {MAX_GOALS_PER_GAME}",
             name="goals_per_game",
