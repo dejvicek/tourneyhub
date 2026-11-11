@@ -170,6 +170,17 @@ def _tuple(row: Json) -> tuple[int, str, int, int, int]:
     )
 
 
+def _start_season(evening: Evening) -> str:
+    """Close the season and start the next one; its id."""
+    started = evening.client.post(
+        evening.url("/seasons"),
+        json={"expected_current_number": 1},
+        headers=evening.headers,
+    )
+    assert started.status_code == 201, started.text
+    return str(started.json()["id"])
+
+
 # ---------------------------------------------------------------- organizer
 
 
@@ -290,15 +301,10 @@ def test_br011_a_closed_season_keeps_its_standings_and_its_table(
 ) -> None:
     evening.finished(evening.players[:3])
     before = evening.standings()
-    started = evening.client.post(
-        evening.url("/seasons"),
-        json={"expected_current_number": 1},
-        headers=evening.headers,
-    )
-    assert started.status_code == 201, started.text
+    next_season = _start_season(evening)
 
     assert evening.standings() == before
-    assert evening.standings(started.json()["id"]) == []
+    assert evening.standings(next_season) == []
 
 
 def test_br002_a_removed_player_keeps_their_place_in_the_standings(
@@ -578,3 +584,60 @@ def test_a_season_id_that_is_not_a_uuid_is_a_validation_error(
     )
 
     assert response.status_code == 422
+
+
+# ---------------------------------------------------------------- ranking
+
+
+def test_br020_seeding_follows_the_earlier_tournaments_of_the_season(
+    evening: Evening,
+) -> None:
+    evening.finished(evening.players[:3])
+    points = {r["player_id"]: r["points"] for r in evening.standings()}
+
+    setup = evening.create(evening.players)
+
+    ranked = [row["player_id"] for row in setup["ranking"]]
+    assert set(ranked[:3]) == set(evening.players[:3])  # those with points first
+    assert [points.get(player, 0) for player in ranked] == sorted(
+        (points.get(player, 0) for player in ranked), reverse=True
+    )
+    assert setup["player_ids"] == ranked  # BR-021: singles follow the ranking
+    assert [e["player_ids"][0] for e in setup["entries"]] == ranked
+
+
+def test_br020_last_seasons_places_rank_after_this_seasons_points(
+    evening: Evening,
+) -> None:
+    evening.finished(evening.players[:2])
+    last = [r["player_id"] for r in evening.standings()]  # 1st, 2nd
+    assert [r["place"] for r in evening.standings()] == [1, 2]
+    _start_season(evening)
+
+    setup = evening.create(evening.players)
+
+    ranked = [row["player_id"] for row in setup["ranking"]]
+    assert ranked[:2] == last  # a place last season beats none
+
+    evening.finished(evening.players[2:4], name="This season")
+
+    setup = evening.create(evening.players, name="Next")
+    ranked = [row["player_id"] for row in setup["ranking"]]
+    assert set(ranked[:2]) == set(evening.players[2:4])  # points come first
+    assert ranked[2:4] == last
+    assert [e["player_ids"][0] for e in setup["entries"]] == ranked
+
+
+def test_br020_a_started_tournament_does_not_rank_by_the_standings(
+    evening: Evening,
+) -> None:
+    running = evening.start(evening.players)
+    before = evening.get(f"/tournaments/{running['id']}/setup")
+    evening.finished(evening.players[:3], name="Another")
+
+    after = evening.get(f"/tournaments/{running['id']}/setup")
+
+    assert isinstance(before, dict)
+    assert isinstance(after, dict)
+    assert after["ranking"] == before["ranking"]
+    assert {row["points"] for row in after["ranking"]} == {0}

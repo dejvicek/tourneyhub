@@ -1826,6 +1826,139 @@
         "title": "PublicLeagueRead",
         "type": "object"
       },
+      "PublicPlaceRead": {
+        "description": "An entry's final place and the season points each of its players earns.",
+        "properties": {
+          "entry_id": {
+            "format": "uuid",
+            "title": "Entry Id",
+            "type": "string"
+          },
+          "place": {
+            "title": "Place",
+            "type": "integer"
+          },
+          "points_per_player": {
+            "title": "Points Per Player",
+            "type": "integer"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/PublicPlaceReasonRead"
+          }
+        },
+        "required": [
+          "place",
+          "entry_id",
+          "points_per_player",
+          "reason"
+        ],
+        "title": "PublicPlaceRead",
+        "type": "object"
+      },
+      "PublicPlaceReasonRead": {
+        "description": "Why an entry has its place, for viewers (\u00a77.13): the organizer's reason.",
+        "properties": {
+          "group_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PhaseFormat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "group_place": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Place"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PlaceReasonKind"
+          },
+          "opponent_entry_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opponent Entry Id"
+          },
+          "round": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BracketRoundName"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          }
+        },
+        "required": [
+          "kind",
+          "round",
+          "score",
+          "opponent_entry_id",
+          "group_place",
+          "group_format"
+        ],
+        "title": "PublicPlaceReasonRead",
+        "type": "object"
+      },
+      "PublicPlacesRead": {
+        "description": "The places of a tournament for viewers (FR-070), best place first.\n\n`complete` is true once the tournament is finished; before that `rows` is\nempty.",
+        "properties": {
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/PublicPlaceRead"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "complete",
+          "rows"
+        ],
+        "title": "PublicPlacesRead",
+        "type": "object"
+      },
       "PublicPlayerRead": {
         "description": "A player's name for viewers; removed players too, for past results.",
         "properties": {
@@ -1844,6 +1977,41 @@
           "name"
         ],
         "title": "PublicPlayerRead",
+        "type": "object"
+      },
+      "PublicSeasonStandingRow": {
+        "description": "One player's line in the season standings, for viewers (FR-061, BR-113).\n\n`place` is shared by players level on points and wins, and the next place\nskips (BR-104). Removed players stay, with their points (BR-002).",
+        "properties": {
+          "place": {
+            "title": "Place",
+            "type": "integer"
+          },
+          "player_id": {
+            "format": "uuid",
+            "title": "Player Id",
+            "type": "string"
+          },
+          "points": {
+            "title": "Points",
+            "type": "integer"
+          },
+          "tournament_wins": {
+            "title": "Tournament Wins",
+            "type": "integer"
+          },
+          "tournaments_played": {
+            "title": "Tournaments Played",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "place",
+          "player_id",
+          "points",
+          "tournaments_played",
+          "tournament_wins"
+        ],
+        "title": "PublicSeasonStandingRow",
         "type": "object"
       },
       "PublicStandingRow": {
@@ -7351,7 +7519,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/SeasonStandingRead"
+                    "$ref": "#/components/schemas/PublicSeasonStandingRow"
                   },
                   "title": "Response Read Public Season Standings",
                   "type": "array"
@@ -7547,7 +7715,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PlacesRead"
+                  "$ref": "#/components/schemas/PublicPlacesRead"
                 }
               }
             },

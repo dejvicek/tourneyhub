@@ -68,6 +68,7 @@ from tourneyhub.engine.schedule import (
     seed_order,
 )
 from tourneyhub.engine.season_points import PlayerPoints, season_points
+from tourneyhub.engine.season_standings import SeasonStandingRow, season_standings
 from tourneyhub.engine.seeding import SeedingEntry, seed_by_lot, seed_by_ranking
 from tourneyhub.engine.standings import (
     PlayedMatch,
@@ -334,33 +335,62 @@ def _lock_setup(
     return league, tournament
 
 
+def _standings_by_player(
+    session: Session, season: Season
+) -> dict[PlayerId, SeasonStandingRow]:
+    """A season's standings by player: its finished tournaments, added up (BR-112)."""
+    points = finished_season_points(session, season=season)
+    return {row.player_id: row for row in season_standings(points.values())}
+
+
+def _previous_season(league: League, season: Season) -> Season | None:
+    """The season that started before this one, the latest of them, if any."""
+    earlier = [s for s in league.seasons if s.number < season.number]
+    return max(earlier, key=lambda s: s.number, default=None)
+
+
 def _ranking(
     session: Session, *, league: League, tournament: Tournament
 ) -> tuple[RankedPlayer, ...]:
     """The league ranking of the players on the list, for this tournament (BR-020).
 
-    The final lot uses the tournament's seed (ADR-010). Season points, wins and
-    last season's place come from finished tournaments through the season
-    standings, which come with the knockout (P10); until then every player has
-    none, although a round robin can finish (FR-040).
+    The final lot uses the tournament's seed (ADR-010). While the tournament is
+    in setup, the season points and wins are those of the tournament's season
+    and `last_season_place` is the place in the previous season's standings,
+    all from finished tournaments (BR-112), as of now. Once it has started, the
+    ranking only orders the names inside an entry: seeds and halves are stored,
+    and the order must not shift as other tournaments finish. So a started
+    tournament skips the standings, which are two reads of every finished
+    tournament of two seasons on each poll of a viewer, and ranks everyone
+    equal, by lot.
     """
     player_ids = session.scalars(
         select(Player.id).where(
             Player.league_id == league.id, Player.removed_at.is_(None)
         )
     ).all()
-    return rank_league(
-        (
+    current: dict[PlayerId, SeasonStandingRow] = {}
+    last: dict[PlayerId, SeasonStandingRow] = {}
+    if tournament.state is TournamentState.SETUP:
+        season = _season_of(league, tournament.season_id)
+        current = _standings_by_player(session, season)
+        previous = _previous_season(league, season)
+        if previous is not None:
+            last = _standings_by_player(session, previous)
+    records: list[PlayerRecord] = []
+    for player_id in player_ids:
+        key = PlayerId(player_id)
+        now = current.get(key)
+        before = last.get(key)
+        records.append(
             PlayerRecord(
-                player_id=PlayerId(player_id),
-                season_points=0,
-                tournament_wins=0,
-                last_season_place=None,
+                player_id=key,
+                season_points=0 if now is None else now.points,
+                tournament_wins=0 if now is None else now.tournament_wins,
+                last_season_place=None if before is None else before.place,
             )
-            for player_id in player_ids
-        ),
-        rng_seed=tournament.rng_seed,
-    )
+        )
+    return rank_league(records, rng_seed=tournament.rng_seed)
 
 
 # ---------------------------------------------------------------- reading
@@ -2721,8 +2751,9 @@ def _placed(tournament: Tournament, placement_points: Sequence[int]) -> _Placed:
     """
     # P10b: this is also what `finished_season_points` runs for every finished
     # tournament of a season. Once a knockout tournament can finish, this 422
-    # would fail the whole season's standings, not just that tournament's
-    # places. P10b must place knockout tournaments here (BR-100, BR-102).
+    # would fail the whole season's standings, and the league ranking of every
+    # tournament in setup (`_ranking`), not just that tournament's places.
+    # P10b must place knockout tournaments here (BR-100, BR-102).
     group = _require_group_only(tournament)
     standings = _standings_of(tournament, group)
     entries = [
