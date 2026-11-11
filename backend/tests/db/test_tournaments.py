@@ -127,9 +127,9 @@ def _entry_and_check(
             id="FR-039-group-without-sit-out-points",
         ),
         pytest.param(
-            "sit_out_points = 2",
+            "sit_out_points = 3",
             "ck_tournament_phases_sit_out_points",
-            id="FR-039-two-sit-out-points",
+            id="FR-039-three-sit-out-points",
         ),
         pytest.param(
             "tiebreakers = ARRAY['bh1']",
@@ -211,6 +211,11 @@ def _knockout(session: Session, tournament: Tournament, **values: object) -> Non
         ),
         pytest.param(
             {"position": 3}, "ck_tournament_phases_position", id="D9-knockout-at-3"
+        ),
+        pytest.param(
+            {"sit_out_points_set_by_hand": True},
+            "ck_tournament_phases_sit_out_points_set_by_hand",
+            id="FR-039-sit-out-points-picked-in-a-knockout",
         ),
     ],
 )
