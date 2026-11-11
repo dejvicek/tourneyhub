@@ -321,7 +321,7 @@ views "III. Flows" {
     variant sequence
     title "17. Players of a league"
     order 22
-    description "FR-012, BR-001, BR-004 to BR-006 and ADR-002: names may repeat in a league. An add or a rename to a name that another player has, ignoring case and removed players included, is answered 422 player_name_taken with the players who have it; the UI warns, and if a holder is removed it offers to restore them. Otherwise the organizer confirms and the same request goes again with confirm_duplicate_name, with an optional note (TODO: required or optional, set by the decision on issue #48). Removing and restoring send the target state."
+    description "FR-012, BR-001, BR-004 to BR-006 and ADR-002: names may repeat in a league, but name and note together may not, removed players counted. An add or a rename to a name that another player has, ignoring case, needs a note that makes the pair differ; without one it is answered 422 player_name_taken with the players who have the name. The UI asks for the note and, if a holder is removed, offers to restore them. A restore never creates a duplicate, so it checks no name. Removing and restoring send the target state."
     organizer -> tourneyhub.spa.organizerUi "adds a player"
     tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "POST player"
     tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "locks the league, counts the active players (BR-006), looks up lower(name) among all players"
@@ -330,27 +330,29 @@ views "III. Flows" {
         tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "inserts the player"
         tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "201: the player"
       }
-      when "a player has it, no confirmation" {
+      when "a player has it, and no note or the same note" {
         tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "422 player_name_taken: the holders with their notes and whether removed"
       }
-      when "a player has it, confirm_duplicate_name" {
-        tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "inserts the player with the optional note (BR-004)"
+      when "a player has it, and a note that tells them apart" {
+        tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "inserts the player with the note (BR-004)"
         tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "201: the player"
       }
     }
-    organizer -> tourneyhub.spa.organizerUi "warned: it is the same person as a removed holder"
+    organizer -> tourneyhub.spa.organizerUi "warned: adds a note to tell the new player apart"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "POST player again with the note"
+    organizer -> tourneyhub.spa.organizerUi "or: it is the same person as a removed holder"
     tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "PUT removed: false"
-    tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "locks the league, clears removed_at (TODO: whether a restore warns about a name another player has, set by the decision on issue #48)"
+    tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "locks the league, clears removed_at; no name check, the unique index already counts removed players"
     tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "200: the same player, history intact; 422 player_limit_reached over the limit"
     organizer -> tourneyhub.spa.organizerUi "renames a player, removed or not"
     tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "PUT name"
-    tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "locks the league, looks up lower(name) among the other players"
+    tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "locks the league, looks up lower(name) and the note among the other players"
     alt {
-      when "no other player has it, or confirm_duplicate_name" {
+      when "no other player has it, or the name and note tell them apart" {
         tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "200: the player with the new name"
       }
-      when "another player has it, no confirmation" {
-        tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "422 player_name_taken: the holders"
+      when "another player has the same name and note" {
+        tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "422 player_name_taken: the holders; the UI asks for a note"
       }
     }
     organizer -> tourneyhub.spa.organizerUi "removes a player"
@@ -464,7 +466,7 @@ views "III. Flows" {
     variant sequence
     title "21. Fields during play"
     order 25
-    description "FR-090 to FR-094, BR-130 to BR-134 and ADR-008: the organizer adds and removes fields and places matches by hand while the tournament runs. Each write locks the league, then the tournament, and sends a target state: a new field carries the number it expects, a field is removed by its id, a placement names each match with its field or with none (a swap names both). The engine refuses a player on two fields; the freed fields take the next waiting match, except one the request sent back to waiting: that match is held (BR-133), stays in the waiting list marked held and takes no field by itself until it is placed again or has a result. The waiting list is computed on read."
+    description "FR-090 to FR-094, BR-130 to BR-134 and ADR-008: the organizer adds and removes fields and places matches by hand while the tournament runs. Each write locks the league, then the tournament, and sends a target state: a new field carries the number it expects, a field is removed by its id, a placement names each match with its field or with none (a swap names both). The engine refuses a player on two fields; the freed fields take the next waiting match, except one the request sent back to waiting: that match is held (BR-133, BR-136), stays in the waiting list marked held and takes no field by itself until it is placed again, released or has a result. The waiting list is computed on read."
     organizer -> tourneyhub.spa.organizerUi "Manage fields: Add a field"
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "POST …/fields with the expected number, the lowest free one"
     tourneyhub.api.tournamentsApi -> tourneyhub.db.leagues "locks the league"
@@ -488,6 +490,12 @@ views "III. Flows" {
         tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: the tournament with its fields and waiting list"
       }
     }
+    organizer -> tourneyhub.spa.organizerUi "releases a held match"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "PUT …/fields/placements: the match waiting, not held"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the league, then the tournament; a match not held now is 409 placement_changed"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.play "clears held_at; the match keeps its place in schedule order (BR-136)"
+    tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "free fields are filled as after any write: the released match can take one if it is the first that can be played"
+    tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: the tournament with its fields and waiting list"
     organizer -> tourneyhub.spa.organizerUi "removes a field after confirming"
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "DELETE …/fields/{id}; a repeat 404, the last field 422"
     tourneyhub.api.tournamentsApi -> tourneyhub.db.play "its match goes to the front of the waiting list (requeued_at)"
