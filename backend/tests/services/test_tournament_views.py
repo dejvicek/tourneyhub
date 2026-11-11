@@ -2,9 +2,11 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid7
 
 import pytest
+from sqlalchemy.orm import Session
 
+from tourneyhub.db.models.leagues import League
 from tourneyhub.db.models.matches import Match, MatchSide, MatchSidePlayer, Round
-from tourneyhub.db.models.tournaments import Tournament, TournamentPhase
+from tourneyhub.db.models.tournaments import Field, Tournament, TournamentPhase
 from tourneyhub.engine.ids import PlayerId
 from tourneyhub.engine.tournaments import (
     KnockoutMatchFormat,
@@ -12,6 +14,7 @@ from tourneyhub.engine.tournaments import (
     MatchKind,
     PhaseKind,
 )
+from tourneyhub.services import tournaments as tournament_service
 from tourneyhub.services.tournaments import (
     SideView,
     _match_format,
@@ -164,3 +167,31 @@ def test_br120_the_final_plays_its_own_format(
     match = next(m for m in round_.matches if m.kind is kind)
 
     assert _match_format(phase, round_, match) is expected
+
+
+def test_d10_a_field_pointing_at_a_match_the_read_did_not_see_counts_as_free(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The play read runs under READ COMMITTED, in separate queries (FR-092)."""
+    one, two, three, four = uuid7(), uuid7(), uuid7(), uuid7()
+    match = _match(_side(1, players=(one,)), _side(2, players=(two,)))
+    other = _match(_side(1, players=(three,)), _side(2, players=(four,)))
+    tournament = _tournament(match)
+    tournament.phases[0].rounds[0].matches.append(other)
+    tournament.fields = [
+        Field(id=uuid7(), number=1, match_id=uuid7()),  # a match that was not loaded
+        Field(id=uuid7(), number=2, match_id=other.id),
+    ]
+    monkeypatch.setattr(
+        tournament_service, "get_league", lambda *_, **__: League(id=uuid7())
+    )
+    monkeypatch.setattr(
+        tournament_service, "_load_tournament", lambda *_, **__: tournament
+    )
+
+    play = tournament_service.read_play(
+        Session(), league_id=uuid7(), tournament_id=tournament.id, user_id=uuid7()
+    )
+
+    assert [waiting.match_id for waiting in play.waiting] == [match.id]
+    assert play.waiting[0].busy == ()

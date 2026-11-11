@@ -2266,15 +2266,25 @@ def read_play(
     """Return the waiting list, the standings and the phase's end (FR-040, FR-060, FR-092).
 
     Read without a lock. Each waiting match names the fields its players are
-    on, which is why it waits (BR-131).
+    on, which is why it waits (BR-131). A field that points at a match the read
+    did not see counts as free.
     """
     league = get_league(session, league_id=league_id, user_id=user_id)
     tournament = _load_tournament(session, league=league, tournament_id=tournament_id)
     slots = _match_slots(tournament)
     players = {slot.match_id: slot.player_ids or frozenset() for slot in slots}
+    # The tournament is read in separate queries, so a write that commits between
+    # them can leave a field pointing at a match that was not loaded; such a field
+    # counts as free instead of failing the read.
+    fields = [
+        replace(field, match_id=None)
+        if field.match_id is not None and field.match_id not in players
+        else field
+        for field in sorted(_field_slots(tournament), key=lambda f: f.number)
+    ]
     on_fields = [
-        (field.id, players[MatchId(field.match_id)])
-        for field in sorted(tournament.fields, key=lambda f: f.number)
+        (field.field_id, players[field.match_id])
+        for field in fields
         if field.match_id is not None
     ]
     waiting = tuple(
@@ -2286,7 +2296,7 @@ def read_play(
                 if (shared := players[slot.match_id] & on_field)
             ),
         )
-        for slot in waiting_order(matches=slots, fields=_field_slots(tournament))
+        for slot in waiting_order(matches=slots, fields=fields)
     )
     group = _group_phase(tournament)
     round_robin = group is not None and group.format is PhaseFormat.ROUND_ROBIN
