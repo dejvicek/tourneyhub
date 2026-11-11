@@ -160,10 +160,7 @@ def default_sit_out_points(match_format: MatchFormat) -> int:
 
     BO1 and BO2 matches can end level, so a sit-out is worth a draw: 1. BO3 and
     BO5 matches cannot, so a sit-out is worth a win: 2. The league's draw setting
-    plays no part here.
-
-    This does not yet follow the PRD: FR-039 makes the default 0, with nothing
-    following the match format or the league's draw setting. PR #65 changes it.
+    plays no part.
     """
     return 1 if match_format in {MatchFormat.BO1, MatchFormat.BO2} else 2
 

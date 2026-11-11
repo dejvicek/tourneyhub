@@ -308,10 +308,7 @@ function resolveFormat(
   const grouped = format.group_phase !== "none";
   const fallback = league.default_match_format;
   const groupMatchFormat = format.group_match_format ?? fallback;
-  // BR-075: a number is the organizer's pick; null takes the default. The PRD
-  // default is 0 (FR-039); this demo takes the match format's default once, and
-  // still gives a round robin a value, which BR-071 forbids. PR #65 changes
-  // both.
+  // BR-071: a number is the organizer's pick; null takes the match format's default.
   const picked = format.sit_out_points ?? null;
   return {
     name: format.name.trim(),

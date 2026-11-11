@@ -71,7 +71,7 @@ export const rules: Readonly<Rules> = {
    * by the fewest sit-outs only, and does not count a missed round as a sit-out
    * for the order (BR-064, BR-067). The default points for sitting out are 0
    * (FR-039), picked by the organizer as 0, 1 or 2 (BR-075). The behaviour
-   * change is tracked in PR #65 and issue #60.
+   * change is tracked in issue #60.
    */
   sitOuts: "fewest_sit_outs",
 

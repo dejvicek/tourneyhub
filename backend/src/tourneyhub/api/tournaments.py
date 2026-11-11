@@ -92,12 +92,7 @@ type PlayerIds = Annotated[
 ]
 
 type SitOutPoints = Literal[0, 1, 2]
-"""The points of a sit-out (FR-039, BR-071, BR-075).
-
-Only a Swiss or Monster DYP phase has them; a round robin has none, not even 0
-(BR-071). The API still takes a value for a round robin; PR #65 (closes
-#59) changes that.
-"""
+"""The points of a sit-out (FR-039, BR-071)."""
 
 _GROUP_SETTINGS = ("round_robin_legs", "sit_out_points", "group_match_format")
 _KNOCKOUT_SETTINGS = (
@@ -120,8 +115,7 @@ class _FormatChecks(RequestModel):
         group phase, its settings apply; without one, the knockout's. With
         `complete`, every setting that applies must be given (`final_match_format`
         may be null: the final plays the knockout's format; `sit_out_points` may
-        be null: the default of FR-039, 0, which the code still takes from the
-        match format, PR #65).
+        be null: the default of the match format, FR-039).
         """
         if (self.type is TournamentType.MONSTER_DYP) != (
             self.group_phase is GroupPhase.MONSTER_DYP
@@ -148,11 +142,6 @@ class _FormatChecks(RequestModel):
         return self
 
 
-# The docstring below is API text (openapi.json) and was left as it is. It still
-# says that `sit_out_points` null follows the default of the match format. The
-# PRD (FR-039) makes the default 0, with nothing following the match format or
-# the draw setting, and BR-071 allows no value for a round robin. PR #65
-# changes the behaviour and this text.
 class TournamentFormatWrite(_FormatChecks):
     """The whole format of a tournament in setup, the target state (FR-030, FR-031).
 
@@ -185,10 +174,6 @@ class TournamentFormatWrite(_FormatChecks):
         return self._check(complete=True)
 
 
-# The docstring below is API text (openapi.json) and was left as it is: its
-# "default sit-out points of the match format" follows the match format. FR-039
-# makes the default 0, and BR-071 gives a round robin no value. PR #65 changes
-# the behaviour and this text.
 class TournamentCreate(_FormatChecks):
     """A new tournament in the league's active season (FR-030).
 
@@ -584,11 +569,6 @@ class WaitingMatchRead(ResponseModel):
     busy: list[BusyFieldRead]
 
 
-# The docstring below is API text (openapi.json) and was left as it is. Its
-# "points include the sit-out points" holds for Swiss and Monster DYP (BR-071,
-# BR-076); a round robin has none (BR-071), which PR #65 (closes #59) makes true. A
-# sit-out counts in the running standings once every match of its round has a
-# result (BR-076).
 class PlayStandingRow(ResponseModel):
     """One entry's line in the group-phase standings (BR-101, FR-060).
 
