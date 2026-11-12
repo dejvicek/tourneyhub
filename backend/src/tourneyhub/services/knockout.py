@@ -400,7 +400,6 @@ def start_knockout(
         format=PhaseFormat.SINGLE_ELIMINATION,
         round_robin_legs=None,
         sit_out_points=None,
-        sit_out_points_set_by_hand=False,
         tiebreakers=None,
         qualifiers=start.qualifiers,
         third_place_match=start.third_place_match,
