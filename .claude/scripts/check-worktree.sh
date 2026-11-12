@@ -41,7 +41,7 @@ run_id="check-worktree-$$"
 frontend_log=
 frontend_pid=
 cleanup() {
-  docker rm -f "$run_id-api" "$run_id-frontend" >/dev/null 2>&1
+  docker rm -fv "$run_id-api" "$run_id-frontend" >/dev/null 2>&1
   [ -z "$frontend_log" ] || rm -f "$frontend_log"
   rmdir "$lock"
 }
