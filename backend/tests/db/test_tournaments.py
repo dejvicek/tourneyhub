@@ -122,9 +122,9 @@ def _entry_and_check(
             id="BR-050-three-legs",
         ),
         pytest.param(
-            "sit_out_points = NULL",
+            "sit_out_points = 1",
             "ck_tournament_phases_sit_out_points",
-            id="FR-039-group-without-sit-out-points",
+            id="BR-071-round-robin-with-sit-out-points",
         ),
         pytest.param(
             "sit_out_points = 3",
@@ -180,6 +180,33 @@ def test_d9_the_checks_refuse_a_group_phase_with_settings_that_do_not_fit(
     assert constraint in str(raised.value)
 
 
+@pytest.mark.parametrize(
+    "assignments",
+    [
+        pytest.param("sit_out_points = NULL", id="BR-071-monster-dyp-without-points"),
+        pytest.param("sit_out_points = 3", id="FR-039-three-sit-out-points"),
+        pytest.param(
+            "format = 'round_robin', round_robin_legs = 1, tiebreakers = NULL",
+            id="BR-071-monster-dyp-turned-round-robin-keeps-points",
+        ),
+    ],
+)
+def test_br071_the_checks_hold_a_monster_dyp_phase_to_a_value_of_0_to_2(
+    session: Session,
+    make_tournament: Callable[..., Tournament],
+    assignments: str,
+) -> None:
+    [phase] = make_tournament(tournament_type=TournamentType.MONSTER_DYP).phases
+
+    with pytest.raises(IntegrityError) as raised, session.begin_nested():
+        session.execute(
+            text(f"UPDATE tournament_phases SET {assignments} WHERE id = :id"),  # noqa: S608
+            {"id": phase.id},
+        )
+
+    assert "ck_tournament_phases_sit_out_points" in str(raised.value)
+
+
 def _knockout(session: Session, tournament: Tournament, **values: object) -> None:
     """Turn the tournament's group phase into a knockout without one (FR-031)."""
     phase = tournament.phases[0]
@@ -213,9 +240,9 @@ def _knockout(session: Session, tournament: Tournament, **values: object) -> Non
             {"position": 3}, "ck_tournament_phases_position", id="D9-knockout-at-3"
         ),
         pytest.param(
-            {"sit_out_points_set_by_hand": True},
-            "ck_tournament_phases_sit_out_points_set_by_hand",
-            id="FR-039-sit-out-points-picked-in-a-knockout",
+            {"sit_out_points": 0},
+            "ck_tournament_phases_sit_out_points",
+            id="BR-071-sit-out-points-in-a-knockout",
         ),
     ],
 )

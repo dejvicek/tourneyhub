@@ -569,6 +569,7 @@ function swissStandings(
   t: StoredTournament,
   group: PhaseRead,
 ): Omit<PlayStandingRow, "form" | "ahead_by">[] {
+  // BR-076, BR-077: each entry or player who sits out gets them, as points.
   const sitOutPoints = group.sit_out_points ?? 0;
   const rows = new Map<string, SwissRow>(
     t.entries

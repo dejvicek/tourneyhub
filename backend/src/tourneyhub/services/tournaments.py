@@ -77,6 +77,7 @@ from tourneyhub.engine.standings import (
     standing_of,
 )
 from tourneyhub.engine.tournaments import (
+    DEFAULT_SIT_OUT_POINTS,
     DEFAULT_TIEBREAKERS,
     EntryKind,
     EntryStage,
@@ -94,7 +95,6 @@ from tourneyhub.engine.tournaments import (
     Tiebreaker,
     TournamentState,
     TournamentType,
-    default_sit_out_points,
     group_phase_format,
     is_seeded,
 )
@@ -135,7 +135,6 @@ class TournamentFormat:
     group_phase: GroupPhase
     round_robin_legs: int | None
     sit_out_points: int | None
-    sit_out_points_set_by_hand: bool | None
     group_match_format: MatchFormat | None
     knockout_match_format: KnockoutMatchFormat | None
     final_match_format: KnockoutMatchFormat | None
@@ -150,9 +149,9 @@ class FormatRequest:
 
     `goals_per_game`, `field_count` and the applicable match format copy the
     league's defaults (FR-030, DATA-MODEL §4.2); `round_robin_legs` is 1 and
-    `third_place_match` false. A `sit_out_points` of None takes the default of
-    the group phase's match format (FR-039, BR-071) and follows it; a number
-    is the organizer's own choice and stays.
+    `third_place_match` false. In Swiss and Monster DYP a `sit_out_points` of
+    None takes the default, 0 (FR-039); 0, 1 or 2 are stored as given (BR-075).
+    A round robin has none, so a number there is refused (BR-071).
     """
 
     name: str
@@ -413,9 +412,6 @@ def _format_of(tournament: Tournament) -> TournamentFormat:
         group_phase=GroupPhase.NONE if group is None else GroupPhase(group.format),
         round_robin_legs=None if group is None else group.round_robin_legs,
         sit_out_points=None if group is None else group.sit_out_points,
-        sit_out_points_set_by_hand=(
-            None if group is None else group.sit_out_points_set_by_hand
-        ),
         group_match_format=None if group is None else group.match_format,
         knockout_match_format=(
             None if knockout is None else KnockoutMatchFormat(knockout.match_format)
@@ -631,6 +627,8 @@ def _resolve_format(request: FormatRequest, league: League) -> TournamentFormat:
     """Fill in what the request left out from the league's defaults (FR-030).
 
     BO2 needs a league that allows draws (BR-121): 422 `draws_not_allowed`.
+    A round robin has no points for sitting out (BR-071): a number is 422
+    `sit_out_points_not_applicable`.
     """
     default_format = league.default_match_format.value
     base = TournamentFormat(
@@ -640,7 +638,6 @@ def _resolve_format(request: FormatRequest, league: League) -> TournamentFormat:
         group_phase=request.group_phase,
         round_robin_legs=None,
         sit_out_points=None,
-        sit_out_points_set_by_hand=None,
         group_match_format=None,
         knockout_match_format=None,
         final_match_format=None,
@@ -658,16 +655,24 @@ def _resolve_format(request: FormatRequest, league: League) -> TournamentFormat:
         )
     else:
         group_match_format = request.group_match_format or MatchFormat(default_format)
-        by_hand = request.sit_out_points is not None
+        # BR-071: only Swiss and Monster DYP score a sit-out, so a change to a
+        # round robin drops the value and a change back starts from the default.
+        round_robin = request.group_phase is GroupPhase.ROUND_ROBIN
+        if round_robin and request.sit_out_points is not None:
+            raise RuleViolationError(ErrorCode.SIT_OUT_POINTS_NOT_APPLICABLE)
+        sit_out_points = None
+        if not round_robin:
+            sit_out_points = (
+                DEFAULT_SIT_OUT_POINTS  # FR-039
+                if request.sit_out_points is None
+                else request.sit_out_points  # BR-075: the organizer's pick
+            )
         resolved = replace(
             base,
             round_robin_legs=(request.round_robin_legs or 1)
             if request.group_phase is GroupPhase.ROUND_ROBIN
             else None,
-            sit_out_points=request.sit_out_points
-            if request.sit_out_points is not None
-            else default_sit_out_points(group_match_format),
-            sit_out_points_set_by_hand=by_hand,
+            sit_out_points=sit_out_points,
             group_match_format=group_match_format,
         )
     if resolved.group_match_format is MatchFormat.BO2 and not league.draws_allowed:
@@ -684,7 +689,6 @@ def _phase_settings(fmt: TournamentFormat) -> dict[str, object]:
             "format": PhaseFormat.SINGLE_ELIMINATION,
             "round_robin_legs": None,
             "sit_out_points": None,
-            "sit_out_points_set_by_hand": False,
             "third_place_match": fmt.third_place_match,
             "match_format": MatchFormat(fmt.knockout_match_format or MatchFormat.BO1),
             "final_match_format": fmt.final_match_format,
@@ -694,7 +698,6 @@ def _phase_settings(fmt: TournamentFormat) -> dict[str, object]:
         "format": group_format,
         "round_robin_legs": fmt.round_robin_legs,
         "sit_out_points": fmt.sit_out_points,
-        "sit_out_points_set_by_hand": fmt.sit_out_points_set_by_hand,
         "third_place_match": None,
         "match_format": fmt.group_match_format,
         "final_match_format": None,
@@ -1406,7 +1409,6 @@ class PhaseView:
     format: PhaseFormat
     round_robin_legs: int | None
     sit_out_points: int | None
-    sit_out_points_set_by_hand: bool
     tiebreakers: tuple[Tiebreaker, ...] | None
     qualifiers: int | None
     third_place_match: bool | None
@@ -1496,7 +1498,6 @@ def _phase_view(phase: TournamentPhase) -> PhaseView:
         format=phase.format,
         round_robin_legs=phase.round_robin_legs,
         sit_out_points=phase.sit_out_points,
-        sit_out_points_set_by_hand=phase.sit_out_points_set_by_hand,
         tiebreakers=None
         if phase.tiebreakers is None
         else tuple(Tiebreaker(t) for t in phase.tiebreakers),
@@ -2312,11 +2313,11 @@ def _played_match(match: Match) -> PlayedMatch:
 def _standings_of(
     tournament: Tournament, phase: TournamentPhase
 ) -> tuple[StandingRow, ...]:
-    """The round robin's standings now (BR-070, BR-071, BR-101).
+    """The round robin's standings now (BR-070, BR-101).
 
-    A sit-out counts once every match of its round has a result: the schedule
+    A sit-out is counted once every match of its round has a result: the schedule
     holds every round from the start, and a sit-out in a round still to come
-    must not earn its point yet.
+    has not happened yet. It earns no points in a round robin (BR-071).
     """
     main = sorted(
         _main_entries(tournament), key=lambda e: (e.seed is None, e.seed or 0, e.id)
@@ -2336,7 +2337,6 @@ def _standings_of(
             for row in round_.participation
             if row.status is Participation.SAT_OUT
         ],
-        sit_out_points=phase.sit_out_points or 0,
     )
 
 

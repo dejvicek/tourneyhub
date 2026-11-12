@@ -11,6 +11,7 @@ import {
   nth,
   pickPlayers,
   setupOf,
+  startTournament,
   tournamentOf,
 } from "./setupTestHelpers";
 
@@ -18,6 +19,15 @@ const league = { league_id: DEMO_LEAGUE_ID };
 const at = (tournament_id: string) => ({
   params: { path: { ...league, tournament_id } },
 });
+
+async function setDraws(draws_allowed: boolean) {
+  await dataOf(
+    api.PATCH("/api/v1/leagues/{league_id}", {
+      params: { path: league },
+      body: { draws_allowed },
+    }),
+  );
+}
 
 async function failure(call: Promise<unknown>) {
   try {
@@ -52,79 +62,148 @@ describe("the fake API for tournament setup", () => {
     expect(again.format.field_count).toBe(2);
   });
 
+  const putFormat = (
+    id: string,
+    body: {
+      group_phase: "round_robin" | "swiss";
+      round_robin_legs: 1 | null;
+      sit_out_points: 0 | 1 | 2 | null;
+    },
+  ) =>
+    api.PUT("/api/v1/leagues/{league_id}/tournaments/{tournament_id}/format", {
+      ...at(id),
+      body: {
+        ...dypFormat,
+        goals_per_game: 10,
+        field_count: 2,
+        group_match_format: "bo1",
+        knockout_match_format: null,
+        final_match_format: null,
+        third_place_match: null,
+        ...body,
+      },
+    });
+
   it.each([
-    ["bo1", 1],
-    ["bo3", 2],
-    ["bo5", 2],
+    ["swiss", "dyp", true],
+    ["swiss", "dyp", false],
+    ["monster_dyp", "monster_dyp", true],
+    ["monster_dyp", "monster_dyp", false],
   ] as const)(
-    "gives a %s group phase %i sit-out points until the organizer picks (BR-071)",
-    async (format, points) => {
+    "gives a %s group phase 0 sit-out points by default, with draws %s (FR-039)",
+    async (groupPhase, type, draws) => {
+      await setDraws(draws);
       const id = await createDraft({
-        group_match_format: format,
+        type,
+        group_phase: groupPhase,
+        group_match_format: "bo3",
         sit_out_points: null,
       });
 
-      const read = (await setupOf(id)).format;
-
-      expect([read.sit_out_points, read.sit_out_points_set_by_hand]).toEqual([
-        points,
-        false,
-      ]);
+      expect((await setupOf(id)).format.sit_out_points).toBe(0);
     },
   );
 
-  it("follows the format with a null pick, and keeps a number", async () => {
-    const id = await createDraft({ sit_out_points: null });
-    const put = (body: {
-      group_match_format: "bo1" | "bo3" | "bo5";
-      sit_out_points: 0 | 1 | 2 | null;
-    }) =>
+  it("stores 1 or 2 as picked, and null as 0 (BR-075)", async () => {
+    const id = await createDraft({ group_phase: "swiss", sit_out_points: 2 });
+    expect((await setupOf(id)).format.sit_out_points).toBe(2);
+
+    const one = await dataOf(
+      putFormat(id, {
+        group_phase: "swiss",
+        round_robin_legs: null,
+        sit_out_points: 1,
+      }),
+    );
+    const reset = await dataOf(
+      putFormat(id, {
+        group_phase: "swiss",
+        round_robin_legs: null,
+        sit_out_points: null,
+      }),
+    );
+
+    expect(one.format.sit_out_points).toBe(1);
+    expect(reset.format.sit_out_points).toBe(0);
+  });
+
+  it("leaves the sit-out points alone when the league's draw setting changes (FR-039)", async () => {
+    const id = await createDraft({
+      group_phase: "swiss",
+      sit_out_points: null,
+    });
+
+    await setDraws(true);
+
+    expect((await setupOf(id)).format.sit_out_points).toBe(0);
+  });
+
+  it("refuses a change of the sit-out points once the tournament runs (BR-075)", async () => {
+    const id = await createDraft({ group_phase: "swiss", sit_out_points: 2 });
+    await pickPlayers(id, 12);
+    await startTournament(id);
+
+    const refused = await failure(
       dataOf(
-        api.PUT(
-          "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/format",
-          {
-            ...at(id),
-            body: {
-              ...dypFormat,
-              goals_per_game: 10,
-              field_count: 2,
-              round_robin_legs: 1,
-              knockout_match_format: null,
-              final_match_format: null,
-              third_place_match: null,
-              ...body,
-            },
-          },
+        putFormat(id, {
+          group_phase: "swiss",
+          round_robin_legs: null,
+          sit_out_points: 0,
+        }),
+      ),
+    );
+
+    expect([refused.status, refused.code]).toEqual([
+      409,
+      "tournament_not_in_setup",
+    ]);
+    expect(nth((await tournamentOf(id)).phases, 0).sit_out_points).toBe(2);
+  });
+
+  describe("a round robin takes no sit-out points (BR-071)", () => {
+    it("refuses a number with its own code and keeps none", async () => {
+      const created = await createDraft();
+      const refusedCreate = await failure(createDraft({ sit_out_points: 1 }));
+      const refusedPut = await failure(
+        dataOf(
+          putFormat(created, {
+            group_phase: "round_robin",
+            round_robin_legs: 1,
+            sit_out_points: 2,
+          }),
         ),
       );
 
-    const followed = await put({
-      group_match_format: "bo3",
-      sit_out_points: null,
-    });
-    const picked = await put({ group_match_format: "bo1", sit_out_points: 2 });
-    const kept = await put({ group_match_format: "bo5", sit_out_points: 0 });
-    const reset = await put({
-      group_match_format: "bo5",
-      sit_out_points: null,
+      for (const refused of [refusedCreate, refusedPut]) {
+        expect([refused.status, refused.code]).toEqual([
+          422,
+          "sit_out_points_not_applicable",
+        ]);
+      }
+      expect((await setupOf(created)).format.sit_out_points).toBeNull();
     });
 
-    expect([
-      followed.format.sit_out_points,
-      followed.format.sit_out_points_set_by_hand,
-    ]).toEqual([2, false]);
-    expect([
-      picked.format.sit_out_points,
-      picked.format.sit_out_points_set_by_hand,
-    ]).toEqual([2, true]);
-    expect([
-      kept.format.sit_out_points,
-      kept.format.sit_out_points_set_by_hand,
-    ]).toEqual([0, true]);
-    expect([
-      reset.format.sit_out_points,
-      reset.format.sit_out_points_set_by_hand,
-    ]).toEqual([2, false]);
+    it("drops the value going from Swiss, and starts from 0 coming back", async () => {
+      const id = await createDraft({ group_phase: "swiss", sit_out_points: 2 });
+
+      const round = await dataOf(
+        putFormat(id, {
+          group_phase: "round_robin",
+          round_robin_legs: 1,
+          sit_out_points: null,
+        }),
+      );
+      const swiss = await dataOf(
+        putFormat(id, {
+          group_phase: "swiss",
+          round_robin_legs: null,
+          sit_out_points: null,
+        }),
+      );
+
+      expect(round.format.sit_out_points).toBeNull();
+      expect(swiss.format.sit_out_points).toBe(0);
+    });
   });
 
   it("refuses BO2 in a league without draws and a group phase the type does not allow", async () => {

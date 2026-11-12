@@ -82,8 +82,8 @@ class PublicStandingRow(ResponseModel):
     """One entry's line in a round robin's standings, for viewers (FR-060, BR-101).
 
     `place` is shared by entries still level (BR-074), and the next place
-    skips (BR-104). `points` include the sit-out points of the rounds sat out
-    (BR-071). The organizer's extras, the form and what ranks one entry above
+    skips (BR-104). `points` come from the matches: a round robin gives no
+    points for sitting out (BR-071). The organizer's extras, the form and what ranks one entry above
     the next, are not part of it.
     """
 

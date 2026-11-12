@@ -58,6 +58,8 @@ class ErrorCode(StrEnum):
     SEED_ORDER_CHANGED = "seed_order_changed"
     DYP_HALVES_INCOMPLETE = "dyp_halves_incomplete"
     NOTHING_TO_PAIR = "nothing_to_pair"  # "pair the rest" with fewer than 2 left
+    # A number of points for sitting out in a round robin (BR-071)
+    SIT_OUT_POINTS_NOT_APPLICABLE = "sit_out_points_not_applicable"
     # Start and back to setup
     TOURNAMENT_NOT_IN_PROGRESS = "tournament_not_in_progress"
     TOURNAMENT_HAS_RESULTS = "tournament_has_results"  # FR-036

@@ -284,6 +284,7 @@
           "seed_order_changed",
           "dyp_halves_incomplete",
           "nothing_to_pair",
+          "sit_out_points_not_applicable",
           "tournament_not_in_progress",
           "tournament_has_results",
           "format_not_supported",
@@ -1166,10 +1167,6 @@
               }
             ]
           },
-          "sit_out_points_set_by_hand": {
-            "title": "Sit Out Points Set By Hand",
-            "type": "boolean"
-          },
           "third_place_match": {
             "anyOf": [
               {
@@ -1203,7 +1200,6 @@
           "format",
           "round_robin_legs",
           "sit_out_points",
-          "sit_out_points_set_by_hand",
           "tiebreakers",
           "qualifiers",
           "third_place_match",
@@ -1502,7 +1498,7 @@
         "type": "object"
       },
       "PlayStandingRow": {
-        "description": "One entry's line in the group-phase standings (BR-101, FR-060).\n\n`place` is shared by entries still level (BR-074), and the next place\nskips (BR-104). `points` include the sit-out points of every round sat\nout whose matches all have results (BR-071). `form` lists the latest five\nresults, oldest first. `ahead_by` names what ranks the entry above the\nnext one when both have the same points, and is null when the points\ndecide or the place is shared. `bh1` and `bh2` are for Swiss and Monster\nDYP, null in a round robin.",
+        "description": "One entry's line in the group-phase standings (BR-101, FR-060).\n\n`place` is shared by entries still level (BR-074), and the next place\nskips (BR-104). In Swiss and Monster DYP, `points` include the sit-out\npoints of every round sat out, as soon as the round is drawn (BR-076); a\nround robin gives none (BR-071). `form` lists the latest five\nresults, oldest first. `ahead_by` names what ranks the entry above the\nnext one when both have the same points, and is null when the points\ndecide or the place is shared. `bh1` and `bh2` are for Swiss and Monster\nDYP, null in a round robin.",
         "properties": {
           "ahead_by": {
             "anyOf": [
@@ -2015,7 +2011,7 @@
         "type": "object"
       },
       "PublicStandingRow": {
-        "description": "One entry's line in a round robin's standings, for viewers (FR-060, BR-101).\n\n`place` is shared by entries still level (BR-074), and the next place\nskips (BR-104). `points` include the sit-out points of the rounds sat out\n(BR-071). The organizer's extras, the form and what ranks one entry above\nthe next, are not part of it.",
+        "description": "One entry's line in a round robin's standings, for viewers (FR-060, BR-101).\n\n`place` is shared by entries still level (BR-074), and the next place\nskips (BR-104). `points` come from the matches: a round robin gives no\npoints for sitting out (BR-071). The organizer's extras, the form and what ranks one entry above\nthe next, are not part of it.",
         "properties": {
           "drawn": {
             "title": "Drawn",
@@ -2738,7 +2734,7 @@
       },
       "TournamentCreate": {
         "additionalProperties": false,
-        "description": "A new tournament in the league's active season (FR-030).\n\n`id` is a UUIDv7 made by the client; a repeat gets the same tournament back\n(ADR-008). A setting left out or null takes the league's default: goals per\ngame, the number of fields and the match format of the phase (FR-011); one\nround robin leg, the default sit-out points of the match format (FR-039,\nBR-071) and no third-place match. `sit_out_points` null follows the default;\nany number counts as a manual pick.",
+        "description": "A new tournament in the league's active season (FR-030).\n\n`id` is a UUIDv7 made by the client; a repeat gets the same tournament back\n(ADR-008). A setting left out or null takes the league's default: goals per\ngame, the number of fields and the match format of the phase (FR-011); one\nround robin leg, 0 points for sitting out in Swiss and Monster DYP (FR-039)\nand no third-place match. A round robin has no points for sitting out\n(BR-071): a number there is 422 `sit_out_points_not_applicable`.",
         "properties": {
           "date": {
             "format": "date",
@@ -2857,7 +2853,7 @@
         "type": "object"
       },
       "TournamentFormatRead": {
-        "description": "The format as stored; settings that do not apply are null (FR-031).\n\n`sit_out_points_set_by_hand` tells whether the organizer chose the\nsit-out points (true) or they are the default of the match format (false).",
+        "description": "The format as stored; settings that do not apply are null (FR-031).\n\n`sit_out_points` is null for a round robin and without a group phase (BR-071).",
         "properties": {
           "date": {
             "format": "date",
@@ -2934,17 +2930,6 @@
               }
             ]
           },
-          "sit_out_points_set_by_hand": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sit Out Points Set By Hand"
-          },
           "third_place_match": {
             "anyOf": [
               {
@@ -2967,7 +2952,6 @@
           "group_phase",
           "round_robin_legs",
           "sit_out_points",
-          "sit_out_points_set_by_hand",
           "group_match_format",
           "knockout_match_format",
           "final_match_format",
@@ -2980,7 +2964,7 @@
       },
       "TournamentFormatWrite": {
         "additionalProperties": false,
-        "description": "The whole format of a tournament in setup, the target state (FR-030, FR-031).\n\nWith a group phase (`round_robin`, `swiss`, `monster_dyp`) its settings are\ngiven and the knockout's are null: a knockout after a group phase is set up\nwhen it starts (FR-045). With `none` the knockout's settings are given and\nthe group phase's are null. `round_robin_legs` is only for a round robin.\nA setting that does not apply is 422 `validation_failed` with\n`setting_not_applicable`; one that applies and is missing, `setting_missing`.\n\n`sit_out_points` is 0, 1 or 2 (FR-039, BR-071). A number is the organizer's\nown choice and stays; null takes the default of the group phase's match\nformat and follows it (`sit_out_points_set_by_hand` false in the read).\nAny number counts as a manual pick, even one equal to the default, so a\nclient that read the format must send null, not the read value, while\n`sit_out_points_set_by_hand` is false to keep following the default.",
+        "description": "The whole format of a tournament in setup, the target state (FR-030, FR-031).\n\nWith a group phase (`round_robin`, `swiss`, `monster_dyp`) its settings are\ngiven and the knockout's are null: a knockout after a group phase is set up\nwhen it starts (FR-045). With `none` the knockout's settings are given and\nthe group phase's are null. `round_robin_legs` is only for a round robin.\nA setting that does not apply is 422 `validation_failed` with\n`setting_not_applicable`; one that applies and is missing, `setting_missing`.\n\n`sit_out_points` is for a Swiss or Monster DYP group phase (FR-039, BR-071):\n0, 1 or 2 is stored as given (BR-075), and null stores the default, 0. A\nround robin has none: a number there is 422 `sit_out_points_not_applicable`.",
         "properties": {
           "date": {
             "format": "date",
@@ -5289,7 +5273,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments": {
       "post": {
-        "description": "Create a tournament in setup in the league's active season (FR-030).\n\nA repeat gets the tournament back. An id that another tournament has, in\nanother season or with another type, is 409 `tournament_id_taken`. BO2 in a\nleague without draws is 422 `draws_not_allowed` (BR-121).",
+        "description": "Create a tournament in setup in the league's active season (FR-030).\n\nA repeat gets the tournament back. An id that another tournament has, in\nanother season or with another type, is 409 `tournament_id_taken`. BO2 in a\nleague without draws is 422 `draws_not_allowed` (BR-121). Points for sitting\nout in a round robin are 422 `sit_out_points_not_applicable` (BR-071).",
         "operationId": "create_tournament",
         "parameters": [
           {
@@ -6025,7 +6009,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/format": {
       "put": {
-        "description": "Set the format of a tournament in setup (FR-030, FR-031, FR-039).\n\nA new type keeps the picked players and makes the entries again. A started\ntournament is 409 `tournament_not_in_setup`, as for every setup write.",
+        "description": "Set the format of a tournament in setup (FR-030, FR-031, FR-039).\n\nA new type keeps the picked players and makes the entries again. A started\ntournament is 409 `tournament_not_in_setup`, as for every setup write, so the\npoints for sitting out cannot change while the phase has a result (BR-075).\nPoints for sitting out in a round robin are 422\n`sit_out_points_not_applicable` (BR-071); BO2 in a league without draws, 422\n`draws_not_allowed` (BR-121).",
         "operationId": "set_tournament_format",
         "parameters": [
           {

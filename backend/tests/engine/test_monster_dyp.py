@@ -297,7 +297,7 @@ def test_br073_bh1_sums_both_opponents_and_bh2_their_bh1() -> None:
 
 
 @pytest.mark.parametrize("sit_out_points", [0, 1, 2])
-def test_br071_a_sit_out_earns_the_sit_out_points(sit_out_points: int) -> None:
+def test_br076_a_sit_out_earns_the_sit_out_points(sit_out_points: int) -> None:
     rounds = [
         MonsterRound(
             round_no=1,
@@ -323,7 +323,34 @@ def test_br071_a_sit_out_earns_the_sit_out_points(sit_out_points: int) -> None:
     )
 
 
-def test_br071_each_player_who_sits_out_gets_2_points_that_bh1_and_bh2_sum() -> None:
+@pytest.mark.parametrize("sit_out_points", [0, 1, 2])
+def test_br076_br077_each_sit_out_counts_as_soon_as_its_round_is_drawn(
+    sit_out_points: int,
+) -> None:
+    rounds = [
+        MonsterRound(
+            round_no=1,
+            matches=(game((1, 4), (2, 3)),),
+            sat_out=(pid(5), pid(6)),
+        )
+    ]
+
+    result = monster_standings(
+        players(6),
+        rounds,
+        tiebreakers=(),
+        sit_out_points=sit_out_points,
+        rng_seed=SEED,
+    )
+
+    by_player = {line.player_id.int: line for line in result}
+    for sitting_out in (5, 6):
+        line = by_player[sitting_out]
+        assert (line.points, line.sat_out, line.played) == (sit_out_points, 1, 0)
+    assert (by_player[1].points, by_player[1].played) == (0, 0)
+
+
+def test_br077_each_player_who_sits_out_gets_2_points_that_bh1_and_bh2_sum() -> None:
     rounds = [
         MonsterRound(
             round_no=1,

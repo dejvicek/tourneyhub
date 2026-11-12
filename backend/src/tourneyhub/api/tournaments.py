@@ -90,7 +90,7 @@ type PlayerIds = Annotated[
 ]
 
 type SitOutPoints = Literal[0, 1, 2]
-"""The points of a sit-out (FR-039, BR-071)."""
+"""The points for sitting out in Swiss and Monster DYP (FR-039, BR-071)."""
 
 _GROUP_SETTINGS = ("round_robin_legs", "sit_out_points", "group_match_format")
 _KNOCKOUT_SETTINGS = (
@@ -113,7 +113,8 @@ class _FormatChecks(RequestModel):
         group phase, its settings apply; without one, the knockout's. With
         `complete`, every setting that applies must be given (`final_match_format`
         may be null: the final plays the knockout's format; `sit_out_points` may
-        be null: the default of the match format, FR-039).
+        be null: the default, 0, FR-039). A round robin has no `sit_out_points`
+        (BR-071); the service refuses a number there with its own code.
         """
         if (self.type is TournamentType.MONSTER_DYP) != (
             self.group_phase is GroupPhase.MONSTER_DYP
@@ -150,12 +151,9 @@ class TournamentFormatWrite(_FormatChecks):
     A setting that does not apply is 422 `validation_failed` with
     `setting_not_applicable`; one that applies and is missing, `setting_missing`.
 
-    `sit_out_points` is 0, 1 or 2 (FR-039, BR-071). A number is the organizer's
-    own choice and stays; null takes the default of the group phase's match
-    format and follows it (`sit_out_points_set_by_hand` false in the read).
-    Any number counts as a manual pick, even one equal to the default, so a
-    client that read the format must send null, not the read value, while
-    `sit_out_points_set_by_hand` is false to keep following the default.
+    `sit_out_points` is for a Swiss or Monster DYP group phase (FR-039, BR-071):
+    0, 1 or 2 is stored as given (BR-075), and null stores the default, 0. A
+    round robin has none: a number there is 422 `sit_out_points_not_applicable`.
     """
 
     round_robin_legs: Literal[1, 2] | None
@@ -178,9 +176,9 @@ class TournamentCreate(_FormatChecks):
     `id` is a UUIDv7 made by the client; a repeat gets the same tournament back
     (ADR-008). A setting left out or null takes the league's default: goals per
     game, the number of fields and the match format of the phase (FR-011); one
-    round robin leg, the default sit-out points of the match format (FR-039,
-    BR-071) and no third-place match. `sit_out_points` null follows the default;
-    any number counts as a manual pick.
+    round robin leg, 0 points for sitting out in Swiss and Monster DYP (FR-039)
+    and no third-place match. A round robin has no points for sitting out
+    (BR-071): a number there is 422 `sit_out_points_not_applicable`.
     """
 
     id: UUID7
@@ -269,8 +267,7 @@ class DrawWrite(RequestModel):
 class TournamentFormatRead(ResponseModel):
     """The format as stored; settings that do not apply are null (FR-031).
 
-    `sit_out_points_set_by_hand` tells whether the organizer chose the
-    sit-out points (true) or they are the default of the match format (false).
+    `sit_out_points` is null for a round robin and without a group phase (BR-071).
     """
 
     name: str
@@ -279,7 +276,6 @@ class TournamentFormatRead(ResponseModel):
     group_phase: GroupPhase
     round_robin_legs: Literal[1, 2] | None
     sit_out_points: SitOutPoints | None
-    sit_out_points_set_by_hand: bool | None
     group_match_format: MatchFormat | None
     knockout_match_format: KnockoutMatchFormat | None
     final_match_format: KnockoutMatchFormat | None
@@ -385,7 +381,6 @@ class PhaseRead(ResponseModel):
     format: PhaseFormat
     round_robin_legs: Literal[1, 2] | None
     sit_out_points: SitOutPoints | None
-    sit_out_points_set_by_hand: bool
     tiebreakers: list[Tiebreaker] | None
     qualifiers: int | None
     third_place_match: bool | None
@@ -571,8 +566,9 @@ class PlayStandingRow(ResponseModel):
     """One entry's line in the group-phase standings (BR-101, FR-060).
 
     `place` is shared by entries still level (BR-074), and the next place
-    skips (BR-104). `points` include the sit-out points of every round sat
-    out whose matches all have results (BR-071). `form` lists the latest five
+    skips (BR-104). In Swiss and Monster DYP, `points` include the sit-out
+    points of every round sat out, as soon as the round is drawn (BR-076); a
+    round robin gives none (BR-071). `form` lists the latest five
     results, oldest first. `ahead_by` names what ranks the entry above the
     next one when both have the same points, and is null when the points
     decide or the place is shared. `bh1` and `bh2` are for Swiss and Monster
@@ -737,7 +733,8 @@ def create_tournament(
 
     A repeat gets the tournament back. An id that another tournament has, in
     another season or with another type, is 409 `tournament_id_taken`. BO2 in a
-    league without draws is 422 `draws_not_allowed` (BR-121).
+    league without draws is 422 `draws_not_allowed` (BR-121). Points for sitting
+    out in a round robin are 422 `sit_out_points_not_applicable` (BR-071).
     """
     setup = tournament_service.create_tournament(
         session,
@@ -855,7 +852,11 @@ def set_tournament_format(
     """Set the format of a tournament in setup (FR-030, FR-031, FR-039).
 
     A new type keeps the picked players and makes the entries again. A started
-    tournament is 409 `tournament_not_in_setup`, as for every setup write.
+    tournament is 409 `tournament_not_in_setup`, as for every setup write, so the
+    points for sitting out cannot change while the phase has a result (BR-075).
+    Points for sitting out in a round robin are 422
+    `sit_out_points_not_applicable` (BR-071); BO2 in a league without draws, 422
+    `draws_not_allowed` (BR-121).
     """
     setup = tournament_service.set_tournament_format(
         session,

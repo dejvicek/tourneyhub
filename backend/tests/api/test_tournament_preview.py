@@ -21,7 +21,7 @@ ROUND_ROBIN: Json = {
     "type": "singles",
     "group_phase": "round_robin",
     "round_robin_legs": 1,
-    "sit_out_points": 0,
+    "sit_out_points": None,
     "group_match_format": "bo1",
     "knockout_match_format": None,
     "final_match_format": None,
@@ -121,7 +121,6 @@ def _shown(tournament: Json) -> list[tuple[list[list[str]], list[list[str]]]]:
         pytest.param({"type": "dyp"}, 6, None, id="dyp"),
         pytest.param({"type": "dyp"}, 5, None, id="dyp-one-left-out"),
         pytest.param({"type": "doubles"}, 6, [(0, 1), (2, 3), (4, 5)], id="doubles"),
-        pytest.param({"sit_out_points": 1}, 7, None, id="sit-out-points"),
     ],
 )
 def test_fr035_the_preview_is_the_schedule_the_start_creates(
