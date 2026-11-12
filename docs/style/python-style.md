@@ -117,7 +117,7 @@ Layers, enforced by import-linter: `api` and `cli` → `services` → `db` → `
 
 ### 4.3 Values
 
-- Engine values are `@dataclass(frozen=True, slots=True, kw_only=True)` with `tuple`, `frozenset` or `frozendict` fields. Change them with `dataclasses.replace`.
+- Engine values are `@dataclass(frozen=True, slots=True, kw_only=True)` with `tuple`, `frozenset` or `frozendict` fields; `tests/test_architecture.py` checks the three arguments. Change them with `dataclasses.replace`.
 - Closed sets of values are `StrEnum`s; the database stores their values (§7).
 - `match` over enums and unions is exhaustive, through mypy's `exhaustive-match` or a final `case _: assert_never(value)`. Plain conditions use `if`.
 - Instants are aware UTC datetimes: `datetime.now(UTC)`, never `utcnow()` (ruff `DTZ`).
