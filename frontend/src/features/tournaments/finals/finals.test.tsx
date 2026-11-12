@@ -745,6 +745,10 @@ describe("Start the knockout (screen 13)", () => {
     renderAt(at(paths.startKnockout, MONSTER));
     expect(await screen.findByText(/can't go through/)).toBeInTheDocument();
     expect(screen.getByText(/Round 5 locks/)).toBeInTheDocument();
+    // BR-080: only the Monster DYP pair options need an even number.
+    expect(
+      screen.getByText(/Paired options need an even number/),
+    ).toBeInTheDocument();
   });
 
   it("steps the players by two for pairs and by one for singles", async () => {
@@ -796,6 +800,33 @@ describe("Start the knockout (screen 13)", () => {
       await screen.findByText("Round robin results lock"),
     ).toBeInTheDocument();
     expect(screen.queryByText(/^Round \d+ locks/)).not.toBeInTheDocument();
+  });
+
+  it("counts players after a Singles round robin, with no even-number hint (BR-080)", async () => {
+    renderAt(`${at(paths.startKnockout, ROUND_ROBIN_DONE)}?qualifiers=4`);
+
+    expect(
+      await screen.findByRole("status", { name: "Players who go through" }),
+    ).toHaveTextContent("4");
+    expect(screen.getByText("The best in the standings.")).toBeInTheDocument();
+    expect(screen.queryByText(/even number/)).not.toBeInTheDocument();
+  });
+
+  it("counts pairs after a Doubles round robin, with no even-number hint (BR-080)", async () => {
+    const tournament = db().tournaments.find((t) => t.id === ROUND_ROBIN_DONE);
+    if (tournament !== undefined) tournament.type = "doubles";
+    renderAt(`${at(paths.startKnockout, ROUND_ROBIN_DONE)}?qualifiers=4`);
+
+    expect(
+      await screen.findByRole("status", { name: "Pairs who go through" }),
+    ).toHaveTextContent("4");
+    expect(
+      screen.getByRole("button", { name: "Fewer pairs" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "More pairs" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/even number/)).not.toBeInTheDocument();
   });
 
   it("gives the knockout its format and the final its own (BR-120)", async () => {

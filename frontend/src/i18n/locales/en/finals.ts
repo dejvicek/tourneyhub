@@ -275,11 +275,14 @@ export const finals = {
   start: {
     title: "Start the knockout",
     qualifiersTitle: "Players who go through",
-    qualifiersHelp:
+    qualifiersTitlePairs: "Pairs who go through",
+    qualifiersHelp: "The best in the standings.",
+    qualifiersHelpMonster:
       "The best in the standings. Paired options need an even number.",
-    qualifiersValue: "Players who go through",
     decrease: "Fewer players",
+    decreasePairs: "Fewer pairs",
     increase: "More players",
+    increasePairs: "More pairs",
     thirdPlace: "Third-place match",
     thirdPlaceOff: "Off: both semifinal losers share 3rd place.",
     thirdPlaceOn: "On: the semifinal losers play for 3rd place.",
