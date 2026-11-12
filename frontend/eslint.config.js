@@ -40,6 +40,21 @@ const restrictedPaths = [
     ],
     message: "API data goes through TanStack Query, not the router.",
   },
+  // Packages the project decided against (guide §4, §7, §8.2, §9).
+  ...[
+    ["react-router-dom", "frontend-style §9: import from react-router."],
+    ["axios", "frontend-style §8.2: call the API through src/api/."],
+    [
+      "openapi-react-query",
+      "frontend-style §8.2: its keys cannot be invalidated by a league's prefix.",
+    ],
+    ["react-hook-form", "frontend-style §4: forms use no form library."],
+    ["zod", "frontend-style §4: the server validates; no client schema."],
+    [
+      "i18next-browser-languagedetector",
+      "frontend-style §7: the language comes from pickLanguage.",
+    ],
+  ].map(([name, message]) => ({ name, message })),
 ];
 const unstableRouterApis = {
   group: ["react-router", "react-router/*"],
@@ -85,6 +100,86 @@ const forwardRefSyntax = [
   },
 ];
 
+// Selectors of no-restricted-syntax beyond forwardRef. A block that sets the
+// rule replaces its whole list, so each block names every group it keeps.
+// esquery has no escaped "/" in a regex, hence \x2F.
+const optimisticSyntax = [
+  "ImportSpecifier[imported.name='useOptimistic']",
+  "MemberExpression[property.name='useOptimistic']",
+  "MemberExpression[property.name=/^set(Query|Queries)Data$/]",
+  "Property[key.name='onMutate']",
+].map((selector) => ({
+  selector,
+  message:
+    "frontend-style §8.1: no optimistic cache writes; render mutation.variables while pending.",
+}));
+const pathSyntax = [
+  "TemplateLiteral[quasis.0.value.raw=/^\\x2F/]",
+  "BinaryExpression[operator='+'] > Literal[value=/^\\x2F/]",
+].map((selector) => ({
+  selector,
+  message:
+    "frontend-style §9: build paths with generatePath and the constants in @/lib/paths.",
+}));
+const intlSyntax = ["NewExpression", "CallExpression"].flatMap((call) =>
+  [":not([arguments.0])", "[arguments.0.type='Literal']"].map((argument) => ({
+    selector: `${call}[callee.object.name='Intl']${argument}`,
+    message: "frontend-style §7: pass i18n.resolvedLanguage as the locale.",
+  })),
+);
+const barrelSyntax = [
+  "ExportAllDeclaration",
+  "ExportNamedDeclaration[source]",
+].map((selector) => ({
+  selector,
+  message: "frontend-style §11: no barrel files; import each module directly.",
+}));
+const htmlSyntax = [
+  {
+    selector: "JSXAttribute[name.name='dangerouslySetInnerHTML']",
+    message: "frontend-style §7: render text as React children, never as HTML.",
+  },
+];
+// `as const` stays; a CSS custom property is not in CSSProperties (§5.1).
+const assertionSyntax = [
+  "TSAsExpression:not([typeAnnotation.typeName.name=/^(const|CSSProperties)$/])",
+  "TSTypeAssertion",
+].map((selector) => ({
+  selector,
+  message:
+    "frontend-style §8.2: no `as` on API data; types come from the generated schema. Any other `as` gets a disable comment that says why it is safe (§3).",
+}));
+const queryClientSyntax = [
+  {
+    selector: "NewExpression[callee.name='QueryClient']",
+    message:
+      "frontend-style §8.1: the one QueryClient is created in src/main.tsx.",
+  },
+];
+const routerDataSyntax = [
+  {
+    selector: "Property[key.name=/^(loader|action|shouldRevalidate)$/]",
+    message:
+      "frontend-style §9: API data goes through TanStack Query, not router loaders or actions.",
+  },
+];
+const mockApiSyntax = [
+  {
+    selector:
+      "CallExpression[callee.object.name='vi'][callee.property.name=/^(mock|doMock)$/][arguments.0.value=/(^|\\x2F)api(\\x2F|$)/]",
+    message:
+      "frontend-style §10.1: mock the network with MSW, never the API modules.",
+  },
+];
+const appSyntax = [
+  ...forwardRefSyntax,
+  ...optimisticSyntax,
+  ...pathSyntax,
+  ...intlSyntax,
+  ...barrelSyntax,
+  ...htmlSyntax,
+];
+
 // One cn for the whole app, configured with the theme's text styles; the
 // package alone takes text-caption for a colour (guide §5.3).
 const cnPackage = {
@@ -119,6 +214,11 @@ const restrictedClasses = [
     message: "Breakpoints come from the theme.",
   },
   { pattern: "(^!|:!|!$)", message: "No important modifier." },
+  {
+    pattern: "(^|:)(ring|outline)-ring/",
+    message:
+      "frontend-style §5.2: the focus ring is solid, so it keeps 3:1 next to the primary colour.",
+  },
 ];
 const restrictedClassesOutsideUi = [
   ...restrictedClasses,
@@ -216,7 +316,12 @@ export default defineConfig([
           checkGlobalObject: true,
         },
       ],
-      "no-restricted-syntax": ["error", ...forwardRefSyntax],
+      "no-restricted-syntax": [
+        "error",
+        ...appSyntax,
+        ...assertionSyntax,
+        ...queryClientSyntax,
+      ],
       // These format in the browser's locale, not the chosen language.
       "no-restricted-properties": [
         "error",
@@ -290,6 +395,44 @@ export default defineConfig([
     // The demo itself; its tests call it through the API clients.
     files: ["src/demo/**/*.ts"],
     rules: { "no-restricted-imports": restrictImports() },
+  },
+  {
+    files: ["src/routes.tsx"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        ...appSyntax,
+        ...assertionSyntax,
+        ...queryClientSyntax,
+        ...routerDataSyntax,
+      ],
+    },
+  },
+  {
+    files: ["src/main.tsx"],
+    rules: {
+      "no-restricted-syntax": ["error", ...appSyntax, ...assertionSyntax],
+    },
+  },
+  {
+    // Tests make their own QueryClient (renderAt in src/test/renderApp.tsx).
+    files: ["src/test/**/*.{ts,tsx}", "src/**/*.test.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        ...appSyntax,
+        ...assertionSyntax,
+        ...mockApiSyntax,
+      ],
+    },
+  },
+  {
+    // The demo's fake engines are leaving with demo mode; no `as` rule there.
+    files: ["src/demo/**/*.ts"],
+    ignores: ["src/demo/**/*.test.ts"],
+    rules: {
+      "no-restricted-syntax": ["error", ...appSyntax, ...queryClientSyntax],
+    },
   },
   {
     files: ["src/**/*.tsx"],
