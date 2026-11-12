@@ -199,7 +199,7 @@ model {
       icon tech:github-actions
       summary "Jobs changes (path filter), backend, frontend and e2e (Playwright against compose.prod.yaml); ci-ok waits for all of them."
       description "
-        The workflow .github/workflows/ci.yml runs on every PR and on every push to main; a newer push cancels the run it supersedes.
+        The workflow .github/workflows/ci.yml runs on every PR and on every push to main; a newer push to a PR cancels the run it supersedes, and every commit on main runs in full.
         - changes: the path filter, inside the workflow; each of the next three jobs runs only when its area changed.
         - backend: ruff, mypy, import-linter, pytest under coverage (100 % in the engine), openapi.json drift, alembic upgrade head and alembic check, uv audit, against a PostgreSQL 17 service with the builtin locale.
         - frontend: ESLint, Prettier, typecheck, Vitest and the build, on the API types generated from the committed openapi.json.

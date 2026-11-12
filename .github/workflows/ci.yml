@@ -8,10 +8,12 @@ on:
 permissions:
   contents: read
 
-# A newer push to the same pull request or to main cancels the run it supersedes:
-# GitHub Free has 2,000 Actions minutes a month (ADR-012).
+# A newer push to the same pull request cancels the run it supersedes: GitHub Free
+# has 2,000 Actions minutes a month (ADR-012). Every commit on main gets its own
+# group, so each one is checked in full; one shared group would cancel a running
+# or waiting run on main whenever the next merge lands.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
   cancel-in-progress: true
 
 jobs:
