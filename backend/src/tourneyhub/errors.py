@@ -37,7 +37,8 @@ class ErrorCode(StrEnum):
     SEASON_NUMBER_CHANGED = "season_number_changed"
     # Players
     PLAYER_NOT_FOUND = "player_not_found"
-    PLAYER_NAME_TAKEN = "player_name_taken"  # also a removed player's name (BR-001)
+    # Also a removed player's name (BR-001, FR-012).
+    PLAYER_NAME_TAKEN = "player_name_taken"
     # BR-006: 1000 active players (#48 follow-up); today 500, removed included.
     PLAYER_LIMIT_REACHED = "player_limit_reached"
     PLAYER_IN_UNFINISHED_TOURNAMENT = "player_in_unfinished_tournament"  # BR-002
