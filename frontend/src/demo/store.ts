@@ -285,7 +285,7 @@ export function publicLeague(
 export function publicTournaments(seasonId: string): TournamentSummary[] {
   return state.tournaments
     .filter((t) => t.season_id === seasonId && t.state !== "setup")
-    .toSorted((a, b) => b.date.localeCompare(a.date))
+    .toSorted((a, b) => Number(a.date < b.date) - Number(a.date > b.date))
     .map(tournamentSummary);
 }
 

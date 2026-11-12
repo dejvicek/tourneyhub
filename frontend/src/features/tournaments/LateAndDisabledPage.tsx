@@ -33,7 +33,7 @@ export function LateAndDisabledPage() {
 }
 
 function PlayersContent() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const entryCount = useEntryCount();
   const queryClient = useQueryClient();
   const leagueId = useRouteParam("leagueId");
@@ -80,12 +80,13 @@ function PlayersContent() {
   const points = new Map(
     (standings.data ?? []).map((row) => [row.player_id, row.points]),
   );
+  const collator = new Intl.Collator(i18n.resolvedLanguage);
   const ranked = [...(players.data ?? [])]
     .filter((p) => p.removed_at === null)
     .sort(
       (a, b) =>
         (points.get(b.id) ?? 0) - (points.get(a.id) ?? 0) ||
-        a.name.localeCompare(b.name),
+        collator.compare(a.name, b.name),
     );
   const candidates = ranked.flatMap((player, index) =>
     inTournament.has(player.id)

@@ -199,7 +199,7 @@ Checked by tools: ESLint jsx-a11y-x `strict` and `jsx-a11y-x/control-has-associa
 
 ## 7. Translations
 
-Checked by tools: `tsc` (keys of `t()` through `CustomTypeOptions` in `src/i18n/i18next.d.ts`; `cs` has every key of `en`, and no other, through its `CsMessages` type); ESLint `no-restricted-properties` (`toLocaleString`, `toLocaleDateString`, `toLocaleTimeString`), `no-restricted-syntax` (an `Intl` constructor without a locale or with a literal one; `dangerouslySetInnerHTML`), `no-restricted-imports` (`i18next-browser-languagedetector`); `i18next-cli lint`, part of `pnpm lint`, for user-facing text in JSX elements and attributes outside `t()` and `<Trans>` [I1].
+Checked by tools: `tsc` (keys of `t()` through `CustomTypeOptions` in `src/i18n/i18next.d.ts`; `cs` has every key of `en`, and no other, through its `CsMessages` type); ESLint `no-restricted-properties` (`toLocaleString`, `toLocaleDateString`, `toLocaleTimeString`, `localeCompare`), `no-restricted-syntax` (an `Intl` constructor without a locale or with a literal one; `dangerouslySetInnerHTML`), `no-restricted-imports` (`i18next-browser-languagedetector`); `i18next-cli lint`, part of `pnpm lint`, for user-facing text in JSX elements and attributes outside `t()` and `<Trans>` [I1].
 
 - No hard-coded user-facing text (ADR-003), `aria-label` and `alt` included. A line that is not user-facing, such as a product name, is excused with `i18next-instrument-ignore-next-line` and a reason after ` -- `, as with `eslint-disable`. If the linter gives a false positive that neither `i18next.config.ts` nor that comment can silence, the pull request that hits it downgrades the check to a report and says so here.
 - `i18next-cli lint` sees only JSX. A string that reaches the screen another way, through state, a prop or a function's return value, goes through `t()` too.
@@ -217,7 +217,7 @@ Checked by tools: `tsc` (keys of `t()` through `CustomTypeOptions` in `src/i18n/
 - Markup inside a sentence, such as a link, uses `<Trans>` with named components [I4].
 - Plurals pass `count` [I5]. English keys take `_one` and `_other`; Czech takes `_one`, `_few` (2–4), `_many` (decimals) and `_other` [I6]. `CsMessages` (in `en.ts`) allows `_few` and `_many` for every key whose English reference has `_one` or `_other`, and no other extra key.
 - Places in a standing are numbers, written "1." in Czech; no `ordinal` plurals [I6].
-- Dates and numbers go through `Intl` with `i18n.resolvedLanguage`, or through i18next's `{{val, datetime}}` and `{{val, number}}` inside a sentence (FR-081) [I7].
+- Dates and numbers go through `Intl` with `i18n.resolvedLanguage`, or through i18next's `{{val, datetime}}` and `{{val, number}}` inside a sentence (FR-081) [I7]. Names are sorted with an `Intl.Collator` in the same language.
 - A viewer's language comes from `pickLanguage` in `src/i18n/language.ts`: their stored choice, else `navigator.language` if it is English or Czech, else English. An organizer's comes from `users.language`, and changing it saves through the API before `i18n.changeLanguage` (ADR-003). No language-detector plugin; `supportedLngs` and `fallbackLng: "en"` stay set [I8].
 - API errors are shown from an `errors` object with one key per generated `ErrorCode` and `detail` as its values; `satisfies Record<ErrorCode, string>` makes a new code in `openapi.json` a type error (ADR-008) [T6].
 - Knockout option names (FR-080) are keys too, with the same value in both languages.

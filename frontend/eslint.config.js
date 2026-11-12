@@ -327,7 +327,7 @@ export default defineConfig([
         ...assertionSyntax,
         ...queryClientSyntax,
       ],
-      // These format in the browser's locale, not the chosen language.
+      // These use the browser's locale, not the chosen language.
       "no-restricted-properties": [
         "error",
         ...["toLocaleString", "toLocaleDateString", "toLocaleTimeString"].map(
@@ -336,6 +336,11 @@ export default defineConfig([
             message: "Format with Intl in i18n.resolvedLanguage.",
           }),
         ),
+        {
+          property: "localeCompare",
+          message:
+            "Sort names with an Intl.Collator in i18n.resolvedLanguage; compare ISO dates as plain strings.",
+        },
       ],
       "no-restricted-imports": restrictImports(apiClient, demoInternals),
     },
