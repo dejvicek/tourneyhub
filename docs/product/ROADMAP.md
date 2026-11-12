@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Status | Draft |
-| Date | 2026-10-14 |
+| Date | 2026-11-12 |
 | Scope | What comes after the MVP in `PRD.md`. Business level only: no dates and no technical design. |
 
 ## 1. Direction
@@ -25,7 +25,7 @@ The bigger version is a hosted platform where any club can run leagues and tourn
 |---|---|---|
 | RM-01 | Co-organizers | Someone else can run a night and enter results, and a league can be handed over to another organizer. |
 | RM-02 | Email | Address verification, self-service password reset, and invitations for co-organizers. |
-| RM-03 | Live updates | The share link updates by itself while matches are played. |
+| RM-03 | Live updates | The share link updates by itself while matches are played, and a TV or beamer view shows the matches field by field. |
 | RM-04 | Best N results | A season counts only each player's best N tournaments, so missed nights hurt less. |
 | RM-05 | Double elimination (DKO) | A second kind of knockout, where an entry is out after its second loss — on its own or after any group phase. |
 | RM-06 | Several groups | A group phase split into parallel groups that feed one knockout. |
@@ -33,6 +33,8 @@ The bigger version is a hosted platform where any club can run leagues and tourn
 | RM-09 | Player pages | Each player's history, win rate and head-to-head records. |
 | RM-10 | CSV export | A league's players, results and standings as a spreadsheet file. |
 | RM-11 | Accessibility | Every screen checked for accessibility (WCAG 2.2 Level AA). |
+| RM-33 | Knockouts by place range | After the group phase, each range of places gets its own knockout, e.g. places 1–8 and 9–16, so more entries play on. |
+| RM-34 | Pinned fields | The organizer pins a match to a field, and the field is kept free for it, even for a final whose sides are not known yet. In the MVP a match goes only onto a free field. |
 
 ## 3. Stage 2 — Players join in
 

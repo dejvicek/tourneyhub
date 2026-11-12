@@ -41,7 +41,7 @@ model {
         Runs in the user's browser; served by the Vite dev server (development) or Caddy (production), and /api goes through the same origin.
       "
       link https://github.com/dejvicek/tourneyhub/blob/main/docs/architecture/ADR.md#adr-003--frontend-react-vite-typescript-tailwind-shadcnui "ADR-003"
-      link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#69-language-and-devices "PRD §6.9 Language and devices (FR-080 to FR-082)"
+      link https://github.com/dejvicek/tourneyhub/blob/main/docs/product/PRD.md#69-language-and-devices "PRD §6.9 Language and devices (FR-080 to FR-083)"
 
       organizerUi = component "Organizer screens" {
         description "Leagues, players, seasons, tournament setup, draws, rounds, results and the knockout."

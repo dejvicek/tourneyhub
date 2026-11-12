@@ -14,9 +14,9 @@ from tourneyhub.errors import ErrorCode, NotAuthenticatedError, RuleViolationErr
 from tourneyhub.services import auth as auth_service
 
 # NIST SP 800-63B-4 asks 15 characters for a password used alone (ADR-006). FR-002
-# says 12; the PRD team decides, and this is the only place that changes. The
-# maximum bounds the Argon2 input; ADR-006's 64 is an open question. Sign-up,
-# password change, an admin's temporary password and `create-admin` share them.
+# says 15 to 1024 characters, and the MVP checks no list of common or breached
+# passwords (decided in #48). The maximum bounds the Argon2 input. Sign-up, password
+# change, an admin's temporary password and `create-admin` share them.
 MIN_PASSWORD_LENGTH = 15
 MAX_PASSWORD_LENGTH = 1024
 
