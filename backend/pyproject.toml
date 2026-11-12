@@ -100,7 +100,8 @@ disallow_any_explicit = false
 
 # The tests with database fixtures take factory fixtures typed Callable[..., X]
 # (§9), which mypy counts as an explicit Any, and the API tests read JSON through
-# dict[str, Any]. The engine, migration and architecture tests are checked (#71).
+# dict[str, Any]. The other tests (engine, migrations, the modules directly in
+# tests/) are checked (#71).
 [[tool.mypy.overrides]]
 module = ["tests.conftest", "tests.api.*", "tests.db.*", "tests.services.*"]
 disallow_any_explicit = false
