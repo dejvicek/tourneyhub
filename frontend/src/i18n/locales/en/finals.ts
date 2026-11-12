@@ -115,12 +115,8 @@ export const finals = {
     wonFinal: "Won the final {{score}} against {{opponent}}",
     wonStandings: "First in the standings",
     earnsEach_one: "Both get {{count}} season point.",
-    earnsEach_few: "Both get {{count}} season points.",
-    earnsEach_many: "Both get {{count}} season points.",
     earnsEach_other: "Both get {{count}} season points.",
     earnsOwn_one: "Gets {{count}} season point.",
-    earnsOwn_few: "Gets {{count}} season points.",
-    earnsOwn_many: "Gets {{count}} season points.",
     earnsOwn_other: "Gets {{count}} season points.",
     places: "Final places",
     reason: {
@@ -175,17 +171,11 @@ export const finals = {
     decisionTitle: "Round {{round}} is complete",
     decisionBody_one:
       "For {{active}} active players we recommend at least {{count}} round, and you have played {{played}}. Add another round, or move on.",
-    decisionBody_few:
-      "For {{active}} active players we recommend at least {{count}} rounds, and you have played {{played}}. Add another round, or move on.",
-    decisionBody_many:
-      "For {{active}} active players we recommend at least {{count}} rounds, and you have played {{played}}. Add another round, or move on.",
     decisionBody_other:
       "For {{active}} active players we recommend at least {{count}} rounds, and you have played {{played}}. Add another round, or move on.",
     notRounds: "This tournament has no rounds to add.",
     inProgressTitle: "Round {{round}} is in progress",
     inProgressBody_one: "{{count}} match has no result yet.",
-    inProgressBody_few: "{{count}} matches have no result yet.",
-    inProgressBody_many: "{{count}} matches have no result yet.",
     inProgressBody_other: "{{count}} matches have no result yet.",
     addRound: "Add round {{round}}",
     startKnockout: "Start the knockout",
@@ -203,8 +193,6 @@ export const finals = {
     deleteConfirm: "Delete round {{round}}",
     standings: "Standings",
     standingsQualifiers_one: "Standings, top {{count}} goes through",
-    standingsQualifiers_few: "Standings, top {{count}} go through",
-    standingsQualifiers_many: "Standings, top {{count}} go through",
     standingsQualifiers_other: "Standings, top {{count}} go through",
     knockoutDrawn:
       "The knockout is drawn. Delete it to add rounds or to change the results of round {{round}}.",
@@ -239,8 +227,6 @@ export const finals = {
     title: "Players",
     addLate: "Add a late player",
     summary_one: "{{count}} player, {{active}} active",
-    summary_few: "{{count}} players, {{active}} active",
-    summary_many: "{{count}} players, {{active}} active",
     summary_other: "{{count}} players, {{active}} active",
     help: "Disable someone who has to leave for a while. Their points stay, and they play again from the next round once enabled.",
     playing: "Playing.",
@@ -259,17 +245,11 @@ export const finals = {
     lateNone: "Every player of the league is already in this tournament.",
     lateRank: "{{rank}}",
     latePoints_one: "{{count}} pt",
-    latePoints_few: "{{count}} pts",
-    latePoints_many: "{{count}} pts",
     latePoints_other: "{{count}} pts",
     latePick: "Late player",
     warnTitle: "This may be unfair to others",
     warnBody_one:
       "{{name}} missed {{count}} round, which earns nothing. Players who meet them later get a lower BH1 and BH2. You can add them anyway.",
-    warnBody_few:
-      "{{name}} missed {{count}} rounds, which earn nothing. Players who meet them later get a lower BH1 and BH2. You can add them anyway.",
-    warnBody_many:
-      "{{name}} missed {{count}} rounds, which earn nothing. Players who meet them later get a lower BH1 and BH2. You can add them anyway.",
     warnBody_other:
       "{{name}} missed {{count}} rounds, which earn nothing. Players who meet them later get a lower BH1 and BH2. You can add them anyway.",
     addConfirm: "Add {{name}} from round {{round}}",
@@ -300,8 +280,6 @@ export const finals = {
       "Pairs are drawn completely at random and placed in the bracket by lot.",
     asTheyAre: "The best {{count}} play on as they are, seeded by their place.",
     skippedTitle_one: "{{names}} can't go through",
-    skippedTitle_few: "{{names}} can't go through",
-    skippedTitle_many: "{{names}} can't go through",
     skippedTitle_other: "{{names}} can't go through",
     skippedBody:
       "Disabled players don't go through, so the next player in the standings moves up. Enable them first if they are back.",
