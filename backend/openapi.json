@@ -7106,7 +7106,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout/final-format": {
       "put": {
-        "description": "Change the final's format while the final has no result (FR-054, BR-120).\n\nNull lets the final play the knockout's format again; the third-place\nmatch always plays it. 404 `knockout_not_found` without a knockout. 409\n`tournament_not_in_progress` in setup (detail `state`) or `season_closed`.\n422 `match_has_result` once the final has a result (BR-096, detail\n`match_id`), so also in a finished tournament.",
+        "description": "Change the final's format while the final has no result (FR-054, BR-120).\n\nNull lets the final play the knockout's format again; the third-place\nmatch always plays it. 404 `knockout_not_found` without a knockout. 409\n`tournament_not_in_progress` in setup (detail `state`), `season_closed` or\n`match_has_result` once the final has a result (BR-096, detail\n`match_id`), so also in a finished tournament.",
         "operationId": "set_final_format",
         "parameters": [
           {

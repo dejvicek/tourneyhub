@@ -357,8 +357,8 @@ def set_final_format(
 
     Null lets the final play the knockout's format again; the third-place
     match always plays it. 404 `knockout_not_found` without a knockout. 409
-    `tournament_not_in_progress` in setup (detail `state`) or `season_closed`.
-    422 `match_has_result` once the final has a result (BR-096, detail
+    `tournament_not_in_progress` in setup (detail `state`), `season_closed` or
+    `match_has_result` once the final has a result (BR-096, detail
     `match_id`), so also in a finished tournament.
     """
     tournament = knockout_service.set_final_format(

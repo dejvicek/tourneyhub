@@ -527,11 +527,12 @@ def set_final_format(
     The final is the standard match of the bracket's last round (D4, BR-120);
     the third-place match keeps the knockout's format. The change is allowed
     while the final has no result (BR-096): one with a result, which every
-    finished tournament's final has, is 422 `match_has_result` (detail
-    `match_id`). A closed season is 409 `season_closed`, a tournament in setup
-    409 `tournament_not_in_progress` (detail `state`), and a tournament
-    without a knockout 404 `knockout_not_found`. A repeat stores the same
-    format again (ADR-008).
+    finished tournament's final has, is 409 `match_has_result` (detail
+    `match_id`), as a field placement is: the screen hides the control then, so
+    only a stale one sends it. A closed season is 409 `season_closed`, a
+    tournament in setup 409 `tournament_not_in_progress` (detail `state`), and
+    a tournament without a knockout 404 `knockout_not_found`. A repeat stores
+    the same format again (ADR-008).
     """
     league, tournament = _lock_tournament(
         session,
@@ -551,7 +552,7 @@ def set_final_format(
     last = max(knockout.phase.rounds, key=lambda round_: round_.round_no)
     final = next(m for m in last.matches if m.kind is MatchKind.STANDARD)
     if final.outcome is not None:
-        raise RuleViolationError(ErrorCode.MATCH_HAS_RESULT, match_id=str(final.id))
+        raise ConflictError(ErrorCode.MATCH_HAS_RESULT, match_id=str(final.id))
     now = clock()
     knockout.phase.final_match_format = final_match_format
     knockout.phase.updated_at = now

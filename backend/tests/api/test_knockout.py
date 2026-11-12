@@ -1087,7 +1087,7 @@ def test_fr054_br096_br120_a_final_with_a_result_keeps_its_format(
     put_result(drawn["id"], final, EMPTY)
     cleared = set_final(drawn["id"], "bo3")
 
-    assert refused == (422, {"code": "match_has_result", "detail": {"match_id": final}})
+    assert refused == (409, {"code": "match_has_result", "detail": {"match_id": final}})
     assert cleared[0] == 200
     assert read(drawn["id"], "/bracket")["final_match_format"] == "bo3"
 
@@ -1103,7 +1103,7 @@ def test_fr054_br120_a_finished_tournaments_final_keeps_its_format(
     status, body = set_final(drawn["id"], "bo3")
 
     assert read(drawn["id"], "")["state"] == "finished"
-    assert status == 422
+    assert status == 409
     assert body["code"] == "match_has_result"
     assert body["detail"] == {"match_id": bracket[3, "standard", 1]["match_id"]}
 
