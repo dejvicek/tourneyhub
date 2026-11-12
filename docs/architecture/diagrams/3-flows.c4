@@ -512,7 +512,7 @@ views "III. Flows" {
     tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: the tournament"
     opt "the organizer changes the final's format" {
       tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "PUT …/knockout/final-format, null for the knockout's format"
-      tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the league, then the tournament: a final with a result 422 match_has_result; stores the phase's final_match_format"
+      tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the league, then the tournament: a final with a result 409 match_has_result; stores the phase's final_match_format"
       tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: the tournament"
     }
     loop "the semifinals, the final and the third-place match" {
