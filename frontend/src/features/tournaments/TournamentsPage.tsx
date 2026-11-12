@@ -15,8 +15,9 @@ import { TournamentItem } from "./setup/TournamentItem";
 
 type TournamentSummary = components["schemas"]["TournamentSummary"];
 
+// ISO dates order as plain strings.
 const byNewest = (a: TournamentSummary, b: TournamentSummary) =>
-  b.date.localeCompare(a.date);
+  Number(a.date < b.date) - Number(a.date > b.date);
 
 /** Screen 1: the season's tournaments, running ones first, and "New tournament" (FR-030, FR-038). */
 export function TournamentsPage() {

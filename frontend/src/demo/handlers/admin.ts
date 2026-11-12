@@ -96,9 +96,13 @@ export const adminHandlers = [
       return caller;
     }
     return outsideDb()
-      .accounts.toSorted((a, b) =>
-        a.user.email.toLowerCase().localeCompare(b.user.email.toLowerCase()),
-      )
+      .accounts.toSorted((a, b) => {
+        const [first, second] = [
+          a.user.email.toLowerCase(),
+          b.user.email.toLowerCase(),
+        ];
+        return Number(first > second) - Number(first < second);
+      })
       .map(({ user, createdAt }) => ({
         id: user.id,
         email: user.email,

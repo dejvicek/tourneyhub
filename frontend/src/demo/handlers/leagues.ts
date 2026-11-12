@@ -100,7 +100,11 @@ export const leagueHandlers = [
     }
     return db()
       .leagues.filter((row) => row.owner_id === userId)
-      .toSorted((a, b) => a.created_at.localeCompare(b.created_at))
+      .toSorted(
+        (a, b) =>
+          Number(a.created_at > b.created_at) -
+          Number(a.created_at < b.created_at),
+      )
       .map(({ id, name }) => ({ id, name }));
   }),
 
