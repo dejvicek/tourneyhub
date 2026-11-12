@@ -37,8 +37,10 @@ class ErrorCode(StrEnum):
     SEASON_NUMBER_CHANGED = "season_number_changed"
     # Players
     PLAYER_NOT_FOUND = "player_not_found"
-    PLAYER_NAME_TAKEN = "player_name_taken"  # also a removed player's name (BR-001)
-    PLAYER_LIMIT_REACHED = "player_limit_reached"  # 500 players, removed included
+    # Also a removed player's name (BR-001, FR-012).
+    PLAYER_NAME_TAKEN = "player_name_taken"
+    # BR-006: 1000 active players (#48 follow-up); today 500, removed included.
+    PLAYER_LIMIT_REACHED = "player_limit_reached"
     PLAYER_IN_UNFINISHED_TOURNAMENT = "player_in_unfinished_tournament"  # BR-002
     # Tournaments
     TOURNAMENT_NOT_FOUND = "tournament_not_found"
@@ -56,12 +58,16 @@ class ErrorCode(StrEnum):
     SEED_ORDER_CHANGED = "seed_order_changed"
     DYP_HALVES_INCOMPLETE = "dyp_halves_incomplete"
     NOTHING_TO_PAIR = "nothing_to_pair"  # "pair the rest" with fewer than 2 left
+    # A number of points for sitting out in a round robin (BR-071)
+    SIT_OUT_POINTS_NOT_APPLICABLE = "sit_out_points_not_applicable"
     # Start and back to setup
     TOURNAMENT_NOT_IN_PROGRESS = "tournament_not_in_progress"
     TOURNAMENT_HAS_RESULTS = "tournament_has_results"  # FR-036
     FORMAT_NOT_SUPPORTED = "format_not_supported"  # until its rounds are served
     PLAYERS_WITHOUT_PARTNER = "players_without_partner"  # Doubles (BR-030)
-    TOO_MANY_ENTRIES_FOR_ROUND_ROBIN = "too_many_entries_for_round_robin"  # 64
+    # FR-032: 64 entries today, 16 after the #48 follow-up (issue to open after
+    # approval).
+    TOO_MANY_ENTRIES_FOR_ROUND_ROBIN = "too_many_entries_for_round_robin"
     # Results, standings and finishing
     MATCH_NOT_FOUND = "match_not_found"
     MATCH_SIDES_UNKNOWN = "match_sides_unknown"  # BR-091

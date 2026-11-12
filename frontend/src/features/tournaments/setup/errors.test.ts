@@ -12,6 +12,16 @@ describe("the texts for a refused start or back to setup", () => {
   it.each([
     [
       "en",
+      refused(422, "sit_out_points_not_applicable"),
+      "A round robin has no points for sitting out.",
+    ],
+    [
+      "cs",
+      refused(422, "sit_out_points_not_applicable"),
+      "Každý s každým nemá body za volno.",
+    ],
+    [
+      "en",
       refused(422, "not_enough_entries", { minimum: 2, given: 1 }),
       "Not enough entries: at least 2 are needed.",
     ],

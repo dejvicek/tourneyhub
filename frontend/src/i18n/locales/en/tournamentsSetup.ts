@@ -160,13 +160,7 @@ export const tournamentsSetup = {
       fieldsMore: "More fields",
       sitOut: "Points for sitting out",
       sitOutHint: "Only matters when someone sits out a round.",
-      sitOutLikeDraw: "like a draw",
-      sitOutLikeWin: "like a win",
-      sitOutDefault:
-        "The default for {{format}} matches: {{points}}, {{like}}.",
-      sitOutByHand:
-        "Set by you. The default for {{format}} matches is {{points}}, {{like}}.",
-      sitOutUseDefault: "Use the default ({{value}})",
+      sitOutScale: "1 point is like a draw, 2 points like a win.",
       knockoutLater: {
         title: "You choose the knockout later",
         body: "Once the group phase is complete, decide how many pairs go through, or finish without a knockout.",
@@ -340,6 +334,7 @@ export const tournamentsSetup = {
       fr035:
         "Starting this format comes in a later version. A round robin starts now.",
       br121: "BO2 is offered only in leagues that allow draws.",
+      br071: "A round robin has no points for sitting out.",
       fr033: "Nobody is left to pair.",
       br032Unequal:
         "Both halves need the same number of players: {{top}} at the top, {{bottom}} at the bottom.",

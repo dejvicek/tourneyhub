@@ -135,13 +135,13 @@ function scoreDifference(match: MatchRead, side: 0 | 1): number {
 }
 
 /**
- * demo only, the engine decides: round-robin standings (BR-070, BR-071,
- * BR-101), with the tie-breakers of rules.roundRobinTiebreakers.
+ * demo only, the engine decides: round-robin standings (BR-070, BR-101), with
+ * the tie-breakers of rules.roundRobinTiebreakers. A sit-out is counted but
+ * earns no points here: only Swiss and Monster DYP score it (BR-071).
  */
 export function roundRobinStandings(
   entryIds: readonly string[],
   rounds: readonly RoundRead[],
-  sitOutPoints: number,
 ): TournamentStandingRow[] {
   const rows = new Map<string, Omit<TournamentStandingRow, "place">>(
     entryIds.map((entry_id) => [
@@ -166,7 +166,6 @@ export function roundRobinStandings(
       const row = rows.get(entryId);
       if (row) {
         row.sat_out += 1;
-        row.points += sitOutPoints;
       }
     }
     for (const match of round.matches) {

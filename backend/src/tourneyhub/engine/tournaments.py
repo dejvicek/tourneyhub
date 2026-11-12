@@ -150,19 +150,16 @@ class Participation(StrEnum):
     NOT_JOINED = "not_joined"
 
 
+DEFAULT_SIT_OUT_POINTS = 0
+"""The default points for sitting out in Swiss and Monster DYP (FR-039).
+
+The organizer picks 0, 1 or 2 in setup (BR-075); a round robin has none (BR-071).
+"""
+
+
 def group_phase_format(choice: GroupPhase) -> PhaseFormat | None:
     """Return the group phase's format for a setup choice; None without one (FR-031)."""
     return None if choice is GroupPhase.NONE else PhaseFormat(choice.value)
-
-
-def default_sit_out_points(match_format: MatchFormat) -> int:
-    """Return the default points for a sit-out in a group phase (FR-039, BR-071).
-
-    BO1 and BO2 matches can end level, so a sit-out is worth a draw: 1. BO3 and
-    BO5 matches cannot, so a sit-out is worth a win: 2. The league's draw setting
-    plays no part.
-    """
-    return 1 if match_format in {MatchFormat.BO1, MatchFormat.BO2} else 2
 
 
 def entry_kind(tournament_type: TournamentType) -> EntryKind:

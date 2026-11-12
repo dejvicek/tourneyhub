@@ -10,7 +10,7 @@
 // players, the halves, the doubles pairs) lives in a draft per tournament,
 // keyed on the store's current state so that resetDemoStore() drops it too.
 import type { components } from "@/api/schema";
-import { defaultSitOutPoints } from "@/lib/sitOutPoints";
+import { DEFAULT_SIT_OUT_POINTS } from "@/lib/sitOutPoints";
 
 import type { EntryRead, MatchRead, PhaseRead, RoundRead } from "./contract";
 import {
@@ -81,7 +81,6 @@ function formatOf(t: StoredTournament): FormatRead {
           : group.format,
     round_robin_legs: group?.round_robin_legs ?? null,
     sit_out_points: group?.sit_out_points ?? null,
-    sit_out_points_set_by_hand: group?.sit_out_points_set_by_hand ?? null,
     group_match_format: group?.match_format ?? null,
     knockout_match_format:
       knockout === undefined || knockout.match_format === "bo2"
@@ -239,6 +238,11 @@ const fail = (
   detail: SetupFailure["detail"] = {},
 ): SetupFailure => ({ status, code, detail });
 
+/** BR-071: the group phases that score a sit-out, not a round robin. */
+function scoresSitOutsIn(groupPhase: string): boolean {
+  return groupPhase === "swiss" || groupPhase === "monster_dyp";
+}
+
 /** A request body the backend's validation refuses (422 `validation_failed`). */
 const invalidBody = (type: string): SetupFailure =>
   fail(422, "validation_failed", { errors: [{ loc: ["body"], type }] });
@@ -293,6 +297,13 @@ function formatProblem(
       return invalidBody("setting_missing");
     }
   }
+  // BR-071: a round robin has no points for sitting out.
+  if (
+    format.group_phase === "round_robin" &&
+    (format.sit_out_points ?? null) !== null
+  ) {
+    return fail(422, "sit_out_points_not_applicable");
+  }
   // BR-121: BO2 is a group-phase format of leagues that allow draws.
   if (format.group_match_format === "bo2" && !drawsAllowed) {
     return fail(422, "draws_not_allowed");
@@ -308,8 +319,9 @@ function resolveFormat(
   const grouped = format.group_phase !== "none";
   const fallback = league.default_match_format;
   const groupMatchFormat = format.group_match_format ?? fallback;
-  // BR-071: a number is the organizer's pick; null takes the match format's default.
-  const picked = format.sit_out_points ?? null;
+  // BR-071: only Swiss and Monster DYP score a sit-out. A number is the
+  // organizer's pick (BR-075); null takes the default, 0 (FR-039).
+  const scoresSitOuts = scoresSitOutsIn(format.group_phase);
   return {
     name: format.name.trim(),
     date: format.date,
@@ -319,10 +331,9 @@ function resolveFormat(
       format.group_phase === "round_robin"
         ? (format.round_robin_legs ?? 1)
         : null,
-    sit_out_points: grouped
-      ? (picked ?? defaultSitOutPoints(groupMatchFormat))
+    sit_out_points: scoresSitOuts
+      ? (format.sit_out_points ?? DEFAULT_SIT_OUT_POINTS)
       : null,
-    sit_out_points_set_by_hand: grouped ? picked !== null : null,
     group_match_format: grouped ? groupMatchFormat : null,
     knockout_match_format: grouped
       ? null
@@ -349,7 +360,6 @@ function buildPhases(
         format: format.group_phase,
         round_robin_legs: format.round_robin_legs,
         sit_out_points: format.sit_out_points,
-        sit_out_points_set_by_hand: format.sit_out_points_set_by_hand ?? false,
         tiebreakers:
           format.group_phase === "round_robin"
             ? null
@@ -370,7 +380,6 @@ function buildPhases(
       format: "single_elimination",
       round_robin_legs: null,
       sit_out_points: null,
-      sit_out_points_set_by_hand: false,
       tiebreakers: null,
       qualifiers: null,
       third_place_match: format.third_place_match ?? false,
@@ -1089,7 +1098,10 @@ export function preview(t: StoredTournament): SchedulePreview {
   };
 }
 
-/** The most entries a round robin is generated for; the backend's limit (FR-032). */
+/**
+ * The most entries a round robin is generated for; the backend's limit (FR-032).
+ * FR-032 now says 16; the change is the #48 follow-up (issue to open after approval).
+ */
 export const MAX_ROUND_ROBIN_ENTRIES = 64;
 
 /**
@@ -1191,7 +1203,11 @@ export function start(
   return null;
 }
 
-/** FR-036: back to setup is possible until the first result is entered. */
+/**
+ * FR-036: back to setup is possible while no match in the tournament has a
+ * result (BR-096): until the first result is entered, and again once every
+ * result is cleared (FR-053). This demo counts the matches with an outcome.
+ */
 export function backToSetup(t: StoredTournament): SetupFailure | null {
   if (t.state !== "in_progress") {
     return fail(409, "tournament_not_in_progress", { state: t.state });

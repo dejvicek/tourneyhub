@@ -24,7 +24,7 @@ ROUND_ROBIN: Json = {
     "type": "singles",
     "group_phase": "round_robin",
     "round_robin_legs": 1,
-    "sit_out_points": 0,
+    "sit_out_points": None,
     "group_match_format": "bo1",
     "knockout_match_format": None,
     "final_match_format": None,

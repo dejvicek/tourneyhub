@@ -64,13 +64,22 @@ export const rules: Readonly<Rules> = {
   /** BR-051. Issue #24 proposes "top_seeds_last". */
   roundRobinOrder: "circle",
 
-  /** BR-058, BR-063. Issue #24 proposes "fewest_sit_outs_not_twice_in_a_row". */
+  /**
+   * BR-058, BR-063. Issue #24 proposed "fewest_sit_outs_not_twice_in_a_row".
+   * The PRD (BR-058, BR-063 as reviewed in #46) picks first those who did not
+   * sit out the round before, then the fewest sit-outs; this demo still orders
+   * by the fewest sit-outs only, and does not count a missed round as a sit-out
+   * for the order (BR-064, BR-067). The behaviour change is tracked in issue
+   * #60. The default points for sitting out are 0 (FR-039), picked by the
+   * organizer as 0, 1 or 2 (BR-075); that default comes with #65.
+   */
   sitOuts: "fewest_sit_outs",
 
   /**
    * FR-041, BR-061, BR-063: whether top players are exempt from the sit-out
-   * lot in rounds 1 and 2. BR-063 as written exempts nobody; issue #24
-   * proposes the same and closes the open question.
+   * lot in rounds 1 and 2. They are not exempt: BR-061 and BR-063 (as
+   * reviewed in #46) pick the sit-outs first and take the top players from
+   * those who play.
    */
   topPlayersSitOutExempt: false,
 
@@ -106,3 +115,7 @@ export const rules: Readonly<Rules> = {
 export const MATCH_POINTS = { win: 2, draw: 1, loss: 0 } as const;
 /** FR-011: the default placement points table, 1st to 5th. */
 export const DEFAULT_PLACEMENT_POINTS = [10, 8, 6, 4, 2] as const;
+
+// BR-071: only Swiss and Monster DYP score a sit-out, not a round robin. The
+// points for sitting out default to 0 (FR-039, DEFAULT_SIT_OUT_POINTS in
+// `@/lib/sitOutPoints`); the organizer picks 0, 1 or 2 in setup (BR-075).

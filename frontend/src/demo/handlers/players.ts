@@ -11,7 +11,10 @@ import { db, findLeague, tournamentSummary } from "../store";
 
 type PlayerRead = components["schemas"]["PlayerRead"];
 
-/** A league holds at most this many players, removed ones included. */
+/**
+ * A league holds at most this many players, removed ones included. BR-006 now says
+ * 1000 active players; the change is the #48 follow-up (issue to open after approval).
+ */
 const MAX_PLAYERS = 500;
 
 /** NFC, then whitespace runs collapsed to one space and the ends trimmed. */

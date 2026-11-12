@@ -1,14 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { defaultSitOutPoints } from "./sitOutPoints";
+import { DEFAULT_SIT_OUT_POINTS, SIT_OUT_POINTS } from "./sitOutPoints";
 
-describe("defaultSitOutPoints (BR-071)", () => {
-  it.each([
-    ["bo1", 1],
-    ["bo2", 1],
-    ["bo3", 2],
-    ["bo5", 2],
-  ] as const)("is %s -> %i", (format, points) => {
-    expect(defaultSitOutPoints(format)).toBe(points);
+describe("sit-out points", () => {
+  it("default to 0 (FR-039)", () => {
+    expect(DEFAULT_SIT_OUT_POINTS).toBe(0);
+  });
+
+  it("are 0, 1 or 2 (BR-071)", () => {
+    expect(SIT_OUT_POINTS).toEqual([0, 1, 2]);
   });
 });

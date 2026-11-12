@@ -298,9 +298,7 @@ Demo mode (`pnpm dev:demo`, `src/demo/README.md`) runs every screen against an M
 
 ## 12. Proposed changes to other documents
 
-| Document | Today | Proposal | Why | Status |
-|---|---|---|---|---|
-| PRD §6.9 | No requirement for the themes | Add FR-083: every screen has a light and a dark theme and follows the device's setting; and decide whether a manual switch becomes a roadmap item | ADR-003 builds both themes in the MVP, and ROADMAP §1 moves a picked-up item into the PRD | Proposed to the PRD team |
+No change is proposed at the moment.
 
 ## 13. Sources
 
