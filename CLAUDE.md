@@ -111,6 +111,11 @@ Inside Docker: `docker compose exec frontend pnpm lint`.
 
 With `HTTP_PORT=8080` and `HTTPS_PORT=8443` in `.env` and the prod stack up: `cd frontend && pnpm e2e` (single spec: `pnpm e2e -g "name"`). `pnpm exec playwright install chromium` once.
 
+## Keep changes proportional
+
+- Don't add ADR history, extra CI checks or rewordings of business rules unless asked.
+- If a BR-xxx rule rewording changes meaning or gets longer, show before/after and ask first.
+
 ## Git workflow
 
 - **Conventional Commits with a gitmoji prefix**, matching the history: `✨ feat(engine): …`, `🐛 fix(frontend): …`, `✅ test(e2e): …`, `📝 docs(adr): …`, `🔧 chore: …`, `👷 ci: …`, `♻️ refactor(…): …`. Scopes are areas such as `engine`, `tournaments`, `leagues`, `auth`, `public`, `frontend`, `backend`, `product`, `architecture`, `style`. Moves and renames use 🚚.
