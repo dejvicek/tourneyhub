@@ -60,8 +60,8 @@ Choices in the configuration that are not obvious:
 - react-refresh skips `src/components/ui/`, whose files export their variants next to the component (`buttonVariants`).
 - better-tailwindcss reads the theme from `src/index.css`. Its `enforce-consistent-class-order` and `enforce-consistent-line-wrapping` stay off, because Prettier owns both.
 - `index.css` sets `--color-*: initial`. Tailwind's palette is gone, so a class such as `bg-red-500` does not exist [W3] and `no-unknown-classes` fails on it. Black and white keep Tailwind's own values for the copied components; `no-restricted-classes` bans `*-black` and `*-white` outside `src/components/ui/`.
-- `no-restricted-imports` has one block per folder (§11), and each block repeats the full list of banned imports, because a later block replaces the options of an earlier one.
-- `linterOptions` reports an unused `eslint-disable` comment and unused inline configuration as errors, and `--max-warnings=0` fails on warnings, such as `react-hooks/exhaustive-deps`. An `eslint-disable` names its rules and gives a reason after ` -- ` [E3].
+- `no-restricted-imports` has one block per folder (§11), and each block repeats the full list of banned imports, because a later block replaces the options of an earlier one. `no-restricted-syntax` works the same way: `src/routes.tsx`, `src/main.tsx`, the tests and the demo each have a block that lists every selector group it keeps.
+- `linterOptions` reports an unused `eslint-disable` comment and unused inline configuration as errors, and `--max-warnings=0` fails on warnings, such as `react-hooks/exhaustive-deps`. An `eslint-disable` names its rules and gives a reason after ` -- ` [E3]; `src/test/disableComments.test.ts` checks this, and that `react-hooks/exhaustive-deps` is never disabled.
 - Prettier and prettier-plugin-tailwindcss are pinned exactly, since both decide the output [E4], and are upgraded in a pull request that reformats the code. Every Prettier option stays at its default [E5]; `.prettierrc.json` holds the plugin, which must load last [E7], and its two options, `tailwindStylesheet` and `tailwindFunctions`. Prettier reads `.gitignore` [E8], so `.prettierignore` lists only `pnpm-lock.yaml`. No `eslint-plugin-prettier` or `prettier-eslint` [E6]; the presets have no formatting rules, so `eslint-config-prettier` is not needed.
 - `pnpm audit --prod` checks only `dependencies` and `optionalDependencies`, what ships to the browser, and fails the CI job on any advisory [E18]. An advisory the project accepts goes in `audit.ignore` in `pnpm-workspace.yaml`, as its `GHSA-…` id with a comment that links an issue. Dev dependencies are not audited; Dependabot's weekly updates cover them.
 - `format` runs `eslint --fix` before `prettier --write`, so that Prettier formats what the import sort moved.
@@ -75,7 +75,19 @@ Checked by tools: `tsc` (`strict`, `noUncheckedIndexedAccess`, `erasableSyntaxOn
 
 - A closed set of values is a string-literal union, or an `as const` array with a type derived from it, as `LANGUAGES` and `Language` in `src/i18n/language.ts` [T9].
 - Typed constant tables (query-key factories, route paths, the map from error code to message, `cva` variants) use `satisfies`, not an annotation or `as`. It checks the shape and keeps the literal types [T6].
-- An `as` says in a comment why it is safe (API data: §8.2).
+
+  ```ts
+  // Wrong: the annotation widens each value to string, and a typo in a code still compiles
+  const CODE_TEXTS: Record<string, string> = {
+    last_field: "fields.errors.lastField",
+  };
+  // Right: the keys are checked against ErrorCode, and the values stay literal keys for t()
+  const CODE_TEXTS = {
+    last_field: "fields.errors.lastField",
+  } as const satisfies Partial<Record<ErrorCode, string>>;
+  ```
+
+- An `as` says in a comment why it is safe (API data: §8.2). ESLint `no-restricted-syntax` reports every `as` except `as const` and `as CSSProperties` (§5.1), so the comment is an `eslint-disable-next-line no-restricted-syntax -- <why>`, as in `dataOf`.
 
 ## 4. React
 
@@ -83,19 +95,30 @@ Checked by tools: ESLint react-hooks `recommended` (among them `rules-of-hooks`,
 
 - The root renders inside `<StrictMode>`, in `src/main.tsx` [R1].
 - Server data lives only in TanStack Query (§8). Read it with the query hook where it is needed; never copy it into `useState`, context or a module variable [R3].
+
+  ```tsx
+  // Wrong: the copy goes stale when a write or a 409 reloads the league
+  const { data } = useQuery(leagueQueries.detail(leagueId));
+  const [league, setLeague] = useState(data);
+  useEffect(() => setLeague(data), [data]);
+  // Right: read the query where it is needed. A form that edits the league gets it
+  // as a prop once loaded and keeps only its draft: useState(league.name)
+  const { data: league } = useQuery(leagueQueries.detail(leagueId));
+  ```
+
 - Client state lives in the lowest component that owns it and moves up only when it is shared. Context holds app-wide values only: language, session [R4].
 - An effect's dependencies are never suppressed. A value the effect reads but must not react to goes through `useEffectEvent` [R5].
 - `use()` reads context only, never a promise of API data [R6].
 - An event handler starts async work with `mutation.mutate(…)`, or marks with `void` a promise whose failure needs no handling, as `LanguageSwitch` does with `i18n.changeLanguage` [E1].
 - Optimistic UI follows §8.1 [R7].
-- Forms use no form library and no client-side schema: a form keeps its fields in component state or reads them from `FormData`, submits with `mutation.mutate`, and shows the server's 422 next to the field (ADR-008). A check only the browser can make, such as two password fields matching, is plain code in the handler. The server is the validator, and a schema in the browser would copy the API contract by hand (ADR-008). Revisit if a form needs cross-field rules the server cannot report per field.
+- Forms use no form library and no client-side schema: a form keeps its fields in component state or reads them from `FormData`, submits with `mutation.mutate`, and shows the server's 422 next to the field (ADR-008). A check only the browser can make, such as two password fields matching, is plain code in the handler. The server is the validator, and a schema in the browser would copy the API contract by hand (ADR-008). Revisit if a form needs cross-field rules the server cannot report per field. ESLint `no-restricted-imports` bans `react-hook-form` and `zod`.
 - A component file is named after its component in PascalCase (`AppShell.tsx`), a hook file after its hook (`useLeague.ts`). `src/components/ui/` and the files the shadcn CLI writes into `src/hooks/` keep its kebab-case names [R8].
 
 ## 5. Styling
 
 ### 5.1 Tailwind
 
-Checked by tools: ESLint better-tailwindcss `no-unknown-classes`, `no-conflicting-classes`, `no-duplicate-classes`, `no-deprecated-classes`, `no-concatenated-classes`, `enforce-consistent-variable-syntax` (`bg-(--x)`) and `no-restricted-classes` (`max-*` and arbitrary `min-[…]` breakpoint variants, the `!` modifier and `outline-none` [W20] everywhere; `dark:`, `*-black`, `*-white` and arbitrary, named or `color-mix()` colour values outside `src/components/ui/`) [W22]; Prettier with prettier-plugin-tailwindcss (class order, inside `cn()` and `cva()` too).
+Checked by tools: ESLint better-tailwindcss `no-unknown-classes`, `no-conflicting-classes`, `no-duplicate-classes`, `no-deprecated-classes`, `no-concatenated-classes`, `enforce-consistent-variable-syntax` (`bg-(--x)`) and `no-restricted-classes` (`max-*` and arbitrary `min-[…]` breakpoint variants, the `!` modifier, `outline-none` [W20] and a translucent ring, `ring-ring/…` or `outline-ring/…` (§5.2), everywhere; `dark:`, `*-black`, `*-white` and arbitrary, named or `color-mix()` colour values outside `src/components/ui/`) [W22]; Prettier with prettier-plugin-tailwindcss (class order, inside `cn()` and `cva()` too).
 
 - Tailwind runs through `@tailwindcss/vite` from one CSS entry, `src/index.css`; there is no `tailwind.config.js`. No Sass, Less, Stylus or CSS modules [W1].
 - A token that needs utilities goes in `@theme`; a plain CSS variable goes in `:root` [W2].
@@ -176,9 +199,19 @@ Checked by tools: ESLint jsx-a11y-x `strict` and `jsx-a11y-x/control-has-associa
 
 ## 7. Translations
 
-Checked by tools: `tsc` (keys of `t()` through `CustomTypeOptions` in `src/i18n/i18next.d.ts`; `cs` has every key of `en`, and no other, through its `CsMessages` type); ESLint `no-restricted-properties` (`toLocaleString`, `toLocaleDateString`, `toLocaleTimeString`); `i18next-cli lint`, part of `pnpm lint`, for user-facing text in JSX elements and attributes outside `t()` and `<Trans>` [I1].
+Checked by tools: `tsc` (keys of `t()` through `CustomTypeOptions` in `src/i18n/i18next.d.ts`; `cs` has every key of `en`, and no other, through its `CsMessages` type); ESLint `no-restricted-properties` (`toLocaleString`, `toLocaleDateString`, `toLocaleTimeString`), `no-restricted-syntax` (an `Intl` constructor without a locale or with a literal one; `dangerouslySetInnerHTML`), `no-restricted-imports` (`i18next-browser-languagedetector`); `i18next-cli lint`, part of `pnpm lint`, for user-facing text in JSX elements and attributes outside `t()` and `<Trans>` [I1].
 
 - No hard-coded user-facing text (ADR-003), `aria-label` and `alt` included. A line that is not user-facing, such as a product name, is excused with `i18next-instrument-ignore-next-line` and a reason after ` -- `, as with `eslint-disable`. If the linter gives a false positive that neither `i18next.config.ts` nor that comment can silence, the pull request that hits it downgrades the check to a report and says so here.
+- `i18next-cli lint` sees only JSX. A string that reaches the screen another way, through state, a prop or a function's return value, goes through `t()` too.
+
+  ```tsx
+  // Wrong: the linter does not see these, and Czech readers get English
+  setStatus(`Field ${String(field.number)} added`);
+  return { label: "Remove", tone: "destructive" };
+  // Right
+  setStatus(t("fields.edit.added", { number: field.number }));
+  return { label: t("players.remove.action"), tone: "destructive" };
+  ```
 - Texts live in `src/i18n/locales/en.ts`, the reference from which the key types come [I2], and `cs.ts`, in one namespace. Each area keeps its texts in its own module, `en/<area>.ts` and `cs/<area>.ts`, which `en.ts` and `cs.ts` merge; a `cs` module is typed `CsMessages<Messages["<area>"]>`. Keys are semantic and nested by area (`notFound.home`), never English sentences.
 - A sentence is one key with `{{placeholders}}`, never pieces joined in code. `escapeValue: false` is safe because React escapes what it renders; `t()` output never goes into `dangerouslySetInnerHTML` [I3].
 - Markup inside a sentence, such as a link, uses `<Trans>` with named components [I4].
@@ -193,7 +226,7 @@ Checked by tools: `tsc` (keys of `t()` through `CustomTypeOptions` in `src/i18n/
 
 ### 8.1 TanStack Query
 
-Checked by tools: ESLint TanStack Query `flat/recommended-strict` (`prefer-query-options`, `exhaustive-deps`, `stable-query-client`, `no-void-query-fn`, `no-unstable-deps`, `mutation-property-order`, `infinite-query-property-order`) and `@tanstack/query/no-rest-destructuring` as an error; `no-restricted-imports` (`useSuspenseQuery`, `useSuspenseQueries`, `useSuspenseInfiniteQuery` [Q11]); `@typescript-eslint/no-deprecated` (the prefetch methods that `queryClient.query` replaces).
+Checked by tools: ESLint TanStack Query `flat/recommended-strict` (`prefer-query-options`, `exhaustive-deps`, `stable-query-client`, `no-void-query-fn`, `no-unstable-deps`, `mutation-property-order`, `infinite-query-property-order`) and `@tanstack/query/no-rest-destructuring` as an error; `no-restricted-imports` (`useSuspenseQuery`, `useSuspenseQueries`, `useSuspenseInfiniteQuery` [Q11]); `no-restricted-syntax` (`useOptimistic`, `setQueryData`, `setQueriesData` and `onMutate` [R7]; `new QueryClient` outside `src/main.tsx` and the tests); `@typescript-eslint/no-deprecated` (the prefetch methods that `queryClient.query` replaces).
 
 - Queries and mutations are defined with `queryOptions` and `mutationOptions` in their feature's `api.ts`, such as `leagueQueries.detail(id)`, and components call `useQuery(leagueQueries.detail(id))` [Q1].
 - Keys go from general to specific and start with the entity: `["leagues", leagueId]`, then `["leagues", leagueId, "tournaments", tournamentId]`; share-link views start with `["public", shareToken]`. One `invalidateQueries` on the league's prefix then reloads all that a write or a 409 touched (ADR-008) [Q2].
@@ -204,14 +237,41 @@ Checked by tools: ESLint TanStack Query `flat/recommended-strict` (`prefer-query
 - A mutation's `onSettled` returns `queryClient.invalidateQueries` on the league's prefix: success, 409 and a 404 from a repeated delete all end in a reload, and `isPending` lasts until the fresh data is in (ADR-008) [Q8].
 - No optimistic cache writes (`onMutate` with `setQueryData`) and no `useOptimistic`: standings, brackets and points come from the server (ADR-009). Optimistic UI renders `mutation.variables` while the mutation is pending [R7].
 - Every mutation of a league has ``scope: { id: `league:${leagueId}` }``, so writes reach the server in the order the organizer made them [Q9].
+
+  ```ts
+  // Wrong: two quick saves can reach the server in either order
+  renameSeason: (queryClient: QueryClient, leagueId: string) =>
+    mutationOptions({
+      mutationFn: (input: { seasonId: string; name: string | null }) =>
+        dataOf(api.PUT("/api/v1/leagues/{league_id}/seasons/{season_id}/name", /* … */)),
+      onSettled: reload(queryClient, leagueId),
+    }),
+  // Right: the league's writes run one after another
+      onSettled: reload(queryClient, leagueId),
+      scope: { id: `league:${leagueId}` },
+  ```
 - `networkMode` stays `online`. A paused query (`fetchStatus === "paused"`) or mutation (`isPaused`) shows that it waits for the connection, not a spinner [Q10].
 - Screens render the pending, paused and error states themselves, errors inline. Only a screen's main resource uses `throwOnError`, which hands the error to the route's `ErrorBoundary` (§9) [Q12].
 - Reactions the whole app shares live once, in the `onError` of `QueryCache` and `MutationCache`: 403 `password_change_required` opens the new-password screen (ADR-006); 409, and 404 from a delete, say that the data changed elsewhere and was reloaded. A 422 is shown by the form that sent it, built from `code` and `detail` [Q13].
 - Cache work (invalidation) goes in `mutationOptions`; UI work (closing a dialog, navigating) goes in `mutate(vars, { onSuccess })`, which does not run once the component has unmounted [Q14].
 
+  ```tsx
+  // Wrong: the reload is lost if the sheet unmounts first, and runs only on success
+  add.mutate(name, {
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leagues", leagueId] }),
+  });
+  // Right: playerMutations.add's onSettled reloads the league; the call does the UI
+  add.mutate(name, {
+    onSuccess: (player) => {
+      setName("");
+      onDone(t("players.add.added", { name: player.name }));
+    },
+  });
+  ```
+
 ### 8.2 API client
 
-Checked by tools: `tsc` (paths, parameters and bodies against `schema.d.ts`; `noUncheckedIndexedAccess`); ESLint `no-restricted-globals` (`fetch`, also through `window` and `globalThis`, outside `src/api/`), `no-restricted-imports` (`api`, `createApi` and `dataOf` only in `src/api/` and a feature's `api.ts`), `@typescript-eslint/switch-exhaustiveness-check` (error codes).
+Checked by tools: `tsc` (paths, parameters and bodies against `schema.d.ts`; `noUncheckedIndexedAccess`); ESLint `no-restricted-globals` (`fetch`, also through `window` and `globalThis`, outside `src/api/`), `no-restricted-imports` (`api`, `createApi` and `dataOf` only in `src/api/` and a feature's `api.ts`; `axios` and `openapi-react-query` everywhere), `no-restricted-syntax` (every `as` except `as const` and `as CSSProperties`, outside `src/demo/`), `@typescript-eslint/switch-exhaustiveness-check` (error codes).
 
 - The runtime client is openapi-fetch, typed by openapi-typescript (ADR-008). No axios, no other generator and no openapi-react-query, whose keys `[method, path, init]` cannot be invalidated by a league's prefix [Q15].
 - `src/api/schema.d.ts` is generated by `pnpm generate:api`, git-ignored and never edited (ADR-008).
@@ -223,7 +283,7 @@ Checked by tools: `tsc` (paths, parameters and bodies against `schema.d.ts`; `no
 
 ## 9. Routing
 
-Checked by tools: ESLint `no-restricted-imports` (`Form`, `useActionData`, `useFetcher`, `useFetchers`, `useLoaderData`, `useRouteLoaderData`, `useSubmit` and any `unstable_*` from `react-router` [N11]); `@typescript-eslint/no-non-null-assertion`.
+Checked by tools: ESLint `no-restricted-imports` (`Form`, `useActionData`, `useFetcher`, `useFetchers`, `useLoaderData`, `useRouteLoaderData`, `useSubmit` and any `unstable_*` from `react-router` [N11]; `react-router-dom` [N12]), `no-restricted-syntax` (`loader`, `action` and `shouldRevalidate` in `src/routes.tsx`; a template literal or a `+` on a string that starts with `/` [N9]); `@typescript-eslint/no-non-null-assertion`.
 
 - React Router runs in Data mode: `createBrowserRouter(routes)` in `src/main.tsx` and `RouterProvider` from `react-router/dom` in `App`. No Framework mode and no Declarative mode [N1]. Everything else is imported from `react-router`; `react-router-dom` is gone in v8 [N12].
 - The router is created once at module level, never in a component or in state [N3].
@@ -241,7 +301,7 @@ Checked by tools: ESLint `no-restricted-imports` (`Form`, `useActionData`, `useF
 
 ### 10.1 Vitest
 
-Checked by tools: ESLint Testing Library `flat/react` (among them `prefer-screen-queries`, `no-container`, `no-node-access`, `prefer-find-by`, `prefer-presence-queries`, `await-async-events`), `testing-library/prefer-user-event` and `testing-library/prefer-user-event-setup` [V11], `@typescript-eslint/no-floating-promises`; Vitest 5 fails an assertion that is not awaited.
+Checked by tools: ESLint Testing Library `flat/react` (among them `prefer-screen-queries`, `no-container`, `no-node-access`, `prefer-find-by`, `prefer-presence-queries`, `await-async-events`), `testing-library/prefer-user-event` and `testing-library/prefer-user-event-setup` [V11], `no-restricted-syntax` (`vi.mock` or `vi.doMock` of a module under `api/` [V6]), `@typescript-eslint/no-floating-promises`; Vitest 5 fails an assertion that is not awaited.
 
 - Unit and component tests run in Vitest with jsdom (ADR-012); real browsers are Playwright's [V1]. A test sits next to its code as `*.test.ts` or `*.test.tsx`; `vite.config.ts` keeps `e2e/` out.
 - `globals` stays off: tests import `describe`, `it` and `expect` from `vitest`, and `src/test/setup.ts` runs `cleanup()` and clears `localStorage` after each test [V2]. `restoreMocks` and `unstubGlobals` are on [V3].
@@ -282,7 +342,7 @@ frontend/
 └── e2e/                  # Playwright: configuration, specs, own tsconfig.json
 ```
 
-Checked by tools: ESLint `no-restricted-imports` (imports flow one way: `api`, `i18n`, `components`, `hooks` and `lib` → `features` → `pages`, `routes.tsx`, `App.tsx` and `main.tsx`).
+Checked by tools: ESLint `no-restricted-imports` (imports flow one way: `api`, `i18n`, `components`, `hooks` and `lib` → `features` → `pages`, `routes.tsx`, `App.tsx` and `main.tsx`), `no-restricted-syntax` (`export * from` and `export { … } from`: no barrel files [S2]).
 
 - The first real feature creates `src/features/<area>/`, with its `api.ts`, components and screens; the skeleton's other folders stay as they are [S1]. Features may import each other, since leagues, tournaments and matches are one domain.
 - `@/` is the one import alias, for `src/`: `paths` without `baseUrl` in `tsconfig.app.json` [T3], `resolve.alias` in `vite.config.ts`.
