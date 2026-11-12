@@ -99,8 +99,9 @@ class MonsterDypOptions:
             players (FR-041); the unmarked always follow the league ranking.
         avoids_sitting_out_twice_in_a_row: Among players with as few
             sit-outs, those who sat out the previous round sit out last
-            (issue #24). BR-063 always applies it, before the fewest
-            sit-outs; issue #60 makes the engine follow that.
+            (issue #24). BR-063 always puts the round-before rule first,
+            before the fewest sit-outs; issue #60 makes the engine follow
+            that.
     """
 
     are_top_players_exempt: bool = False
