@@ -630,7 +630,7 @@ def test_br091_a_bye_takes_no_result(
     )
 
 
-def test_fr040_a_knockout_is_not_finished_by_hand(
+def test_fr037_a_knockout_is_not_finished_by_hand(
     client: TestClient,
     league_id: UUID,
     headers: dict[str, str],
