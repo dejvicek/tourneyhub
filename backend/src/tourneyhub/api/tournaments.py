@@ -18,6 +18,7 @@ from pydantic_core import PydanticCustomError
 from tourneyhub.api.deps import ClockDep, CurrentUserDep, SessionDep
 from tourneyhub.api.schemas import INT_MAX, ErrorResponse, RequestModel, ResponseModel
 from tourneyhub.engine.dyp import DypHalf
+from tourneyhub.engine.knockout import RoundName
 from tourneyhub.engine.leagues import (
     MAX_FIELD_COUNT,
     MAX_GOALS_PER_GAME,
@@ -482,11 +483,16 @@ class PreviewMatchRead(ResponseModel):
 
 
 class PreviewRoundRead(ResponseModel):
-    """A round of the preview, with the players of each entry that sits it out."""
+    """A round of the preview, with the players of each entry that sits it out.
+
+    `byes` lists, by seed, the players of each entry that goes straight to a
+    knockout's second round (BR-041); empty in a round robin.
+    """
 
     round_no: int
     matches: list[PreviewMatchRead]
     sitting_out: list[list[UUID]]
+    byes: list[list[UUID]]
 
 
 class SchedulePreviewRead(ResponseModel):
@@ -495,11 +501,17 @@ class SchedulePreviewRead(ResponseModel):
     `can_start` is false exactly when `problem` is set: the same code and detail
     as the 422 of `POST /start` (the 409s of a stale draw counter apart). Then
     `rounds` is empty and the counts are null. A round robin lists all its
-    rounds; `bracket_size` is null until a knockout can start. `draw_counter`
-    goes back in the start (ADR-008).
+    rounds, and `bracket_size` is null. A knockout without a group phase lists
+    its first round with its matches and byes (BR-040 to BR-042);
+    `match_count` counts every match of the bracket, the third-place match
+    too and no bye, `round_count` its rounds and `bracket_size` its
+    first-round spots. `draw_counter` and `seed_order` go back in the start
+    (ADR-008): `seed_order` is the entries the preview was drawn from, seed 1
+    first, empty with a `problem`.
     """
 
     draw_counter: int
+    seed_order: list[UUID]
     can_start: bool
     problem: StartProblemRead | None
     rounds: list[PreviewRoundRead]
@@ -509,9 +521,14 @@ class SchedulePreviewRead(ResponseModel):
 
 
 class StartWrite(RequestModel):
-    """Generate and start, with the draw counter the review screen showed (ADR-008)."""
+    """Generate and start, from the setup the review screen showed (ADR-008).
+
+    The draw counter does not change when the organizer reorders the seeds by
+    hand, so the request also carries the seed order the preview showed.
+    """
 
     expected_draw_counter: Annotated[int, Field(ge=0, le=INT_MAX)]
+    expected_seed_order: EntryIds
 
 
 class BackToSetupWrite(RequestModel):
@@ -536,10 +553,16 @@ class ResultWrite(RequestModel):
 
     A walkover names its winner and has no games (FR-052, BR-124). No walkover
     and no games is the empty result, which clears the match's result (FR-053).
+
+    `expected_sides` are the entries the screen saw on side 1 and side 2. The
+    sides of a knockout match after the first round are derived from the
+    winners (DATA-MODEL D4), so "side 1 wins" must name the entry it meant:
+    it is required there, and optional for a match whose sides are stored.
     """
 
     walkover_winner: Literal[Outcome.SIDE_1, Outcome.SIDE_2] | None
     games: Annotated[list[GameWrite], Field(max_length=MAX_GAMES)]
+    expected_sides: tuple[UUID, UUID] | None = None
 
     @model_validator(mode="after")
     def _walkover_has_no_games(self) -> Self:
@@ -663,20 +686,22 @@ type PlaceReasonKind = Literal[
     "lost_in_round",
     "group_place",
 ]
-type BracketRoundName = Literal["round_of_16", "quarterfinal", "semifinal", "final"]
 
 
 class PlaceReasonRead(ResponseModel):
     """Why an entry has its place (§7.13).
 
-    After a group phase without a knockout it is `group_place`, with the
-    entry's place in the standings and the phase's format (BR-103). The
-    knockout's kinds, `round`, `score` (the entry's first) and the opponent
-    come with the knockout and are null until then.
+    An entry that did not go through to the knockout, or every entry of a
+    group phase without one, has `group_place`: its place in the standings
+    and the phase's format (BR-103). A knockout entry has the final, the
+    third-place match or `lost_in_round` with the `round` it went out in, the
+    `score` of that match (the entry's first: a BO1 game's goals, else the
+    games won; null for a walkover or a game without a score) and the
+    opponent (BR-102); its `group_place` is that of the entry it continues.
     """
 
     kind: PlaceReasonKind
-    round: BracketRoundName | None
+    round: RoundName | None
     score: tuple[int, int] | None
     opponent_entry_id: UUID | None
     group_place: int | None
@@ -790,14 +815,19 @@ def start_tournament(
 ) -> TournamentRead:
     """Generate the schedule and start the tournament (FR-035).
 
-    A round robin gets all its rounds (BR-050 to BR-052), and the first
-    matches take the fields (BR-130). A started tournament is 409
-    `tournament_not_in_setup`; a stale `expected_draw_counter` is 409
-    `draw_counter_changed`. Another format is 422 `format_not_supported` for
-    now. An incomplete setup is 422: `players_without_partner` (Doubles),
-    `not_enough_players`, `dyp_halves_incomplete`, `dyp_halves_unequal`,
-    `too_many_left_out` (DYP), `not_enough_entries` (FR-032) or
-    `too_many_entries_for_round_robin` (detail `limit`: 64).
+    A round robin gets all its rounds (BR-050 to BR-052); a knockout without
+    a group phase gets its whole bracket from the setup seeds, the byes for
+    the top seeds (BR-040 to BR-044). The first matches take the fields
+    (BR-130). A started tournament is 409 `tournament_not_in_setup`; a stale
+    `expected_draw_counter` is 409 `draw_counter_changed`, and an
+    `expected_seed_order` that is not the entries' current order, seed 1
+    first, 409 `seed_order_changed`: the review shows the new setup. Swiss and
+    Monster DYP are 422 `format_not_supported` for now. An incomplete setup is 422:
+    `players_without_partner` (Doubles), `not_enough_players`,
+    `dyp_halves_incomplete`, `dyp_halves_unequal`, `too_many_left_out` (DYP),
+    `not_enough_entries` (FR-032: 2, or 4 with a third-place match),
+    `too_many_entries_for_round_robin` (detail `limit`: 64) or
+    `too_many_entries_for_knockout` (detail `limit`: 256).
     """
     tournament = tournament_service.start_tournament(
         session,
@@ -805,6 +835,7 @@ def start_tournament(
         tournament_id=tournament_id,
         user_id=user.id,
         expected_draw_counter=body.expected_draw_counter,
+        expected_seed_order=body.expected_seed_order,
         clock=clock,
     )
     return TournamentRead.model_validate(tournament)
@@ -1016,6 +1047,7 @@ def read_schedule_preview(
     A tournament that cannot start is still 200 with `can_start` false and the
     `problem`: `players_without_partner`, `not_enough_entries`,
     `too_many_entries_for_round_robin` (detail `limit`: 64),
+    `too_many_entries_for_knockout` (detail `limit`: 256),
     `format_not_supported`, the DYP codes of a draw that cannot be made, or
     `tournament_not_in_setup` for a started tournament. Another league's
     tournament is 404.
@@ -1084,6 +1116,18 @@ def set_match_result(
     `draws_not_allowed` (BR-090), `game_score_mismatch` (BR-092, detail
     `game_no`) or `scores_required` (Swiss and Monster DYP, detail `game_no`).
     A walkover with games is 422 `validation_failed`.
+
+    A knockout match after the first round has derived sides: the body names
+    the entries the screen saw in `expected_sides`. Other entries, or a side
+    still to come, are 409 `match_sides_changed` (detail `entry_ids`, the
+    current ones); none is 422 `expected_sides_required`.
+
+    The knockout: once it is drawn, a group-phase result is 422
+    `group_phase_locked` (BR-053, detail `phase_id`); a knockout result that a
+    later match it feeds has a result for is 422 `result_locked` (BR-094,
+    detail `match_ids`), and a knockout has no draws (BR-090). A new winner
+    changes the later matches' sides. The result that completes the
+    knockout finishes the tournament (FR-037).
     """
     match = tournament_service.set_match_result(
         session,
@@ -1092,6 +1136,7 @@ def set_match_result(
         match_id=match_id,
         user_id=user.id,
         result=MatchResult(
+            expected_sides=body.expected_sides,
             walkover_winner=body.walkover_winner,
             games=tuple(
                 Game(winner=game.winner, score_1=game.score_1, score_2=game.score_2)
@@ -1255,7 +1300,8 @@ def finish_tournament(
     A tournament that is not in progress is 409 `tournament_not_in_progress`
     (detail `state`), so a repeat changes nothing. A match without a result is
     422 `group_phase_not_done` (detail `matches_left`). A tournament with a
-    knockout, a Swiss or a Monster DYP is 422 `format_not_supported` for now.
+    knockout, which finishes with its last result (FR-037), a Swiss or a
+    Monster DYP is 422 `format_not_supported`.
     The standings become the places (`GET …/places`).
     """
     tournament = tournament_service.finish_tournament(
@@ -1278,8 +1324,11 @@ def read_places(
     """Return the places and the season points of a finished tournament (§7.13, §7.14).
 
     Computed on read. Before the tournament finishes, `complete` is false and
-    there are no rows. A finished tournament with a knockout is 422
-    `format_not_supported` until the knockout is served.
+    there are no rows. With a knockout, its entries take the top places and
+    the others follow in their group-phase order (BR-102, BR-103); without a
+    group phase, every entry is placed by the knockout, and its reason has no
+    `group_place` and no `group_format`. A Swiss or
+    a Monster DYP is 422 `format_not_supported` until they are played.
     """
     places = tournament_service.read_places(
         session, league_id=league_id, tournament_id=tournament_id, user_id=user.id
@@ -1297,10 +1346,10 @@ def places_read(places: PlacesView) -> PlacesRead:
                 entry_id=row.entry_id,
                 points_per_player=row.points_per_player,
                 reason=PlaceReasonRead(
-                    kind="group_place",
-                    round=None,
-                    score=None,
-                    opponent_entry_id=None,
+                    kind=row.kind,
+                    round=row.round,
+                    score=row.score,
+                    opponent_entry_id=row.opponent_entry_id,
                     group_place=row.group_place,
                     group_format=places.group_format,
                 ),

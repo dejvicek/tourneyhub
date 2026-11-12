@@ -31,6 +31,11 @@ ROUND_ROBIN: Json = {
 }
 
 
+def _seed_order(setup: Json) -> list[str]:
+    """The entries of a setup in seed order, as the review's start carries them."""
+    return [e["id"] for e in sorted(setup["entries"], key=lambda e: e["seed"] or 0)]
+
+
 def _url(league: League | UUID, rest: str = "") -> str:
     league_id = league.id if isinstance(league, League) else league
     return f"/api/v1/leagues/{league_id}{rest}"
@@ -93,7 +98,10 @@ def _start(
 ) -> tuple[int, Json]:
     response = client.post(
         _t_url(league, setup["tournament_id"], "/start"),
-        json={"expected_draw_counter": setup["draw_counter"]},
+        json={
+            "expected_draw_counter": setup["draw_counter"],
+            "expected_seed_order": _seed_order(setup),
+        },
         headers=headers,
     )
     result: Json = response.json()
@@ -190,10 +198,10 @@ def test_br051_the_preview_names_the_players_who_sit_out_each_round(
                 "sit_out_points": None,
                 "group_match_format": None,
                 "knockout_match_format": "bo1",
-                "third_place_match": False,
+                "third_place_match": True,
             },
-            4,
-            id="knockout",
+            3,
+            id="knockout-third-place-FR-032",
         ),
         pytest.param(
             {
@@ -346,7 +354,10 @@ def test_adr010_the_preview_carries_the_draw_counter_the_start_expects(
     _, preview = _preview(client, league, setup["tournament_id"], headers)
     started = client.post(
         _t_url(league, setup["tournament_id"], "/start"),
-        json={"expected_draw_counter": preview["draw_counter"]},
+        json={
+            "expected_draw_counter": preview["draw_counter"],
+            "expected_seed_order": preview["seed_order"],
+        },
         headers=headers,
     )
 

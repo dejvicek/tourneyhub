@@ -47,6 +47,9 @@ const CODE_TEXTS = {
   game_score_mismatch: "results.errors.mismatch",
   result_does_not_fit_format: "results.errors.format",
   match_sides_unknown: "results.unknownSides",
+  group_phase_locked: "results.errors.locked",
+  result_locked: "results.errors.lockedKnockout",
+  match_sides_changed: "results.errors.sidesChanged",
 } as const satisfies Partial<Record<ErrorCode, string>>;
 
 function hasText(code: ErrorCode | undefined): code is keyof typeof CODE_TEXTS {
@@ -60,13 +63,6 @@ function useResultError(error: ApiError | null): string | null {
   }
   if (hasText(error.code)) {
     return t(CODE_TEXTS[error.code], { game: Number(error.detail.game_no) });
-  }
-  // The demo's knockout locks (BR-053, BR-094) until the backend serves the knockout (P10).
-  if (error.detail.rule === "BR-094") {
-    return t("results.errors.lockedKnockout");
-  }
-  if (error.detail.reason === "results_locked") {
-    return t("results.errors.locked");
   }
   return error.status === 404 || error.status === 409
     ? t("results.errors.changed")
@@ -122,8 +118,17 @@ export function ResultEntry({
         ? "knockout"
         : null;
   const locked = lock !== null;
+  // ADR-008: a result names the entries the screen saw on both sides, so a
+  // later match whose sides have changed since is refused, not decided for
+  // someone else (BR-094).
+  const [seenA, seenB] = [sideA.entry_id, sideB.entry_id];
+  const expectedSides: [string, string] | null =
+    seenA !== null && seenB !== null ? [seenA, seenB] : null;
   const onSave: ResultFormContext["onSave"] = (body) => {
-    save.mutate(body, { onSuccess: onDone });
+    save.mutate(
+      { ...body, expected_sides: expectedSides },
+      { onSuccess: onDone },
+    );
   };
   // The bracket's seeds, as the bracket shows them (BR-042), not the setup's.
   const seedOf = (entryId: string | null, index: 0 | 1) =>

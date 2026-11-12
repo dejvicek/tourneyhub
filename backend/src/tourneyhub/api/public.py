@@ -16,7 +16,6 @@ from tourneyhub.api.leagues import SeasonRead
 from tourneyhub.api.public_headers import PUBLIC_PREFIX
 from tourneyhub.api.schemas import ErrorResponse, ResponseModel
 from tourneyhub.api.tournaments import (
-    BracketRoundName,
     EntryRead,
     FieldRead,
     PhaseRead,
@@ -24,6 +23,7 @@ from tourneyhub.api.tournaments import (
     RoundRead,
     TournamentSummary,
 )
+from tourneyhub.engine.knockout import RoundName
 from tourneyhub.engine.tournaments import PhaseFormat, TournamentState, TournamentType
 from tourneyhub.services import public as public_service
 from tourneyhub.services.tournaments import PlacesView
@@ -116,7 +116,7 @@ class PublicPlaceReasonRead(ResponseModel):
     """Why an entry has its place, for viewers (§7.13): the organizer's reason."""
 
     kind: PlaceReasonKind
-    round: BracketRoundName | None
+    round: RoundName | None
     score: tuple[int, int] | None
     opponent_entry_id: UUID | None
     group_place: int | None
@@ -152,10 +152,10 @@ def _public_places(places: PlacesView) -> PublicPlacesRead:
                 entry_id=row.entry_id,
                 points_per_player=row.points_per_player,
                 reason=PublicPlaceReasonRead(
-                    kind="group_place",
-                    round=None,
-                    score=None,
-                    opponent_entry_id=None,
+                    kind=row.kind,
+                    round=row.round,
+                    score=row.score,
+                    opponent_entry_id=row.opponent_entry_id,
                     group_place=row.group_place,
                     group_format=places.group_format,
                 ),
@@ -245,8 +245,10 @@ def read_public_places(
     """Return the places and the season points of a finished tournament (FR-070).
 
     Before the tournament finishes, `complete` is false and there are no rows.
-    A finished tournament with a knockout is 422 `format_not_supported` until
-    the knockout is served. A tournament in setup is 404 `tournament_not_found`.
+    With a knockout, its entries take the top places by BR-102, the others
+    follow in their group-phase order (BR-103); a Swiss or a Monster DYP is
+    422 `format_not_supported` until they are played. A tournament in setup
+    is 404 `tournament_not_found`.
     """
     places = public_service.read_shared_places(
         session, share_token=share_token, tournament_id=tournament_id

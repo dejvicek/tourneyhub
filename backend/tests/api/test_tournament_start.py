@@ -48,6 +48,11 @@ ROUND_ROBIN: Json = {
 }
 
 
+def _seed_order(setup: Json) -> list[str]:
+    """The entries of a setup in seed order, as the review's start carries them."""
+    return [e["id"] for e in sorted(setup["entries"], key=lambda e: e["seed"] or 0)]
+
+
 def _url(league: League | UUID, rest: str = "") -> str:
     league_id = league.id if isinstance(league, League) else league
     return f"/api/v1/leagues/{league_id}{rest}"
@@ -108,7 +113,8 @@ def _start(
         json={
             "expected_draw_counter": setup["draw_counter"]
             if counter is None
-            else counter
+            else counter,
+            "expected_seed_order": _seed_order(setup),
         },
         headers=headers,
     )
@@ -275,6 +281,59 @@ def test_adr008_a_stale_draw_counter_does_not_start(
     assert tournament.state == "setup"
 
 
+@pytest.mark.parametrize("change", ["swapped", "missing", "unknown"])
+def test_adr008_a_start_from_a_seed_order_the_review_did_not_show_is_stale(
+    client: TestClient,
+    league: League,
+    headers: dict[str, str],
+    players: list[str],
+    session: Session,
+    change: str,
+) -> None:
+    setup = _setup(client, league, headers, players[:4])
+    shown = client.get(
+        _t_url(league, setup["tournament_id"], "/setup/preview"), headers=headers
+    ).json()
+    order = [*shown["seed_order"]]
+    assert order == _seed_order(setup)
+    # another tab swaps seeds 1 and 2; the draw counter stays (ADR-010)
+    swapped = [order[1], order[0], *order[2:]]
+    reordered = client.put(
+        _t_url(league, setup["tournament_id"], "/setup/seed-order"),
+        json={"entry_ids": swapped},
+        headers=headers,
+    )
+    assert reordered.status_code == 200, reordered.text
+    previewed = {
+        "swapped": order,
+        "missing": swapped[:-1],
+        "unknown": [*swapped[:-1], str(uuid7())],
+    }[change]
+
+    response = client.post(
+        _t_url(league, setup["tournament_id"], "/start"),
+        json={
+            "expected_draw_counter": shown["draw_counter"],
+            "expected_seed_order": previewed,
+        },
+        headers=headers,
+    )
+
+    assert (response.status_code, response.json()) == (
+        409,
+        {"code": "seed_order_changed", "detail": {}},
+    )
+    tournament = session.get_one(Tournament, UUID(setup["tournament_id"]))
+    session.refresh(tournament)
+    assert tournament.state == "setup"
+    fresh = client.get(
+        _t_url(league, setup["tournament_id"], "/setup/preview"), headers=headers
+    ).json()
+    assert fresh["seed_order"] == swapped
+    again = _start(client, league, reordered.json(), headers)
+    assert again[0] == 200, again
+
+
 @pytest.mark.parametrize(
     ("values", "picked", "code", "detail"),
     [
@@ -302,12 +361,12 @@ def test_adr008_a_stale_draw_counter_does_not_start(
                 "sit_out_points": None,
                 "group_match_format": None,
                 "knockout_match_format": "bo1",
-                "third_place_match": False,
+                "third_place_match": True,
             },
-            4,
-            "format_not_supported",
-            {"format": "single_elimination"},
-            id="knockout-later",
+            3,
+            "not_enough_entries",
+            {"minimum": 4, "given": 3},
+            id="FR-032-third-place",
         ),
         pytest.param(
             {
@@ -742,7 +801,9 @@ def test_fr038_a_started_tournament_is_deleted_with_its_schedule(
 # ---------------------------------------------------------------- races
 
 
-def _commit_setup(engine: Engine, now: datetime) -> tuple[UUID, UUID, UUID, int]:
+def _commit_setup(
+    engine: Engine, now: datetime
+) -> tuple[UUID, UUID, UUID, int, list[UUID]]:
     """A committed league with a Singles round robin of four picked players."""
     with Session(engine) as setup:
         owner = User(
@@ -789,16 +850,17 @@ def _commit_setup(engine: Engine, now: datetime) -> tuple[UUID, UUID, UUID, int]
             player_ids=player_ids,
             clock=lambda: now,
         )
-        counter = tournament_service.set_seeding_method(  # a draw has seeds to shuffle
+        seeded = tournament_service.set_seeding_method(  # a draw has seeds to shuffle
             setup,
             league_id=league.id,
             tournament_id=tournament_id,
             user_id=owner.id,
             method=SeedingMethod.RANDOM,
             clock=lambda: now,
-        ).draw_counter
+        )
         setup.commit()
-        return owner.id, league.id, tournament_id, counter
+        seeds = [e.id for e in sorted(seeded.entries, key=lambda e: e.seed or 0)]
+        return owner.id, league.id, tournament_id, seeded.draw_counter, seeds
 
 
 @pytest.mark.concurrency
@@ -809,7 +871,9 @@ def test_adr008_of_two_starts_with_one_counter_exactly_one_starts(
     committed_auth_header: Callable[..., dict[str, str]],
     wait_for_a_lock_wait: Callable[[], None],
 ) -> None:
-    owner_id, league_id, tournament_id, counter = _commit_setup(committing_engine, now)
+    owner_id, league_id, tournament_id, counter, seeds = _commit_setup(
+        committing_engine, now
+    )
     outcome: list[tuple[int, object]] = []
 
     with (
@@ -822,13 +886,17 @@ def test_adr008_of_two_starts_with_one_counter_exactly_one_starts(
             tournament_id=tournament_id,
             user_id=owner_id,
             expected_draw_counter=counter,
+            expected_seed_order=seeds,
             clock=lambda: now,
         )
 
         def start_second() -> None:
             response = client.post(
                 _t_url(league_id, str(tournament_id), "/start"),
-                json={"expected_draw_counter": counter},
+                json={
+                    "expected_draw_counter": counter,
+                    "expected_seed_order": [str(s) for s in seeds],
+                },
                 headers=committed_auth_header(owner_id, issued_at=datetime.now(UTC)),
             )
             outcome.append((response.status_code, response.json()))
@@ -854,7 +922,9 @@ def test_fr036_back_to_setup_racing_a_start_waits_and_deletes_its_schedule(
     committed_auth_header: Callable[..., dict[str, str]],
     wait_for_a_lock_wait: Callable[[], None],
 ) -> None:
-    owner_id, league_id, tournament_id, counter = _commit_setup(committing_engine, now)
+    owner_id, league_id, tournament_id, counter, seeds = _commit_setup(
+        committing_engine, now
+    )
     outcome: list[tuple[int, object]] = []
 
     with (
@@ -867,6 +937,7 @@ def test_fr036_back_to_setup_racing_a_start_waits_and_deletes_its_schedule(
             tournament_id=tournament_id,
             user_id=owner_id,
             expected_draw_counter=counter,
+            expected_seed_order=seeds,
             clock=lambda: now,
         )
 
@@ -900,7 +971,9 @@ def test_adr008_a_start_racing_a_setup_write_has_exactly_one_winner(
     wait_for_a_lock_wait: Callable[[], None],
     winner: str,
 ) -> None:
-    owner_id, league_id, tournament_id, counter = _commit_setup(committing_engine, now)
+    owner_id, league_id, tournament_id, counter, seeds = _commit_setup(
+        committing_engine, now
+    )
     outcome: list[tuple[int, object]] = []
 
     with (
@@ -914,9 +987,11 @@ def test_adr008_a_start_racing_a_setup_write_has_exactly_one_winner(
                 tournament_id=tournament_id,
                 user_id=owner_id,
                 expected_draw_counter=counter,
+                expected_seed_order=seeds,
                 clock=lambda: now,
             )
-            path, body = "/setup/draw", {"target": "seeds"}
+            path = "/setup/draw"
+            body: Json = {"target": "seeds"}
         else:
             tournament_service.draw_again(
                 first,
@@ -927,7 +1002,8 @@ def test_adr008_a_start_racing_a_setup_write_has_exactly_one_winner(
                 expected_draw_counter=counter,
                 clock=lambda: now,
             )
-            path, body = "/start", {}
+            path = "/start"
+            body = {"expected_seed_order": [str(s) for s in seeds]}
 
         def second_request() -> None:
             response = client.post(

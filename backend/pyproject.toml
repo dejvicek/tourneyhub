@@ -6,10 +6,10 @@ classifiers = ["Private :: Do Not Upload"]
 dependencies = [
   "alembic>=1.20.1",          # 1.20.1 fixes duplicate CHECKs with SQLAlchemy 2.1
   "argon2-cffi>=25.1",
-  "fastapi>=0.162",           # Depends(scope="function") needs 0.121 or later (§5)
+  "fastapi>=0.162.2",           # Depends(scope="function") needs 0.121 or later (§5)
   "httptools>=0.9",
   "networkx>=3.7",
-  "psycopg[binary]>=3.3.7",
+  "psycopg[binary]>=3.3.8",
   "pydantic>=2.14.2",
   "pydantic-settings>=2.16",
   "pyjwt>=2.15.1",
@@ -77,6 +77,7 @@ ban-lazy = "all"                    # no PEP 810 lazy imports (§4.2)
 "typing.TYPE_CHECKING".msg = "Import for real (§4.2)."
 "typing_extensions".msg = "Use the standard library (§1)."
 "__future__.annotations".msg = "Not needed on Python 3.15 (§1)."
+"hypothesis.reproduce_failure".msg = "Turn the failure into an @example (§9)."
 
 [tool.mypy]
 python_version = "3.15"
@@ -125,6 +126,15 @@ forbidden_modules = [
   "fastapi", "starlette", "sqlalchemy", "alembic", "psycopg", "pydantic",
   "pydantic_settings", "jwt", "argon2", "random", "secrets", "time", "os",
 ]
+
+[[tool.importlinter.contracts]]
+name = "Only the api knows HTTP (§3, §4.4)"
+type = "forbidden"
+source_modules = [
+  "tourneyhub.services", "tourneyhub.db", "tourneyhub.cli",
+  "tourneyhub.errors", "tourneyhub.settings",
+]
+forbidden_modules = ["fastapi", "starlette", "http"]
 
 [[tool.importlinter.contracts]]
 name = "errors and settings stand alone (§3)"

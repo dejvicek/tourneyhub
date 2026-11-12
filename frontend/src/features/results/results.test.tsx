@@ -253,4 +253,48 @@ describe("result entry (screens 7 and 7b)", () => {
       });
     },
   );
+
+  it.each([
+    ["en", "The pairs in this match changed; the screen has been refreshed."],
+    ["cs", "Dvojice v tomto zápase se změnily, obrazovka byla znovu načtena."],
+  ])(
+    "sends the entries it saw and says when the sides changed (ADR-008, %s)",
+    async (language, text) => {
+      await i18n.changeLanguage(language);
+      let sent: unknown;
+      server.use(
+        http.put(
+          "/api/v1/leagues/:leagueId/tournaments/:tournamentId/matches/:matchId/result",
+          async ({ request }) => {
+            sent = await request.json();
+            return HttpResponse.json(
+              { code: "match_sides_changed", detail: {} },
+              { status: 409 },
+            );
+          },
+        ),
+      );
+      const user = userEvent.setup();
+      const { match } = onField(1);
+      renderAt(playPath(paths.scheduleResult, { matchId: match.id }));
+
+      const sheet = await screen.findByRole("dialog");
+      const beads = await within(sheet).findAllByRole("radio", {
+        name: /^10 goals for|^10 gólů/,
+      });
+      await user.click(beads[1] ?? sheet);
+      await user.click(
+        within(sheet).getByRole("button", {
+          name: language === "en" ? "Save result" : /^Uložit výsledek/,
+        }),
+      );
+
+      await waitFor(() => {
+        expect(within(sheet).getByRole("alert")).toHaveTextContent(text);
+      });
+      expect(sent).toMatchObject({
+        expected_sides: match.sides.map((side) => side.entry_id),
+      });
+    },
+  );
 });

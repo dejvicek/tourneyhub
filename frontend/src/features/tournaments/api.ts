@@ -174,16 +174,16 @@ export const setupMutations = {
         ),
       ),
     ),
-  /** FR-035: carries the draw counter the review showed (409 when stale). */
+  /**
+   * FR-035: carries the draw counter and the seed order the review showed
+   * (409 when stale).
+   */
   start: (leagueId: string, tournamentId: string) =>
-    leagueWrite(leagueId, (expectedDrawCounter: number) =>
+    leagueWrite(leagueId, (body: Schemas["StartWrite"]) =>
       dataOf(
         api.POST(
           "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/start",
-          {
-            ...tournamentPath(leagueId, tournamentId),
-            body: { expected_draw_counter: expectedDrawCounter },
-          },
+          { ...tournamentPath(leagueId, tournamentId), body },
         ),
       ),
     ),

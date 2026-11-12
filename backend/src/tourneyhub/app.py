@@ -12,6 +12,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from tourneyhub.api import (
     admin,
     auth,
+    knockout,
     leagues,
     me,
     players,
@@ -91,6 +92,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     for router in (
         admin.router,
         auth.router,
+        knockout.router,
+        knockout.public_router,
         leagues.router,
         me.router,
         players.router,

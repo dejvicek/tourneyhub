@@ -344,6 +344,7 @@ export const tournamentsSetup: CsMessages<typeof english> = {
       round: "{{round}}. kolo",
       versus: "PROTI",
       sitsOut: "Volno má: {{names}}",
+      byes: "Rovnou do 2. kola (volný los): {{names}}",
       bracketNote:
         "Pavouk má {{size}} míst. Další kola se doplní podle vítězů.",
       nextRoundsNote: "Další kola přidáte sami, jedno po druhém.",
@@ -362,6 +363,8 @@ export const tournamentsSetup: CsMessages<typeof english> = {
     generic: "Něco se nepovedlo. Zkuste to znovu.",
     changed:
       "Tohle se změnilo na jiném zařízení. Obrazovka ukazuje aktuální stav.",
+    seedOrderChanged:
+      "Nasazení se změnilo na jiném zařízení. Zkontrolujte první kolo a spusťte turnaj znovu.",
     load: "Turnaj se nepodařilo načíst.",
     rules: {
       name_required: "Zadejte název turnaje.",
@@ -369,12 +372,14 @@ export const tournamentsSetup: CsMessages<typeof english> = {
       fr032Entries: "Účastníků je málo, potřeba je alespoň {{min}}.",
       fr032Max:
         "Každý s každým má nejvýše {{limit}} účastníků. Odeberte některé, nebo zvolte jiný formát.",
+      fr032MaxKnockout:
+        "Vyřazovací fáze má nejvýše {{limit}} účastníků. Odeberte některé, nebo zvolte jiný formát.",
       br030_one: "{{count}} hráč ještě nemá spoluhráče.",
       br030_few: "{{count}} hráči ještě nemají spoluhráče.",
       br030_many: "{{count}} hráče ještě nemá spoluhráče.",
       br030_other: "{{count}} hráčů ještě nemá spoluhráče.",
       fr035:
-        "Spuštění tohoto formátu přijde v další verzi. Každý s každým lze spustit už teď.",
+        "Spuštění tohoto formátu přijde v další verzi. Každý s každým nebo vyřazovací fázi bez skupinové fáze lze spustit už teď.",
       br121: "BO2 nabízíme jen v ligách s remízami.",
       br071: "Každý s každým nemá body za volno.",
       fr033: "Není koho spárovat.",

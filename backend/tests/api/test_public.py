@@ -28,6 +28,11 @@ ROUND_ROBIN: Json = {
 UNKNOWN = {"code": "share_link_not_found", "detail": {}}
 
 
+def _seed_order(setup: Json) -> list[str]:
+    """The entries of a setup in seed order, as the review's start carries them."""
+    return [e["id"] for e in sorted(setup["entries"], key=lambda e: e["seed"] or 0)]
+
+
 def _public(league: League | str, rest: str = "") -> str:
     token = league.share_token if isinstance(league, League) else league
     return f"/api/v1/public/{token}{rest}"
@@ -73,7 +78,10 @@ def make_started(client: TestClient, players: list[Player]) -> Callable[..., Jso
             return setup
         started = client.post(
             f"{base}/{tournament_id}/start",
-            json={"expected_draw_counter": picked.json()["draw_counter"]},
+            json={
+                "expected_draw_counter": picked.json()["draw_counter"],
+                "expected_seed_order": _seed_order(picked.json()),
+            },
             headers=headers,
         )
         assert started.status_code == 200, started.text
@@ -340,7 +348,10 @@ def test_owasp_api1_a_valid_token_does_not_open_another_leagues_tournament(
     )
     started = client.post(
         f"{base}/{tournament_id}/start",
-        json={"expected_draw_counter": picked.json()["draw_counter"]},
+        json={
+            "expected_draw_counter": picked.json()["draw_counter"],
+            "expected_seed_order": _seed_order(picked.json()),
+        },
         headers=other_headers,
     )
     assert started.status_code == 200
@@ -442,6 +453,32 @@ _PUBLIC_PROPERTIES: dict[str, set[str]] = {
         "tiebreakers",
     },
     "PhaseSummary": {"format", "id", "kind", "position"},
+    "PublicBracketMatchRead": {
+        "field_number",
+        "is_walkover",
+        "kind",
+        "match_format",
+        "match_id",
+        "next_number",
+        "number",
+        "outcome",
+        "position",
+        "round_no",
+        "score",
+        "sides",
+        "state",
+    },
+    "PublicBracketRead": {
+        "final_match_format",
+        "has_group_phase",
+        "match_format",
+        "phase_id",
+        "rounds",
+        "size",
+        "third_place_match",
+    },
+    "PublicBracketRoundRead": {"matches", "name", "round_no"},
+    "PublicBracketSideRead": {"decided_by_lot", "entry_id", "is_bye", "seed"},
     "PublicLeagueRead": {"name", "players", "seasons"},
     "PublicPlaceRead": {"entry_id", "place", "points_per_player", "reason"},
     "PublicPlaceReasonRead": {
@@ -556,7 +593,7 @@ def test_fr071_public_schemas_carry_nothing_only_the_organizer_sees(
         reachable,
     )
 
-    assert len(public) == 6
+    assert len(public) == 7
     assert all(set(item) == {"get"} for item in public.values())  # FR-072
     assert {
         name: set(schemas[name]["properties"])

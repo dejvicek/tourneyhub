@@ -89,7 +89,7 @@ Every package and module above exists, empty where nothing lives in it yet: impo
 Layers, enforced by import-linter: `api` and `cli` → `services` → `db` → `engine`. A module imports from layers below it, never from above. `errors.py` and `settings.py` import nothing else from `tourneyhub`.
 
 - **`engine`** imports nothing from the rest of `tourneyhub`, no framework and no source of time or chance (§2). It also holds the domain `StrEnum`s, so that `db` and `api` can use them.
-- **`services`** are module-level functions in `services/<area>.py`, named verb first (`create_league`, `generate_round`). A service takes `session: Session` first, then keyword-only arguments: plain values, never request models, and `now: datetime` when it needs the time. It takes the locks and checks the expected state (§7), calls the engine and raises `AppError`s. It returns ORM rows or engine values with everything the response will read already loaded; a `lazy="raise"` error in a router is a bug in the service. Services never import FastAPI, never commit and never build response models.
+- **`services`** are module-level functions in `services/<area>.py`, named verb first (`create_league`, `generate_round`). A service takes `session: Session` first, then keyword-only arguments: plain values, never request models, and `now: datetime` when it needs the time. It takes the locks and checks the expected state (§7), calls the engine and raises `AppError`s. It returns ORM rows or engine values with everything the response will read already loaded; a `lazy="raise"` error in a router is a bug in the service. Services never import FastAPI, never commit and never build response models. import-linter keeps `fastapi`, `starlette` and `http` out of `services`, `db`, `cli`, `errors` and `settings`, and `tests/test_architecture.py` checks that services, models and the engine never commit, roll back or begin a transaction.
 - **`api`** turns requests into service calls and service results into response models. Routers and dependencies run no queries of their own; `CurrentUserDep`, for example, calls a service. import-linter keeps `tourneyhub.db` out of `api`, except the `User` model that `api/deps.py` needs as the type of `CurrentUserDep` and `AdminDep` (§2). It cannot keep out SQLAlchemy, which `api` needs for `Session` and `IntegrityError`, so a query that does not use the models, such as one through `text()`, is left to review.
 - **`db/models/`** has one module per DATA-MODEL §4 area (`accounts`, `leagues`, `tournaments`, `entries`, `matches`); `db/models/__init__.py` imports them all, so Alembic sees the whole schema.
 - One module per area in `api/` and `services/`: `api/leagues.py` calls `services/leagues.py`.
@@ -121,7 +121,7 @@ Layers, enforced by import-linter: `api` and `cli` → `services` → `db` → `
 - Closed sets of values are `StrEnum`s; the database stores their values (§7).
 - `match` over enums and unions is exhaustive, through mypy's `exhaustive-match` or a final `case _: assert_never(value)`. Plain conditions use `if`.
 - Instants are aware UTC datetimes: `datetime.now(UTC)`, never `utcnow()` (ruff `DTZ`).
-- "Now" is read once per request and passed down. The API gets it from `NowDep` (§5), the CLI calls `datetime.now(UTC)` once per command, and services and the engine take `now: datetime` as an argument. Everything a rule compares against uses that value: the refresh token's 60-second window and 90-day expiry (ADR-006), and `auth_attempts.created_at`, which the abuse limits count in a time window (DATA-MODEL §4.1). So do every `created_at` and `updated_at` (DATA-MODEL §2): one clock keeps `updated_at` from falling before `created_at`, and a test that overrides `get_now` (§9) fixes both.
+- "Now" is read once per request and passed down. The API gets it from `NowDep` (§5), the CLI calls `datetime.now(UTC)` once per command, and services and the engine take `now: datetime` as an argument. Everything a rule compares against uses that value: the refresh token's 60-second window and 90-day expiry (ADR-006), and `auth_attempts.created_at`, which the abuse limits count in a time window (DATA-MODEL §4.1). So do every `created_at` and `updated_at` (DATA-MODEL §2): one clock keeps `updated_at` from falling before `created_at`, and a test that overrides `get_now` (§9) fixes both. `tests/test_architecture.py` checks that only `api/deps.py` and `cli.py` call `.now()`.
 - Server-generated ids come from `uuid.uuid7()`.
 - Where `None` is a valid value and "not given" must be told apart, use a `sentinel()`; in Pydantic models, `model_fields_set`.
 - Flags and options are keyword-only parameters (`*, include_removed: bool = False`), checked by ruff `FBT`.
@@ -154,7 +154,7 @@ The subclass decides the HTTP status, and the code tells the frontend what happe
 - The engine raises its own exceptions, defined in `engine/errors.py` as subclasses of `EngineError` with keyword-only fields (`NotEnoughEntriesError(minimum=4, given=3)`). One function, `services/engine_errors.py:to_app_error()`, translates each into a `RuleViolationError` whose `detail` carries the same fields; services call engine functions inside `except EngineError as err: raise to_app_error(err) from err`.
 - 409 makes the frontend reload, and the reloaded screen shows what changed (ADR-008); a stale `expected_round_no` is 409. 422 makes it show a message built from the code and `detail`, because a reload would change nothing; a player name the league already has is 422.
 - Services check the rules an organizer can break under the lock, before a unique index would fire. Adding a player locks the league and looks the name up with `lower()` (BR-001): any player of that name, a removed one included, is 422 `player_name_taken`, and the organizer restores a removed holder by a separate request (FR-012, DATA-MODEL §4.2). A create with a client id first loads the row with that id and answers as ADR-008 says; only then are its rules checked, so a retry gets its row back instead of a 422 that its own first attempt caused.
-- Services never catch `IntegrityError`; where a race is expected, the query avoids it (`on_conflict_do_nothing`). A violation surfaces at the next flush, at the latest at the commit in `get_session`; either way it reaches the handler uncaught. A handler in `api/errors.py` turns one from a constraint listed in its table, recognized by `err.orig.diag.constraint_name`, into that constraint's 409 code. The table lists only constraints that a race can reach, because no lock covers their check: creating a league has no league row to lock (§7), so `pk_leagues` is listed. Any other violation, including a deferred foreign key or a unique index that a service checks under its lock, is a bug and becomes 500 `internal_error` with the constraint name logged (DATA-MODEL §2).
+- Services never catch `IntegrityError`; where a race is expected, the query avoids it (`on_conflict_do_nothing`). A violation surfaces at the next flush, at the latest at the commit in `get_session`; either way it reaches the handler uncaught. A handler in `api/errors.py` turns one from a constraint listed in its table, recognized by `err.orig.diag.constraint_name`, into that constraint's 409 code. The table lists only constraints that a race can reach, because no lock covers their check: creating a league has no league row to lock (§7), so `pk_leagues` is listed. Any other violation, including a deferred foreign key or a unique index that a service checks under its lock, is a bug and becomes 500 `internal_error` with the constraint name logged (DATA-MODEL §2). `tests/test_architecture.py` checks that no module but `api/errors.py` names `IntegrityError`.
 - Inside `except`, write `raise NewError(...) from err`. Use `from None` only when the cause tells a reader of the log nothing.
 - Catch the narrowest exception. The only catch-all is the API's handler for unexpected errors, which answers `internal_error`.
 - Log an unexpected exception once: `logger.exception(...)` inside `except` (ruff `TRY400`), and `logger.error(..., exc_info=exc)` in the `IntegrityError` handler, which receives the exception as an argument (ruff `LOG004`). The `Exception` handler logs nothing and only answers `internal_error`: Starlette re-raises the exception after that response, and uvicorn logs it with its traceback and the request id (§4.6).
@@ -216,11 +216,11 @@ LOGGING_CONFIG: dict[str, object] = {
 ## 5. FastAPI
 
 - `create_app(settings: Settings | None = None) -> FastAPI` builds the application. It reads the settings eagerly, so a missing or invalid variable stops startup (ADR-001). It creates the database engine and the session factory, keeps them and the settings on `app.state`, installs the error handlers and includes the routers under `/api/v1`. uvicorn runs `--factory tourneyhub.app:create_app`. No module creates an app, an engine or settings at import time.
-- Only the dependencies in `api/deps.py` read `app.state`; nothing reads environment variables except `Settings`.
+- Only the dependencies in `api/deps.py` read `app.state`; nothing reads environment variables except `Settings`. `tests/test_architecture.py` checks both.
 - Use `lifespan`, never `on_event`. The lifespan disposes of the database engine.
 - One `APIRouter` per area, with a `prefix` and `tags`.
-- Every endpoint and dependency is `def`; FastAPI runs them in its thread pool. Exception handlers and middleware are `async def` and never block.
-- Dependencies are `Annotated` aliases defined once in `api/deps.py`: `SessionDep`, `SettingsDep`, `NowDep` (`get_now`, which returns `datetime.now(UTC)`), `CurrentUserDep`, `AccountDep`, `AccessClaimsDep`, `AdminDep`, `LoginThrottleDep`, `SignUpThrottleDep`, `PasswordChangeThrottleDep`, `CustomHeaderDep`. Endpoints use the aliases, never an inline `Depends(...)`.
+- Every endpoint and dependency is `def`; FastAPI runs them in its thread pool. Exception handlers and middleware are `async def` and never block. `tests/test_architecture.py` allows `async def` only in `api/errors.py` and `app.py`.
+- Dependencies are `Annotated` aliases defined once in `api/deps.py`: `SessionDep`, `SettingsDep`, `NowDep` (`get_now`, which returns `datetime.now(UTC)`), `CurrentUserDep`, `AccountDep`, `AccessClaimsDep`, `AdminDep`, `LoginThrottleDep`, `SignUpThrottleDep`, `PasswordChangeThrottleDep`, `CustomHeaderDep`. Endpoints use the aliases, never an inline `Depends(...)`. The one exception is a router-wide guard, `APIRouter(dependencies=[Depends(get_admin)])` in `api/admin.py` (below). `tests/test_architecture.py` checks this.
 - **The request owns the transaction:**
 
 ```python
@@ -318,7 +318,7 @@ class LeagueCreate(RequestModel):
 - JSON field names are the Python names, in snake_case, with no aliases.
 - Put constraints in the type (`StringConstraints`, `Field(ge=0)`) rather than in validators. They appear in OpenAPI and produce stable error types. Every string and list in a request has a maximum length (OWASP API4).
 - Don't set `strict=True` or `str_strip_whitespace=True` on a whole model. Strict mode rejects the UUID and date strings that JSON carries, and stripping would change passwords.
-- A custom validator raises `PydanticCustomError("stable_type", "message", {...})`, never `ValueError("English text")`, so the error type is a code the frontend can translate.
+- A custom validator raises `PydanticCustomError("stable_type", "message", {...})`, never `ValueError("English text")`, so the error type is a code the frontend can translate. `tests/test_architecture.py` checks that nothing in `api/` raises `ValueError` or `TypeError`.
 - Client-supplied ids are `UUID7`, instants are `AwareDatetime`, passwords are `SecretStr`.
 - Per-format phase options are a discriminated union on `format` (DATA-MODEL §4.3): `Annotated[RoundRobinOptions | SwissOptions | MonsterDypOptions | KnockoutOptions, Field(discriminator="format")]`.
 - Only the v2 API: `model_validate`, `model_dump`, `model_copy`, `ConfigDict`, `field_validator`.
@@ -379,6 +379,7 @@ def str_enum[E: StrEnum](enum: type[E], *, name: str) -> Enum:
 - Relationships are `Mapped[list[X]]` or `Mapped[X]` with `back_populates` and `lazy="raise"`. Each query names what it loads: `selectinload` for collections, `joinedload` for many-to-one.
 - A relationship along an `ON DELETE CASCADE` foreign key sets `passive_deletes=True`, so deleting a league or a tournament leaves the cascade to PostgreSQL. Without it, the ORM loads the children and sets their foreign keys to `NULL`, which fails.
 - A relationship from `players` or `entries` to the rows that reference them through a deferred foreign key (DATA-MODEL §2) sets `passive_deletes="all"` or does not exist, so the ORM never sets those references to `NULL`. Removing a player sets `removed_at`; the application deletes `players` rows only with their league.
+- `tests/test_architecture.py` inspects the mappers and checks `lazy="raise"` and both `passive_deletes` rules.
 - Queries are 2.0 style: `session.scalars(select(...))`, `session.execute(...)`, `session.get(...)`, `insert(...).returning(...)`. No `session.query()`.
 - In query expressions, compare with `.is_(None)`, `.is_not(None)` and `.is_(True)`, or use the boolean column itself. `column is None` silently becomes `WHERE false`; don't apply ruff's unsafe fixes for E711 and E712 inside queries.
 - Raw SQL only through `text()` with `:name` parameters.
@@ -397,6 +398,25 @@ league = session.scalars(
   - A lock query that joins other tables uses `with_for_update(of=Model)`. Never combine `FOR UPDATE` with `joinedload`; PostgreSQL refuses it on the nullable side of an outer join.
   - The refresh endpoint locks a token family's rows the same way before reading them (ADR-006).
   - Creating a league has no league row to lock, and no ADR names another lock, so its checks run unlocked. Two requests that race with one id meet at the primary key, and the later one gets 409 (§4.4).
+  - A write to a tournament locks its league first and loads the tournament through that league (§5):
+
+```python
+# Wrong: the tournament first, by its id alone. Another organizer's id is found,
+# two writers can lock in opposite orders, and a row already in the session
+# keeps its old attributes.
+tournament = session.get(Tournament, tournament_id, with_for_update=True)
+league = lock_league(session, league_id=league_id, user_id=user_id)
+
+# Right: the league, then a tournament of that league, both read fresh.
+league = lock_league(session, league_id=league_id, user_id=user_id)
+tournament = session.scalars(
+    select(Tournament)
+    .join(Season, Tournament.season_id == Season.id)
+    .where(Tournament.id == tournament_id, Season.league_id == league.id)
+    .with_for_update(of=Tournament)
+    .execution_options(populate_existing=True)
+).one_or_none()
+```
 - SQLAlchemy 2.1 flushes before every statement, `text()` included. Use `with session.no_autoflush:` while an intermediate state must not reach the database.
 - The engine is `create_engine("postgresql+psycopg://…", pool_pre_ping=True)`. Keep the pool defaults (5 + 10 connections) until a measurement shows FastAPI's 40 worker threads waiting for them. Nothing sleeps; the login throttle answers 429 instead of waiting (§5).
 - ORM objects stay in the session that loaded them: never hand them to another session or a cache, and never use a session or its objects from two threads concurrently. One after the other is fine: FastAPI runs a request's dependencies, endpoint and commit on whichever threads of its pool are free, and the test client of §9 hands the test's session to them. A lock test (§9) that uses threads gives each its own session.
@@ -448,10 +468,24 @@ def migrate() -> None:
 
 ## 8. Engine
 
-- The engine is pure functions over values: no I/O, no clock, no randomness except the seed (ADR-009, ADR-010). import-linter keeps out the frameworks and `random`, `secrets`, `time` and `os`. No tool sees a call to `datetime.now()` or `uuid.uuid7()` inside the engine; reviews catch those.
+- The engine is pure functions over values: no I/O, no clock, no randomness except the seed (ADR-009, ADR-010). import-linter keeps out the frameworks and `random`, `secrets`, `time` and `os`. `tests/test_architecture.py` catches a call to `.now()` or `uuid.uuid7()` inside the engine.
 - Services build its inputs from ORM rows; its outputs are engine dataclasses. ORM and Pydantic objects never reach the engine.
 - One function in `engine/lots.py` implements ADR-010: `sha256(seed + purpose.encode() + candidate.bytes)` with a 16-byte seed. A test pins one digest, because changing the encoding would reorder the lots of every stored tournament.
 - Results never depend on the iteration order of a set or dict of strings (Python randomizes string hashing per process). Sort explicitly.
+
+```python
+# Wrong: the set's order changes from process to process, so the same
+# tournament gets other pairs after a restart.
+def pair_names(names: Iterable[str]) -> tuple[tuple[str, str], ...]:
+    ordered = tuple(set(names))
+    return tuple(zip(ordered[::2], ordered[1::2], strict=True))
+
+
+# Right: sort first; the pairs depend only on the input.
+def pair_names(names: Iterable[str]) -> tuple[tuple[str, str], ...]:
+    ordered = tuple(sorted(set(names)))
+    return tuple(zip(ordered[::2], ordered[1::2], strict=True))
+```
 
 ## 9. Tests
 
@@ -462,9 +496,9 @@ def migrate() -> None:
 - Check domain errors by code: `with pytest.raises(ConflictError) as raised:` and then `assert raised.value.code is ErrorCode.SEASON_NUMBER_CHANGED`. Never match English messages.
 - Fixtures that need teardown use `yield`; the others `return` (ruff `PT022`). Broad scopes only for expensive, immutable things such as the migrated database.
 - Test data comes from factory fixtures named `make_<noun>`. Each returns a function with keyword-only arguments and unique defaults that adds the row, flushes and returns it: `make_league(name="Thursday DYP")`. The row's `created_at`, and `updated_at` where a service would set it, come from the `now` fixture (§4.3).
-- Property tests use Hypothesis on the pure engine only, never together with function-scoped database fixtures.
+- Property tests use Hypothesis on the pure engine only, never together with function-scoped database fixtures. `tests/test_architecture.py` allows `hypothesis` imports only under `tests/engine/`.
   - Build inputs with `st.builds` or `@composite`.
-  - A failure Hypothesis finds becomes an `@example(...)`; `@reproduce_failure` is never committed.
+  - A failure Hypothesis finds becomes an `@example(...)`; `@reproduce_failure` is never committed (ruff `TID251`).
   - CI uses Hypothesis's built-in `ci` profile (derandomized, no deadline), selected by the `CI` variable; don't redefine it.
   - Pairing tests cap the field at about 32 entries and set `@settings(deadline=None)` (ADR-011).
 - Integration tests use PostgreSQL 17 created with the builtin locale (DATA-MODEL §2). A session-scoped `settings` fixture reads its URL from `TOURNEYHUB_TEST_DATABASE_URL` and passes `env="development", cookie_secure=False`: the test client talks to `http://testserver`, and a client never sends a `Secure` cookie back over plain HTTP. A session-scoped `engine` fixture creates the engine, puts it in `config.attributes["connection"]` of `Config(toml_file=...)` and runs `command.upgrade(config, "head")` once. Each test then runs in a transaction that is rolled back:

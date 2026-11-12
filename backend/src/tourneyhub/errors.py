@@ -68,15 +68,31 @@ class ErrorCode(StrEnum):
     # FR-032: 64 entries today, 16 after the #48 follow-up (issue to open after
     # approval).
     TOO_MANY_ENTRIES_FOR_ROUND_ROBIN = "too_many_entries_for_round_robin"
+    TOO_MANY_ENTRIES_FOR_KNOCKOUT = "too_many_entries_for_knockout"  # 256
     # Results, standings and finishing
     MATCH_NOT_FOUND = "match_not_found"
     MATCH_SIDES_UNKNOWN = "match_sides_unknown"  # BR-091
+    MATCH_SIDES_CHANGED = (
+        "match_sides_changed"  # the derived sides are not the ones seen
+    )
+    EXPECTED_SIDES_REQUIRED = "expected_sides_required"  # a derived match needs them
     GROUP_PHASE_NOT_DONE = "group_phase_not_done"  # FR-040
+    GROUP_PHASE_LOCKED = "group_phase_locked"  # the knockout is drawn (BR-053)
+    RESULT_LOCKED = "result_locked"  # a later knockout match has a result (BR-094)
+    CURRENT_PHASE_CHANGED = "current_phase_changed"  # the knockout was drawn (FR-045)
+    QUALIFIERS_OUT_OF_RANGE = "qualifiers_out_of_range"  # BR-080
+    QUALIFIERS_CHANGED = "qualifiers_changed"  # the cut is not the one previewed
+    PHASE_NOT_FOUND = "phase_not_found"
+    PHASE_NOT_DELETABLE = "phase_not_deletable"  # only a knockout after a group phase
+    KNOCKOUT_NOT_FOUND = "knockout_not_found"  # the tournament has no knockout
+    KNOCKOUT_MODE_NOT_APPLICABLE = "knockout_mode_not_applicable"  # Monster DYP only
     # Fields (FR-090 to FR-094)
     FIELD_NOT_FOUND = "field_not_found"
     FIELD_NUMBER_CHANGED = "field_number_changed"  # the expected new number is stale
     FIELD_NOT_FREE = "field_not_free"  # another match is on it now
-    MATCH_HAS_RESULT = "match_has_result"  # a match placed by hand has a result now
+    # A match placed by hand has a result now (409), or the final whose format
+    # changes has one (422, FR-054, BR-096)
+    MATCH_HAS_RESULT = "match_has_result"
     PLACEMENT_CHANGED = "placement_changed"  # a match is not where the screen saw it
     PLACEMENT_NOT_ALLOWED = "placement_not_allowed"  # not one of the FR-093 operations
     LAST_FIELD = "last_field"  # the last field cannot be removed (BR-132)

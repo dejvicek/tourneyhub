@@ -8,6 +8,7 @@ import {
 
 import { api, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
+import type { components } from "@/api/schema";
 import type {
   DisabledWrite,
   KnockoutWrite,
@@ -18,8 +19,11 @@ import type {
 import type { MonsterKnockoutMode } from "@/demo/rules";
 import { tournamentQueries } from "@/features/tournaments/api";
 
+type FinalFormatWrite = components["schemas"]["FinalFormatWrite"];
+
 // Provisional routes of the demo's contract, "finals" section
-// (src/demo/contract.ts), except the places (P8) and the season effect (P10a),
+// (src/demo/contract.ts), except the places (P8), the season effect (P10a) and
+// the knockout (P10b),
 // which the backend serves. Keys start with the entity (docs/style/frontend-style.md §8.1).
 const tournamentKey = (leagueId: string, tournamentId: string) =>
   ["leagues", leagueId, "tournaments", tournamentId] as const;
@@ -32,7 +36,6 @@ export interface PreviewRequest {
   qualifiers: number;
   thirdPlaceMatch: boolean;
   mode: MonsterKnockoutMode | null;
-  draw: number;
 }
 
 export const finalsQueries = {
@@ -41,7 +44,7 @@ export const finalsQueries = {
       queryKey: [...tournamentKey(leagueId, tournamentId), "bracket"],
       queryFn: ({ signal }) =>
         dataOf(
-          provisionalApi.GET(
+          api.GET(
             "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/bracket",
             { params: pathOf(leagueId, tournamentId), signal },
           ),
@@ -108,7 +111,7 @@ export const finalsQueries = {
           ? skipToken
           : ({ signal }) =>
               dataOf(
-                provisionalApi.GET(
+                api.GET(
                   "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout/preview",
                   {
                     params: {
@@ -119,7 +122,6 @@ export const finalsQueries = {
                         ...(request.mode === null
                           ? {}
                           : { mode: request.mode }),
-                        draw: request.draw,
                       },
                     },
                     signal,
@@ -281,6 +283,7 @@ export const finalsMutations = {
         ),
       onSettled: () => settle(queryClient, leagueId),
     }),
+  /** ADR-008: carries the phase the screen saw as current, the group phase. */
   drawKnockout: (
     queryClient: QueryClient,
     leagueId: string,
@@ -290,13 +293,34 @@ export const finalsMutations = {
       scope: scope(leagueId),
       mutationFn: (body: KnockoutWrite) =>
         dataOf(
-          provisionalApi.PUT(
+          api.PUT(
             "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout",
             { params: { path: pathOf(leagueId, tournamentId).path }, body },
           ),
         ),
       onSettled: () => settle(queryClient, leagueId),
     }),
+  /**
+   * The final's own format, or null to play the knockout's, while the final
+   * has no result (FR-054, BR-120). A target value, so a repeat is harmless.
+   */
+  setFinalFormat: (
+    queryClient: QueryClient,
+    leagueId: string,
+    tournamentId: string,
+  ) =>
+    mutationOptions({
+      scope: scope(leagueId),
+      mutationFn: (body: FinalFormatWrite) =>
+        dataOf(
+          api.PUT(
+            "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout/final-format",
+            { params: { path: pathOf(leagueId, tournamentId).path }, body },
+          ),
+        ),
+      onSettled: () => settle(queryClient, leagueId),
+    }),
+  /** The knockout is deleted by its phase id (ADR-008, FR-046). */
   deleteKnockout: (
     queryClient: QueryClient,
     leagueId: string,
@@ -306,7 +330,7 @@ export const finalsMutations = {
       scope: scope(leagueId),
       mutationFn: (phaseId: string) =>
         dataOf(
-          provisionalApi.DELETE(
+          api.DELETE(
             "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/phases/{phase_id}",
             {
               params: {
@@ -319,6 +343,14 @@ export const finalsMutations = {
             },
           ),
         ),
+      // The bracket is gone: drop it, so that the refresh after the delete
+      // does not ask for it again (404) before the screen leaves.
+      onSuccess: () => {
+        queryClient.removeQueries({
+          queryKey: [...tournamentKey(leagueId, tournamentId), "bracket"],
+          exact: true,
+        });
+      },
       onSettled: () => settle(queryClient, leagueId),
     }),
 };
@@ -328,9 +360,21 @@ export const finalsMutations = {
 type QueryData<T extends { queryKey: unknown }> =
   T["queryKey"] extends DataTag<unknown, infer Data, unknown> ? Data : never;
 
-export type BracketData = QueryData<ReturnType<typeof finalsQueries.bracket>>;
-export type BracketRoundData = BracketData["rounds"][number];
-export type BracketMatchData = BracketRoundData["matches"][number];
+type OrganizerBracket = QueryData<ReturnType<typeof finalsQueries.bracket>>;
+type OrganizerMatch = OrganizerBracket["rounds"][number]["matches"][number];
+
+// The bracket screens also draw the share link's bracket, which has no
+// `result_locked` (it is the organizer's, BR-094), so there it is optional.
+export type BracketMatchData = Omit<OrganizerMatch, "result_locked"> & {
+  result_locked?: boolean;
+};
+export type BracketRoundData = Omit<
+  OrganizerBracket["rounds"][number],
+  "matches"
+> & { matches: BracketMatchData[] };
+export type BracketData = Omit<OrganizerBracket, "rounds"> & {
+  rounds: BracketRoundData[];
+};
 export type BracketSideData = BracketMatchData["sides"][number];
 export type PlacesData = QueryData<ReturnType<typeof finalsQueries.places>>;
 export type PlaceData = PlacesData["rows"][number];

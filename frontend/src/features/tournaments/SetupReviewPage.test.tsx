@@ -10,6 +10,7 @@ import {
   drawElsewhere,
   pickPlayers,
   startTournament,
+  swapSeedsElsewhere,
   tournamentOf,
 } from "@/demo/setupTestHelpers";
 import { i18n } from "@/i18n";
@@ -94,6 +95,24 @@ describe("setup: review and start (screen 5)", () => {
     expect((await tournamentOf(id)).state).toBe("setup");
   });
 
+  it("does not start from seeds that were reordered on another device", async () => {
+    const user = userEvent.setup();
+    const id = await dypWith(6, { type: "singles", group_phase: "none" });
+    renderAt(reviewPage(id));
+    const start = await screen.findByRole("button", {
+      name: "Generate and start",
+    });
+    await screen.findByRole("heading", { name: "First round" });
+    await swapSeedsElsewhere(id);
+
+    await user.click(start);
+
+    expect(
+      await screen.findByText(/The seeds changed on another device/),
+    ).toBeInTheDocument();
+    expect((await tournamentOf(id)).state).toBe("setup");
+  });
+
   it.each([
     [
       "too few entries",
@@ -155,6 +174,38 @@ describe("setup: review and start (screen 5)", () => {
         "You add the next rounds yourself, one at a time.",
       ),
     ).not.toHaveLength(0);
+  });
+
+  it("previews a knockout without a group phase and opens its bracket (FR-031, BR-041)", async () => {
+    const user = userEvent.setup();
+    const id = await dypWith(12, {
+      group_phase: "none",
+      knockout_match_format: "bo1",
+      third_place_match: false,
+    });
+    const view = renderAt(reviewPage(id));
+
+    await screen.findAllByText("VS");
+    expect(row("Matches")).toHaveTextContent("5 matches, BO1");
+    expect(screen.getAllByText("VS")).toHaveLength(2);
+    expect(
+      screen.getByText(/^Straight to round 2 \(bye\): /),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "The bracket has 8 places. Later rounds fill in as winners are known.",
+      ),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: "Generate and start" }),
+    );
+
+    await waitFor(() => {
+      expect(view.state.location.pathname).toBe(
+        generatePath(paths.knockout, { leagueId, tournamentId: id }),
+      );
+    });
   });
 
   it("goes on to the tournament when setup is already closed (D21)", async () => {

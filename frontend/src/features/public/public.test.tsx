@@ -157,6 +157,50 @@ describe("share-link views", () => {
     expect(rows.at(-1)?.[0]).not.toHaveTextContent(/^1$/);
   });
 
+  it("the places list a shared place once, with every entry under it", async () => {
+    const october = db().tournaments.find((t) => t.name === "October Singles");
+    if (october === undefined) {
+      throw new Error("The seed has an October Singles");
+    }
+    const [a, b, c, d] = october.entries;
+    if (
+      a === undefined ||
+      b === undefined ||
+      c === undefined ||
+      d === undefined
+    ) {
+      throw new Error("The seed has four entries");
+    }
+    const reason = { kind: "lost_in_round", round: "semifinal", score: null };
+    const row = (entry: { id: string }, place: number, points: number) => ({
+      entry_id: entry.id,
+      place,
+      points_per_player: points,
+      reason,
+    });
+    server.use(
+      http.get("*/api/v1/public/:token/tournaments/:id/places", () =>
+        HttpResponse.json({
+          complete: true,
+          rows: [row(a, 1, 10), row(b, 2, 8), row(c, 3, 5), row(d, 3, 5)],
+        }),
+      ),
+    );
+    renderAt(pageOf("October Singles"));
+
+    const section = await screen.findByRole("region", {
+      name: "Final places",
+    });
+    const items = within(section).getAllByRole("listitem");
+    expect(items).toHaveLength(3);
+    const shared = items.at(2);
+    if (shared === undefined) {
+      throw new Error("The third place has a row");
+    }
+    expect(shared).toHaveTextContent("3.");
+    expect(within(shared).getAllByRole("paragraph")).toHaveLength(2);
+  });
+
   it("D03: a knockout shows its bracket and byes as byes, not as 0 : 0 matches", async () => {
     stubViewport(1280);
     renderAt(pageOf("Spring Cup"));
