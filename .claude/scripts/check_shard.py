@@ -2,10 +2,12 @@
 
 `--shard I/N` keeps the tests whose node id falls into shard I of N and deselects the
 rest. CRC-32 is the same in every process (unlike `hash()`), so the N shards together
-run every collected test exactly once. `--shard-report FILE` receives the line
-"<kept> <collected>", which check-backend.sh adds up to prove that.
+run every collected test exactly once, provided that they all collected the same node
+ids. `--shard-report FILE` receives the line "<kept> <collected> <digest of the node
+ids>", which check-backend.sh compares and adds up to prove that.
 """
 
+import hashlib
 import zlib
 from pathlib import Path
 
@@ -31,7 +33,10 @@ def pytest_collection_modifyitems(
     for item in items:
         in_shard = zlib.crc32(item.nodeid.encode()) % count == index
         (kept if in_shard else dropped).append(item)
-    Path(config.getoption("shard_report")).write_text(f"{len(kept)} {len(items)}\n")
+    digest = hashlib.sha256("\n".join(sorted(i.nodeid for i in items)).encode())
+    Path(config.getoption("shard_report")).write_text(
+        f"{len(kept)} {len(items)} {digest.hexdigest()}\n"
+    )
     if dropped:
         config.hook.pytest_deselected(items=dropped)
         items[:] = kept

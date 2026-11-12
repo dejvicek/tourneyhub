@@ -14,7 +14,8 @@ prefix=$2
 db=${TOURNEYHUB_DATABASE_URL%/*}
 out=$(mktemp -d)
 
-# Everything is kept out of /src: only .coverage is git-ignored there.
+# Logs, shard reports and coverage data go to $out, not /src, where only .coverage
+# and the tools' caches are git-ignored.
 (ruff format --check && ruff check && mypy && lint-imports &&
   python -W error -m tourneyhub.openapi | diff -u openapi.json -) >"$out/static.log" 2>&1 &
 static=$!
@@ -53,9 +54,11 @@ for pid in $pids; do
 done
 $failed && exit 1
 
-# Every shard must have collected the same tests, and together they must have run all.
+# Every shard must have collected the same tests (same count and same node ids), so
+# that the split by node id gives each test to exactly one shard; together they must
+# have run all of them.
 if ! awk -v shards="$shards" '
-      { kept += $1; if (NR == 1) total = $2; else if ($2 != total) differ = 1 }
+      { kept += $1; if (NR == 1) { total = $2; ids = $3 } else if ($2 != total || $3 != ids) differ = 1 }
       END {
         if (NR != shards || differ || kept != total) {
           printf "Error: %d shards ran %d of %d collected tests\n", NR, kept, total

@@ -34,11 +34,13 @@ main=$(dirname "$common")
 lock="$common/check-worktree.lock"
 mkdir "$lock" 2>/dev/null \
   || fail "another check is running (lock $lock). Wait for it. Remove the lock only if no check runs."
-frontend_pid=
+# The one-off containers get names of this run. Killing `docker compose run` (Ctrl-C,
+# a timeout) does not stop its container, so the cleanup removes them: an interrupted
+# run must not keep testing against the databases or the worktree of the next run.
+run_id="check-worktree-$$"
 frontend_log=
 cleanup() {
-  # An interrupted run must not leave the frontend checks running without the lock.
-  [ -z "$frontend_pid" ] || kill "$frontend_pid" 2>/dev/null
+  docker rm -f "$run_id-api" "$run_id-frontend" >/dev/null 2>&1
   [ -z "$frontend_log" ] || rm -f "$frontend_log"
   rmdir "$lock"
 }
@@ -104,7 +106,8 @@ fi
 # A one-off api container with the worktree's backend mounted over /src; the running
 # api container keeps serving the main checkout.
 run_backend() {
-  docker compose run --rm --no-deps -T -v "$wt/backend:/src" -v "$here:/check:ro" \
+  docker compose run --rm --no-deps -T --name "$run_id-api" \
+    -v "$wt/backend:/src" -v "$here:/check:ro" \
     api sh /check/check-backend.sh "$shards" tourneyhub_check
 }
 
@@ -112,7 +115,7 @@ run_backend() {
 # the host may not). node_modules is an anonymous volume, so the main stack's
 # frontend-node-modules volume stays untouched; it is removed with the container.
 run_frontend() {
-  docker compose run --rm --no-deps -T \
+  docker compose run --rm --no-deps -T --name "$run_id-frontend" \
     -v "$wt/frontend:/src/frontend" \
     -v /src/frontend/node_modules \
     -v "$wt/backend/openapi.json:/src/backend/openapi.json:ro" \
@@ -145,7 +148,6 @@ if $check_frontend; then
   if [ -n "$frontend_pid" ]; then
     wait "$frontend_pid"
     frontend_rc=$?
-    frontend_pid=
     cat "$frontend_log"
   else
     run_frontend
