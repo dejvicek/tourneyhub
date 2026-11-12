@@ -536,7 +536,7 @@ def make_tournament(
                     if monster
                     else PhaseFormat.ROUND_ROBIN,
                     round_robin_legs=None if monster else 1,
-                    sit_out_points=0,
+                    sit_out_points=0 if monster else None,
                     tiebreakers=list(DEFAULT_TIEBREAKERS) if monster else None,
                     match_format=MatchFormat.BO1,
                     created_at=now,

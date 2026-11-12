@@ -34,6 +34,8 @@ export const finals = {
       "The season was closed meanwhile, so nothing in it can change.",
     qualifiersChanged:
       "A group result changed who goes through, so the preview was refreshed. Check it and draw again.",
+    finalHasResult:
+      "The final has a result now, so its format cannot change. Clear the result first.",
   },
   place: {
     label: "{{place}}{{suffix}}",
@@ -99,6 +101,8 @@ export const finals = {
     placesLine: "{{place}}: {{names}}",
     placesLineShared: "{{place}}, shared: {{names}}",
     placesFinal: "1st and 2nd are decided by the final.",
+    finalFormat: "Format of the final",
+    finalFormatHint: "You can change it while the final has no result.",
     delete: "Delete the knockout",
     deleteTitle: "Delete the knockout?",
     deleteBody:
@@ -275,11 +279,14 @@ export const finals = {
   start: {
     title: "Start the knockout",
     qualifiersTitle: "Players who go through",
-    qualifiersHelp:
+    qualifiersTitlePairs: "Pairs who go through",
+    qualifiersHelp: "The best in the standings.",
+    qualifiersHelpMonster:
       "The best in the standings. Paired options need an even number.",
-    qualifiersValue: "Players who go through",
     decrease: "Fewer players",
+    decreasePairs: "Fewer pairs",
     increase: "More players",
+    increasePairs: "More pairs",
     thirdPlace: "Third-place match",
     thirdPlaceOff: "Off: both semifinal losers share 3rd place.",
     thirdPlaceOn: "On: the semifinal losers play for 3rd place.",
@@ -318,6 +325,9 @@ export const finals = {
     bye: "Bye",
     followLead: "Places {{from}} to {{to}} follow the standings.",
     lockTitle: "Round {{round}} locks",
+    lockTitleRoundRobin: "Round robin results lock",
+    lockBodyRoundRobin:
+      "Once the knockout is drawn, no round robin result can be changed. Delete the knockout to unlock them.",
     lockBody:
       "Once the knockout is drawn, round {{round}} results can't be changed. Delete the knockout to unlock them.",
     draw: "Draw the knockout",

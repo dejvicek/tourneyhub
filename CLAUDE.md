@@ -8,8 +8,12 @@ TourneyHub keeps long-term statistics for leagues of game nights (table football
 
 Tournament formats combine a **type** (Singles, Doubles, DYP, Monster DYP) with an optional **group phase** (round robin, Swiss or Monster DYP rounds) and an optional single-elimination **knockout**.
 
-- Singles, Doubles, round robin, Swiss and the knockout are meant to be **as fair as possible** for the players: seeding by league ranking, tie-breakers (head-to-head, score difference, BH1/BH2), no repeat opponents while that can be avoided.
+- Singles, Doubles, round robin, Swiss and the knockout are meant to be **as fair as possible** for the players: seeding by league ranking, tie-breakers (round robin: head-to-head between two level entries, then game difference, then score difference; Swiss and Monster DYP: BH1, BH2 and score difference in the organizer's order), no repeat opponents while that can be avoided.
 - **DYP** ("Draw Your Partner") and **Monster DYP** lean towards **casual players**: partners are drawn (top half + bottom half in DYP, new teams every round in Monster DYP), so weaker players play with stronger ones. Keep that intent when changing their rules: mixing players matters more there than strict fairness.
+
+## Ownership
+
+This codebase is yours: what it's for and how it's built are your call, and you'll keep building on it.
 
 ## Where the decisions live
 
@@ -106,6 +110,11 @@ Inside Docker: `docker compose exec frontend pnpm lint`.
 ### End-to-end (Playwright, against the prod stack)
 
 With `HTTP_PORT=8080` and `HTTPS_PORT=8443` in `.env` and the prod stack up: `cd frontend && pnpm e2e` (single spec: `pnpm e2e -g "name"`). `pnpm exec playwright install chromium` once.
+
+## Keep changes proportional
+
+- Don't add ADR history, extra CI checks or rewordings of business rules unless asked.
+- If a BR-xxx rule rewording changes meaning or gets longer, show before/after and ask first.
 
 ## Git workflow
 

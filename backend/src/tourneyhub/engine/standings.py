@@ -65,8 +65,8 @@ class StandingRow:
         drawn: Matches drawn.
         lost: Matches lost.
         sat_out: Rounds sat out (BR-051).
-        points: 2 per win, 1 per draw and the sit-out points per round sat
-            out (BR-070, BR-071).
+        points: 2 per win and 1 per draw (BR-070); a round sat out earns none
+            in a round robin (BR-071).
         score_difference: Goals for minus goals against, over the games with
             a score (BR-101).
         form: The entry's latest results, at most `FORM_LENGTH`, oldest first.
@@ -116,10 +116,13 @@ def round_robin_standings(
     *,
     matches: Iterable[PlayedMatch],
     sit_outs: Iterable[EntryId] = (),
-    sit_out_points: int = 0,
 ) -> tuple[StandingRow, ...]:
-    """Rank a round robin's entries (BR-070, BR-071, BR-101).
+    """Rank a round robin's entries (BR-070, BR-101).
 
+    Entries are ranked by the points of their matches (BR-070); a sit-out earns
+    none here, only Swiss and Monster DYP score one (BR-071): in a complete
+    round robin every entry sits out equally often, and with a late entry
+    (BR-054) the points would distort the order. A sit-out is still counted.
     Entries are ranked by points. When exactly two entries are level on
     points, the one with more points from the matches between them ranks
     higher; entries still level, and three or more level on points, are
@@ -132,9 +135,7 @@ def round_robin_standings(
         matches: The matches with a result, in schedule order; the form
             follows this order.
         sit_outs: One item per round an entry sat out (BR-051); the caller
-            decides which rounds count.
-        sit_out_points: The points of a sit-out: 0, 1 or 2
-            (FR-039, BR-071).
+            decides which rounds count. They are counted, not scored.
 
     Returns:
         One row per entry, best first.
@@ -180,7 +181,6 @@ def round_robin_standings(
     for entry_id in sit_outs:
         row = tally(entry_id)
         row.sat_out += 1
-        row.points += sit_out_points
 
     ranked = _rank(order, tallies, meetings)
     rows: list[StandingRow] = []

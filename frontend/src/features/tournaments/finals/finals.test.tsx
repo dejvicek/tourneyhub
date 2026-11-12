@@ -215,6 +215,93 @@ describe("Knockout (screen 9)", () => {
     expect(screen.getByText("Semifinal 1")).toBeInTheDocument();
   });
 
+  it("changes the final's format and reloads the bracket (FR-054, BR-120)", async () => {
+    const sent: unknown[] = [];
+    let bracketReads = 0;
+    server.use(
+      http.put(
+        "/api/v1/leagues/:leagueId/tournaments/:tournamentId/knockout/final-format",
+        async ({ request }) => {
+          sent.push(await request.clone().json());
+          return HttpResponse.json({});
+        },
+      ),
+      http.get(
+        "/api/v1/leagues/:leagueId/tournaments/:tournamentId/bracket",
+        () => {
+          bracketReads += 1;
+        },
+      ),
+    );
+    const user = userEvent.setup();
+    renderAt(at(paths.knockout, DYP_EVENING));
+
+    const picker = await screen.findByRole("radiogroup", {
+      name: "Format of the final",
+    });
+    expect(within(picker).getByRole("radio", { name: "BO3" })).toBeChecked();
+    const reads = bracketReads;
+    await user.click(within(picker).getByRole("radio", { name: "BO5" }));
+    await waitFor(() => {
+      expect(bracketReads).toBeGreaterThan(reads);
+    });
+    await user.click(
+      within(picker).getByRole("radio", { name: "Same as knockout" }),
+    );
+
+    await waitFor(() => {
+      expect(sent).toEqual([
+        { final_match_format: "bo5" },
+        { final_match_format: null },
+      ]);
+    });
+  });
+
+  it("says why the final's format cannot change once it has a result, after the reload hid the control (BR-096)", async () => {
+    server.use(
+      http.put(
+        "/api/v1/leagues/:leagueId/tournaments/:tournamentId/knockout/final-format",
+        async () => {
+          // Another screen played the final first: the reloaded bracket has its result.
+          await playFinal(DYP_EVENING);
+          return HttpResponse.json(
+            { code: "match_has_result", detail: { match_id: "x" } },
+            { status: 409 },
+          );
+        },
+      ),
+    );
+    const user = userEvent.setup();
+    renderAt(at(paths.knockout, DYP_EVENING));
+
+    const picker = await screen.findByRole("radiogroup", {
+      name: "Format of the final",
+    });
+    await user.click(within(picker).getByRole("radio", { name: "BO5" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The final has a result now, so its format cannot change.",
+    );
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("radiogroup", { name: "Format of the final" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "The final has a result now, so its format cannot change.",
+    );
+  });
+
+  it("offers no format change once the final has a result (FR-054)", async () => {
+    await playFinal(DYP_EVENING);
+    renderAt(at(paths.knockout, DYP_EVENING));
+
+    await screen.findByRole("link", { name: "Change result, Final" });
+    expect(
+      screen.queryByRole("radiogroup", { name: "Format of the final" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("has no axe violations", async () => {
     renderAt(at(paths.knockout, DYP_EVENING));
     await screen.findByText("Semifinal 1");
@@ -705,7 +792,7 @@ describe("Late and disabled players (screen 12)", () => {
 });
 
 describe("Start the knockout (screen 13)", () => {
-  it("offers the four modes from the rules and previews each", async () => {
+  it("offers the three modes from the rules and previews each", async () => {
     const user = userEvent.setup();
     renderAt(at(paths.startKnockout, MONSTER));
 
@@ -716,17 +803,16 @@ describe("Start the knockout (screen 13)", () => {
       within(modes)
         .getAllByRole("radio")
         .map((radio) => radio.parentElement?.textContent ?? ""),
-    ).toHaveLength(4);
-    for (const name of [
-      "Seeded pairs",
-      "Singles",
-      "A little mercy",
-      "Lord have mercy",
-    ]) {
+    ).toHaveLength(3);
+    for (const name of ["Seeded pairs", "Singles", "A little mercy"]) {
       expect(
         within(modes).getByRole("radio", { name: new RegExp(`^${name}`) }),
       ).toBeInTheDocument();
     }
+    // Not offered until the re-mix is built (issue #63).
+    expect(
+      within(modes).queryByRole("radio", { name: /^Lord have mercy/ }),
+    ).not.toBeInTheDocument();
     // Seeded pairs: 8 players make 4 pairs and semifinals.
     expect(screen.getAllByText("VS")).toHaveLength(2);
     expect(
@@ -746,6 +832,10 @@ describe("Start the knockout (screen 13)", () => {
     renderAt(at(paths.startKnockout, MONSTER));
     expect(await screen.findByText(/can't go through/)).toBeInTheDocument();
     expect(screen.getByText(/Round 5 locks/)).toBeInTheDocument();
+    // BR-080: only the Monster DYP pair options need an even number.
+    expect(
+      screen.getByText(/Paired options need an even number/),
+    ).toBeInTheDocument();
   });
 
   it("steps the players by two for pairs and by one for singles", async () => {
@@ -788,6 +878,42 @@ describe("Start the knockout (screen 13)", () => {
     );
     expect(await screen.findByText("Semifinal 1")).toBeInTheDocument();
     expect(screen.getByText("Third place")).toBeInTheDocument();
+  });
+
+  it("says that every round robin result locks, not one round (BR-053)", async () => {
+    renderAt(`${at(paths.startKnockout, ROUND_ROBIN_DONE)}?qualifiers=4`);
+
+    expect(
+      await screen.findByText("Round robin results lock"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^Round \d+ locks/)).not.toBeInTheDocument();
+  });
+
+  it("counts players after a Singles round robin, with no even-number hint (BR-080)", async () => {
+    renderAt(`${at(paths.startKnockout, ROUND_ROBIN_DONE)}?qualifiers=4`);
+
+    expect(
+      await screen.findByRole("status", { name: "Players who go through" }),
+    ).toHaveTextContent("4");
+    expect(screen.getByText("The best in the standings.")).toBeInTheDocument();
+    expect(screen.queryByText(/even number/)).not.toBeInTheDocument();
+  });
+
+  it("counts pairs after a Doubles round robin, with no even-number hint (BR-080)", async () => {
+    const tournament = db().tournaments.find((t) => t.id === ROUND_ROBIN_DONE);
+    if (tournament !== undefined) tournament.type = "doubles";
+    renderAt(`${at(paths.startKnockout, ROUND_ROBIN_DONE)}?qualifiers=4`);
+
+    expect(
+      await screen.findByRole("status", { name: "Pairs who go through" }),
+    ).toHaveTextContent("4");
+    expect(
+      screen.getByRole("button", { name: "Fewer pairs" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "More pairs" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/even number/)).not.toBeInTheDocument();
   });
 
   it("gives the knockout its format and the final its own (BR-120)", async () => {

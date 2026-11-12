@@ -16,7 +16,7 @@ export const dypFormat: Omit<TournamentCreate, "id"> = {
   type: "dyp",
   group_phase: "round_robin",
   round_robin_legs: 1,
-  sit_out_points: 0,
+  sit_out_points: null,
   group_match_format: "bo1",
   goals_per_game: 10,
   field_count: 2,
@@ -39,7 +39,9 @@ export async function createDraft(
   const base = {
     ...dypFormat,
     round_robin_legs: groupPhase === "round_robin" ? 1 : null,
-    sit_out_points: groupPhase === "none" ? null : 0,
+    // BR-071: only Swiss and Monster DYP take sit-out points, not a round robin.
+    sit_out_points:
+      groupPhase === "swiss" || groupPhase === "monster_dyp" ? 0 : null,
     group_match_format: groupPhase === "none" ? null : "bo1",
   } as const;
   await dataOf(

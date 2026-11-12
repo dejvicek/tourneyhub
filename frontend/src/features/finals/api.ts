@@ -8,6 +8,7 @@ import {
 
 import { api, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
+import type { components } from "@/api/schema";
 import type {
   DisabledWrite,
   KnockoutWrite,
@@ -17,6 +18,8 @@ import type {
 } from "@/demo/contract";
 import type { MonsterKnockoutMode } from "@/demo/rules";
 import { tournamentQueries } from "@/features/tournaments/api";
+
+type FinalFormatWrite = components["schemas"]["FinalFormatWrite"];
 
 // Provisional routes of the demo's contract, "finals" section
 // (src/demo/contract.ts), except the places (P8), the season effect (P10a) and
@@ -292,6 +295,26 @@ export const finalsMutations = {
         dataOf(
           api.PUT(
             "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout",
+            { params: { path: pathOf(leagueId, tournamentId).path }, body },
+          ),
+        ),
+      onSettled: () => settle(queryClient, leagueId),
+    }),
+  /**
+   * The final's own format, or null to play the knockout's, while the final
+   * has no result (FR-054, BR-120). A target value, so a repeat is harmless.
+   */
+  setFinalFormat: (
+    queryClient: QueryClient,
+    leagueId: string,
+    tournamentId: string,
+  ) =>
+    mutationOptions({
+      scope: scope(leagueId),
+      mutationFn: (body: FinalFormatWrite) =>
+        dataOf(
+          api.PUT(
+            "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout/final-format",
             { params: { path: pathOf(leagueId, tournamentId).path }, body },
           ),
         ),

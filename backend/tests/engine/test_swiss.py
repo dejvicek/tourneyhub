@@ -145,7 +145,7 @@ def test_br070_a_win_earns_2_a_draw_1_and_a_loss_0() -> None:
 
 
 @pytest.mark.parametrize("sit_out_points", [0, 1, 2])
-def test_br071_a_sit_out_earns_the_sit_out_points(sit_out_points: int) -> None:
+def test_br076_a_sit_out_earns_the_sit_out_points(sit_out_points: int) -> None:
     rounds = [round_(1, match(1, 2, WIN), sat_out=3)]
 
     lines = standings(ids(1, 2, 3), rounds, sit_out_points=sit_out_points)
@@ -153,6 +153,18 @@ def test_br071_a_sit_out_earns_the_sit_out_points(sit_out_points: int) -> None:
     assert lines[3].points == sit_out_points
     assert lines[3].sat_out == 1
     assert lines[3].played == 0
+
+
+@pytest.mark.parametrize("sit_out_points", [0, 1, 2])
+def test_br076_a_sit_out_counts_as_soon_as_its_round_is_drawn(
+    sit_out_points: int,
+) -> None:
+    rounds = [round_(1, match(1, 2, None), sat_out=3)]
+
+    lines = standings(ids(1, 2, 3), rounds, sit_out_points=sit_out_points)
+
+    assert (lines[3].points, lines[3].sat_out) == (sit_out_points, 1)
+    assert (lines[1].points, lines[1].played) == (0, 0)
 
 
 def test_br073_bh1_sums_the_opponents_points_and_bh2_their_bh1() -> None:
@@ -189,7 +201,7 @@ def test_br073_sit_outs_add_nothing_to_bh() -> None:
     assert lines[1].bh1 == lines[2].points + lines[3].points
 
 
-def test_br071_sit_out_points_count_in_the_points_that_bh1_and_bh2_sum() -> None:
+def test_br076_sit_out_points_count_in_the_points_that_bh1_and_bh2_sum() -> None:
     rounds = [
         round_(1, match(1, 2, WIN), sat_out=3),
         round_(2, match(3, 1, WIN), sat_out=2),

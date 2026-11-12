@@ -1,6 +1,6 @@
-"""The knockout after a group phase: preview, start, delete and the bracket.
+"""The knockout after a group phase: preview, start, final format, delete, bracket.
 
-FR-045, FR-046, BR-040 to BR-044, BR-080, BR-085 to BR-087, BR-094, BR-120.
+FR-045, FR-046, FR-054, BR-040 to BR-044, BR-080, BR-085 to BR-087, BR-094, BR-120.
 Results go through `PUT …/matches/{match_id}/result` (`api.tournaments`).
 The share link's bracket has an allowlisted model of its own (FR-070).
 """
@@ -124,6 +124,15 @@ class KnockoutWrite(RequestModel):
     match_format: KnockoutMatchFormat | None
     final_match_format: KnockoutMatchFormat | None
     mode: MonsterKnockoutMode | None
+
+
+class FinalFormatWrite(RequestModel):
+    """The final's own format, or null to play the knockout's (FR-054, BR-120).
+
+    BO2 is never a knockout's (BR-121).
+    """
+
+    final_match_format: KnockoutMatchFormat | None
 
 
 type MatchState = Literal["bye", "played", "on_field", "ready", "waiting"]
@@ -329,6 +338,34 @@ def start_knockout(
             final_match_format=body.final_match_format,
             mode=body.mode,
         ),
+        clock=clock,
+    )
+    return TournamentRead.model_validate(tournament)
+
+
+@router.put("/knockout/final-format", responses=_WRITE_ERRORS)
+def set_final_format(
+    league_id: UUID,
+    tournament_id: UUID,
+    body: FinalFormatWrite,
+    session: SessionDep,
+    user: CurrentUserDep,
+    clock: ClockDep,
+) -> TournamentRead:
+    """Change the final's format while the final has no result (FR-054, BR-120).
+
+    Null lets the final play the knockout's format again; the third-place
+    match always plays it. 404 `knockout_not_found` without a knockout. 409
+    `tournament_not_in_progress` in setup (detail `state`), `season_closed` or
+    `match_has_result` once the final has a result (BR-096, detail
+    `match_id`), so also in a finished tournament.
+    """
+    tournament = knockout_service.set_final_format(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user.id,
+        final_match_format=body.final_match_format,
         clock=clock,
     )
     return TournamentRead.model_validate(tournament)

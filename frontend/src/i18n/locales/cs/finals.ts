@@ -34,6 +34,8 @@ export const finals: CsMessages<Messages["finals"]> = {
       "Sezóna byla mezitím uzavřena, takže v ní už nic nejde změnit.",
     qualifiersChanged:
       "Výsledek ve skupině změnil, kdo postupuje, proto jsme náhled načetli znovu. Zkontrolujte ho a losujte znovu.",
+    finalHasResult:
+      "Finále už má výsledek, takže jeho formát nejde změnit. Nejdřív výsledek smažte.",
   },
   place: {
     label: "{{place}}{{suffix}}",
@@ -99,6 +101,8 @@ export const finals: CsMessages<Messages["finals"]> = {
     placesLine: "{{place}}: {{names}}",
     placesLineShared: "{{place}}, společně: {{names}}",
     placesFinal: "1. a 2. místo rozhodne finále.",
+    finalFormat: "Formát finále",
+    finalFormatHint: "Změnit ho jde, dokud finále nemá výsledek.",
     delete: "Smazat vyřazovací část",
     deleteTitle: "Smazat vyřazovací část?",
     deleteBody:
@@ -276,10 +280,13 @@ export const finals: CsMessages<Messages["finals"]> = {
   start: {
     title: "Začít vyřazovací část",
     qualifiersTitle: "Postupující hráči",
-    qualifiersHelp: "Nejlepší z tabulky. Dvojice potřebují sudý počet.",
-    qualifiersValue: "Postupující hráči",
+    qualifiersTitlePairs: "Postupující dvojice",
+    qualifiersHelp: "Nejlepší z tabulky.",
+    qualifiersHelpMonster: "Nejlepší z tabulky. Dvojice potřebují sudý počet.",
     decrease: "Méně hráčů",
+    decreasePairs: "Méně dvojic",
     increase: "Více hráčů",
+    increasePairs: "Více dvojic",
     thirdPlace: "Zápas o 3. místo",
     thirdPlaceOff: "Vypnuto: oba poražení semifinalisté sdílejí 3. místo.",
     thirdPlaceOn: "Zapnuto: poražení semifinalisté hrají o 3. místo.",
@@ -318,6 +325,9 @@ export const finals: CsMessages<Messages["finals"]> = {
     bye: "Volný los",
     followLead: "Místa {{from}} až {{to}} určuje tabulka kol.",
     lockTitle: "Kolo {{round}} se zamkne",
+    lockTitleRoundRobin: "Výsledky skupiny se zamknou",
+    lockBodyRoundRobin:
+      "Po rozlosování vyřazovací části už nejde měnit žádný výsledek skupiny. Smažte vyřazovací část a výsledky se odemknou.",
     lockBody:
       "Po rozlosování vyřazovací části už nejde měnit výsledky kola {{round}}. Smažte vyřazovací část a výsledky se odemknou.",
     draw: "Rozlosovat vyřazovací část",

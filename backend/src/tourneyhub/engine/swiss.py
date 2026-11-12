@@ -86,7 +86,7 @@ class SwissStanding:
             share a place (BR-074).
         place: The shown place: entries level on points and on every enabled
             tie-breaker share the position of the best of them (BR-074).
-        points: Points from results and sit-outs (BR-070, BR-071).
+        points: Points from results and sit-outs (BR-070, BR-076).
         bh1: The sum of the points of every opponent, once per match (BR-073).
         bh2: The sum of those opponents' BH1, once per match (BR-073).
         score_difference: Goals for minus goals against, entered scores only
@@ -96,7 +96,8 @@ class SwissStanding:
         drawn: Matches drawn.
         lost: Matches lost.
         sat_out: Rounds the entry sat out (BR-058); missed rounds of a
-            disabled or late entry do not count (BR-064, BR-067).
+            disabled or late entry do not count here (BR-064, BR-067, FR-060).
+            BR-058 counts them for the sit-out order only; issue #60 adds that.
         is_decided_by_lot: The entry shares its place, so the lot decided its
             position (ADR-009).
     """
@@ -184,7 +185,7 @@ def swiss_standings(
     """Compute the Swiss standings (BR-070 to BR-074, FR-043, FR-060).
 
     A win earns 2 points, a draw 1 and a loss 0 (BR-070); a sit-out earns
-    `sit_out_points`: 0, 1 or 2 (BR-071). Entries are ordered by points, then by
+    `sit_out_points`: 0, 1 or 2 (BR-071), as points (BR-076). Entries are ordered by points, then by
     `tiebreakers`: the enabled tie-breakers in the organizer's order, each
     higher first (BR-072, FR-043). BH1 sums the current points of every
     opponent, once per match, and BH2 sums those opponents' BH1; sit-outs add
@@ -390,6 +391,12 @@ def draw_next_swiss_round(
     sitting: SwissStanding | None = None
     is_sit_out_by_lot = False
     if len(active) % 2:
+        # BR-058 picks, in this order: entries that did not sit out the round
+        # before; the fewest sit-outs (a missed round counts as one, BR-064,
+        # BR-067); the entry whose sitting out leaves the fewest repeat
+        # opponents in the round (BR-057); the lowest place; then a lot
+        # (BR-074). This takes the fewest sit-outs and then the lowest place
+        # only. Issue #60 changes it.
         fewest = min(line.sat_out for line in active)
         candidates = [line for line in active if line.sat_out == fewest]
         sitting = candidates[-1]

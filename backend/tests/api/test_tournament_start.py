@@ -15,11 +15,13 @@ from tourneyhub.db.models.accounts import User
 from tourneyhub.db.models.entries import Entry
 from tourneyhub.db.models.leagues import League, Player
 from tourneyhub.db.models.matches import Match, MatchGame, Round
-from tourneyhub.db.models.tournaments import Field, Tournament
+from tourneyhub.db.models.tournaments import Field, Tournament, TournamentPhase
 from tourneyhub.engine.accounts import Language
 from tourneyhub.engine.tournaments import (
+    DEFAULT_TIEBREAKERS,
     GroupPhase,
     Outcome,
+    PhaseFormat,
     SeedingMethod,
     TournamentType,
 )
@@ -36,7 +38,7 @@ ROUND_ROBIN: Json = {
     "type": "singles",
     "group_phase": "round_robin",
     "round_robin_legs": 1,
-    "sit_out_points": 0,
+    "sit_out_points": None,
     "group_match_format": "bo1",
     "knockout_match_format": None,
     "final_match_format": None,
@@ -473,25 +475,92 @@ def test_owasp_api1_a_tournament_of_another_league_does_not_start(
 # ---------------------------------------------------------------- the read
 
 
-def test_br071_generating_fixes_the_sit_out_points(
-    client: TestClient, league: League, headers: dict[str, str], players: list[str]
+S1_WINS: Json = {
+    "walkover_winner": None,
+    "games": [{"winner": "side_1", "score_1": 10, "score_2": 7}],
+}
+
+
+def _as_swiss(session: Session, setup: Json, *, points: int) -> None:
+    """Make the started tournament's phase a Swiss one that has these sit-out points.
+
+    The backend does not generate Swiss rounds yet, so a running Swiss phase is made
+    from a started round robin: its rounds and matches stay, the phase's settings
+    change (BR-071: Swiss and Monster DYP score a sit-out, a round robin does not).
+    """
+    phase = session.scalars(
+        select(TournamentPhase)
+        .where(TournamentPhase.tournament_id == UUID(setup["tournament_id"]))
+        .execution_options(populate_existing=True)
+    ).one()
+    phase.format = PhaseFormat.SWISS
+    phase.round_robin_legs = None
+    phase.tiebreakers = list(DEFAULT_TIEBREAKERS)
+    phase.sit_out_points = points
+    session.flush()
+
+
+def _sit_out(
+    client: TestClient, league: League, headers: dict[str, str], tournament: Json
+) -> int | None:
+    read = client.get(_t_url(league, tournament["tournament_id"]), headers=headers)
+    [phase] = read.json()["phases"]
+    points: int | None = phase["sit_out_points"]
+    return points
+
+
+def _first_result(
+    client: TestClient, league: League, headers: dict[str, str], started: Json
 ) -> None:
-    setup = _setup(client, league, headers, players[:3], sit_out_points=None)
-    assert setup["format"]["sit_out_points"] == 1
+    match = next(
+        m
+        for r in started["rounds"]
+        for m in r["matches"]
+        if not any(side["is_bye"] for side in m["sides"])
+    )
+    response = client.put(
+        _t_url(league, started["id"], f"/matches/{match['id']}/result"),
+        json=S1_WINS,
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+
+
+def test_br075_the_sit_out_points_cannot_change_while_the_phase_has_a_result(
+    client: TestClient,
+    league: League,
+    headers: dict[str, str],
+    players: list[str],
+    session: Session,
+) -> None:
+    setup = _setup(client, league, headers, players[:3])
     started = _started(client, league, setup, headers)
+    _as_swiss(session, setup, points=2)
+    _first_result(client, league, headers, started)
 
     refused = client.put(
         _t_url(league, setup["tournament_id"], "/format"),
-        json={**ROUND_ROBIN, "group_match_format": "bo3", "sit_out_points": None},
+        json={
+            **ROUND_ROBIN,
+            "group_phase": "swiss",
+            "round_robin_legs": None,
+            "sit_out_points": 0,
+        },
         headers=headers,
     )
 
-    [phase] = started["phases"]
-    assert (phase["sit_out_points"], phase["sit_out_points_set_by_hand"]) == (1, False)
     assert refused.status_code == 409
     assert refused.json()["code"] == "tournament_not_in_setup"
-    read = client.get(_t_url(league, setup["tournament_id"]), headers=headers)
-    assert read.json()["phases"][0]["sit_out_points"] == 1
+    assert _sit_out(client, league, headers, setup) == 2
+
+
+def test_br071_a_running_round_robin_keeps_no_sit_out_points(
+    client: TestClient, league: League, headers: dict[str, str], players: list[str]
+) -> None:
+    setup = _setup(client, league, headers, players[:3])
+    _started(client, league, setup, headers)
+
+    assert _sit_out(client, league, headers, setup) is None
 
 
 def test_fr030_a_tournament_in_setup_reads_without_rounds(
@@ -515,8 +584,7 @@ def test_fr030_a_tournament_in_setup_reads_without_rounds(
             "kind": "group",
             "format": "round_robin",
             "round_robin_legs": 1,
-            "sit_out_points": 0,
-            "sit_out_points_set_by_hand": True,
+            "sit_out_points": None,
             "tiebreakers": None,
             "qualifiers": None,
             "third_place_match": None,

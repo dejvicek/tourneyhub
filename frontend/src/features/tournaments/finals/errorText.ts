@@ -11,6 +11,7 @@ const CODE_TEXTS = {
   phase_not_deletable: "finals.errors.phaseNotDeletable",
   season_closed: "finals.errors.seasonClosed",
   qualifiers_changed: "finals.errors.qualifiersChanged",
+  match_has_result: "finals.errors.finalHasResult",
 } as const satisfies Partial<Record<ErrorCode, string>>;
 
 function hasText(code: ErrorCode | undefined): code is keyof typeof CODE_TEXTS {

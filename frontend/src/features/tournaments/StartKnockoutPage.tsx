@@ -128,6 +128,9 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
   const placeLabel = usePlaceLabel();
   const roster = useRoster(leagueId, data.entries);
   const monster = group.format === "monster_dyp";
+  const roundRobin = group.format === "round_robin";
+  // BR-080, FR-045: Doubles and DYP entries are pairs, the stepper counts them.
+  const pairs = data.type === "doubles" || data.type === "dyp";
   // Screen 8 hands over its choices in the query; a bad value is ignored.
   const [search] = useSearchParams();
   const fromQuery = Number(search.get("qualifiers"));
@@ -248,10 +251,18 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
       >
         <div className="min-w-0 flex-1">
           <p id="qualifiers-label" className="text-body-md font-bold">
-            {t("finals.start.qualifiersTitle")}
+            {t(
+              pairs
+                ? "finals.start.qualifiersTitlePairs"
+                : "finals.start.qualifiersTitle",
+            )}
           </p>
           <p className="text-body-sm text-muted-foreground">
-            {t("finals.start.qualifiersHelp")}
+            {t(
+              monster
+                ? "finals.start.qualifiersHelpMonster"
+                : "finals.start.qualifiersHelp",
+            )}
           </p>
         </div>
         <Button
@@ -259,7 +270,9 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
           variant="outline"
           size="icon"
           disabled={shown <= minimum}
-          aria-label={t("finals.start.decrease")}
+          aria-label={t(
+            pairs ? "finals.start.decreasePairs" : "finals.start.decrease",
+          )}
           onClick={() => {
             changeQualifiers(shown - step);
           }}
@@ -268,7 +281,11 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
         </Button>
         <output
           aria-live="polite"
-          aria-label={t("finals.start.qualifiersValue")}
+          aria-label={t(
+            pairs
+              ? "finals.start.qualifiersTitlePairs"
+              : "finals.start.qualifiersTitle",
+          )}
           className="w-9 text-center font-display text-score-l"
         >
           {shown}
@@ -278,7 +295,9 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
           variant="outline"
           size="icon"
           disabled={shown >= maximum}
-          aria-label={t("finals.start.increase")}
+          aria-label={t(
+            pairs ? "finals.start.increasePairs" : "finals.start.increase",
+          )}
           onClick={() => {
             changeQualifiers(shown + step);
           }}
@@ -479,12 +498,20 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
           </p>
         )}
       </section>
-      <Notice
-        tone="warning"
-        title={t("finals.start.lockTitle", { round: plan.locks_round_no })}
-      >
-        {t("finals.start.lockBody", { round: plan.locks_round_no })}
-      </Notice>
+      {/* BR-053: a knockout locks all of a round robin's results, but only the
+          newest round of a Swiss or Monster DYP (BR-087). */}
+      {roundRobin ? (
+        <Notice tone="warning" title={t("finals.start.lockTitleRoundRobin")}>
+          {t("finals.start.lockBodyRoundRobin")}
+        </Notice>
+      ) : (
+        <Notice
+          tone="warning"
+          title={t("finals.start.lockTitle", { round: plan.locks_round_no })}
+        >
+          {t("finals.start.lockBody", { round: plan.locks_round_no })}
+        </Notice>
+      )}
     </div>
   );
 

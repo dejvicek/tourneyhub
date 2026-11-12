@@ -14,6 +14,7 @@ import { useLayout } from "@/hooks/useLayout";
 import { paths } from "@/lib/paths";
 
 import { describeError, describeRefusal, isChanged } from "./setup/errors";
+import { scoresSitOuts } from "./setup/format";
 import { Notice } from "./setup/Notice";
 import { type SetupData, SetupPage } from "./setup/SetupPage";
 import {
@@ -158,7 +159,7 @@ function Review({ data }: { data: SetupData }) {
               ? t("tournaments.setup.review.drawsAllowed")
               : t("tournaments.setup.review.drawsNotAllowed")}
           </SummaryRow>
-          {!noGroup && (
+          {scoresSitOuts(format.group_phase) && (
             <SummaryRow label={t("tournaments.setup.summary.sitOut")}>
               {sitOutLabel(t, format.sit_out_points)}
             </SummaryRow>
