@@ -170,7 +170,7 @@ export async function dataOf<T>(call: Promise<CallResult<T>>): Promise<T> {
   if (!response.ok) {
     throw new ApiError(response.status, error);
   }
-  // openapi-fetch returns the success member of its result union for a 2xx.
+  // eslint-disable-next-line no-restricted-syntax -- openapi-fetch returns the success member of its result union for a 2xx
   return data as T;
 }
 
