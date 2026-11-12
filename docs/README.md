@@ -9,6 +9,5 @@
 | | [diagrams/](architecture/diagrams/README.md) | A LikeC4 picture of the ADRs, the PRD and the data model. |
 | `style/` | [python-style.md](style/python-style.md) | How the backend's code is written. |
 | | [frontend-style.md](style/frontend-style.md) | How the frontend's code is written. |
-| `research/` | [best-practices-skills.md](research/best-practices-skills.md) | Whether generic best-practice skills for AI agents fit our stack (2026-11-12). |
 
 The PRD decides what, the ADRs and the data model decide how, and the style guides decide how the code is written; where a style guide and an ADR disagree, the ADR wins until it is changed. How to run the project is in the [README](../README.md) at the repository root.
