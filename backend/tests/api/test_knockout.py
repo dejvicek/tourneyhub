@@ -556,6 +556,7 @@ def test_fr045_a_knockout_after_swiss_is_not_supported_yet(
     phase = session.get_one(TournamentPhase, UUID(group_of(tournament)["id"]))
     phase.format = PhaseFormat.SWISS
     phase.round_robin_legs = None
+    phase.sit_out_points = 0
     phase.tiebreakers = ["bh1"]
     session.flush()
 
