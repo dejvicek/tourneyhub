@@ -607,7 +607,7 @@ def test_fr045_a_team_mode_after_a_round_robin_is_422(
     assert preview["problem"] == refusal
 
 
-def test_br120_bo2_is_never_a_knockouts(
+def test_br121_bo2_is_never_a_knockouts(
     played_group: Callable[..., Json],
     start_knockout: Callable[..., tuple[int, Json]],
 ) -> None:
