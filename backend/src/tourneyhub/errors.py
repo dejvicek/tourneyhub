@@ -89,7 +89,9 @@ class ErrorCode(StrEnum):
     FIELD_NOT_FOUND = "field_not_found"
     FIELD_NUMBER_CHANGED = "field_number_changed"  # the expected new number is stale
     FIELD_NOT_FREE = "field_not_free"  # another match is on it now
-    MATCH_HAS_RESULT = "match_has_result"  # a match placed by hand has a result now
+    # A match placed by hand has a result now (409), or the final whose format
+    # changes has one (422, FR-054, BR-096)
+    MATCH_HAS_RESULT = "match_has_result"
     PLACEMENT_CHANGED = "placement_changed"  # a match is not where the screen saw it
     PLACEMENT_NOT_ALLOWED = "placement_not_allowed"  # not one of the FR-093 operations
     LAST_FIELD = "last_field"  # the last field cannot be removed (BR-132)

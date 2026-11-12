@@ -1,6 +1,6 @@
-"""The knockout after a group phase: preview, start, delete and the bracket.
+"""The knockout after a group phase: preview, start, final format, delete, bracket.
 
-FR-045, FR-046, BR-040 to BR-044, BR-080, BR-085 to BR-087, BR-094, BR-120.
+FR-045, FR-046, FR-054, BR-040 to BR-044, BR-080, BR-085 to BR-087, BR-094, BR-120.
 Every write locks the league row, then the tournament row (ADR-008). Starting
 creates the knockout's entries, which continue the qualifying group-phase
 entries (`source_entry_id`, BR-085), and every bracket match at once, with
@@ -508,6 +508,58 @@ def _bracket_rounds(
             )
         )
     return rounds
+
+
+# ---------------------------------------------------------------- the final's format
+
+
+def set_final_format(
+    session: Session,
+    *,
+    league_id: UUID,
+    tournament_id: UUID,
+    user_id: UUID,
+    final_match_format: KnockoutMatchFormat | None,
+    clock: Clock,
+) -> TournamentView:
+    """Give the final a format of its own, or None to play the knockout's (FR-054).
+
+    The final is the standard match of the bracket's last round (D4, BR-120);
+    the third-place match keeps the knockout's format. The change is allowed
+    while the final has no result (BR-096): one with a result, which every
+    finished tournament's final has, is 422 `match_has_result` (detail
+    `match_id`). A closed season is 409 `season_closed`, a tournament in setup
+    409 `tournament_not_in_progress` (detail `state`), and a tournament
+    without a knockout 404 `knockout_not_found`. A repeat stores the same
+    format again (ADR-008).
+    """
+    league, tournament = _lock_tournament(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user_id,
+        rounds=True,
+    )
+    _require_open_season(league, tournament)
+    if tournament.state is TournamentState.SETUP:
+        raise ConflictError(
+            ErrorCode.TOURNAMENT_NOT_IN_PROGRESS, state=tournament.state
+        )
+    knockout = knockout_bracket(tournament)
+    if knockout is None:
+        raise NotFoundError(ErrorCode.KNOCKOUT_NOT_FOUND)
+    last = max(knockout.phase.rounds, key=lambda round_: round_.round_no)
+    final = next(m for m in last.matches if m.kind is MatchKind.STANDARD)
+    if final.outcome is not None:
+        raise RuleViolationError(ErrorCode.MATCH_HAS_RESULT, match_id=str(final.id))
+    now = clock()
+    knockout.phase.final_match_format = final_match_format
+    knockout.phase.updated_at = now
+    tournament.updated_at = now
+    session.flush()
+    return read_tournament(
+        session, league_id=league_id, tournament_id=tournament.id, user_id=user_id
+    )
 
 
 # ---------------------------------------------------------------- delete

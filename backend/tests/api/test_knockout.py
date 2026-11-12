@@ -1,5 +1,6 @@
-"""The knockout after a round robin (FR-037, FR-045, FR-046, BR-040 to BR-044,
-BR-053, BR-080, BR-085 to BR-087, BR-090, BR-094, BR-102, BR-103, BR-120, BR-130).
+"""The knockout after a round robin (FR-037, FR-045, FR-046, FR-054, BR-040 to
+BR-044, BR-053, BR-080, BR-085 to BR-087, BR-090, BR-094, BR-102, BR-103, BR-120,
+BR-130).
 """
 
 import threading
@@ -1002,6 +1003,164 @@ def test_br120_the_final_plays_its_own_format(
     assert read(started["id"], "")["state"] == "finished"
 
 
+# ---------------------------------------------------------------- the final's format
+
+
+@pytest.fixture
+def set_final(
+    client: TestClient, league_id: UUID, headers: dict[str, str]
+) -> Callable[[str, str | None], tuple[int, Json]]:
+    def set_final(tournament_id: str, final_format: str | None) -> tuple[int, Json]:
+        response = client.put(
+            _t_url(league_id, tournament_id, "/knockout/final-format"),
+            json={"final_match_format": final_format},
+            headers=headers,
+        )
+        result: Json = response.json()
+        return response.status_code, result
+
+    return set_final
+
+
+def test_fr054_br120_the_final_gets_a_format_of_its_own_after_the_start(
+    drawn: Json,
+    read: Callable[[str, str], Json],
+    set_final: Callable[[str, str | None], tuple[int, Json]],
+) -> None:
+    status, body = set_final(drawn["id"], "bo5")
+    bracket = read(drawn["id"], "/bracket")
+    matches = bracket_matches(bracket)
+
+    assert status == 200
+    assert knockout_of(body)["final_match_format"] == "bo5"
+    assert bracket["final_match_format"] == "bo5"
+    assert matches[3, "standard", 1]["match_format"] == "bo5"
+    assert matches[3, "third_place", 1]["match_format"] == "bo1"
+    assert matches[2, "standard", 1]["match_format"] == "bo1"
+
+
+def test_fr054_br120_a_cleared_final_format_plays_the_knockouts_again(
+    played_group: Callable[..., Json],
+    start_knockout: Callable[..., tuple[int, Json]],
+    read: Callable[[str, str], Json],
+    set_final: Callable[[str, str | None], tuple[int, Json]],
+) -> None:
+    _, started = start_knockout(
+        played_group(4), qualifiers=4, match_format="bo3", final_match_format="bo5"
+    )
+
+    status, body = set_final(started["id"], None)
+    repeated = set_final(started["id"], None)
+    bracket = read(started["id"], "/bracket")
+
+    assert status == 200
+    assert knockout_of(body)["final_match_format"] is None
+    assert repeated[0] == 200
+    assert bracket["final_match_format"] is None
+    assert bracket_matches(bracket)[2, "standard", 1]["match_format"] == "bo3"
+
+
+def test_fr054_br121_bo2_is_never_the_finals(
+    drawn: Json, set_final: Callable[[str, str | None], tuple[int, Json]]
+) -> None:
+    status, body = set_final(drawn["id"], "bo2")
+
+    assert status == 422
+    assert body["code"] == "validation_failed"
+
+
+def test_fr054_br096_br120_a_final_with_a_result_keeps_its_format(
+    drawn: Json,
+    read: Callable[[str, str], Json],
+    put_result: Callable[[str, str, Json], tuple[int, Json]],
+    set_final: Callable[[str, str | None], tuple[int, Json]],
+) -> None:
+    bracket = _play_to_the_semifinals(drawn, read, put_result)
+    for position in (1, 2):
+        put_result(
+            drawn["id"], bracket[2, "standard", position]["match_id"], win("side_1")
+        )
+    final = bracket[3, "standard", 1]["match_id"]
+    put_result(drawn["id"], final, win("side_1"))
+
+    refused = set_final(drawn["id"], "bo3")
+    put_result(drawn["id"], final, EMPTY)
+    cleared = set_final(drawn["id"], "bo3")
+
+    assert refused == (422, {"code": "match_has_result", "detail": {"match_id": final}})
+    assert cleared[0] == 200
+    assert read(drawn["id"], "/bracket")["final_match_format"] == "bo3"
+
+
+def test_fr054_br120_a_finished_tournaments_final_keeps_its_format(
+    drawn: Json,
+    read: Callable[[str, str], Json],
+    put_result: Callable[[str, str, Json], tuple[int, Json]],
+    set_final: Callable[[str, str | None], tuple[int, Json]],
+) -> None:
+    bracket = _play_out(drawn, read, put_result)
+
+    status, body = set_final(drawn["id"], "bo3")
+
+    assert read(drawn["id"], "")["state"] == "finished"
+    assert status == 422
+    assert body["code"] == "match_has_result"
+    assert body["detail"] == {"match_id": bracket[3, "standard", 1]["match_id"]}
+
+
+def test_fr054_br120_a_tournament_without_a_knockout_has_no_final_to_change(
+    played_group: Callable[..., Json],
+    set_final: Callable[[str, str | None], tuple[int, Json]],
+) -> None:
+    status, body = set_final(played_group(4)["id"], "bo3")
+
+    assert (status, body) == (404, {"code": "knockout_not_found", "detail": {}})
+
+
+def test_fr054_br120_the_final_of_a_tournament_in_setup_is_409(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    set_final: Callable[[str, str | None], tuple[int, Json]],
+) -> None:
+    body = {"id": str(uuid7()), **ROUND_ROBIN}
+    created = client.post(_url(league_id, "/tournaments"), json=body, headers=headers)
+
+    status, result = set_final(created.json()["tournament_id"], "bo3")
+
+    assert status == 409
+    assert result == {
+        "code": "tournament_not_in_progress",
+        "detail": {"state": "setup"},
+    }
+
+
+def test_fr054_br120_br011_the_final_of_a_closed_season_is_409(
+    drawn: Json,
+    session: Session,
+    now: datetime,
+    set_final: Callable[[str, str | None], tuple[int, Json]],
+) -> None:
+    season = session.get_one(Season, UUID(drawn["season_id"]))
+    season.state, season.closed_at = SeasonState.CLOSED, now
+    session.flush()  # season 1 closes before season 2 becomes the active one
+    session.add(
+        Season(
+            league_id=season.league_id,
+            number=2,
+            state=SeasonState.ACTIVE,
+            placement_points=season.placement_points,
+            started_at=now,
+            created_at=now,
+        )
+    )
+    session.flush()
+
+    status, body = set_final(drawn["id"], "bo3")
+
+    assert (status, body) == (409, {"code": "season_closed", "detail": {}})
+
+
 # ---------------------------------------------------------------- places
 
 
@@ -1196,6 +1355,7 @@ def test_d4_a_tournament_without_a_knockout_has_no_bracket(
         ("get", "/bracket", None),
         ("get", "/knockout/preview?qualifiers=2&third_place_match=false", None),
         ("put", "/knockout", "start"),
+        ("put", "/knockout/final-format", "final"),
         ("delete", "/phases/{phase}", None),
     ],
 )
@@ -1211,20 +1371,24 @@ def test_api1_another_organizers_knockout_is_not_found(
 ) -> None:
     other = make_league()
     url = _t_url(league_id, drawn["id"], rest.format(phase=knockout_of(drawn)["id"]))
-    payload = {
-        "expected_current_phase_id": drawn["current_phase_id"],
-        "expected_qualifier_ids": [],
-        "qualifiers": 2,
-        "third_place_match": False,
-        "match_format": None,
-        "final_match_format": None,
-        "mode": None,
+    payloads: dict[str | None, Json | None] = {
+        None: None,
+        "start": {
+            "expected_current_phase_id": drawn["current_phase_id"],
+            "expected_qualifier_ids": [],
+            "qualifiers": 2,
+            "third_place_match": False,
+            "match_format": None,
+            "final_match_format": None,
+            "mode": None,
+        },
+        "final": {"final_match_format": "bo3"},
     }
 
     response = client.request(
         method,
         url,
-        json=payload if body else None,
+        json=payloads[body],
         headers=auth_header(other.owner_user_id),
     )
 
