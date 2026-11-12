@@ -1089,7 +1089,10 @@ export function preview(t: StoredTournament): SchedulePreview {
   };
 }
 
-/** The most entries a round robin is generated for; the backend's limit (FR-032). */
+/**
+ * The most entries a round robin is generated for; the backend's limit (FR-032).
+ * FR-032 now says 16; the change is the #48 follow-up (issue to open after approval).
+ */
 export const MAX_ROUND_ROBIN_ENTRIES = 64;
 
 /**
@@ -1191,7 +1194,11 @@ export function start(
   return null;
 }
 
-/** FR-036: back to setup is possible until the first result is entered. */
+/**
+ * FR-036: back to setup is possible while no match in the tournament has a
+ * result (BR-096): until the first result is entered, and again once every
+ * result is cleared (FR-053). This demo counts the matches with an outcome.
+ */
 export function backToSetup(t: StoredTournament): SetupFailure | null {
   if (t.state !== "in_progress") {
     return fail(409, "tournament_not_in_progress", { state: t.state });

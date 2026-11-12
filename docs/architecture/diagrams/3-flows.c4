@@ -321,10 +321,10 @@ views "III. Flows" {
     variant sequence
     title "17. Players of a league"
     order 22
-    description "FR-012, BR-001, BR-002 and ADR-002: names are unique in a league ignoring case, and a removed player keeps their name. Adding a removed player's name is refused with the holder, so the UI can ask whether it is the same person and restore that player. Removing and restoring send the target state."
+    description "FR-012, BR-001, BR-002, BR-006 and ADR-002: names are unique in a league ignoring case, and a removed player keeps their name. Adding a removed player's name is refused with the holder, so the UI can ask whether it is the same person and restore that player. A league holds at most 1000 active players (BR-006). Removing and restoring send the target state."
     organizer -> tourneyhub.spa.organizerUi "adds a player"
     tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "POST player"
-    tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "locks the league, looks up lower(name) among all players"
+    tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "locks the league, counts the active players (BR-006), looks up lower(name) among all players"
     alt {
       when "the name is free" {
         tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "inserts the player"
@@ -337,7 +337,7 @@ views "III. Flows" {
     organizer -> tourneyhub.spa.organizerUi "confirms it is the same person"
     tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "PUT removed: false"
     tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "locks the league, clears removed_at"
-    tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "200: the same player, history intact"
+    tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "200: the same player, history intact; 422 player_limit_reached over the limit"
     organizer -> tourneyhub.spa.organizerUi "renames a player, removed or not"
     tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "PUT name"
     tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "locks the league, looks up lower(name) among the other players"
@@ -392,7 +392,7 @@ views "III. Flows" {
     variant sequence
     title "19. Generate and start, back to setup"
     order 23
-    description "FR-035, FR-036, BR-050 to BR-052, BR-130, ADR-008 and ADR-010: the review screen reads the preview first, which runs the same checks and the same round robin without writing and returns the draw counter. Starting carries that counter. The engine makes the round robin from the seeds and fills the fields; the schedule is stored in one transaction. Back to setup deletes the schedule until the first result and keeps the draws. Only the round robin is generated so far."
+    description "FR-035, FR-036, BR-050 to BR-052, BR-130, ADR-008 and ADR-010: the review screen reads the preview first, which runs the same checks and the same round robin without writing and returns the draw counter. Starting carries that counter. The engine makes the round robin from the seeds and fills the fields; the schedule is stored in one transaction. Back to setup deletes the schedule while no match in the tournament has a result (FR-036, BR-096) and keeps the draws. Only the round robin is generated so far."
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "GET setup/preview"
     tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "same checks and round robin as the start, nothing written"
     tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: rounds and counts, or the reason it cannot start; the draw counter"
@@ -400,7 +400,7 @@ views "III. Flows" {
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "POST start with the expected draw counter"
     tourneyhub.api.tournamentsApi -> tourneyhub.db.leagues "locks the league"
     tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the tournament: started 409, stale counter 409"
-    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "setup complete? pairs, halves, FR-032 minimum, at most 64 entries in a round robin: else 422"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "setup complete? pairs, halves, FR-032 minimum, at most 16 entries in a round robin (FR-032; the code still stops at 64): else 422"
     tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "round robin by seed: circle method, one sit-out per round with an odd count"
     tourneyhub.api.tournamentsApi -> tourneyhub.db.play "rounds, matches, sides with their players, participation: bulk inserts"
     tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "free fields take the first matches whose players are free"
@@ -410,11 +410,11 @@ views "III. Flows" {
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "POST back-to-setup expecting in_progress"
     tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the league, then the tournament"
     alt {
-      when "no result yet" {
+      when "no match has a result (BR-096)" {
         tourneyhub.api.tournamentsApi -> tourneyhub.db.play "frees the fields, deletes the rounds; entries, seeds and draws stay"
         tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: the tournament in setup"
       }
-      when "a match has a result" {
+      when "some match has a result (BR-096)" {
         tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "422 tournament_has_results"
       }
       when "not in progress (a repeat)" {
@@ -427,7 +427,7 @@ views "III. Flows" {
     variant sequence
     title "20. Standings, finishing a round robin and the season standings"
     order 24
-    description "FR-040, FR-060, BR-070, BR-101, BR-103, BR-110, BR-111 and ADR-009: the play read computes the waiting list and the round robin's standings from the stored results; a round robin has no points for sitting out (BR-071). When every match has a result, the organizer confirms in the UI and finishes. The places and season points are computed on read, from the standings and the season's placement points table; nothing derived is stored. The season standings sum the points of the season's finished tournaments on read (BR-112, BR-113). A knockout after the round robin is P10."
+    description "FR-040, FR-060, BR-070, BR-071, BR-101, BR-103, BR-110, BR-111 and ADR-009: the play read computes the waiting list and the round robin's standings from the stored results; a sit-out is counted once its round is played and earns no points in a round robin (BR-071: only Swiss and Monster DYP score it). When every match has a result, the organizer confirms in the UI and finishes. The places and season points are computed on read, from the standings and the season's placement points table; nothing derived is stored. The season standings sum the points of the season's finished tournaments on read (BR-112, BR-113). A knockout after the round robin is P10."
     organizer -> tourneyhub.spa.organizerUi "opens the schedule or the Standings tab"
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "GET …/play"
     tourneyhub.api.tournamentsApi -> tourneyhub.db.play "loads the rounds, results, games and participation"
@@ -460,7 +460,7 @@ views "III. Flows" {
     variant sequence
     title "21. Fields during play"
     order 25
-    description "FR-090 to FR-094, BR-130 to BR-134 and ADR-008: the organizer adds and removes fields and places matches by hand while the tournament runs. Each write locks the league, then the tournament, and sends a target state: a new field carries the number it expects, a field is removed by its id, a placement names each match with its field or with none (a swap names both). The engine refuses a player on two fields; the freed fields take the next waiting match, except one the request sent back to waiting. The waiting list is computed on read."
+    description "FR-090 to FR-094, BR-130 to BR-134 and ADR-008: the organizer adds and removes fields and places matches by hand while the tournament runs. Each write locks the league, then the tournament, and sends a target state: a new field carries the number it expects, a field is removed by its id, a placement names each match with its field or with none (a swap names both). The engine refuses a player on two fields; the freed fields take the next waiting match, except one the request sent back to waiting: that match is held (BR-133, BR-136), stays in the waiting list marked held and takes no field by itself until it is placed again, released or has a result. The waiting list is computed on read."
     organizer -> tourneyhub.spa.organizerUi "Manage fields: Add a field"
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "POST …/fields with the expected number, the lowest free one"
     tourneyhub.api.tournamentsApi -> tourneyhub.db.leagues "locks the league"
@@ -479,11 +479,17 @@ views "III. Flows" {
         tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "422 player_on_another_field"
       }
       when "otherwise" {
-        tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "places by hand; the freed fields take the next waiting matches, not the ones sent back"
+        tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "places by hand; the freed fields take the next waiting matches, not the held ones sent back (BR-133)"
         tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "fields hold their new matches; a match placed by hand stays until its result"
         tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: the tournament with its fields and waiting list"
       }
     }
+    organizer -> tourneyhub.spa.organizerUi "releases a held match"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "PUT …/fields/placements: the match waiting, not held"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the league, then the tournament; a match not held now is 409 placement_changed"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.play "clears held_at; the match keeps its place in schedule order (BR-136)"
+    tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "free fields are filled as after any write: the released match can take one if it is the first that can be played"
+    tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: the tournament with its fields and waiting list"
     organizer -> tourneyhub.spa.organizerUi "removes a field after confirming"
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "DELETE …/fields/{id}; a repeat 404, the last field 422"
     tourneyhub.api.tournamentsApi -> tourneyhub.db.play "its match goes to the front of the waiting list (requeued_at)"
