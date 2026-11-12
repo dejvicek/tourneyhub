@@ -52,6 +52,7 @@ export const authMutations = {
         );
         setAccessToken(access_token);
       },
+      // eslint-disable-next-line no-restricted-syntax -- only a success sets the token; a failure leaves nothing to reload
       onSuccess: () => queryClient.invalidateQueries({ queryKey: ["me"] }),
     }),
   signUp: (queryClient: QueryClient) =>
@@ -70,6 +71,7 @@ export const authMutations = {
         );
         setAccessToken(access_token);
       },
+      // eslint-disable-next-line no-restricted-syntax -- only a success sets the token; a failure leaves nothing to reload
       onSuccess: () => queryClient.invalidateQueries({ queryKey: ["me"] }),
     }),
   changePassword: () =>

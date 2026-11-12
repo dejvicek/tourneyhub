@@ -345,6 +345,7 @@ export const finalsMutations = {
         ),
       // The bracket is gone: drop it, so that the refresh after the delete
       // does not ask for it again (404) before the screen leaves.
+      // eslint-disable-next-line no-restricted-syntax -- drops the deleted bracket; onSettled reloads
       onSuccess: () => {
         queryClient.removeQueries({
           queryKey: [...tournamentKey(leagueId, tournamentId), "bracket"],

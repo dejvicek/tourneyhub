@@ -176,6 +176,14 @@ const mockApiSyntax = ["value", "source.value"].map((specifier) => ({
   message:
     "frontend-style §10.1: mock the network with MSW, never the API modules.",
 }));
+const mutationSyntax = [
+  {
+    selector:
+      "CallExpression[callee.name='mutationOptions'] > ObjectExpression > Property[key.name='onSuccess']",
+    message:
+      "frontend-style §8.1: cache work after a mutation goes in onSettled. A real exception gets an eslint-disable-next-line with its reason.",
+  },
+];
 const appSyntax = [
   ...forwardRefSyntax,
   ...optimisticSyntax,
@@ -394,6 +402,13 @@ export default defineConfig([
     files: ["src/features/*/api.ts"],
     rules: {
       "no-restricted-imports": restrictImports(appFromFeature, demoInternals),
+      "no-restricted-syntax": [
+        "error",
+        ...appSyntax,
+        ...assertionSyntax,
+        ...queryClientSyntax,
+        ...mutationSyntax,
+      ],
     },
   },
   {
