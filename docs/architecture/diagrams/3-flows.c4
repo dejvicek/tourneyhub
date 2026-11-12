@@ -321,38 +321,32 @@ views "III. Flows" {
     variant sequence
     title "17. Players of a league"
     order 22
-    description "FR-012, BR-001, BR-004 to BR-006 and ADR-002: names may repeat in a league, but name and note together may not, removed players counted. An add or a rename to a name that another player has, ignoring case, needs a note that makes the pair differ; without one it is answered 422 player_name_taken with the players who have the name. The UI asks for the note and, if a holder is removed, offers to restore them. A restore never creates a duplicate, so it checks no name. Removing and restoring send the target state."
+    description "FR-012, BR-001, BR-002, BR-006 and ADR-002: names are unique in a league ignoring case, and a removed player keeps their name. Adding a removed player's name is refused with the holder, so the UI can ask whether it is the same person and restore that player. A league holds at most 1000 active players (BR-006). Removing and restoring send the target state."
     organizer -> tourneyhub.spa.organizerUi "adds a player"
     tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "POST player"
     tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "locks the league, counts the active players (BR-006), looks up lower(name) among all players"
     alt {
-      when "no player has the name" {
+      when "the name is free" {
         tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "inserts the player"
         tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "201: the player"
       }
-      when "a player has it, and no note or the same note" {
-        tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "422 player_name_taken: the holders with their notes and whether removed"
-      }
-      when "a player has it, and a note that tells them apart" {
-        tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "inserts the player with the note (BR-004)"
-        tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "201: the player"
+      when "a player has it" {
+        tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "422 player_name_taken: the holder and whether removed"
       }
     }
-    organizer -> tourneyhub.spa.organizerUi "warned: adds a note to tell the new player apart"
-    tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "POST player again with the note"
-    organizer -> tourneyhub.spa.organizerUi "or: it is the same person as a removed holder"
+    organizer -> tourneyhub.spa.organizerUi "confirms it is the same person"
     tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "PUT removed: false"
-    tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "locks the league, clears removed_at; no name check, the unique index already counts removed players"
+    tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "locks the league, clears removed_at"
     tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "200: the same player, history intact; 422 player_limit_reached over the limit"
     organizer -> tourneyhub.spa.organizerUi "renames a player, removed or not"
     tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "PUT name"
-    tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "locks the league, looks up lower(name) and the note among the other players"
+    tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "locks the league, looks up lower(name) among the other players"
     alt {
-      when "no other player has the name, or the player has a note and no other player has the same name and note" {
+      when "the name is free" {
         tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "200: the player with the new name"
       }
-      when "another player has the name, and the player has no note or the same note" {
-        tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "422 player_name_taken: the holders; the UI asks for a note"
+      when "another player has it" {
+        tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "422 player_name_taken: the holder (409 if a write without the lock won the race)"
       }
     }
     organizer -> tourneyhub.spa.organizerUi "removes a player"
@@ -406,7 +400,7 @@ views "III. Flows" {
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "POST start with the expected draw counter"
     tourneyhub.api.tournamentsApi -> tourneyhub.db.leagues "locks the league"
     tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the tournament: started 409, stale counter 409"
-    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "setup complete? pairs, halves, FR-032 minimum, at most 256 entries in a round robin (FR-032): else 422"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "setup complete? pairs, halves, FR-032 minimum, at most 16 entries in a round robin (FR-032; the code still stops at 64): else 422"
     tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "round robin by seed: circle method, one sit-out per round with an odd count"
     tourneyhub.api.tournamentsApi -> tourneyhub.db.play "rounds, matches, sides with their players, participation: bulk inserts"
     tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "free fields take the first matches whose players are free"
