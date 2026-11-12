@@ -26,6 +26,14 @@ MIN_KNOCKOUT_ENTRIES = 2
 MIN_KNOCKOUT_ENTRIES_WITH_THIRD_PLACE = 4
 """The fewest entries of a knockout with a third-place match (BR-080)."""
 
+MAX_KNOCKOUT_ENTRIES = 256
+"""The most entries a knockout without a group phase is drawn for (FR-032).
+
+FR-032 sets no maximum, but a technical one must still allow 256 entries. A
+bracket of 256 has 8 rounds, the first named `round_of_256`; one entry more
+would need a bracket of 512.
+"""
+
 KNOCKOUT_SEEDING_PURPOSE = "knockout-seeding"
 """The lot that orders entries still level for the knockout's cut and seeding.
 

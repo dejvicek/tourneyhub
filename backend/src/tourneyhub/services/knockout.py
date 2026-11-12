@@ -20,12 +20,11 @@ from sqlalchemy.orm import Session
 
 from tourneyhub.db.models.entries import Entry, EntryMember
 from tourneyhub.db.models.leagues import League
-from tourneyhub.db.models.matches import Match, MatchSide, MatchSidePlayer, Round
+from tourneyhub.db.models.matches import Match
 from tourneyhub.db.models.tournaments import Tournament, TournamentPhase
 from tourneyhub.engine.errors import EngineError
 from tourneyhub.engine.ids import EntryId
 from tourneyhub.engine.knockout import (
-    Bracket,
     BracketMatch,
     Cut,
     FirstRoundMatch,
@@ -62,6 +61,7 @@ from tourneyhub.services.tournaments import (
     Clock,
     KnockoutBracket,
     TournamentView,
+    _bracket_rounds,
     _current_phase,
     _fill_fields,
     _group_phase,
@@ -461,53 +461,6 @@ def _knockout_entries(
         tournament.entries.append(entry)
         created.append(entry)
     return created
-
-
-def _bracket_rounds(
-    bracket: Bracket, members: dict[UUID, list[EntryMember]], now: datetime
-) -> list[Round]:
-    """Every round of the bracket; only the first round stores its sides (D4)."""
-    rounds = [
-        Round(
-            id=uuid7(), round_no=round_no, created_at=now, matches=[], participation=[]
-        )
-        for round_no in range(1, bracket.round_count + 1)
-    ]
-    first = {match.position: match for match in bracket.first_round}
-    for key in bracket.keys:
-        sides: list[MatchSide] = []
-        if key.round_no == 1:
-            stored = first[key.position]
-            sides = [
-                MatchSide(
-                    side=number,
-                    entry_id=entry_id,
-                    is_bye=entry_id is None,
-                    created_at=now,
-                    players=[
-                        MatchSidePlayer(
-                            side=number, player_id=member.player_id, created_at=now
-                        )
-                        for member in ([] if entry_id is None else members[entry_id])
-                    ],
-                )
-                for number, entry_id in ((1, stored.side_1), (2, stored.side_2))
-            ]
-        rounds[key.round_no - 1].matches.append(
-            Match(
-                id=uuid7(),
-                position=key.position,
-                kind=key.kind,
-                outcome=None,
-                is_walkover=False,
-                result_entered_at=None,
-                requeued_at=None,
-                created_at=now,
-                sides=sides,
-                games=[],
-            )
-        )
-    return rounds
 
 
 # ---------------------------------------------------------------- the final's format

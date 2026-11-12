@@ -68,6 +68,7 @@ class ErrorCode(StrEnum):
     # FR-032: 64 entries today, 16 after the #48 follow-up (issue to open after
     # approval).
     TOO_MANY_ENTRIES_FOR_ROUND_ROBIN = "too_many_entries_for_round_robin"
+    TOO_MANY_ENTRIES_FOR_KNOCKOUT = "too_many_entries_for_knockout"  # 256
     # Results, standings and finishing
     MATCH_NOT_FOUND = "match_not_found"
     MATCH_SIDES_UNKNOWN = "match_sides_unknown"  # BR-091

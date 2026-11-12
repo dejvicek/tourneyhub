@@ -192,15 +192,122 @@ export async function startDypRoundRobin(
     data: { player_ids: playerIds },
   });
   expect(picked.status(), "picking the players").toBe(200);
-  const { draw_counter: drawCounter } = (await picked.json()) as {
+  const setup = (await picked.json()) as {
     draw_counter: number;
+    entries: { id: string; seed: number | null }[];
   };
   const started = await request.post(`${base}/${tournamentId}/start`, {
     headers,
-    data: { expected_draw_counter: drawCounter },
+    data: {
+      expected_draw_counter: setup.draw_counter,
+      expected_seed_order: setup.entries
+        .toSorted((a, b) => (a.seed ?? 0) - (b.seed ?? 0))
+        .map((entry) => entry.id),
+    },
   });
   expect(started.status(), "starting the tournament").toBe(200);
   return tournamentId;
+}
+
+/**
+ * Creates a Singles knockout without a group phase (FR-031) of the given
+ * players on two fields, BO1 and no third-place match, and picks them; the
+ * seeds follow the league ranking. Returns the tournament's id, in setup.
+ */
+export async function setUpKnockoutOnly(
+  request: APIRequestContext,
+  token: string,
+  leagueId: string,
+  { name, playerIds }: { name: string; playerIds: readonly string[] },
+): Promise<string> {
+  const headers = { Authorization: `Bearer ${token}` };
+  const base = `/api/v1/leagues/${leagueId}/tournaments`;
+  const created = await request.post(base, {
+    headers,
+    data: {
+      id: uuid7(),
+      name,
+      date: new Date().toISOString().slice(0, 10),
+      type: "singles",
+      group_phase: "none",
+      round_robin_legs: null,
+      sit_out_points: null,
+      group_match_format: null,
+      knockout_match_format: "bo1",
+      final_match_format: null,
+      third_place_match: false,
+      goals_per_game: 10,
+      field_count: 2,
+    },
+  });
+  expect(created.status(), "creating the tournament").toBe(201);
+  const { tournament_id: tournamentId } = (await created.json()) as {
+    tournament_id: string;
+  };
+  const picked = await request.put(`${base}/${tournamentId}/setup/players`, {
+    headers,
+    data: { player_ids: playerIds },
+  });
+  expect(picked.status(), "picking the players").toBe(200);
+  return tournamentId;
+}
+
+interface BracketMatch {
+  match_id: string;
+  number: number | null;
+  state: string;
+  sides: { entry_id: string | null; seed: number | null }[];
+}
+
+/**
+ * Plays every knockout match over the API in match order, the better seed
+ * winning 10:6; each result names the sides the bracket showed (BR-094).
+ * Returns the number of matches played.
+ */
+export async function playBracket(
+  request: APIRequestContext,
+  token: string,
+  leagueId: string,
+  tournamentId: string,
+): Promise<number> {
+  const headers = { Authorization: `Bearer ${token}` };
+  const tournament = `/api/v1/leagues/${leagueId}/tournaments/${tournamentId}`;
+  let played = 0;
+  for (;;) {
+    const response = await request.get(`${tournament}/bracket`, { headers });
+    expect(response.status()).toBe(200);
+    const bracket = (await response.json()) as {
+      rounds: { matches: BracketMatch[] }[];
+    };
+    const next = bracket.rounds
+      .flatMap((round) => round.matches)
+      .filter((match) => match.state === "ready" || match.state === "on_field")
+      .toSorted((a, b) => (a.number ?? 0) - (b.number ?? 0))[0];
+    if (next === undefined) {
+      return played;
+    }
+    const [one, two] = next.sides.map((side) => side.seed ?? Infinity);
+    const sideOne = (one ?? Infinity) < (two ?? Infinity);
+    const result = await request.put(
+      `${tournament}/matches/${next.match_id}/result`,
+      {
+        headers,
+        data: {
+          walkover_winner: null,
+          games: [
+            {
+              winner: sideOne ? "side_1" : "side_2",
+              score_1: sideOne ? 10 : 6,
+              score_2: sideOne ? 6 : 10,
+            },
+          ],
+          expected_sides: next.sides.map((side) => side.entry_id),
+        },
+      },
+    );
+    expect(result.status(), `result of match ${String(next.number)}`).toBe(200);
+    played += 1;
+  }
 }
 
 /** A UUIDv7, as a client makes one for a new tournament (ADR-008). */

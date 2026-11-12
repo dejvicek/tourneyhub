@@ -304,6 +304,7 @@ export const tournamentsSetup = {
       round: "Round {{round}}",
       versus: "VS",
       sitsOut: "Sits out: {{names}}",
+      byes: "Straight to round 2 (bye): {{names}}",
       bracketNote:
         "The bracket has {{size}} places. Later rounds fill in as winners are known.",
       nextRoundsNote: "You add the next rounds yourself, one at a time.",
@@ -322,6 +323,8 @@ export const tournamentsSetup = {
     generic: "Something went wrong. Try again.",
     changed:
       "This changed on another device. The screen shows the current state.",
+    seedOrderChanged:
+      "The seeds changed on another device. Check the first round and start again.",
     load: "The tournament could not be loaded.",
     rules: {
       name_required: "Give the tournament a name.",
@@ -329,10 +332,12 @@ export const tournamentsSetup = {
       fr032Entries: "Not enough entries: at least {{min}} are needed.",
       fr032Max:
         "A round robin takes at most {{limit}} entries. Remove some, or pick another format.",
+      fr032MaxKnockout:
+        "A knockout takes at most {{limit}} entries. Remove some, or pick another format.",
       br030_one: "{{count}} player has no partner yet.",
       br030_other: "{{count}} players have no partner yet.",
       fr035:
-        "Starting this format comes in a later version. A round robin starts now.",
+        "Starting this format comes in a later version. A round robin or a knockout without a group phase starts now.",
       br121: "BO2 is offered only in leagues that allow draws.",
       br071: "A round robin has no points for sitting out.",
       fr033: "Nobody is left to pair.",

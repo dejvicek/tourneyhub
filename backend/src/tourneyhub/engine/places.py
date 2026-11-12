@@ -21,10 +21,13 @@ class PlacingEntry:
         player_ids: The entry's one or two players. After a group phase they
             tell which group-phase entries went on to the knockout, since a
             knockout entry has an id of its own (DATA-MODEL §4.4).
+        seed: The entry's setup seed, 1 for the best, or None without one.
+            Entries sharing a place are listed by seed, seedless ones last.
     """
 
     entry_id: EntryId
     player_ids: tuple[PlayerId, ...]
+    seed: int | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -100,8 +103,8 @@ def place_entries(
     entry sizes are the bracket generator's job and are not validated here.
 
     Returns:
-        One `EntryPlace` per placed entry, best place first and by entry id
-        within a place. A group-phase entry that went on to the knockout is
+        One `EntryPlace` per placed entry, best place first and by seed
+        within a place (seedless entries last, then by entry id). A group-phase entry that went on to the knockout is
         not listed; its knockout entry is.
 
     Raises:
@@ -161,10 +164,16 @@ def place_entries(
                 player_ids=by_id[entry_id].player_ids,
                 place=place,
             )
-            for entry_id in sorted(block, key=lambda entry_id: entry_id.int)
+            for entry_id in sorted(block, key=lambda entry_id: _order(by_id[entry_id]))
         )
         place += len(block)
     return tuple(placed)
+
+
+def _order(entry: PlacingEntry) -> tuple[bool, int, int]:
+    """Order entries sharing a place: by seed, seedless last, then by id."""
+    seed = entry.seed
+    return (seed is None, 0 if seed is None else seed, entry.entry_id.int)
 
 
 def _entry(by_id: dict[EntryId, PlacingEntry], entry_id: EntryId) -> PlacingEntry:

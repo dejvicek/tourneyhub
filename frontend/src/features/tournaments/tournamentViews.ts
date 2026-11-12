@@ -76,6 +76,7 @@ export interface TournamentTab {
  * and Standings (the design's order); Swiss and Monster DYP show Rounds, Fields, Players and
  * Standings. A knockout adds its tab once it exists, a finished tournament
  * its places first, and Fields and Players leave once nothing is played.
+ * A knockout without a group phase has no Standings.
  */
 export function tournamentTabs(t: TournamentView): TournamentTab[] {
   if (t.state === "setup") {
@@ -107,7 +108,11 @@ export function tournamentTabs(t: TournamentView): TournamentTab[] {
   if (running && inGroup && group !== undefined && group !== "round_robin") {
     tabs.push({ path: "lateAndDisabled", label: "players" });
   }
-  tabs.push({ path: "tournamentStandings", label: "standings" });
+  // A knockout without a group phase has no standings: its places come
+  // with its end (BR-102).
+  if (group !== undefined) {
+    tabs.push({ path: "tournamentStandings", label: "standings" });
+  }
   return tabs;
 }
 

@@ -52,6 +52,16 @@ describe("the texts for a refused start or back to setup", () => {
     ],
     [
       "en",
+      refused(409, "seed_order_changed"),
+      "The seeds changed on another device. Check the first round and start again.",
+    ],
+    [
+      "cs",
+      refused(409, "seed_order_changed"),
+      "Nasazení se změnilo na jiném zařízení. Zkontrolujte první kolo a spusťte turnaj znovu.",
+    ],
+    [
+      "en",
       refused(409, "tournament_not_in_progress", { state: "setup" }),
       "This changed on another device. The screen shows the current state.",
     ],

@@ -49,7 +49,7 @@ function Review({ data }: { data: SetupData }) {
   // reload, then opens the tournament on the screen for its state.
   const start = useMutation({
     ...setupMutations.start(leagueId, tournamentId),
-    onSuccess: async (_data, _counter, _result, context) => {
+    onSuccess: async (_data, _body, _result, context) => {
       await context.client.invalidateQueries({
         queryKey: ["leagues", leagueId],
       });
@@ -228,6 +228,15 @@ function Review({ data }: { data: SetupData }) {
               })}
             </p>
           )}
+          {round.byes.length > 0 && (
+            <p className="text-body-sm text-muted-foreground">
+              {t("tournaments.setup.review.byes", {
+                names: round.byes
+                  .map((ids) => entryName(t, sides(ids)))
+                  .join(", "),
+              })}
+            </p>
+          )}
         </div>
       ))}
       <div className="grid gap-1 text-body-sm text-muted-foreground">
@@ -295,7 +304,10 @@ function Review({ data }: { data: SetupData }) {
           className="md:min-w-60"
           onClick={() => {
             if (preview.data !== undefined) {
-              start.mutate(preview.data.draw_counter);
+              start.mutate({
+                expected_draw_counter: preview.data.draw_counter,
+                expected_seed_order: preview.data.seed_order,
+              });
             }
           }}
         >

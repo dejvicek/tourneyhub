@@ -125,6 +125,18 @@ describe("tournamentTabs", () => {
     ).toEqual(["rounds", "knockout", "fields", "standings"]);
   });
 
+  it("shows the knockout and Fields, but no Standings, for a knockout without a group phase", () => {
+    const only = [{ ...knockout, position: 1 }];
+    expect(labels(tournament("in_progress", only, "knockout"))).toEqual([
+      "knockout",
+      "fields",
+    ]);
+    expect(labels(tournament("finished", only, "knockout"))).toEqual([
+      "places",
+      "knockout",
+    ]);
+  });
+
   it("puts the places first and drops Fields once finished", () => {
     expect(
       labels(
