@@ -34,9 +34,6 @@ APP_STATE_READERS = {
     "api/deps.py": "the dependencies read the settings and the session factory",
     "app.py": "create_app() puts them there",
 }
-NO_DIRECT_FOREIGN_KEY = {
-    "Tournament.halves": "dyp_halves references the tournament via tournament_players",
-}
 DEFERRED_TARGETS = {"players", "entries"}  # DATA-MODEL §2
 
 
@@ -182,7 +179,6 @@ def test_relationships_leave_deletes_to_postgresql() -> None:
         relationship
         for relationship in _relationships()
         if relationship.direction is RelationshipDirection.ONETOMANY
-        and str(relationship) not in NO_DIRECT_FOREIGN_KEY
     ]
 
     places = [
