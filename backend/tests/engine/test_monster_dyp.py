@@ -1118,7 +1118,7 @@ def test_br063_the_players_with_the_fewest_sit_outs_sit_out(
 
 @settings(deadline=None)
 @given(tournaments(max_players=8, can_disable=False), st.data())
-def test_br062_partnership_counts_stay_balanced(
+def test_br062_partnership_counts_stay_balanced_while_repeats_can_be_avoided(
     tournament: tuple[
         int, int, MonsterDypOptions, frozenset[int], list[frozenset[int]], bytes
     ],
@@ -1138,6 +1138,11 @@ def test_br062_partnership_counts_stay_balanced(
             for team in (group.team_1, group.team_2)
         ]
         counts = partnerships(before)
+        if fewest_repeats(playing, counts)[0]:
+            # Every grouping repeats a partner. BR-062 does not rule on that
+            # case; ADR-011 does, and it takes the fewest repeated teams, which
+            # are not always the most even counts.
+            continue
 
         assert spread(counts, teams, tournament[0]) <= min(
             spread(counts, grouping, tournament[0]) for grouping in pairings(playing)
