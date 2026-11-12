@@ -155,6 +155,18 @@ def test_br076_a_sit_out_earns_the_sit_out_points(sit_out_points: int) -> None:
     assert lines[3].played == 0
 
 
+@pytest.mark.parametrize("sit_out_points", [0, 1, 2])
+def test_br076_a_sit_out_counts_as_soon_as_its_round_is_drawn(
+    sit_out_points: int,
+) -> None:
+    rounds = [round_(1, match(1, 2, None), sat_out=3)]
+
+    lines = standings(ids(1, 2, 3), rounds, sit_out_points=sit_out_points)
+
+    assert (lines[3].points, lines[3].sat_out) == (sit_out_points, 1)
+    assert (lines[1].points, lines[1].played) == (0, 0)
+
+
 def test_br073_bh1_sums_the_opponents_points_and_bh2_their_bh1() -> None:
     rounds = [
         round_(1, match(1, 2, WIN), match(3, 4, DRAW)),
