@@ -34,6 +34,8 @@ export const finals = {
       "The season was closed meanwhile, so nothing in it can change.",
     qualifiersChanged:
       "A group result changed who goes through, so the preview was refreshed. Check it and draw again.",
+    finalHasResult:
+      "The final has a result now, so its format cannot change. Clear the result first.",
   },
   place: {
     label: "{{place}}{{suffix}}",
@@ -99,6 +101,8 @@ export const finals = {
     placesLine: "{{place}}: {{names}}",
     placesLineShared: "{{place}}, shared: {{names}}",
     placesFinal: "1st and 2nd are decided by the final.",
+    finalFormat: "Format of the final",
+    finalFormatHint: "You can change it until the final has a result.",
     delete: "Delete the knockout",
     deleteTitle: "Delete the knockout?",
     deleteBody:

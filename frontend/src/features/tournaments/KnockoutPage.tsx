@@ -31,6 +31,7 @@ import { paths } from "@/lib/paths";
 import { type BracketContext, bracketTitles } from "./finals/bracketContext";
 import { BracketView, CompactBracket, RoundList } from "./finals/BracketView";
 import { errorText } from "./finals/errorText";
+import { FinalFormat } from "./finals/FinalFormat";
 import { resultPath } from "./finals/links";
 import { useRoster } from "./finals/names";
 import { Notice } from "./finals/Notice";
@@ -41,8 +42,8 @@ import { LoadError, Loading } from "./finals/StateMessage";
 /**
  * Screen 9: the knockout in progress (FR-037, BR-040–BR-045, BR-102). The
  * bracket for 4, 8 or 16 spots with byes, the third-place match, the final in
- * its own format, and the places already decided. Results are entered in the
- * result screens.
+ * its own format, which can change while the final has no result (FR-054),
+ * and the places already decided. Results are entered in the result screens.
  */
 export function KnockoutPage() {
   const { t } = useTranslation();
@@ -148,6 +149,11 @@ function KnockoutContent() {
           {decided}
         </>
       )}
+      <FinalFormat
+        leagueId={leagueId}
+        tournamentId={tournamentId}
+        bracket={shape}
+      />
       {shape.has_group_phase && (
         <section className="space-y-2">
           {removal.isError && (

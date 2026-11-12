@@ -34,6 +34,8 @@ export const finals: CsMessages<Messages["finals"]> = {
       "Sezóna byla mezitím uzavřena, takže v ní už nic nejde změnit.",
     qualifiersChanged:
       "Výsledek ve skupině změnil, kdo postupuje, proto jsme náhled načetli znovu. Zkontrolujte ho a losujte znovu.",
+    finalHasResult:
+      "Finále už má výsledek, takže jeho formát nejde změnit. Nejdřív výsledek smažte.",
   },
   place: {
     label: "{{place}}{{suffix}}",
@@ -99,6 +101,8 @@ export const finals: CsMessages<Messages["finals"]> = {
     placesLine: "{{place}}: {{names}}",
     placesLineShared: "{{place}}, společně: {{names}}",
     placesFinal: "1. a 2. místo rozhodne finále.",
+    finalFormat: "Formát finále",
+    finalFormatHint: "Změnit ho jde, dokud finále nemá výsledek.",
     delete: "Smazat vyřazovací část",
     deleteTitle: "Smazat vyřazovací část?",
     deleteBody:

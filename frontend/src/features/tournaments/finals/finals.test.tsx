@@ -215,6 +215,82 @@ describe("Knockout (screen 9)", () => {
     expect(screen.getByText("Semifinal 1")).toBeInTheDocument();
   });
 
+  it("changes the final's format and reloads the bracket (FR-054, BR-120)", async () => {
+    const sent: unknown[] = [];
+    let bracketReads = 0;
+    server.use(
+      http.put(
+        "/api/v1/leagues/:leagueId/tournaments/:tournamentId/knockout/final-format",
+        async ({ request }) => {
+          sent.push(await request.clone().json());
+          return HttpResponse.json({});
+        },
+      ),
+      http.get(
+        "/api/v1/leagues/:leagueId/tournaments/:tournamentId/bracket",
+        () => {
+          bracketReads += 1;
+        },
+      ),
+    );
+    const user = userEvent.setup();
+    renderAt(at(paths.knockout, DYP_EVENING));
+
+    const picker = await screen.findByRole("radiogroup", {
+      name: "Format of the final",
+    });
+    expect(within(picker).getByRole("radio", { name: "BO3" })).toBeChecked();
+    const reads = bracketReads;
+    await user.click(within(picker).getByRole("radio", { name: "BO5" }));
+    await waitFor(() => {
+      expect(bracketReads).toBeGreaterThan(reads);
+    });
+    await user.click(
+      within(picker).getByRole("radio", { name: "Same as knockout" }),
+    );
+
+    await waitFor(() => {
+      expect(sent).toEqual([
+        { final_match_format: "bo5" },
+        { final_match_format: null },
+      ]);
+    });
+  });
+
+  it("says why the final's format cannot change once it has a result (BR-096)", async () => {
+    server.use(
+      http.put(
+        "/api/v1/leagues/:leagueId/tournaments/:tournamentId/knockout/final-format",
+        () =>
+          HttpResponse.json(
+            { code: "match_has_result", detail: { match_id: "x" } },
+            { status: 422 },
+          ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderAt(at(paths.knockout, DYP_EVENING));
+
+    const picker = await screen.findByRole("radiogroup", {
+      name: "Format of the final",
+    });
+    await user.click(within(picker).getByRole("radio", { name: "BO5" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The final has a result now, so its format cannot change.",
+    );
+  });
+
+  it("offers no format change once the final has a result (FR-054)", async () => {
+    await playFinal(DYP_EVENING);
+    renderAt(at(paths.knockout, DYP_EVENING));
+
+    await screen.findByRole("link", { name: "Change result, Final" });
+    expect(
+      screen.queryByRole("radiogroup", { name: "Format of the final" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("has no axe violations", async () => {
     renderAt(at(paths.knockout, DYP_EVENING));
     await screen.findByText("Semifinal 1");
