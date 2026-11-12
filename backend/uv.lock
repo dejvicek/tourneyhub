@@ -972,7 +972,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.162.2" },
     { name = "httptools", specifier = ">=0.9" },
     { name = "networkx", specifier = ">=3.7" },
-    { name = "psycopg", extras = ["binary"], specifier = ">=3.3.7" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.3.8" },
     { name = "pydantic", specifier = ">=2.14.2" },
     { name = "pydantic-settings", specifier = ">=2.16" },
     { name = "pyjwt", specifier = ">=2.15.1" },
