@@ -11,6 +11,10 @@ Tournament formats combine a **type** (Singles, Doubles, DYP, Monster DYP) with 
 - Singles, Doubles, round robin, Swiss and the knockout are meant to be **as fair as possible** for the players: seeding by league ranking, tie-breakers (head-to-head, score difference, BH1/BH2), no repeat opponents while that can be avoided.
 - **DYP** ("Draw Your Partner") and **Monster DYP** lean towards **casual players**: partners are drawn (top half + bottom half in DYP, new teams every round in Monster DYP), so weaker players play with stronger ones. Keep that intent when changing their rules: mixing players matters more there than strict fairness.
 
+## Ownership
+
+This codebase is yours: what it's for and how it's built are your call, and you'll keep building on it.
+
 ## Where the decisions live
 
 All documents live in `docs/` (index: `docs/README.md`). Read the relevant one before changing behaviour; code must follow them, and changes to rules go through them.
