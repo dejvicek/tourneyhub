@@ -121,8 +121,14 @@ const pathSyntax = [
   message:
     "frontend-style §9: build paths with generatePath and the constants in @/lib/paths.",
 }));
+// esquery reads a missing attribute as the text "undefined", so the selector
+// for `undefined` also asks for an Identifier.
 const intlSyntax = ["NewExpression", "CallExpression"].flatMap((call) =>
-  [":not([arguments.0])", "[arguments.0.type='Literal']"].map((argument) => ({
+  [
+    ":not([arguments.0])",
+    "[arguments.0.type='Literal']",
+    "[arguments.0.type='Identifier'][arguments.0.name='undefined']",
+  ].map((argument) => ({
     selector: `${call}[callee.object.name='Intl']${argument}`,
     message: "frontend-style §7: pass i18n.resolvedLanguage as the locale.",
   })),
@@ -140,9 +146,10 @@ const htmlSyntax = [
     message: "frontend-style §7: render text as React children, never as HTML.",
   },
 ];
-// `as const` stays; a CSS custom property is not in CSSProperties (§5.1).
+// `as const` stays; a CSS custom property is not in CSSProperties (§5.1),
+// written bare or as React.CSSProperties.
 const assertionSyntax = [
-  "TSAsExpression:not([typeAnnotation.typeName.name=/^(const|CSSProperties)$/])",
+  "TSAsExpression:not([typeAnnotation.typeName.name=/^(const|CSSProperties)$/]):not([typeAnnotation.typeName.right.name='CSSProperties'])",
   "TSTypeAssertion",
 ].map((selector) => ({
   selector,
@@ -163,14 +170,12 @@ const routerDataSyntax = [
       "frontend-style §9: API data goes through TanStack Query, not router loaders or actions.",
   },
 ];
-const mockApiSyntax = [
-  {
-    selector:
-      "CallExpression[callee.object.name='vi'][callee.property.name=/^(mock|doMock)$/][arguments.0.value=/(^|\\x2F)api(\\x2F|$)/]",
-    message:
-      "frontend-style §10.1: mock the network with MSW, never the API modules.",
-  },
-];
+// The module is named by a string or, in Vitest's typed form, by import("…").
+const mockApiSyntax = ["value", "source.value"].map((specifier) => ({
+  selector: `CallExpression[callee.object.name='vi'][callee.property.name=/^(mock|doMock)$/][arguments.0.${specifier}=/(^|\\x2F)api(\\x2F|$)/]`,
+  message:
+    "frontend-style §10.1: mock the network with MSW, never the API modules.",
+}));
 const appSyntax = [
   ...forwardRefSyntax,
   ...optimisticSyntax,
@@ -432,6 +437,13 @@ export default defineConfig([
     ignores: ["src/demo/**/*.test.ts"],
     rules: {
       "no-restricted-syntax": ["error", ...appSyntax, ...queryClientSyntax],
+    },
+  },
+  {
+    // The demo's tests: the tests' list without the `as` rule.
+    files: ["src/demo/**/*.test.ts"],
+    rules: {
+      "no-restricted-syntax": ["error", ...appSyntax, ...mockApiSyntax],
     },
   },
   {
