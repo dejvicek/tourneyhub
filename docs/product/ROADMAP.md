@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Status | Draft |
-| Date | 2026-11-11 |
+| Date | 2026-11-12 |
 | Scope | What comes after the MVP in `PRD.md`. Business level only: no dates and no technical design. |
 
 ## 1. Direction
