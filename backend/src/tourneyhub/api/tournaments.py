@@ -567,7 +567,7 @@ class PlayStandingRow(ResponseModel):
 
     `place` is shared by entries still level (BR-074), and the next place
     skips (BR-104). In Swiss and Monster DYP, `points` include the sit-out
-    points of every round sat out whose matches all have results (BR-076); a
+    points of every round sat out, as soon as the round is drawn (BR-076); a
     round robin gives none (BR-071). `form` lists the latest five
     results, oldest first. `ahead_by` names what ranks the entry above the
     next one when both have the same points, and is null when the points

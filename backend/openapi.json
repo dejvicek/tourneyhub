@@ -1498,7 +1498,7 @@
         "type": "object"
       },
       "PlayStandingRow": {
-        "description": "One entry's line in the group-phase standings (BR-101, FR-060).\n\n`place` is shared by entries still level (BR-074), and the next place\nskips (BR-104). In Swiss and Monster DYP, `points` include the sit-out\npoints of every round sat out whose matches all have results (BR-076); a\nround robin gives none (BR-071). `form` lists the latest five\nresults, oldest first. `ahead_by` names what ranks the entry above the\nnext one when both have the same points, and is null when the points\ndecide or the place is shared. `bh1` and `bh2` are for Swiss and Monster\nDYP, null in a round robin.",
+        "description": "One entry's line in the group-phase standings (BR-101, FR-060).\n\n`place` is shared by entries still level (BR-074), and the next place\nskips (BR-104). In Swiss and Monster DYP, `points` include the sit-out\npoints of every round sat out, as soon as the round is drawn (BR-076); a\nround robin gives none (BR-071). `form` lists the latest five\nresults, oldest first. `ahead_by` names what ranks the entry above the\nnext one when both have the same points, and is null when the points\ndecide or the place is shared. `bh1` and `bh2` are for Swiss and Monster\nDYP, null in a round robin.",
         "properties": {
           "ahead_by": {
             "anyOf": [
