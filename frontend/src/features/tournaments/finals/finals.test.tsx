@@ -789,6 +789,15 @@ describe("Start the knockout (screen 13)", () => {
     expect(screen.getByText("Third place")).toBeInTheDocument();
   });
 
+  it("says that every round robin result locks, not one round (BR-053)", async () => {
+    renderAt(`${at(paths.startKnockout, ROUND_ROBIN_DONE)}?qualifiers=4`);
+
+    expect(
+      await screen.findByText("Round robin results lock"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^Round \d+ locks/)).not.toBeInTheDocument();
+  });
+
   it("gives the knockout its format and the final its own (BR-120)", async () => {
     const user = userEvent.setup();
     renderAt(`${at(paths.startKnockout, ROUND_ROBIN_DONE)}?qualifiers=4`);

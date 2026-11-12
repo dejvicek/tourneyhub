@@ -318,6 +318,9 @@ export const finals: CsMessages<Messages["finals"]> = {
     bye: "Volný los",
     followLead: "Místa {{from}} až {{to}} určuje tabulka kol.",
     lockTitle: "Kolo {{round}} se zamkne",
+    lockTitleRoundRobin: "Výsledky skupiny se zamknou",
+    lockBodyRoundRobin:
+      "Po rozlosování vyřazovací části už nejde měnit žádný výsledek skupiny. Smažte vyřazovací část a výsledky se odemknou.",
     lockBody:
       "Po rozlosování vyřazovací části už nejde měnit výsledky kola {{round}}. Smažte vyřazovací část a výsledky se odemknou.",
     draw: "Rozlosovat vyřazovací část",

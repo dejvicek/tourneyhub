@@ -128,6 +128,7 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
   const placeLabel = usePlaceLabel();
   const roster = useRoster(leagueId, data.entries);
   const monster = group.format === "monster_dyp";
+  const roundRobin = group.format === "round_robin";
   // Screen 8 hands over its choices in the query; a bad value is ignored.
   const [search] = useSearchParams();
   const fromQuery = Number(search.get("qualifiers"));
@@ -479,12 +480,20 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
           </p>
         )}
       </section>
-      <Notice
-        tone="warning"
-        title={t("finals.start.lockTitle", { round: plan.locks_round_no })}
-      >
-        {t("finals.start.lockBody", { round: plan.locks_round_no })}
-      </Notice>
+      {/* BR-053: a knockout locks all of a round robin's results, but only the
+          newest round of a Swiss or Monster DYP (BR-087). */}
+      {roundRobin ? (
+        <Notice tone="warning" title={t("finals.start.lockTitleRoundRobin")}>
+          {t("finals.start.lockBodyRoundRobin")}
+        </Notice>
+      ) : (
+        <Notice
+          tone="warning"
+          title={t("finals.start.lockTitle", { round: plan.locks_round_no })}
+        >
+          {t("finals.start.lockBody", { round: plan.locks_round_no })}
+        </Notice>
+      )}
     </div>
   );
 

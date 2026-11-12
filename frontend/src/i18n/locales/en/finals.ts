@@ -318,6 +318,9 @@ export const finals = {
     bye: "Bye",
     followLead: "Places {{from}} to {{to}} follow the standings.",
     lockTitle: "Round {{round}} locks",
+    lockTitleRoundRobin: "Round robin results lock",
+    lockBodyRoundRobin:
+      "Once the knockout is drawn, no round robin result can be changed. Delete the knockout to unlock them.",
     lockBody:
       "Once the knockout is drawn, round {{round}} results can't be changed. Delete the knockout to unlock them.",
     draw: "Draw the knockout",
