@@ -34,9 +34,16 @@ export function FinalFormat({
   const final = bracket.rounds
     .at(-1)
     ?.matches.find((match) => match.kind === "standard");
-  // Shown only while the final has no result (BR-096).
+  const failure = change.isError && (
+    <p role="alert" className="text-body-sm">
+      {errorText(t, change.error)}
+    </p>
+  );
+  // The control shows only while the final has no result (BR-096). A refused
+  // change (409 `match_has_result` from a stale screen) reloads the bracket
+  // with the result, so its message must outlive the control.
   if (final?.outcome !== null) {
-    return null;
+    return failure || null;
   }
   const shown = change.isPending
     ? change.variables.final_match_format
@@ -65,11 +72,7 @@ export function FinalFormat({
           });
         }}
       />
-      {change.isError && (
-        <p role="alert" className="text-body-sm">
-          {errorText(t, change.error)}
-        </p>
-      )}
+      {failure}
     </section>
   );
 }

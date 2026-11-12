@@ -102,7 +102,7 @@ export const finals = {
     placesLineShared: "{{place}}, shared: {{names}}",
     placesFinal: "1st and 2nd are decided by the final.",
     finalFormat: "Format of the final",
-    finalFormatHint: "You can change it until the final has a result.",
+    finalFormatHint: "You can change it while the final has no result.",
     delete: "Delete the knockout",
     deleteTitle: "Delete the knockout?",
     deleteBody:

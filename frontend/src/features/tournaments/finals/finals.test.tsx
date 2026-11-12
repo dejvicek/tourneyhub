@@ -257,15 +257,18 @@ describe("Knockout (screen 9)", () => {
     });
   });
 
-  it("says why the final's format cannot change once it has a result (BR-096)", async () => {
+  it("says why the final's format cannot change once it has a result, after the reload hid the control (BR-096)", async () => {
     server.use(
       http.put(
         "/api/v1/leagues/:leagueId/tournaments/:tournamentId/knockout/final-format",
-        () =>
-          HttpResponse.json(
+        async () => {
+          // Another screen played the final first: the reloaded bracket has its result.
+          await playFinal(DYP_EVENING);
+          return HttpResponse.json(
             { code: "match_has_result", detail: { match_id: "x" } },
-            { status: 422 },
-          ),
+            { status: 409 },
+          );
+        },
       ),
     );
     const user = userEvent.setup();
@@ -277,6 +280,14 @@ describe("Knockout (screen 9)", () => {
     await user.click(within(picker).getByRole("radio", { name: "BO5" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The final has a result now, so its format cannot change.",
+    );
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("radiogroup", { name: "Format of the final" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent(
       "The final has a result now, so its format cannot change.",
     );
   });
