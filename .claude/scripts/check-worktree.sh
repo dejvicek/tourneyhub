@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# Runs the CI checks against the code in a git worktree of this repository,
-# without replacing the running dev stack.
+# Runs the backend and frontend CI checks (not e2e and not the dependency audits)
+# against the code in a git worktree of this repository, without replacing the
+# running dev stack.
 #
 # Usage: .claude/scripts/check-worktree.sh <worktree-path> [auto|backend|frontend|all]
 #   auto (default): check backend and/or frontend, whichever changed against origin/main
-#                   (committed or not).
+#                   (committed or not); as in CI, a change to backend/openapi.json also
+#                   checks the frontend.
 # Needs: the dev stack running from the main checkout (`docker compose up`); both
 #        areas run in one-off containers, so the host needs no Node or Python.
 # Exit:  0 all checks passed, 1 a check failed, 2 usage or environment error.
@@ -24,7 +26,7 @@ common=$(git -C "$wt" rev-parse --path-format=absolute --git-common-dir 2>/dev/n
 main=$(dirname "$common")
 [ -f "$main/compose.yaml" ] || fail "$wt is not a worktree of the TourneyHub repository"
 
-# Test runs share the tourneyhub_test databases, so only one may run at a time.
+# Test runs share the tourneyhub_check databases, so only one may run at a time.
 lock="$common/check-worktree.lock"
 mkdir "$lock" 2>/dev/null \
   || fail "another check is running (lock $lock). Wait for it. Remove the lock only if no check runs."
@@ -39,10 +41,13 @@ case $mode in
   auto)
     git -C "$wt" fetch --quiet origin main 2>/dev/null \
       || echo "Warning: could not fetch origin/main; comparing with the local copy." >&2
-    changed=$( { git -C "$wt" diff --name-only origin/main...HEAD
-                 git -C "$wt" status --porcelain | cut -c4-; } 2>/dev/null )
+    committed=$(git -C "$wt" diff --name-only origin/main...HEAD) \
+      || fail "could not compare $wt with origin/main"
+    uncommitted=$(git -C "$wt" status --porcelain | cut -c4-) \
+      || fail "could not read the git status of $wt"
+    changed=$committed$'\n'$uncommitted
     grep -q '^backend/' <<<"$changed" && check_backend=true
-    grep -q '^frontend/' <<<"$changed" && check_frontend=true
+    grep -qE '^(frontend/|backend/openapi\.json$)' <<<"$changed" && check_frontend=true
     if ! $check_backend && ! $check_frontend; then
       echo "No changes in backend/ or frontend/ against origin/main: nothing to check."
       exit 0
@@ -50,12 +55,20 @@ case $mode in
     ;;
 esac
 
+# Without Docker or Compose no check can run; that is an environment error, not a failed check.
+(cd "$main" && docker compose ps --quiet >/dev/null 2>&1) \
+  || fail "Docker or Compose is not reachable from $main"
+
 echo "Worktree: $wt ($(git -C "$wt" rev-parse --abbrev-ref HEAD) @ $(git -C "$wt" rev-parse --short HEAD))"
 result=0
 
 if $check_backend; then
   (cd "$main" && docker compose ps --status running --services 2>/dev/null | grep -qx db) \
     || fail "the dev database is not running. Start the stack in $main: docker compose up --build"
+  # The api image has the main checkout's dependencies; only the worktree's source is
+  # mounted. With other dependencies the result would mislead, so leave it to CI.
+  cmp -s "$wt/backend/uv.lock" "$main/backend/uv.lock" \
+    || fail "backend/uv.lock in $wt differs from the main checkout's, whose dependencies the api image has; CI checks this branch"
   echo "== backend =="
   # Fresh test databases for every run, as in CI. The tests migrate their database to
   # the branch's head and leave it there, so a database shared between branches ends
