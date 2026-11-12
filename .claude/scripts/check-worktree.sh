@@ -39,6 +39,7 @@ mkdir "$lock" 2>/dev/null \
 # run must not keep testing against the databases or the worktree of the next run.
 run_id="check-worktree-$$"
 frontend_log=
+frontend_pid=
 cleanup() {
   docker rm -f "$run_id-api" "$run_id-frontend" >/dev/null 2>&1
   [ -z "$frontend_log" ] || rm -f "$frontend_log"
