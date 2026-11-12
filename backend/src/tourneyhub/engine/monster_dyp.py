@@ -93,13 +93,14 @@ class MonsterDypOptions:
 
     Attributes:
         are_top_players_exempt: In rounds 1 and 2, the top players never sit
-            out; the sit-out lot is drawn among the others. Off: BR-063 as
-            written, the top players are chosen after the sit-outs.
+            out; the sit-out lot is drawn among the others. Off, as BR-061
+            and BR-063 say: the top players are chosen after the sit-outs.
         top_player_order: In which order the marked players count first as top
             players (FR-041); the unmarked always follow the league ranking.
         avoids_sitting_out_twice_in_a_row: Among players with as few
             sit-outs, those who sat out the previous round sit out last
-            (issue #24). Off: BR-063 as written.
+            (issue #24). BR-063 always applies it, before the fewest
+            sit-outs; issue #60 makes the engine follow that.
     """
 
     are_top_players_exempt: bool = False
@@ -108,7 +109,10 @@ class MonsterDypOptions:
 
 
 DEFAULT_OPTIONS = MonsterDypOptions()
-"""The PRD as written: no exemption, the league ranking, no extra sit-out rule."""
+"""No exemption and the league ranking, as BR-061 and BR-063 say.
+
+The round-before rule of BR-063 stays off until issue #60 changes the engine.
+"""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

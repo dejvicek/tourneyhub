@@ -37,9 +37,7 @@ class ErrorCode(StrEnum):
     SEASON_NUMBER_CHANGED = "season_number_changed"
     # Players
     PLAYER_NOT_FOUND = "player_not_found"
-    # BR-001: name plus note must differ, removed players counted (#48 follow-up,
-    # issue to open after approval; today the name alone, a removed one too).
-    PLAYER_NAME_TAKEN = "player_name_taken"
+    PLAYER_NAME_TAKEN = "player_name_taken"  # also a removed player's name (BR-001)
     # BR-006: 1000 active players (#48 follow-up); today 500, removed included.
     PLAYER_LIMIT_REACHED = "player_limit_reached"
     PLAYER_IN_UNFINISHED_TOURNAMENT = "player_in_unfinished_tournament"  # BR-002
@@ -64,7 +62,7 @@ class ErrorCode(StrEnum):
     TOURNAMENT_HAS_RESULTS = "tournament_has_results"  # FR-036
     FORMAT_NOT_SUPPORTED = "format_not_supported"  # until its rounds are served
     PLAYERS_WITHOUT_PARTNER = "players_without_partner"  # Doubles (BR-030)
-    # FR-032: 64 entries today, 256 after the #48 follow-up (issue to open after
+    # FR-032: 64 entries today, 16 after the #48 follow-up (issue to open after
     # approval).
     TOO_MANY_ENTRIES_FOR_ROUND_ROBIN = "too_many_entries_for_round_robin"
     # Results, standings and finishing

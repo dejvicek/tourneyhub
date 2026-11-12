@@ -66,8 +66,6 @@ _WRITE_ERRORS: dict[int | str, dict[str, object]] = {
     HTTPStatus.UNPROCESSABLE_CONTENT: {"model": ErrorResponse},
 }
 
-# FR-030 allows 200 characters; the code stops at 100 until the #48 follow-up
-# (issue to open after approval).
 type TournamentName = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)
 ]

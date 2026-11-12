@@ -25,8 +25,8 @@ MAX_ROUND_ROBIN_ENTRIES = 64
 """The most entries a round robin is generated for.
 
 Everyone plays everyone, so 64 entries are 2,016 matches in one leg and 4,032 in
-two. FR-032 now requires 256 entries in a round robin too (a late entry cannot
-take it past 256); the change is the #48 follow-up (issue to open after approval).
+two. FR-032 caps a round robin at 16 entries (a late entry cannot take it past
+16); lowering the limit is the #48 follow-up (issue to open after approval).
 """
 
 ROUND_ROBIN_LEGS = frozenset({1, 2})
