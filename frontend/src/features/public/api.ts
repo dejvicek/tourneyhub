@@ -5,10 +5,10 @@ import { provisionalApi } from "@/api/provisional";
 
 // The share-link views (FR-070–FR-072): no account, read-only. The backend
 // serves the league, a season's tournaments, a tournament, the season
-// standings, a round robin's standings and the places (P11, P10a). The
-// knockout and the Swiss and Monster DYP ranking are still the demo's
-// contract (P10b, P12); a tournament that has either cannot be started on the
-// backend yet, so the screens that call them are not reached outside demo mode.
+// standings, a round robin's standings, the places (P11, P10a) and the
+// knockout (P10b). Only the Swiss and Monster DYP ranking is still the demo's
+// contract (P12); a tournament that has one cannot be started on the backend
+// yet, so the screen that calls it is not reached outside demo mode.
 
 function fetchLeague(shareToken: string, signal?: AbortSignal) {
   return dataOf(
@@ -130,7 +130,7 @@ export const publicQueries = {
       queryKey: ["public", shareToken, "tournaments", tournamentId, "bracket"],
       queryFn: ({ signal }) =>
         dataOf(
-          provisionalApi.GET(
+          api.GET(
             "/api/v1/public/{share_token}/tournaments/{tournament_id}/bracket",
             {
               params: {

@@ -7,7 +7,12 @@ import type {
   BracketSideData as BracketSide,
 } from "@/features/finals/api";
 
-const NO_SIDE: BracketSide = { entry_id: null, seed: null, is_bye: false };
+const NO_SIDE: BracketSide = {
+  entry_id: null,
+  seed: null,
+  is_bye: false,
+  decided_by_lot: false,
+};
 
 /** A side of a match; the API's two-side tuple arrives typed as an array. */
 export function sideAt(match: BracketMatch, index: 0 | 1): BracketSide {

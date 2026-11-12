@@ -138,3 +138,82 @@ export async function fieldsOf(
     ),
   };
 }
+
+/** The league's players by name. */
+export async function playerIdsOf(
+  request: APIRequestContext,
+  token: string,
+  leagueId: string,
+): Promise<Map<string, string>> {
+  const response = await request.get(`/api/v1/leagues/${leagueId}/players`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect(response.status()).toBe(200);
+  const body = (await response.json()) as { id: string; name: string }[];
+  return new Map(body.map((player) => [player.name, player.id]));
+}
+
+/**
+ * Creates a DYP round robin of the given players on two fields, lets the
+ * league ranking draw the pairs and starts it; returns the tournament's id.
+ */
+export async function startDypRoundRobin(
+  request: APIRequestContext,
+  token: string,
+  leagueId: string,
+  { name, playerIds }: { name: string; playerIds: readonly string[] },
+): Promise<string> {
+  const headers = { Authorization: `Bearer ${token}` };
+  const base = `/api/v1/leagues/${leagueId}/tournaments`;
+  const created = await request.post(base, {
+    headers,
+    data: {
+      id: uuid7(),
+      name,
+      date: new Date().toISOString().slice(0, 10),
+      type: "dyp",
+      group_phase: "round_robin",
+      round_robin_legs: 1,
+      sit_out_points: null,
+      group_match_format: "bo1",
+      knockout_match_format: null,
+      final_match_format: null,
+      third_place_match: null,
+      goals_per_game: 10,
+      field_count: 2,
+    },
+  });
+  expect(created.status(), "creating the tournament").toBe(201);
+  const { tournament_id: tournamentId } = (await created.json()) as {
+    tournament_id: string;
+  };
+  const picked = await request.put(`${base}/${tournamentId}/setup/players`, {
+    headers,
+    data: { player_ids: playerIds },
+  });
+  expect(picked.status(), "picking the players").toBe(200);
+  const { draw_counter: drawCounter } = (await picked.json()) as {
+    draw_counter: number;
+  };
+  const started = await request.post(`${base}/${tournamentId}/start`, {
+    headers,
+    data: { expected_draw_counter: drawCounter },
+  });
+  expect(started.status(), "starting the tournament").toBe(200);
+  return tournamentId;
+}
+
+/** A UUIDv7, as a client makes one for a new tournament (ADR-008). */
+function uuid7(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  const millis = BigInt(Date.now());
+  for (let i = 0; i < 6; i++) {
+    bytes[i] = Number((millis >> BigInt(8 * (5 - i))) & 0xffn);
+  }
+  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x70;
+  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join(
+    "",
+  );
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}

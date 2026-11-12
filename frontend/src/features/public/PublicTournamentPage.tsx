@@ -177,30 +177,44 @@ function Places({
         {t("publicView.tournament.placesHeading")}
       </h2>
       <ol className="rounded-lg border border-border-surface bg-card px-4 text-card-foreground">
-        {places.data.rows.map((row) => (
-          <li
-            key={row.entry_id}
-            className="flex items-center gap-3 border-t border-border py-3 first:border-t-0"
-          >
-            <span
-              className={
-                row.place === 1
-                  ? "w-10 shrink-0 font-display text-score-m text-primary"
-                  : "w-10 shrink-0 font-display text-score-m"
-              }
+        {[...new Set(places.data.rows.map((row) => row.place))].map((place) => {
+          const group = places.data.rows.filter((row) => row.place === place);
+          const first = group[0];
+          if (first === undefined) {
+            return null;
+          }
+          return (
+            <li
+              key={place}
+              className="flex items-start gap-3 border-t border-border py-3 first:border-t-0"
             >
-              {t("publicView.table.placeValue", { place: row.place })}
-            </span>
-            <span className="min-w-0 flex-1 text-body-md font-bold break-words">
-              {names.ofEntry(row.entry_id)}
-            </span>
-            <span className="text-body-sm font-bold text-primary">
-              {t("publicView.tournament.pointsEach", {
-                count: row.points_per_player,
-              })}
-            </span>
-          </li>
-        ))}
+              <span
+                className={
+                  place === 1
+                    ? "w-10 shrink-0 font-display text-score-m text-primary"
+                    : "w-10 shrink-0 font-display text-score-m"
+                }
+              >
+                {t("publicView.table.placeValue", { place })}
+              </span>
+              <div className="min-w-0 flex-1 space-y-1">
+                {group.map((row) => (
+                  <p
+                    key={row.entry_id}
+                    className="text-body-md font-bold break-words"
+                  >
+                    {names.ofEntry(row.entry_id)}
+                  </p>
+                ))}
+              </div>
+              <span className="text-body-sm font-bold text-primary">
+                {t("publicView.tournament.pointsEach", {
+                  count: first.points_per_player,
+                })}
+              </span>
+            </li>
+          );
+        })}
       </ol>
     </section>
   );

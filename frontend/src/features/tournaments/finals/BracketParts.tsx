@@ -126,6 +126,11 @@ function SideRow({ match, index, name, muted }: SideRowProps) {
           <span className="sr-only"> ({t("finals.knockout.winner")})</span>
         )}
       </span>
+      {side.decided_by_lot && (
+        <span className="shrink-0 text-caption text-muted-foreground">
+          {t("finals.common.byLot")}
+        </span>
+      )}
       {score !== undefined && (
         <span
           className={cn(
@@ -264,6 +269,11 @@ export function FinalCard({ ctx, round, match }: FinalCardProps) {
                 </span>
               )}
             </span>
+            {sideAt(match, index).decided_by_lot && (
+              <span className="shrink-0 text-caption">
+                {t("finals.common.byLot")}
+              </span>
+            )}
             {match.score !== null && (
               <span className="font-display text-score-m">
                 {match.score[index]}

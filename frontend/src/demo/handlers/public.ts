@@ -104,7 +104,7 @@ export const publicHandlers = [
         });
       }
       syncBracket(t);
-      return bracketOf(t) ?? apiError(404, "not_found", { knockout: "none" });
+      return bracketOf(t) ?? apiError(404, "knockout_not_found", {});
     },
   ),
 

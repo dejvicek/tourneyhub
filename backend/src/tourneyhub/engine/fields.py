@@ -63,15 +63,17 @@ class FieldSlot:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Placement:
-    """A waiting match that takes a free field (BR-130).
+    """A waiting match that takes a free field, or a field let go (BR-130).
 
     Attributes:
-        field_id: The free field.
-        match_id: The match that takes it.
+        field_id: The field.
+        match_id: The match that takes it, or None when the field lets go of
+            a match that can no longer be played there and nothing takes its
+            place.
     """
 
     field_id: FieldId
-    match_id: MatchId
+    match_id: MatchId | None
 
 
 def _schedule_key(match: MatchSlot) -> tuple[int, int, bool, int]:
@@ -135,36 +137,57 @@ def fill_fields(
 ) -> tuple[Placement, ...]:
     """Put waiting matches on the free fields (BR-130, BR-131).
 
-    Each free field, lowest number first, takes the first match of the
-    waiting order none of whose players is on a field. A match already on a
-    field stays there (BR-133), so a placement by hand holds. A free field
-    stays free when no waiting match can be played on it.
+    A match can be on a field only while both its sides are known (BR-130).
+    In a knockout a later match's sides come from earlier results (D4), so
+    clearing or changing one can leave a match on a field with a side no
+    longer known: its field lets go of it first, and the match waits again
+    once its sides are known. Every other match already on a field stays
+    there (BR-133), so a placement by hand holds.
+
+    Then each free field, lowest number first, takes the first match of the
+    waiting order none of whose players is on a field. A free field stays
+    free when no waiting match can be played on it.
 
     Returns:
-        The new placements, lowest field number first.
+        The changed fields, lowest number first: a new match, or None for a
+        field that let go of its match and took no other.
 
     Raises:
         ValueError: As for `waiting_order`.
     """
     matches = tuple(matches)
     fields = tuple(fields)
+    _check(matches, fields)
+    players = {match.match_id: match.player_ids for match in matches}
+    let_go = {
+        field.field_id
+        for field in fields
+        if field.match_id is not None and players[field.match_id] is None
+    }
+    fields = tuple(
+        replace(field, match_id=None) if field.field_id in let_go else field
+        for field in fields
+    )
     waiting = list(waiting_order(matches=matches, fields=fields))
-    players = {match.match_id: match.player_ids or frozenset() for match in matches}
     busy = {
         player
         for field in fields
         if field.match_id is not None
-        for player in players[field.match_id]
+        for player in players[field.match_id] or ()
     }
     placements: list[Placement] = []
     for field in sorted(fields, key=lambda field: field.number):
         if field.match_id is not None:
             continue
-        match = next((m for m in waiting if busy.isdisjoint(players[m.match_id])), None)
+        match = next(
+            (m for m in waiting if busy.isdisjoint(players[m.match_id] or ())), None
+        )
         if match is None:
+            if field.field_id in let_go:
+                placements.append(Placement(field_id=field.field_id, match_id=None))
             continue
         waiting.remove(match)
-        busy |= players[match.match_id]
+        busy |= players[match.match_id] or frozenset()
         placements.append(Placement(field_id=field.field_id, match_id=match.match_id))
     return tuple(placements)
 

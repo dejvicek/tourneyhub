@@ -127,6 +127,99 @@ class Evening:
         self.finish(tournament)
         return tournament
 
+    def play_by_seed(self, tournament: Json) -> None:
+        """Every match of a round robin goes to the side with the better seed."""
+        seed = {e["id"]: e["seed"] for e in tournament["entries"]}
+        every = [m for r in tournament["rounds"] for m in r["matches"]]
+        for match in every:
+            one, two = (side["entry_id"] for side in match["sides"])
+            body = {
+                "walkover_winner": None,
+                "games": [
+                    {
+                        "winner": "side_1" if seed[one] < seed[two] else "side_2",
+                        "score_1": 10 if seed[one] < seed[two] else 7,
+                        "score_2": 7 if seed[one] < seed[two] else 10,
+                    }
+                ],
+            }
+            self.put_result(tournament["id"], match["id"], body)
+
+    def put_result(self, tournament_id: str, match_id: str, body: Json) -> None:
+        response = self.client.put(
+            self.url(f"/tournaments/{tournament_id}/matches/{match_id}/result"),
+            json=body,
+            headers=self.headers,
+        )
+        assert response.status_code == 200, response.text
+
+    def knockout_after_round_robin(
+        self, player_ids: list[str], *, qualifiers: int, **values: object
+    ) -> Json:
+        """A round robin of these players and a knockout of the top `qualifiers`.
+
+        The better seed wins every group match, and side 1 every knockout match,
+        until the last one finishes the tournament by itself (FR-037).
+        """
+        tournament = self.start(player_ids, **values)
+        self.play_by_seed(tournament)
+        tournament_id = tournament["id"]
+        group_done = self.get(f"/tournaments/{tournament_id}")
+        assert isinstance(group_done, dict)
+        query = f"qualifiers={qualifiers}&third_place_match=false"
+        shown = self.get(f"/tournaments/{tournament_id}/knockout/preview?{query}")
+        assert isinstance(shown, dict)
+        drawn = self.client.put(
+            self.url(f"/tournaments/{tournament_id}/knockout"),
+            json={
+                "expected_current_phase_id": group_done["current_phase_id"],
+                "expected_qualifier_ids": [
+                    e["members"][0]["entry_id"] for e in shown["entries"]
+                ],
+                "qualifiers": qualifiers,
+                "third_place_match": False,
+                "match_format": None,
+                "final_match_format": None,
+                "mode": None,
+            },
+            headers=self.headers,
+        )
+        assert drawn.status_code == 200, drawn.text
+        while True:
+            bracket = self.get(f"/tournaments/{tournament_id}/bracket")
+            assert isinstance(bracket, dict)
+            ready = [
+                m
+                for round_ in bracket["rounds"]
+                for m in round_["matches"]
+                if m["state"] in ("ready", "on_field")
+            ]
+            if not ready:
+                break
+            match = ready[0]
+            sides = [side["entry_id"] for side in match["sides"]]
+            self.put_result(
+                tournament_id, match["match_id"], {**S1_WINS, "expected_sides": sides}
+            )
+        done = self.get(f"/tournaments/{tournament_id}")
+        assert isinstance(done, dict)
+        assert done["state"] == "finished"
+        return done
+
+    def places_of(self, tournament: Json) -> dict[str, int]:
+        """The place each player took in a finished tournament."""
+        places = self.get(f"/tournaments/{tournament['id']}/places")
+        assert isinstance(places, dict)
+        place_of = {r["entry_id"]: r["place"] for r in places["rows"]}
+        read = self.get(f"/tournaments/{tournament['id']}")
+        assert isinstance(read, dict)
+        return {
+            player: place_of[entry["id"]]
+            for entry in read["entries"]
+            if entry["id"] in place_of
+            for player in entry["player_ids"]
+        }
+
     def points_of(self, tournament: Json) -> dict[str, int]:
         """What each player earned in a finished tournament, from its places."""
         places = self.get(f"/tournaments/{tournament['id']}/places")
@@ -159,6 +252,17 @@ def evening(
     auth_header: Callable[..., dict[str, str]],
 ) -> Evening:
     players = [make_player(league=league, name=f"P{n}") for n in range(1, 6)]
+    return Evening(client, league, auth_header(league.owner_user_id), players)
+
+
+@pytest.fixture
+def six_evening(
+    client: TestClient,
+    league: League,
+    make_player: Callable[..., Player],
+    auth_header: Callable[..., dict[str, str]],
+) -> Evening:
+    players = [make_player(league=league, name=f"P{n}") for n in range(1, 7)]
     return Evening(client, league, auth_header(league.owner_user_id), players)
 
 
@@ -717,3 +821,171 @@ def test_br020_equal_points_and_wins_go_by_last_seasons_place_then_lot(
         ),
     )
     assert [row["player_id"] for row in read["ranking"]] == [*last, *lot]
+
+
+# ---------------------------------------------------------------- knockout
+
+
+# The default table is 10, 8, 6, 4, 2; entries sharing a place get the average of
+# the places they cover, rounded down, and a place beyond the table earns 0
+# (BR-110, BR-111): 3rd and 4th share 3rd, 5th and 6th share 5th.
+ROUND_ROBIN_POINTS = {1: 10, 2: 8, 3: 6}
+KNOCKOUT_POINTS = {1: 10, 2: 8, 3: 5, 5: 1}
+
+
+class Season:
+    """A season with a round robin of three and a round robin plus knockout of six."""
+
+    def __init__(self, evening: Evening) -> None:
+        self.evening = evening
+        self.players = evening.players
+        self.round_robin = evening.finished(self.players[:3], name="Round robin only")
+        self.knockout = evening.knockout_after_round_robin(
+            self.players, qualifiers=6, name="With a knockout"
+        )
+        self.first = evening.places_of(self.round_robin)
+        self.second = evening.places_of(self.knockout)
+
+    def points(self) -> dict[str, int]:
+        """What each player has in the season, from the places and the table."""
+        return {
+            player: ROUND_ROBIN_POINTS.get(self.first.get(player, 0), 0)
+            + KNOCKOUT_POINTS[self.second[player]]
+            for player in self.players
+        }
+
+    def wins(self) -> dict[str, int]:
+        return {
+            player: (self.first.get(player) == 1) + (self.second[player] == 1)
+            for player in self.players
+        }
+
+
+@pytest.fixture
+def season(six_evening: Evening) -> Season:
+    return Season(six_evening)
+
+
+def test_br102_br111_a_knockout_tournament_places_with_a_shared_fifth(
+    season: Season,
+) -> None:
+    assert sorted(season.second.values()) == [1, 2, 3, 3, 5, 5]
+    assert sorted(season.first.values()) == [1, 2, 3]
+
+
+def test_br112_the_standings_add_up_a_round_robin_and_a_knockout_tournament(
+    season: Season,
+) -> None:
+    expected = season.points()
+    wins = season.wins()
+
+    rows = season.evening.standings()
+
+    assert {r["player_id"]: r["points"] for r in rows} == expected
+    assert {r["player_id"]: r["tournament_wins"] for r in rows} == wins
+    assert {r["player_id"]: r["tournaments_played"] for r in rows} == {
+        player: 2 if player in season.first else 1 for player in season.players
+    }
+    # BR-113: by points, then wins, level players share the place
+    keys = [(-expected[r["player_id"]], -wins[r["player_id"]]) for r in rows]
+    assert keys == sorted(keys)
+    assert [r["place"] for r in rows] == [
+        1 + sum(other < key for other in keys) for key in keys
+    ]
+    assert max(expected.values()) == 20  # 10 + 10: 1st in both
+
+
+def test_br112_the_knockout_tournament_has_its_effect_on_the_standings(
+    season: Season,
+) -> None:
+    evening = season.evening
+    before = {
+        player: ROUND_ROBIN_POINTS[place] for player, place in season.first.items()
+    }
+
+    effect = evening.get(f"/tournaments/{season.knockout['id']}/season-effect")
+
+    assert isinstance(effect, list)
+    assert [(e["player_id"], e["place"], e["points"]) for e in effect] == [
+        (r["player_id"], r["place"], r["points"]) for r in evening.standings()
+    ]
+    assert {e["player_id"]: e["earned"] for e in effect} == {
+        player: KNOCKOUT_POINTS[place] for player, place in season.second.items()
+    }
+    assert {e["player_id"]: e["previous_place"] for e in effect} == {
+        player: (1 + sum(before[o] > before[player] for o in before))
+        if player in before
+        else None
+        for player in season.players
+    }
+
+
+def test_br112_the_round_robin_tournament_has_its_effect_beside_the_knockout(
+    season: Season,
+) -> None:
+    effect = season.evening.get(
+        f"/tournaments/{season.round_robin['id']}/season-effect"
+    )
+
+    assert isinstance(effect, list)
+    assert {e["player_id"]: e["earned"] for e in effect} == {
+        player: ROUND_ROBIN_POINTS[place] for player, place in season.first.items()
+    } | {player: 0 for player in season.players if player not in season.first}
+
+
+def test_fr070_the_public_season_standings_include_the_knockout_places(
+    season: Season,
+) -> None:
+    evening = season.evening
+
+    response = evening.client.get(
+        evening.public(f"/seasons/{evening.season_id}/standings")
+    )
+
+    assert response.status_code == 200
+    assert response.json() == evening.standings()
+    assert {r["player_id"]: r["points"] for r in response.json()} == season.points()
+
+
+def test_fr070_the_public_places_of_the_knockout_name_why(season: Season) -> None:
+    evening = season.evening
+
+    response = evening.client.get(
+        evening.public(f"/tournaments/{season.knockout['id']}/places")
+    )
+
+    rows = response.json()["rows"]
+    assert response.status_code == 200
+    assert [(r["place"], r["reason"]["kind"]) for r in rows] == [
+        (1, "won_final"),
+        (2, "lost_final"),
+        (3, "lost_in_round"),
+        (3, "lost_in_round"),
+        (5, "lost_in_round"),
+        (5, "lost_in_round"),
+    ]
+    assert [r["reason"]["round"] for r in rows] == [
+        "final",
+        "final",
+        "semifinal",
+        "semifinal",
+        "quarterfinal",
+        "quarterfinal",
+    ]
+    assert [r["points_per_player"] for r in rows] == [10, 8, 5, 5, 1, 1]
+
+
+def test_br020_the_setup_ranking_uses_the_knockout_tournaments_points_and_wins(
+    season: Season,
+) -> None:
+    evening = season.evening
+    expected = season.points()
+    wins = season.wins()
+
+    setup = evening.create(evening.players, name="Next")
+
+    ranking = setup["ranking"]
+    assert {row["player_id"]: row["points"] for row in ranking} == expected
+    keys = [(-expected[row["player_id"]], -wins[row["player_id"]]) for row in ranking]
+    assert keys == sorted(keys)  # BR-020: points, then tournament wins
+    assert [row["rank"] for row in ranking] == list(range(1, 7))

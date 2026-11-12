@@ -442,6 +442,32 @@ _PUBLIC_PROPERTIES: dict[str, set[str]] = {
         "tiebreakers",
     },
     "PhaseSummary": {"format", "id", "kind", "position"},
+    "PublicBracketMatchRead": {
+        "field_number",
+        "is_walkover",
+        "kind",
+        "match_format",
+        "match_id",
+        "next_number",
+        "number",
+        "outcome",
+        "position",
+        "round_no",
+        "score",
+        "sides",
+        "state",
+    },
+    "PublicBracketRead": {
+        "final_match_format",
+        "has_group_phase",
+        "match_format",
+        "phase_id",
+        "rounds",
+        "size",
+        "third_place_match",
+    },
+    "PublicBracketRoundRead": {"matches", "name", "round_no"},
+    "PublicBracketSideRead": {"decided_by_lot", "entry_id", "is_bye", "seed"},
     "PublicLeagueRead": {"name", "players", "seasons"},
     "PublicPlaceRead": {"entry_id", "place", "points_per_player", "reason"},
     "PublicPlaceReasonRead": {
@@ -556,7 +582,7 @@ def test_fr071_public_schemas_carry_nothing_only_the_organizer_sees(
         reachable,
     )
 
-    assert len(public) == 6
+    assert len(public) == 7
     assert all(set(item) == {"get"} for item in public.values())  # FR-072
     assert {
         name: set(schemas[name]["properties"])
