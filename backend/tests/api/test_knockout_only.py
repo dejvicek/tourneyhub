@@ -651,6 +651,31 @@ def test_fr037_a_knockout_is_not_finished_by_hand(
     }
 
 
+def test_fr054_the_final_gets_a_format_of_its_own_after_a_knockout_only_start(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    started: Callable[..., Json],
+    read: Callable[..., Json],
+) -> None:
+    tournament = started(6)
+
+    response = client.put(
+        _t_url(league_id, tournament["id"], "/knockout/final-format"),
+        json={"final_match_format": "bo3"},
+        headers=headers,
+    )
+    bracket = read(tournament["id"], "/bracket")
+    matches = by_key(bracket)
+
+    assert response.status_code == 200, response.text
+    knockout = next(p for p in response.json()["phases"] if p["kind"] == "knockout")
+    assert knockout["final_match_format"] == "bo3"
+    assert bracket["final_match_format"] == "bo3"
+    assert matches[3, "standard", 1]["match_format"] == "bo3"
+    assert matches[2, "standard", 1]["match_format"] == "bo1"
+
+
 # ---------------------------------------------------------------- places
 
 
