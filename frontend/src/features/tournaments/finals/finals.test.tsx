@@ -784,6 +784,46 @@ describe("Late and disabled players (screen 12)", () => {
     );
   });
 
+  it("orders players level on points by name in the chosen language (FR-081)", async () => {
+    await i18n.changeLanguage("cs");
+    // Czech puts Č, Ř, Š and Ž after their base letters and "Ch" after H.
+    const czechOrder = [
+      "Cyril",
+      "Čeněk",
+      "Hana",
+      "Chalupa",
+      "Ivan",
+      "Radek",
+      "Řehoř",
+      "Sára",
+      "Šimon",
+      "Zora",
+      "Žaneta",
+    ];
+    // New players have no season points, so only their names order them.
+    db().players.push(
+      ...czechOrder.toReversed().map((name, i) => ({
+        id: demoId(9100 + i),
+        league_id: DEMO_LEAGUE_ID,
+        name,
+        removed_at: null,
+      })),
+    );
+    const user = userEvent.setup();
+    renderAt(at(paths.lateAndDisabled, MONSTER));
+
+    await user.click(
+      await screen.findByRole("button", { name: "Přidat pozdního hráče" }),
+    );
+    const sheet = await screen.findByRole("dialog", {
+      name: "Přidat pozdního hráče",
+    });
+    const shown = await within(sheet).findAllByText((text) =>
+      czechOrder.includes(text),
+    );
+    expect(shown.map((name) => name.textContent)).toEqual(czechOrder);
+  });
+
   it("has no axe violations", async () => {
     renderAt(at(paths.lateAndDisabled, MONSTER));
     await screen.findByRole("heading", { name: "15 players, 14 active" });
