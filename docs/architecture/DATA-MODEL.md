@@ -46,7 +46,7 @@ The schema follows the proposed ADRs in `ADR.md`, in particular ADR-002 (Postgre
   - a round is deleted by `rounds.id`, never as "the newest round" (FR-046);
   - adding a round carries the expected `round_no`, and the unique `(phase_id, round_no)` also catches a duplicate (FR-040);
   - starting a season carries the current season's `number` (FR-021);
-  - "shuffle again", "new DYP draw" and "generate and start" (FR-035) carry the expected `draw_counter`; a tournament already started gets 409 `tournament_not_in_setup`;
+  - "shuffle again", "new DYP draw" and "generate and start" (FR-035) carry the expected `draw_counter`, and "generate and start" also the seed order the preview showed (`expected_seed_order`); a tournament already started gets 409 `tournament_not_in_setup`, and seeds reordered since the review get 409 `seed_order_changed`;
   - "back to setup" (FR-036) carries the state it expects, `in_progress`; any other gets 409 `tournament_not_in_progress`, so a repeat changes nothing;
   - finishing a round robin without a knockout (FR-040) carries the state it expects, `in_progress`, the same way; a match still without a result is 422 `group_phase_not_done`;
   - creating a league or a tournament uses a client-supplied id (see Primary keys);
