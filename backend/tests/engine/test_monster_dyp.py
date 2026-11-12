@@ -706,6 +706,28 @@ def test_br062_a_partnership_played_twice_is_avoided_before_one_played_once() ->
     assert result.method is GroupingMethod.SWAPS
 
 
+def test_br062_fewer_repeated_teams_come_before_lower_earlier_counts() -> None:
+    # Hypothesis found this case (6 players, round 7). 1, 3, 4 and 5 play, and
+    # every grouping repeats a partner: 3+4 have partnered twice, 1+5 never and
+    # the other four teams once. One repeated team is fewer than two (ADR-011),
+    # so 1 and 5 get a new partner, although the counts would be more even
+    # with two teams that each partner a second time.
+    rounds = rounds_of(
+        [((6, 1), (5, 2))],
+        [((3, 4), (2, 6))],
+        [((3, 1), (4, 5))],
+        [((5, 6), (1, 4))],
+        [((5, 3), (6, 2))],
+        [((1, 2), (4, 3))],
+    )
+
+    result = draw_round(6, rounds, standing=(1, 4, 5, 3, 2, 6), disabled=(2, 6))
+
+    assert numbers(result) == [((1, 5), (4, 3))]
+    assert earlier_counts(result, rounds) == [0, 2]
+    assert result.method is GroupingMethod.SWAPS
+
+
 # ---------------------------------------------------------------- draw caller bugs
 
 
