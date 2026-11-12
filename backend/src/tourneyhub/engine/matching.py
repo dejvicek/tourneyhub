@@ -24,7 +24,8 @@ def min_cost_matching(
     Returns:
         The pairs, each with the lower node first, in ascending order.
     """
-    graph: nx.Graph[int] = nx.Graph()
+    # The data types are spelled out: the stub defaults them to dict[str, Any].
+    graph: nx.Graph[int, dict[str, object], dict[str, object]] = nx.Graph()
     graph.add_nodes_from(range(count))
     graph.add_weighted_edges_from(edges)
     return tuple(

@@ -689,7 +689,8 @@ def has_repeat_free_pairing(
     """The oracle of ADR-011: brute force below 12 entries, else blossom."""
     if len(entries) < 12:
         return min_repeats(entries, met) == 0
-    graph: nx.Graph[EntryId] = nx.Graph()
+    # The data types are spelled out: the stub defaults them to dict[str, Any].
+    graph: nx.Graph[EntryId, dict[str, object], dict[str, object]] = nx.Graph()
     graph.add_nodes_from(entries)
     graph.add_edges_from(
         (a, b) for a, b in combinations(entries, 2) if frozenset((a, b)) not in met

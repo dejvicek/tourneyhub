@@ -12,7 +12,7 @@ The ADRs decide what the backend is built from; this guide decides how its code 
 
 - **The tools are the rulebook.** What ruff, mypy, import-linter and pytest check is configured in `backend/pyproject.toml` (§2). Prose mentions a tool-checked rule only to name its code; every other rule written here exists because no tool checks it.
 - **Python 3.15 only.** No compatibility code for older versions, no `typing_extensions` for what the standard library has, no `from __future__ import annotations`.
-- **Typed throughout.** `mypy --strict` passes on `src` and `tests`. No `Any` of our own; where a library's signature forces it (`type_annotation_map`, a decoded JWT payload), a comment says so. A `cast` or `# type: ignore[code]` carries a comment saying why it is safe.
+- **Typed throughout.** `mypy --strict` passes on `src` and `tests`. No `Any` of our own; where a library's signature forces it (`type_annotation_map`, a decoded JWT payload), a comment says so. mypy's `disallow_any_explicit` checks this, except in `tourneyhub.db.base` and in `tests/conftest.py`, `tests/api`, `tests/db` and `tests/services`, whose factory fixtures are `Callable[..., X]` (§9). A `cast` or `# type: ignore[code]` carries a comment saying why it is safe.
 - **One way per task.** Use the patterns this guide shows. A second way to do the same thing (another session helper, another base model) needs a reason in the pull request.
 - **Business rules are cited.** Code and tests that implement a rule name its ID (`BR-056`, `FR-082`) in a docstring, comment or test name.
 - **Changing a rule** is a pull request that changes this guide and the configuration together.
