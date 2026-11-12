@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Status | Draft |
-| Date | 2026-10-21 |
+| Date | 2026-11-11 |
 | Scope | MVP only. Business requirements only: technical decisions are recorded in `ADR.md` when they are made. |
 
 ## 1. Purpose
@@ -52,6 +52,7 @@ The MVP lets an organizer run a league in seasons, play tournaments inside each 
 | Disabled | A player or pair the organizer has taken out of new rounds for now. |
 | Top players | In Monster DYP, the players kept apart in rounds 1 and 2. |
 | BH1, BH2 | Buchholz tie-breakers. BH1 sums the points of an entry's opponents; BH2 sums those opponents' BH1. |
+| Game difference | Games won minus games lost, over every match with a result. A drawn BO1 game counts as neither, and a walkover counts the games needed to win the match format: BO1 1:0, BO2 2:0, BO3 2:0, BO5 3:0. |
 | Score difference | Goals for minus goals against, over every game with an entered score. |
 | Place | An entry's finishing position in a tournament. Several entries can share a place. |
 | Placement points | Season points a player earns for their place in a finished tournament. |
@@ -67,7 +68,7 @@ The MVP lets an organizer run a league in seasons, play tournaments inside each 
 4. Tournament types: Singles, Doubles, DYP and Monster DYP.
 5. Tournaments in two phases, either of which can be left out: a group phase — round robin (once or twice), Swiss or Monster DYP rounds — then a single-elimination knockout (optional third-place match). Swiss and Monster DYP rounds go on for as long as the organizer wants.
 6. Seeding by league ranking or random shuffle, adjustable by hand; generating brackets, schedules and rounds; adding and deleting rounds, late players and disabling players; result entry and corrections.
-7. Group-phase points (2 / 1 / 0, optional points for sitting out), tie-breakers (head-to-head and score difference in a round robin; score difference, BH1 and BH2 in Swiss and Monster DYP), and season standings from placement points.
+7. Group-phase points (2 / 1 / 0, and 0, 1 or 2 points for sitting out in Swiss and Monster DYP), tie-breakers (head-to-head, game difference and score difference in a round robin; score difference, BH1 and BH2 in Swiss and Monster DYP), and season standings from placement points.
 8. A read-only share link per league.
 9. English and Czech UI, usable on a phone.
 10. Match formats BO1, BO2, BO3 and BO5, chosen per phase, with an optional different format for the final.
@@ -94,8 +95,8 @@ Each of these is on the roadmap (`ROADMAP.md`).
 
 ### 5.2 A Monster DYP night
 
-1. 14 players come. The organizer creates a Monster DYP and is shown a recommendation of at least 4 rounds. Points for sitting out stay off.
-2. Round 1: 12 players play in 3 matches and 2 sit out. The 3 best-ranked players are in different matches.
+1. 14 players come. The organizer creates a Monster DYP and is shown a recommendation of at least 4 rounds. Points for sitting out stay at their default, 0 (FR-039).
+2. Round 1: 12 players play in 3 matches and 2 sit out. The 3 best-ranked of the 12 who play are in different matches.
 3. After round 1 a late player arrives. The organizer adds them, and they play from round 2, starting on 0 points.
 4. Whenever every match of a round has a result, the organizer adds the next round. A win is worth 2 points, a draw 1.
 5. After round 3 one player leaves for a while. The organizer disables them, and re-enables them before round 5.
@@ -145,17 +146,17 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | FR-033 | Doubles: the organizer puts the players into pairs. DYP: the players are split into a top and a bottom half — by the league ranking or by hand — and the pairs are drawn (BR-031–BR-033). |
 | FR-034 | The first phase of a Singles, Doubles or DYP tournament is seeded by league ranking (default) or random shuffle, and the organizer can then reorder the seeds by hand. A knockout after a group phase is seeded by the group-phase places (§7.11). |
 | FR-035 | Generating creates the bracket, the round-robin schedule, or the first round of a Swiss or Monster DYP, and starts the tournament. |
-| FR-036 | Until the first result is entered, the organizer can go back to setup, change anything — including a new DYP draw — and generate again. |
+| FR-036 | While no match in the tournament has a result (BR-096), the organizer can go back to setup, change anything — including a new DYP draw — and generate again. |
 | FR-037 | A tournament with a knockout finishes automatically when every knockout match has a result. A tournament without one finishes when the organizer finishes it after the group phase (FR-040). |
 | FR-038 | The organizer can delete a tournament after confirming, unless its season is closed. |
-| FR-039 | Round robin, Swiss and Monster DYP have a setup setting, **points for sitting out**: off by default (0 points), on gives 1 point (BR-071). |
+| FR-039 | Swiss and Monster DYP have a setup setting, **points for sitting out**: 0, 1 or 2 (BR-071, BR-075–BR-077). The default is 0. Setup does not show it for a round robin, which has no points for sitting out (BR-071). |
 
 ### 6.5 Group phase and knockout
 
 | ID | Requirement |
 |---|---|
 | FR-040 | Swiss and Monster DYP have no set number of rounds: once every match in the current round has a result, the organizer adds the next round, starts the knockout (FR-045) or finishes the tournament after confirming. The organizer sees a recommended minimum number of rounds (BR-068) but can stop earlier or play on. A round robin offers the same choice — knockout or finish — once all its matches have results. |
-| FR-041 | Monster DYP: the top players (BR-061) are taken from the league ranking, or marked by the organizer — at most one per match in a round. |
+| FR-041 | Monster DYP: the top players are the players the organizer marked, filled up from the league ranking (BR-061). The organizer can mark at most one player per match of round 1; when a later round has fewer matches, the marked players who play count in league-ranking order (BR-061). |
 | FR-042 | Each new round is drawn from the current standings (§7.7, §7.8), leaving out disabled players (BR-064). |
 | FR-043 | For a Swiss or Monster DYP, the organizer switches each tie-breaker — score difference, BH1, BH2 — on or off and puts them in order. Default: BH1, then BH2, then score difference. |
 | FR-044 | In a Swiss or Monster DYP, the organizer can disable any player — in Doubles and DYP, a pair — and re-enable them later (BR-064). |
@@ -172,13 +173,13 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | FR-051 | A result can include the score of each game — goals for each side, in whole numbers. Swiss and Monster DYP rounds require them (BR-092). Without game scores, the organizer picks the winner of each game. |
 | FR-052 | A match can be recorded as a walkover: a winner, with no score. |
 | FR-053 | The organizer can change or clear a result, subject to BR-011, BR-053, BR-065 and BR-094. |
-| FR-054 | The organizer can change a phase's match format until the phase's first result is entered, and the final's format until the final has a result. |
+| FR-054 | The organizer can change a phase's match format while the phase has no result (BR-096). The final's format can change while the final has no result (BR-096). |
 
 ### 6.7 Standings
 
 | ID | Requirement |
 |---|---|
-| FR-060 | Every tournament shows its standings, which update as results come in (§7.13). Swiss and Monster DYP standings also show BH1, BH2, score difference and sit-outs. |
+| FR-060 | Every tournament shows its standings, which update as results come in (§7.13). Swiss and Monster DYP standings also show BH1, BH2, score difference and sit-outs. The sat-out column counts sit-outs only, not missed rounds (BR-064, BR-067). |
 | FR-061 | Every season shows season standings: each player who has played in a finished tournament of the season, with their total placement points, tournaments played and tournament wins (§7.14). |
 
 ### 6.8 Sharing
@@ -223,7 +224,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 |---|---|
 | BR-010 | A new season cannot start while any tournament in the current season is unfinished. The organizer finishes or deletes it first. |
 | BR-011 | Nothing in a closed season can change: no new tournaments, results, corrections or deletions. Renaming the league, the season or a player, and deleting the whole league, still apply. |
-| BR-012 | Changing the placement points table recalculates the active season's standings; a closed season keeps the table it was played under. Turning draws off affects only results entered afterwards. |
+| BR-012 | Changing the placement points table recalculates the active season's standings; a closed season keeps the table it was played under. Turning draws off does not change results already entered. |
 
 ### 7.3 League ranking and seeding
 
@@ -258,10 +259,10 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | ID | Rule |
 |---|---|
 | BR-050 | Every entry plays every other entry once, or twice if the organizer chose twice. |
-| BR-051 | Matches are grouped into rounds, and no entry plays twice in a round. With an odd number of entries, one sits out each round, and every entry sits out the same number of times. |
-| BR-052 | When played twice, the second half repeats the first half's pairings, round by round. |
+| BR-051 | Matches are grouped into rounds, and no entry plays twice in a round. In the schedule made at the start, an odd number of entries means one sits out each round and every entry sits out the same number of times, and seeds 1 and 2 meet in the last round, as the last match of that round; when played twice, the same holds in each half (BR-052). After a late entry, BR-054 governs the rescheduled rounds: with 4 entries and a 5th joining after round 2, entries 1-4 sit out twice and the 5th never. |
+| BR-052 | When played twice, the second half repeats the first half's pairings, round by round. After a late entry, BR-054 governs the matches not yet played. |
 | BR-053 | A round robin's results lock when the knockout is drawn. |
-| BR-054 | A late entry in a round robin plays every other entry as often as everyone else does. The matches not yet played are rescheduled to fit its matches in, keeping sit-outs as even as possible; results already entered stay. |
+| BR-054 | A late entry in a round robin plays every other entry as often as everyone else does. The matches not yet played are rescheduled to fit its matches in; results already entered stay. When played twice, BR-052 holds only for the matches before the reschedule: the matches not yet played follow BR-054, and a repeat order is kept only where BR-054 leaves it unchanged. The reschedule prefers, in this order: (1) fewer rounds; (2) a shorter longest run of rounds that any entry sits out in a row, counting the rounds already played (rounds that already had a result when the late entry joined are not its sit-outs); (3) the last unplayed match of seeds 1 and 2 in a later round, as the last match of that round (BR-051); (4) fewer already scheduled matches moved to a different round; (5) the late entry's opponents compared round by round, the better seed first. With 4 entries and a 5th joining after round 2, four more rounds are needed (6 in all), and with 1 v 2 in round 6 some entry would sit out two rounds in a row, so 1 v 2 is played in round 5 of 6. The schedule is then: round 3: 5 v 1; round 4: 5 v 2, 3 v 4; round 5: 5 v 3, 1 v 2; round 6: 5 v 4. |
 
 ### 7.7 Swiss
 
@@ -270,25 +271,25 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | BR-055 | Round 1 pairs the top half of the seeds against the bottom half: seed 1 plays seed N/2 + 1, seed 2 plays seed N/2 + 2, and so on (8 entries: 1 v 5, 2 v 6, 3 v 7, 4 v 8). |
 | BR-056 | From round 2, entries are ordered by current standing and play their neighbour: 1st v 2nd, 3rd v 4th, and so on. An entry that has already played its neighbour plays the next entry down that it has not played. |
 | BR-057 | No entry meets the same opponent twice while it can be avoided. |
-| BR-058 | With an odd number of entries in a round, one sits out: the lowest-placed of those who have sat out the fewest times. Disabled entries do not count. |
+| BR-058 | With an odd number of entries in a round, one sits out. Entries that did not sit out the round before are picked to sit out first; among them, the one with the fewest sit-outs so far, and then the lowest-placed; remaining ties by lot (BR-074). A missed round counts as a sit-out here (BR-064, BR-067). In round 1, before any result, the lowest seed sits out, and the others are paired by BR-055 (7 entries: seed 7 sits out, then 1 v 4, 2 v 5, 3 v 6). Disabled entries do not count and are not picked. |
 
 ### 7.8 Monster DYP rounds
 
 | ID | Rule |
 |---|---|
 | BR-060 | Every round, players are grouped in fours by their current standing — in round 1, by the league ranking. In each group, the 1st and 4th play the 2nd and 3rd (#1 + #4 vs #2 + #3). |
-| BR-061 | There are as many top players as matches in a round. In rounds 1 and 2 they are in different groups, and the other players fill the groups in standing order (16 players, top 4: #1 #5 #6 #7 · #2 #8 #9 #10 · #3 #11 #12 #13 · #4 #14 #15 #16). |
+| BR-061 | There are as many top players as matches in a round. In rounds 1 and 2 they are in different groups, and the other players fill the groups in standing order (16 players, top 4: #1 #5 #6 #7 · #2 #8 #9 #10 · #3 #11 #12 #13 · #4 #14 #15 #16). Top players are not exempt from sitting out: the sit-outs are chosen before the top players (BR-063), and the top players are taken from the players who play, in this order: the players marked by the organizer (FR-041), then the others, each in league-ranking order. A top player who sits out or is disabled is replaced by the next one, so every group has exactly one. The number of top players follows each round's number of matches, so it changes when a late or disabled player changes the number of matches between rounds 1 and 2. |
 | BR-062 | Nobody gets the same partner twice while it can be avoided; the grouping changes as little as needed to avoid it. |
-| BR-063 | When the number of players is not divisible by 4, the extra one to three players sit out the round. The players who have sat out the fewest times sit out; ties are decided by lot. Disabled players do not count. |
+| BR-063 | When the number of players is not divisible by 4, the extra one to three players sit out the round. Players who did not sit out the round before are picked to sit out first; among them, those who have sat out the fewest times, and remaining ties are decided by lot. A missed round counts as a sit-out here (BR-064, BR-067). Disabled players do not count and are not picked. For example, 6 players play 6 rounds, and each has sat out twice. A 7th player arrives and counts 6 sit-outs. From round 7, three sit out each round: the 7th plays rounds 7 to 14, and the other six sit out every second round. After round 14 all seven count 6, and in round 15 the lot can pick the 7th for the first time. |
 
 ### 7.9 Round by round (Swiss and Monster DYP)
 
 | ID | Rule |
 |---|---|
-| BR-064 | A disabled player or pair is not drawn into new rounds. Their results and points stay; rounds they miss earn 0 and do not count as sit-outs. Once re-enabled, they play from the next round. At the end they are placed by their standing. |
+| BR-064 | A disabled player or pair is not drawn into new rounds. Their results and points stay; rounds they miss earn 0 and no points for sitting out (BR-071, BR-076, BR-077). For the sit-out order only (BR-058, BR-063), each missed round counts as a sit-out. Once re-enabled, they are in the draw from the next round. At the end they are placed by their standing. |
 | BR-065 | A round's results can be changed until the next round or the knockout is drawn; after that they are locked. |
 | BR-066 | Deleting the newest round removes its matches and results and unlocks the round before it. |
-| BR-067 | In a Swiss or Monster DYP, a late player starts on 0 points and plays from the next round; rounds they missed earn 0 and do not count as sit-outs. A round robin fits a late entry into its schedule (BR-054), and a knockout without a group phase only lets one take a bye (BR-045). DYP takes no late players, because its pairs are drawn at the start, and neither does a knockout after a group phase, whose qualifiers are fixed. |
+| BR-067 | In a Swiss or Monster DYP, a late player starts on 0 points and is in the draw from the next round; rounds they missed earn 0 and no points for sitting out (BR-071, BR-076, BR-077). For the sit-out order only (BR-058, BR-063), each missed round counts as a sit-out. A round robin fits a late entry into its schedule (BR-054), and a knockout without a group phase only lets one take a bye (BR-045). DYP takes no late players, because its pairs are drawn at the start, and neither does a knockout after a group phase, whose qualifiers are fixed. |
 | BR-068 | The recommended minimum number of rounds is log₂ of the number of entries, rounded up — the usual Swiss minimum, after which at most one entry can have won every match. Monster DYP counts players. 5–8 entries → 3 rounds, 9–16 → 4, 17–32 → 5. Late players count from when they join. |
 
 ### 7.10 Group-phase points and standings
@@ -296,10 +297,13 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | ID | Rule |
 |---|---|
 | BR-070 | In round robin, Swiss and Monster DYP rounds, a win is worth 2 points, a draw 1 and a loss 0. In Monster DYP, both players of a team get the points. |
-| BR-071 | A sit-out is worth 0 points, or 1 point when the tournament's "points for sitting out" setting is on. |
+| BR-071 | In Swiss and Monster DYP, a sit-out is worth the tournament's points for sitting out: 0, 1 or 2 (FR-039). A round-robin phase has no points for sitting out: in a complete round robin every entry sits out equally often (BR-051), and with a late entry (BR-054) the points would distort the order. Switching the group phase to a round robin drops the setting, a picked value included; switching back starts from the default (FR-039). |
 | BR-072 | Swiss and Monster DYP: entries level on points are ordered by the enabled tie-breakers, in the organizer's order (FR-043). |
 | BR-073 | BH1 is the sum of the current points of every opponent faced, counted once per match. BH2 is the sum of those opponents' BH1. Score difference is goals for minus goals against over all games. Sit-outs add nothing to BH1 or BH2, and score difference counts only entered game scores. |
 | BR-074 | Entries still level share the place. Where a strict order is needed — pairing the next round, or the knockout's cut and seeding — the lot decides. |
+| BR-075 | The organizer picks the points for sitting out, 0, 1 or 2, in setup (FR-036). While the phase has a result (BR-096), the value cannot change. |
+| BR-076 | Sit-out points count as points in the standings (BR-072). |
+| BR-077 | In Monster DYP, each player who sits out a round (BR-063) gets the points for sitting out. |
 
 ### 7.11 From group phase to knockout
 
@@ -324,13 +328,14 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | BR-093 | A walkover counts as a normal win and loss everywhere. |
 | BR-094 | In a knockout, a result is locked once any later match it feeds has a result: the next match for its winner and, for a semifinal with a third-place match, that match for its loser. That later result must be cleared first. Changing a winner updates the sides of the later matches. |
 | BR-095 | Clearing a result in a finished tournament puts it back in progress. |
+| BR-096 | A phase, a final or a whole tournament has no result while none of its matches has one. It has none again once every result in it is cleared (FR-053), and a phase also once its round 1 is deleted (FR-046). |
 
 ### 7.13 Tournament places
 
 | ID | Rule |
 |---|---|
 | BR-100 | Places belong to entries. Every player in an entry gets the entry's place. |
-| BR-101 | Round robin: entries are ranked by points (BR-070, BR-071), with played, won, drawn, lost, sat out, score difference and points shown. When exactly two entries are level, the one with more points from the matches between them ranks higher. Entries still level are ordered by score difference, counting only entered scores, and after that share the place (BR-074). |
+| BR-101 | Round robin: entries are ranked by the points of their matches (BR-070), with played, won, drawn, lost, sat out, game difference, score difference and points shown; a round robin has no points for sitting out (BR-071). When exactly two entries are level, the one with more points from the matches between them ranks higher. Entries still level are ordered by game difference (a walkover counts the games needed to win the format, as in the glossary), then by score difference, counting only entered scores, and after that share the place (BR-074). This order applies in every match format. The game-difference column is shown only when the phase plays BO3 or BO5: in BO1 and BO2 it follows from won and lost, which the table already shows, and it costs width on a phone (FR-082). |
 | BR-102 | Knockout: the winner is 1st and the final's loser 2nd. With a third-place match, its winner is 3rd and its loser 4th; without one, the two semifinal losers share 3rd. Entries knocked out in the same earlier round share a place: quarterfinal losers share 5th, round-of-16 losers share 9th, and so on. |
 | BR-103 | With a group phase but no knockout, the group-phase standings are the places. With both, the knockout entries take the top places by BR-102, and the other entries follow in their group-phase order, numbered after the knockout entries: after 8 knockout pairs, the best non-qualifier is 9th. |
 | BR-104 | After a shared place, numbering skips accordingly: two entries sharing 3rd are followed by 5th. |
