@@ -9,9 +9,9 @@
 #                   checks the frontend.
 # Needs: the dev stack running from the main checkout (`docker compose up`); both
 #        areas run in one-off containers, so the host needs no Node or Python.
-# Speed: the backend tests run as several pytest processes (check-backend.sh,
-#        check_shard.py). Both files are mounted from this script's directory, so the
-#        checked worktree needs no copy of them.
+# Speed: the two areas run side by side, and the backend tests run as several pytest
+#        processes (check-backend.sh, check_shard.py). Both files are mounted from this
+#        script's directory, so the checked worktree needs no copy of them.
 # Exit:  0 all checks passed, 1 a check failed, 2 usage or environment error.
 set -uo pipefail
 
@@ -34,7 +34,15 @@ main=$(dirname "$common")
 lock="$common/check-worktree.lock"
 mkdir "$lock" 2>/dev/null \
   || fail "another check is running (lock $lock). Wait for it. Remove the lock only if no check runs."
-trap 'rmdir "$lock"' EXIT
+frontend_pid=
+frontend_log=
+cleanup() {
+  # An interrupted run must not leave the frontend checks running without the lock.
+  [ -z "$frontend_pid" ] || kill "$frontend_pid" 2>/dev/null
+  [ -z "$frontend_log" ] || rm -f "$frontend_log"
+  rmdir "$lock"
+}
+trap cleanup EXIT
 
 check_backend=false
 check_frontend=false
@@ -65,6 +73,8 @@ docker compose ps --quiet >/dev/null 2>&1 || fail "Docker or Compose is not reac
 
 echo "Worktree: $wt ($(git -C "$wt" rev-parse --abbrev-ref HEAD) @ $(git -C "$wt" rev-parse --short HEAD))"
 
+# Every environment check and the databases come before the first check starts, so
+# that `fail` never leaves a check running in the background.
 if $check_backend; then
   docker compose ps --status running --services 2>/dev/null | grep -qx db \
     || fail "the dev database is not running. Start the stack in $main: docker compose up --build"
@@ -73,7 +83,7 @@ if $check_backend; then
   cmp -s "$wt/backend/uv.lock" "$main/backend/uv.lock" \
     || fail "backend/uv.lock in $wt differs from the main checkout's, whose dependencies the api image has; CI checks this branch"
   # One pytest process for every two of Docker's CPUs: the database works as hard as
-  # the tests.
+  # the tests, and the frontend checks may run beside them.
   cpus=$(docker info --format '{{.NCPU}}' 2>/dev/null) || fail "could not read Docker's CPU count"
   shards=$((cpus / 2))
   [ "$shards" -ge 1 ] || shards=1
@@ -112,6 +122,14 @@ run_frontend() {
 
 result=0
 
+# With both areas to check, the frontend runs in the background while the backend
+# reports; its output is kept and printed afterwards.
+if $check_backend && $check_frontend; then
+  frontend_log=$(mktemp) || fail "could not create a temporary file"
+  run_frontend >"$frontend_log" 2>&1 &
+  frontend_pid=$!
+fi
+
 if $check_backend; then
   echo "== backend =="
   if run_backend; then
@@ -124,7 +142,16 @@ fi
 
 if $check_frontend; then
   echo "== frontend =="
-  if run_frontend; then
+  if [ -n "$frontend_pid" ]; then
+    wait "$frontend_pid"
+    frontend_rc=$?
+    frontend_pid=
+    cat "$frontend_log"
+  else
+    run_frontend
+    frontend_rc=$?
+  fi
+  if [ "$frontend_rc" -eq 0 ]; then
     echo "frontend: PASS"
   else
     echo "frontend: FAIL"
