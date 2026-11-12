@@ -457,7 +457,7 @@ def migrate() -> None:
 
 - `tests/` mirrors the package, e.g. `tests/engine/test_standings.py`. Shared helpers are fixtures in `conftest.py`; under `--import-mode=importlib`, test modules cannot import each other, so factory fixtures are typed `Callable[..., League]` in tests.
 - A test name states the rule: `test_br056_pairs_the_next_unplayed_entry_below`.
-- The PRD's worked examples (§5.1 and those inside BR-055, BR-061, BR-081, BR-111) are exact test vectors (ADR-012). §5.2 holds for every seed: top players are not exempt from the sit-out lot: the sit-outs are chosen first, and the top players come from the players who play, the marked ones first and then the others in league-ranking order (BR-061, BR-063; ADR-011).
+- The PRD's worked examples (§5.1 and those inside BR-054, BR-055, BR-058, BR-061, BR-063, BR-081, BR-111) are exact test vectors (ADR-012). §5.2 holds for every seed: top players are not exempt from the sit-out lot: the sit-outs are chosen first, and the top players come from the players who play, the marked ones first and then the others in league-ranking order (BR-061, BR-063; ADR-011).
 - One behaviour per test, with arrange, act and assert separated by blank lines. Parametrize with ids: `pytest.param(..., id="BR-104-shared-places")`.
 - Check domain errors by code: `with pytest.raises(ConflictError) as raised:` and then `assert raised.value.code is ErrorCode.SEASON_NUMBER_CHANGED`. Never match English messages.
 - Fixtures that need teardown use `yield`; the others `return` (ruff `PT022`). Broad scopes only for expensive, immutable things such as the migrated database.
