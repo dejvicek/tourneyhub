@@ -51,9 +51,10 @@ The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. 
   - [ ] Services and API: start, rounds, top players (`entries.is_top_player`).
   - [ ] Knockout modes: seeded pairs, singles, A little mercy, Lord have mercy.
   - [ ] Lord have mercy re-mix ([#63](https://github.com/dejvicek/tourneyhub/issues/63)):
-    - [x] Step 1, data model and engine: a stored draw per knockout round (DATA-MODEL D4 and D5, ADR-009, ADR-010); the draw of later rounds, the result lock and places per player in the engine.
+    - [x] Step 1, data model and engine: a stored draw per knockout round (DATA-MODEL D4 and D5, ADR-009, ADR-010); the draw of later rounds, the result lock and places per player in the engine ([#93](https://github.com/dejvicek/tourneyhub/pull/93)).
     - [ ] Step 1, services, API and screens: drawing and deleting a knockout round, disabling a player in the knockout, finishing, the round-by-round view on the organizer's screen and on the share link, and the option on the start-knockout screen. Needs the Monster DYP services and the knockout modes above.
     - [ ] Step 2: replacements.
+    - [ ] Order of re-mixed pairs sharing a place ([#94](https://github.com/dejvicek/tourneyhub/issues/94), waiting for an answer).
   - [ ] Screen 13 and marking top players on the real API.
   - [x] Which draw to use when every grouping repeats a partner ([#79](https://github.com/dejvicek/tourneyhub/issues/79), [#83](https://github.com/dejvicek/tourneyhub/pull/83)).
 - [ ] **P14 Late players and disabling** (FR-044, FR-047, FR-048; BR-045, BR-054, BR-064, BR-067)
