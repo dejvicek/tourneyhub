@@ -22,6 +22,7 @@ All documents live in `docs/` (index: `docs/README.md`). Read the relevant one b
 | Document | Holds |
 |---|---|
 | `docs/product/PRD.md` | What the MVP does. Requirement IDs `FR-xxx`, business rules `BR-xxx`, glossary (§3). The user owns it. |
+| `docs/product/MVP-ROADMAP.md` | What is left before the MVP (packages P1–P16, follow-ups, demo removal), as a checklist mirroring issue #84. |
 | `docs/product/ROADMAP.md` | Post-MVP items (`RM-xx`). Not in scope unless moved into the PRD. |
 | `docs/architecture/ADR.md` | How it is built (ADR-001 – ADR-014). |
 | `docs/architecture/DATA-MODEL.md` | Tables, constraints, what the DB enforces vs. the app (§5). |
@@ -30,6 +31,15 @@ All documents live in `docs/` (index: `docs/README.md`). Read the relevant one b
 | `docs/style/frontend-style.md` | Frontend rules. Load the `frontend-style` skill before touching `frontend/`. |
 
 New documents go into the matching folder and get a row in `docs/README.md`.
+
+### Keeping the MVP roadmap current
+
+Issue [#84](https://github.com/dejvicek/tourneyhub/issues/84) is the MVP checklist; `docs/product/MVP-ROADMAP.md` mirrors it item for item. Keep the two identical:
+
+- A PR that finishes a checklist item ticks it in `MVP-ROADMAP.md` in the same PR and adds the PR link, e.g. `([#57](…/pull/57))`. Once the PR is merged, tick the same item in issue #84 (`gh issue edit 84 --body-file …`).
+- When the plan changes (a new follow-up issue, a split or dropped item, an open question answered), change both the file and the issue body the same way.
+- A parent item is ticked only when all its sub-items are. A finished package moves to section 1 "Done".
+- If the file and the issue disagree, the issue wins; fix the file to match.
 
 Code and tests that implement a rule cite its ID (`BR-056`, `FR-082`) in a docstring, comment or test name.
 
