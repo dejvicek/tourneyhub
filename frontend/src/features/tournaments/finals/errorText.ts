@@ -19,6 +19,7 @@ const CODE_TEXTS = {
   round_not_complete: "finals.errors.roundNotComplete",
   round_not_newest: "finals.errors.roundNotNewest",
   not_enough_entries: "finals.errors.notEnoughEntries",
+  not_enough_players: "finals.errors.notEnoughPlayers",
   group_phase_locked: "finals.errors.groupPhaseLocked",
 } as const satisfies Partial<Record<ErrorCode, string>>;
 

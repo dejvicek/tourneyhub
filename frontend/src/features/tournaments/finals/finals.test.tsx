@@ -715,6 +715,29 @@ describe("Between rounds (screen 11)", () => {
     );
   });
 
+  it("says how many players another round needs (FR-046)", async () => {
+    server.use(
+      http.post(
+        "*/api/v1/leagues/:leagueId/tournaments/:tournamentId/rounds",
+        () =>
+          HttpResponse.json(
+            { code: "not_enough_players", detail: { minimum: 4, given: 3 } },
+            { status: 422 },
+          ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderAt(at(paths.betweenRounds, SWISS));
+
+    await user.click(
+      await screen.findByRole("button", { name: "Add round 4" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Another round needs at least 4 players who are not disabled.",
+    );
+  });
+
   it("finishes the tournament after confirming and shows its places", async () => {
     const user = userEvent.setup();
     renderAt(at(paths.betweenRounds, SWISS));

@@ -388,6 +388,8 @@ export const tournamentsSetup: CsMessages<typeof english> = {
       br032LeftOut: "Vynechat lze jen jednoho hráče.",
       br032Incomplete: "Nejdřív zařaďte každého hráče do poloviny.",
       fr036: "Do přípravy se lze vrátit jen do prvního výsledku.",
+      fr041Max:
+        "Nasazených hráčů může být nejvýše {{max}}: jeden na zápas prvního kola.",
     },
   },
 };

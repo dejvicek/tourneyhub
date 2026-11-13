@@ -17,6 +17,7 @@ const CODE_TEXTS = {
   too_many_entries_for_knockout: "tournaments.errors.rules.fr032MaxKnockout",
   format_not_supported: "tournaments.errors.rules.fr035",
   tournament_has_results: "tournaments.errors.rules.fr036",
+  too_many_top_players: "tournaments.errors.rules.fr041Max",
 } as const satisfies Partial<Record<ErrorCode, string>>;
 
 function hasText<T extends object>(texts: T, key: unknown): key is keyof T {
@@ -36,6 +37,7 @@ export function describeRefusal(
     min: Number(detail.minimum),
     limit: Number(detail.limit),
     count: Number(detail.unpaired),
+    max: Number(detail.max),
     top: Number(detail.top),
     bottom: Number(detail.bottom),
   };
