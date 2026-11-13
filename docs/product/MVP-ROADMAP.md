@@ -42,7 +42,7 @@ The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. 
 
 - [ ] **P12 Swiss** (FR-040, FR-042, FR-043, FR-046; BR-055 – BR-058, BR-065, BR-066, BR-068, BR-072 – BR-074; ADR-011)
   - [x] Engine: pairing, standings with BH1 and BH2, recommended number of rounds ([#38](https://github.com/dejvicek/tourneyhub/pull/38), [#43](https://github.com/dejvicek/tourneyhub/pull/43)).
-  - [ ] Services and API: start a Swiss phase, add a round against an expected number, delete a round, the order of tie-breakers.
+  - [x] Services and API: start a Swiss phase, add a round against an expected number, delete a round, the order of tie-breakers.
   - [ ] Screen 11 (between rounds) on the real API.
   - [ ] Property tests and the benchmark (ADR-011 Timing).
 - [ ] **P13 Monster DYP** (FR-041, FR-045; BR-060 – BR-063, BR-081 – BR-084; ADR-010, ADR-011)
