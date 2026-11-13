@@ -1,5 +1,6 @@
-"""The Monster DYP group phase: the top players in setup and the start with
-round 1 (FR-041, BR-060, BR-061, BR-063).
+"""The Monster DYP group phase: the top players in setup, the start with round 1
+and the standings (FR-041, FR-060, BR-060, BR-061, BR-063, BR-070, BR-072,
+BR-075, BR-077).
 """
 
 from collections.abc import Callable
@@ -473,3 +474,257 @@ def test_fr032_a_monster_dyp_needs_four_players(
     refusal = {"code": "not_enough_entries", "detail": {"minimum": 4, "given": 3}}
     assert (status, body) == (422, refusal)
     assert preview["problem"] == refusal
+
+
+# ---------------------------------------------------------------- standings
+
+
+def win(side: str, score: tuple[int, int] = (10, 5)) -> Json:
+    """A BO1 result with a score, which a Monster DYP requires (BR-092)."""
+    winner, loser = score
+    scores = (winner, loser) if side == "side_1" else (loser, winner)
+    return {
+        "walkover_winner": None,
+        "games": [{"winner": side, "score_1": scores[0], "score_2": scores[1]}],
+    }
+
+
+DRAW: Json = {
+    "walkover_winner": None,
+    "games": [{"winner": "draw", "score_1": 5, "score_2": 5}],
+}
+
+
+def _result(
+    client: TestClient,
+    league: League,
+    tournament_id: str,
+    match_id: str,
+    body: Json,
+    headers: dict[str, str],
+) -> None:
+    response = client.put(
+        _t_url(league, tournament_id, f"/matches/{match_id}/result"),
+        json=body,
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+
+
+def _standings(play: Json, tournament: Json) -> dict[str, Json]:
+    """The standings by player."""
+    player_of = _player_of(tournament)
+    return {player_of[row["entry_id"]]: row for row in play["standings"]}
+
+
+def test_br077_sit_out_points_count_right_after_the_draw(
+    client: TestClient, league: League, headers: dict[str, str], twelve: list[str]
+) -> None:
+    tid = _monster(client, league, headers, twelve[:10], sit_out_points=2)
+    tournament = _started(client, league, tid, headers)
+
+    play = _get(client, league, tid, "/play", headers)
+
+    out = set(_round(tournament)["sitting_out"])
+    points = {
+        row["entry_id"]: (row["points"], row["sat_out"]) for row in play["standings"]
+    }
+    assert points == {
+        entry_id: (2, 1) if entry_id in out else (0, 0)
+        for entry_id in _player_of(tournament)
+    }
+    assert play["group_done"] is False
+
+
+def test_br075_sit_out_points_locked_after_first_result(
+    client: TestClient, league: League, headers: dict[str, str], players: list[str]
+) -> None:
+    tid = _monster(client, league, headers, players[:9], sit_out_points=2)
+    tournament = _started(client, league, tid, headers)
+    match = _round(tournament)["matches"][0]
+    _result(client, league, tid, match["id"], win("side_1"), headers)
+
+    refused = client.put(
+        _t_url(league, tid, "/format"),
+        json={**MONSTER_DYP, "sit_out_points": 0},
+        headers=headers,
+    )
+    back = client.post(
+        _t_url(league, tid, "/back-to-setup"),
+        json={"expected_state": "in_progress"},
+        headers=headers,
+    )
+
+    assert refused.status_code == 409
+    assert refused.json()["code"] == "tournament_not_in_setup"
+    assert back.status_code == 422
+    assert back.json()["code"] == "tournament_has_results"
+    phases = _get(client, league, tid, "", headers)["phases"]
+    assert [p["sit_out_points"] for p in phases] == [2]
+
+
+def test_br070_both_team_members_get_the_points(
+    client: TestClient,
+    session: Session,
+    league: League,
+    headers: dict[str, str],
+    players: list[str],
+) -> None:
+    league.draws_allowed = True
+    session.flush()
+    tid = _monster(client, league, headers, players[:8])
+    tournament = _started(client, league, tid, headers)
+    first, second = _round(tournament)["matches"]
+    _result(client, league, tid, first["id"], win("side_1"), headers)
+    _result(client, league, tid, second["id"], DRAW, headers)
+
+    rows = _standings(_get(client, league, tid, "/play", headers), tournament)
+
+    points = {
+        **dict.fromkeys(first["sides"][0]["player_ids"], (2, 1, 0, 0)),
+        **dict.fromkeys(first["sides"][1]["player_ids"], (0, 0, 0, 1)),
+        **dict.fromkeys(
+            second["sides"][0]["player_ids"] + second["sides"][1]["player_ids"],
+            (1, 0, 1, 0),
+        ),
+    }
+    assert {
+        p: (row["points"], row["won"], row["drawn"], row["lost"])
+        for p, row in rows.items()
+    } == points
+    assert all(row["played"] == 1 for row in rows.values())
+
+
+def test_br101_a_walkover_counts_the_games_needed_to_win(
+    client: TestClient, league: League, headers: dict[str, str], players: list[str]
+) -> None:
+    tid = _monster(client, league, headers, players[:4], group_match_format="bo3")
+    tournament = _started(client, league, tid, headers)
+    [match] = _round(tournament)["matches"]
+    walkover = {"walkover_winner": "side_2", "games": []}
+    _result(client, league, tid, match["id"], walkover, headers)
+
+    rows = _standings(_get(client, league, tid, "/play", headers), tournament)
+
+    # A BO3 walkover counts as 2:0 games; it has no score (BR-073, BR-101).
+    side_1, side_2 = (side["player_ids"] for side in match["sides"])
+    assert {p: rows[p]["game_difference"] for p in side_1 + side_2} == {
+        **dict.fromkeys(side_1, -2),
+        **dict.fromkeys(side_2, 2),
+    }
+    assert {rows[p]["score_difference"] for p in side_1 + side_2} == {0}
+    assert {rows[p]["points"] for p in side_2} == {2}
+
+
+def test_br072_tiebreakers_follow_the_organizers_order(
+    client: TestClient, league: League, headers: dict[str, str], twelve: list[str]
+) -> None:
+    tid = _monster(client, league, headers, twelve[:10], sit_out_points=0)
+    tournament = _started(client, league, tid, headers)
+    for match in _round(tournament)["matches"]:
+        _result(client, league, tid, match["id"], win("side_1"), headers)
+    round_ = _round(tournament)
+    losers = {p for m in round_["matches"] for p in m["sides"][1]["player_ids"]}
+    out = {_player_of(tournament)[e] for e in round_["sitting_out"]}
+
+    def places(order: list[str]) -> dict[str, int]:
+        status, body = _put(
+            client, league, tid, "/tiebreakers", {"tiebreakers": order}, headers
+        )
+        assert status == 200, body
+        rows = _standings(_get(client, league, tid, "/play", headers), tournament)
+        return {p: rows[p]["place"] for p in losers | out}
+
+    # The losers and the sit-outs are level on 0 points. The losers lead on
+    # BH1 (their opponents won), the sit-outs on score difference (0 to -5).
+    by_bh1 = places(["bh1", "score_difference"])
+    by_score = places(["score_difference", "bh1"])
+
+    assert by_bh1 == {**dict.fromkeys(losers, 5), **dict.fromkeys(out, 9)}
+    assert by_score == {**dict.fromkeys(out, 5), **dict.fromkeys(losers, 7)}
+
+
+def test_fr060_monster_dyp_standings_on_play_and_share_link(
+    client: TestClient, league: League, headers: dict[str, str], players: list[str]
+) -> None:
+    tid = _monster(client, league, headers, players[:9])
+    tournament = _started(client, league, tid, headers)
+    for match in _round(tournament)["matches"]:
+        _result(client, league, tid, match["id"], win("side_1", (10, 4)), headers)
+
+    play = _get(client, league, tid, "/play", headers)
+    shared = client.get(
+        f"/api/v1/public/{league.share_token}/tournaments/{tid}/standings"
+    )
+
+    # One row per player's main entry, best first.
+    assert len(play["standings"]) == 9
+    assert {row["entry_id"] for row in play["standings"]} == set(_player_of(tournament))
+    # The sit-out's 1 point puts them between the winners and the losers.
+    assert [row["place"] for row in play["standings"]] == [1] * 4 + [5] + [6] * 4
+    winner, out, loser = (play["standings"][i] for i in (0, 4, 5))
+    assert {k: winner[k] for k in ("played", "won", "points", "bh1", "bh2")} == {
+        "played": 1,
+        "won": 1,
+        "points": 2,
+        "bh1": 0,
+        "bh2": 8,
+    }
+    assert (winner["score_difference"], winner["game_difference"]) == (6, 1)
+    assert (loser["bh1"], loser["bh2"], loser["score_difference"]) == (4, 0, -6)
+    assert loser["game_difference"] == -1
+    assert (out["sat_out"], out["points"], out["played"]) == (1, 1, 0)
+    assert all(
+        row["form"] == [] and row["ahead_by"] is None for row in play["standings"]
+    )
+    assert play["group_done"] is True
+    assert shared.status_code == 200
+    assert shared.json() == [
+        {k: v for k, v in row.items() if k not in {"form", "ahead_by"}}
+        for row in play["standings"]
+    ]
+
+
+def test_monster_dyp_round_reads_without_errors(
+    client: TestClient, league: League, headers: dict[str, str], twelve: list[str]
+) -> None:
+    tid = _monster(client, league, headers, twelve[:10])
+    tournament = _started(client, league, tid, headers)
+    on_field = next(f for f in tournament["fields"] if f["match_id"] is not None)
+
+    placed = [
+        client.put(
+            _t_url(league, tid, "/fields/placements"),
+            json={"placements": [placement]},
+            headers=headers,
+        )
+        for placement in (
+            {
+                "match_id": on_field["match_id"],
+                "field_id": None,
+                "from_field_id": on_field["id"],
+            },
+            {
+                "match_id": on_field["match_id"],
+                "field_id": on_field["id"],
+                "from_field_id": None,
+            },
+        )
+    ]
+    for match in _round(tournament)["matches"]:
+        _result(client, league, tid, match["id"], win("side_2"), headers)
+
+    public = f"/api/v1/public/{league.share_token}"
+    season_id = tournament["season_id"]
+    reads = [
+        client.get(_t_url(league, tid), headers=headers),
+        client.get(_t_url(league, tid, "/play"), headers=headers),
+        client.get(public),
+        client.get(f"{public}/seasons/{season_id}/tournaments"),
+        client.get(f"{public}/tournaments/{tid}"),
+        client.get(f"{public}/tournaments/{tid}/standings"),
+        client.get(f"{public}/seasons/{season_id}/standings"),
+    ]
+
+    assert [r.status_code for r in placed] == [200, 200], [r.text for r in placed]
+    assert [r.status_code for r in reads] == [200] * len(reads), [r.text for r in reads]

@@ -282,6 +282,46 @@ def test_fr070_the_tournament_reads_as_the_organizer_sees_it(
     assert body["waiting"][0] == body["rounds"][1]["matches"][0]["id"]
 
 
+def test_fr060_the_share_link_shows_the_monster_dyp_standings(
+    client: TestClient,
+    league: League,
+    headers: dict[str, str],
+    make_started: Callable[..., Json],
+) -> None:
+    setup = make_started(
+        league,
+        headers,
+        start=False,
+        type="monster_dyp",
+        group_phase="monster_dyp",
+        round_robin_legs=None,
+        sit_out_points=2,
+    )
+    base = f"/api/v1/leagues/{league.id}/tournaments/{setup['tournament_id']}"
+    preview = client.get(f"{base}/setup/preview", headers=headers).json()
+    started = client.post(
+        f"{base}/start",
+        json={
+            "expected_draw_counter": preview["draw_counter"],
+            "expected_seed_order": preview["seed_order"],
+        },
+        headers=headers,
+    )
+    assert started.status_code == 200, started.text
+
+    response = client.get(
+        _public(league, f"/tournaments/{setup['tournament_id']}/standings")
+    )
+
+    # 5 players: one match and one sit-out, who has the points at once (BR-077).
+    assert response.status_code == 200
+    rows = response.json()
+    assert len(rows) == 5
+    [out] = started.json()["rounds"][0]["sitting_out"]
+    assert rows[0]["entry_id"] == out
+    assert (rows[0]["points"], rows[0]["sat_out"]) == (2, 1)
+
+
 def test_fr070_a_tournament_in_setup_is_not_found(
     client: TestClient,
     league: League,

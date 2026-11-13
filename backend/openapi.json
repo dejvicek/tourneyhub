@@ -2004,7 +2004,7 @@
         "type": "object"
       },
       "PlayRead": {
-        "description": "The running group phase, computed on read (ADR-009, FR-060, FR-092).\n\n`waiting` is the waiting list: requeued matches first, then schedule order\n(BR-130, BR-132). `standings` are the group phase's, best first: a round\nrobin's (BR-101) or a Swiss's (BR-072 to BR-074); a Monster DYP has none\nyet. `group_done` says every group-phase match has a result, in a Swiss\nevery match of the newest round, so the organizer chooses: knockout or\nfinish, or in a Swiss also the next round (FR-040).",
+        "description": "The running group phase, computed on read (ADR-009, FR-060, FR-092).\n\n`waiting` is the waiting list: requeued matches first, then schedule order\n(BR-130, BR-132). `standings` are the group phase's, best first: a round\nrobin's (BR-101), a Swiss's or a Monster DYP's (BR-072 to BR-074), a\nMonster DYP's one row per player. `group_done` says every group-phase\nmatch has a result, in a Swiss and a Monster DYP every match of the newest\nround, so the organizer chooses: knockout or finish, or in a Swiss also\nthe next round (FR-040).",
         "properties": {
           "group_done": {
             "title": "Group Done",
@@ -2812,7 +2812,7 @@
         "type": "object"
       },
       "PublicStandingRow": {
-        "description": "One entry's line in the group-phase standings, for viewers (FR-060).\n\nA round robin's (BR-101) or a Swiss's (BR-072 to BR-074). `place` is\nshared by entries still level (BR-074), and the next place skips\n(BR-104). `points` come from the matches; in a Swiss they also include\nthe points for sitting out, as soon as the round is drawn (BR-076), and a\nround robin gives none (BR-071). `bh1` and `bh2` are the Swiss's\n(BR-073), null in a round robin. `game_difference` ranks a round robin in\nevery match format; the screen shows its column only in BO3 and BO5\n(BR-101). The organizer's extras, the form and what ranks one entry above\nthe next, are not part of it.",
+        "description": "One entry's line in the group-phase standings, for viewers (FR-060).\n\nA round robin's (BR-101), a Swiss's or a Monster DYP's (BR-072 to\nBR-074); a Monster DYP's row is a player's, by their main entry. `place`\nis shared by entries still level (BR-074), and the next place skips\n(BR-104). `points` come from the matches; in a Swiss and a Monster DYP\nthey also include the points for sitting out, as soon as the round is\ndrawn (BR-076, BR-077), and a round robin gives none (BR-071). `bh1` and\n`bh2` are the Swiss's and the Monster DYP's (BR-073), null in a round\nrobin. `game_difference` ranks a round robin in\nevery match format; the screen shows its column only in BO3 and BO5\n(BR-101). The organizer's extras, the form and what ranks one entry above\nthe next, are not part of it.",
         "properties": {
           "bh1": {
             "anyOf": [
@@ -9747,7 +9747,7 @@
     },
     "/api/v1/public/{share_token}/tournaments/{tournament_id}/standings": {
       "get": {
-        "description": "Return the group phase's standings as they are now (FR-060, FR-070).\n\nA round robin's or a Swiss's; a tournament without a group phase, or a\nMonster DYP, has an empty list. A tournament in setup is 404\n`tournament_not_found`, like an unknown one or one of another league.",
+        "description": "Return the group phase's standings as they are now (FR-060, FR-070).\n\nA round robin's, a Swiss's or a Monster DYP's, one row per player in a\nMonster DYP; a tournament without a group phase has an empty list. A\ntournament in setup is 404\n`tournament_not_found`, like an unknown one or one of another league.",
         "operationId": "read_public_standings",
         "parameters": [
           {

@@ -116,7 +116,7 @@ def read_shared_season_standings(
 def read_shared_standings(
     session: Session, *, share_token: str, tournament_id: UUID
 ) -> tuple[tournament_service.GroupStandingRow, ...]:
-    """Return the group phase's standings now, a round robin's or a Swiss's (FR-060).
+    """Return the group phase's standings now, of any group format (FR-060).
 
     A tournament in setup, of another league or unknown is 404
     `tournament_not_found`, the same answer for all three.

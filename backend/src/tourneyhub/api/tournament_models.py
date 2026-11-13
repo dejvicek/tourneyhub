@@ -641,10 +641,11 @@ class PlayRead(ResponseModel):
 
     `waiting` is the waiting list: requeued matches first, then schedule order
     (BR-130, BR-132). `standings` are the group phase's, best first: a round
-    robin's (BR-101) or a Swiss's (BR-072 to BR-074); a Monster DYP has none
-    yet. `group_done` says every group-phase match has a result, in a Swiss
-    every match of the newest round, so the organizer chooses: knockout or
-    finish, or in a Swiss also the next round (FR-040).
+    robin's (BR-101), a Swiss's or a Monster DYP's (BR-072 to BR-074), a
+    Monster DYP's one row per player. `group_done` says every group-phase
+    match has a result, in a Swiss and a Monster DYP every match of the newest
+    round, so the organizer chooses: knockout or finish, or in a Swiss also
+    the next round (FR-040).
     """
 
     waiting: list[WaitingMatchRead]
