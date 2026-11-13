@@ -737,7 +737,7 @@ def test_br062_adr011_no_third_time_while_teams_could_partner_a_second_time() ->
     # From 1+5 v 3+4, the swaps leave it too.
     swapped = draw_round(6, rounds, standing=(1, 3, 4, 5, 2, 6), disabled=(2, 6))
 
-    assert numbers(swapped) in ([((1, 3), (4, 5))], [((1, 4), (3, 5))])
+    assert numbers(swapped) == [((1, 4), (3, 5))]
     assert earlier_counts(swapped, rounds) == [1, 1]
     assert swapped.method is GroupingMethod.SWAPS
 
