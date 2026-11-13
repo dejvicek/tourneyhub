@@ -543,23 +543,29 @@ def add_round(
     user: CurrentUserDep,
     clock: ClockDep,
 ) -> SwissRoundRead:
-    """Draw the next round of a Swiss from the current standings (FR-040, FR-042).
+    """Draw the next round of a Swiss or Monster DYP from the standings (FR-040, FR-042).
 
-    Entries play their neighbour in the standings without meeting anyone
-    twice while that can be avoided (BR-056, BR-057, ADR-011); with an odd
-    number one sits out (BR-058). Disabled entries are not drawn (BR-064).
-    The rounds before it lock (BR-065), and its first matches take the free
-    fields (BR-130). Returns the new round, with what a lot decided and
-    which pairs repeat (ADR-009).
+    A Swiss: entries play their neighbour in the standings without meeting
+    anyone twice while that can be avoided (BR-056, BR-057, ADR-011); with an
+    odd number one sits out (BR-058). A Monster DYP: players are grouped in
+    fours by their standing, the 1st and 4th against the 2nd and 3rd, with the
+    top players of the league ranking apart in rounds 1 and 2 and nobody
+    getting a partner twice while that can be avoided (BR-060 to BR-062); the
+    extra one to three players sit out (BR-063). Disabled entries are not
+    drawn (BR-064). The rounds before it lock (BR-065), and its first matches
+    take the free fields (BR-130). Returns the new round, with what a lot
+    decided and which pairs repeat (ADR-009).
 
     409: `round_number_changed` (the body's `expected_round_no` is not the
     newest round's number plus one; detail `current_round_no`, the newest
     round's), `tournament_not_in_progress` (detail `state`) or
-    `season_closed`. 422: `format_not_supported` (not a Swiss; detail
-    `format`), `group_phase_locked` (the knockout is drawn; detail
+    `season_closed`. 422: `format_not_supported` (not a Swiss or Monster DYP;
+    detail `format`), `group_phase_locked` (the knockout is drawn; detail
     `phase_id`), `round_not_complete` (a match of the newest round has no
-    result; detail `matches_left`) or `not_enough_entries` (fewer than 2
-    entries that are not disabled).
+    result; detail `matches_left`), `not_enough_entries` (a Swiss with fewer
+    than 2 entries that are not disabled) or `not_enough_players` (a Monster
+    DYP with fewer than 4 players that are not disabled; details `minimum`,
+    `given`).
     """
     round_ = tournament_service.add_round(
         session,
@@ -585,17 +591,20 @@ def delete_round(
     user: CurrentUserDep,
     clock: ClockDep,
 ) -> None:
-    """Delete the newest round of a Swiss, with its results; the UI asks first (FR-046).
+    """Delete the newest round of a Swiss or Monster DYP, with its results (FR-046).
+
+    The UI asks first.
 
     The round before it unlocks (BR-066). Deleting round 1 takes the
     tournament back to setup, results or not: every round goes, the
-    entries, seeds and draws stay, and every disabled flag is cleared.
+    entries, seeds, draws and top-player marks stay, and every disabled flag
+    is cleared.
 
     An unknown round, or a repeated delete, is 404 `round_not_found`: it is
     gone. 409: `round_not_newest` (a later round exists; detail `round_id`,
     the newest round's), `tournament_not_in_progress` (detail `state`) or
-    `season_closed`. 422: `format_not_supported` (not a Swiss; detail
-    `format`) or `group_phase_locked` (the knockout is drawn: delete it
+    `season_closed`. 422: `format_not_supported` (not a Swiss or Monster DYP;
+    detail `format`) or `group_phase_locked` (the knockout is drawn: delete it
     first, BR-087; detail `phase_id`).
     """
     tournament_service.delete_round(

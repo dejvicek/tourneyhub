@@ -63,8 +63,39 @@ def _ranking(
     and the order must not shift as other tournaments finish. So a started
     tournament skips the standings, which are two reads of every finished
     tournament of two seasons on each poll of a viewer, and ranks everyone
-    equal, by lot.
+    equal, by lot. A draw that needs the standings of now, as a later round of
+    a Monster DYP does, asks `_current_ranking`.
     """
+    return _rank_league(
+        session,
+        league=league,
+        tournament=tournament,
+        with_standings=tournament.state is TournamentState.SETUP,
+    )
+
+
+def _current_ranking(
+    session: Session, *, league: League, tournament: Tournament
+) -> tuple[RankedPlayer, ...]:
+    """The league ranking as of now, whatever the tournament's state (BR-020).
+
+    The same ranking a setup shows and the start draws round 1 from, but read
+    again from the finished tournaments: a Monster DYP picks the top players of
+    each of its first rounds from it (BR-061).
+    """
+    return _rank_league(
+        session, league=league, tournament=tournament, with_standings=True
+    )
+
+
+def _rank_league(
+    session: Session,
+    *,
+    league: League,
+    tournament: Tournament,
+    with_standings: bool,
+) -> tuple[RankedPlayer, ...]:
+    """The league's players ranked, by the standings or all equal, by lot."""
     player_ids = session.scalars(
         select(Player.id).where(
             Player.league_id == league.id, Player.removed_at.is_(None)
@@ -72,7 +103,7 @@ def _ranking(
     ).all()
     current: dict[PlayerId, SeasonStandingRow] = {}
     last: dict[PlayerId, SeasonStandingRow] = {}
-    if tournament.state is TournamentState.SETUP:
+    if with_standings:
         season = _season_of(league, tournament.season_id)
         current = _standings_by_player(session, season)
         previous = _previous_season(league, season)

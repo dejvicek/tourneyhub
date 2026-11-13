@@ -1,9 +1,9 @@
-"""The Monster DYP group phase: the top players in setup, the start with round 1
-and the standings (FR-041, FR-060, BR-060, BR-061, BR-063, BR-070, BR-072,
-BR-075, BR-077).
+"""The Monster DYP group phase: the top players in setup, the start with round 1,
+the standings, and adding and deleting rounds (FR-041, FR-046, FR-060, BR-060 to
+BR-064, BR-070, BR-072, BR-075, BR-077).
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 from uuid import UUID, uuid7
 
@@ -15,8 +15,12 @@ from sqlalchemy.orm import Session
 from tourneyhub.db.models.entries import Entry, EntryMember
 from tourneyhub.db.models.leagues import League, Player
 from tourneyhub.db.models.matches import RoundParticipation
-from tourneyhub.db.models.tournaments import Tournament
+from tourneyhub.db.models.tournaments import Tournament, TournamentPhase
+from tourneyhub.engine.monster_dyp import MonsterDraw
+from tourneyhub.engine.ranking import RankedPlayer
 from tourneyhub.engine.tournaments import TournamentState
+from tourneyhub.services.tournaments import rounds as rounds_service
+from tourneyhub.services.tournaments.monster_dyp import draw_monster
 
 type Json = dict[str, Any]
 
@@ -728,3 +732,429 @@ def test_monster_dyp_round_reads_without_errors(
 
     assert [r.status_code for r in placed] == [200, 200], [r.text for r in placed]
     assert [r.status_code for r in reads] == [200] * len(reads), [r.text for r in reads]
+
+
+# ---------------------------------------------------------------- rounds
+
+
+@pytest.fixture
+def disable(session: Session) -> Callable[[str], None]:
+    def disable(entry_id: str) -> None:
+        """Disable an entry; its route comes with P14 (FR-044)."""
+        session.get_one(Entry, UUID(entry_id)).is_disabled = True
+        session.flush()
+
+    return disable
+
+
+def _add_round(
+    client: TestClient,
+    league: League,
+    tournament_id: str,
+    expected_round_no: int,
+    headers: dict[str, str],
+) -> tuple[int, Json]:
+    response = client.post(
+        _t_url(league, tournament_id, "/rounds"),
+        json={"expected_round_no": expected_round_no},
+        headers=headers,
+    )
+    result: Json = response.json()
+    return response.status_code, result
+
+
+def _next_round(
+    client: TestClient,
+    league: League,
+    tournament_id: str,
+    round_no: int,
+    headers: dict[str, str],
+) -> Json:
+    status, body = _add_round(client, league, tournament_id, round_no, headers)
+    assert status == 201, body
+    assert body["round_no"] == round_no
+    return body
+
+
+def _play_round(
+    client: TestClient,
+    league: League,
+    tournament_id: str,
+    round_: Json,
+    headers: dict[str, str],
+) -> None:
+    """Side 1 wins every match of the round, by a score that differs per match."""
+    for index, match in enumerate(round_["matches"]):
+        _result(
+            client,
+            league,
+            tournament_id,
+            match["id"],
+            win("side_1", (10, 1 + index)),
+            headers,
+        )
+
+
+def _groups(round_: Json) -> list[set[str]]:
+    """The four players of each match."""
+    return [a | b for a, b in _teams(round_)]
+
+
+def _partners(round_: Json) -> list[frozenset[str]]:
+    return [frozenset(team) for pair in _teams(round_) for team in pair]
+
+
+def _delete_round(
+    client: TestClient,
+    league: League,
+    tournament_id: str,
+    round_id: str,
+    headers: dict[str, str],
+) -> tuple[int, Json]:
+    response = client.delete(
+        _t_url(league, tournament_id, f"/rounds/{round_id}"), headers=headers
+    )
+    return response.status_code, response.json() if response.content else {}
+
+
+def test_br060_later_rounds_group_by_standing(
+    client: TestClient, league: League, headers: dict[str, str], twelve: list[str]
+) -> None:
+    tid = _monster(client, league, headers, twelve)
+    r = _ranked(_get(client, league, tid, "/setup", headers))
+    tournament = _started(client, league, tid, headers)
+    _play_round(client, league, tid, _round(tournament), headers)
+    play = _get(client, league, tid, "/play", headers)
+    player_of = _player_of(tournament)
+    order = [player_of[row["entry_id"]] for row in play["standings"]]
+
+    two = _next_round(client, league, tid, 2, headers)
+
+    # Round 2 keeps the top players of the league ranking apart (BR-061) and
+    # fills the groups from the standings, best first (BR-060): the best-placed
+    # of the others joins the first top player, the worst-placed the last. The
+    # swaps of BR-062 move a player only when a partner would repeat.
+    others = [p for p in order if p not in r[:3]]
+    groups = _groups(two)
+    assert sorted(len(g) for g in groups) == [4, 4, 4]
+    assert {next(iter(g & set(r[:3]))) for g in groups} == set(r[:3])
+    assert {p for g in groups for p in g} == set(twelve)
+    first = next(g for g in groups if r[0] in g)
+    last = next(g for g in groups if r[2] in g)
+    assert others[0] in first
+    assert others[-1] in last
+
+
+def test_br061_top_players_apart_in_round_two(
+    client: TestClient, league: League, headers: dict[str, str], twelve: list[str]
+) -> None:
+    tid = _monster(client, league, headers, twelve)
+    r = _ranked(_get(client, league, tid, "/setup", headers))
+    marked = [r[11], r[7]]
+    _put(client, league, tid, "/setup/top-players", {"player_ids": marked}, headers)
+    tournament = _started(client, league, tid, headers)
+    _play_round(client, league, tid, _round(tournament), headers)
+
+    two = _next_round(client, league, tid, 2, headers)
+
+    # 3 matches: the marked #12 and #8 first, then #1 (BR-061).
+    tops = {r[11], r[7], r[0]}
+    assert sorted(len(g & tops) for g in _groups(two)) == [1, 1, 1]
+
+
+def test_br061_round_two_uses_the_league_ranking_of_now(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    league: League,
+    headers: dict[str, str],
+    players: list[str],
+) -> None:
+    tid = _monster(client, league, headers, players[:8])
+    tournament = _started(client, league, tid, headers)
+    _play_round(client, league, tid, _round(tournament), headers)
+    # Another tournament finishes meanwhile: its winner earns season points,
+    # and the league ranking reflects the standings when it is used (BR-020).
+    other = client.post(
+        f"/api/v1/leagues/{league.id}/tournaments",
+        json={
+            "id": str(uuid7()),
+            **MONSTER_DYP,
+            "type": "singles",
+            "group_phase": "round_robin",
+            "round_robin_legs": 1,
+            "sit_out_points": None,
+        },
+        headers=headers,
+    )
+    assert other.status_code == 201, other.text
+    oid: str = other.json()["tournament_id"]
+    duo = [players[7], players[6]]
+    _put(client, league, oid, "/setup/players", {"player_ids": duo}, headers)
+    finished = _started(client, league, oid, headers)
+    _play_round(client, league, oid, _round(finished), headers)
+    done = client.post(
+        _t_url(league, oid, "/finish"),
+        json={"expected_state": "in_progress"},
+        headers=headers,
+    )
+    assert done.status_code == 200, done.text
+    seen: list[tuple[RankedPlayer, ...]] = []
+    real = draw_monster
+
+    def spy(
+        tournament: Tournament,
+        group: TournamentPhase,
+        *,
+        ranking: Sequence[RankedPlayer],
+    ) -> MonsterDraw:
+        seen.append(tuple(ranking))
+        return real(tournament, group, ranking=ranking)
+
+    monkeypatch.setattr(rounds_service, "draw_monster", spy)
+
+    two = _next_round(client, league, tid, 2, headers)
+
+    [ranking] = seen
+    assert {ranked.player_id for ranked in ranking[:2]} == {UUID(p) for p in duo}
+    assert all(ranked.season_points > 0 for ranked in ranking[:2])
+    assert all(ranked.season_points == 0 for ranked in ranking[2:])
+    assert sorted(len(g & set(duo)) for g in _groups(two)) == [1, 1]
+
+
+def test_br061_disabled_top_player_is_replaced(
+    client: TestClient,
+    league: League,
+    headers: dict[str, str],
+    twelve: list[str],
+    disable: Callable[[str], None],
+) -> None:
+    tid = _monster(client, league, headers, twelve)
+    r = _ranked(_get(client, league, tid, "/setup", headers))
+    _put(
+        client, league, tid, "/setup/top-players", {"player_ids": [r[0], r[5]]}, headers
+    )
+    tournament = _started(client, league, tid, headers)
+    _play_round(client, league, tid, _round(tournament), headers)
+    entry_of = {p: e for e, p in _player_of(tournament).items()}
+    disable(entry_of[r[0]])  # the marked #1 leaves
+
+    two = _next_round(client, league, tid, 2, headers)
+
+    # 11 players: 2 matches, 3 sit out (BR-063). The top players are taken
+    # from the 8 who play: the marked #6 if it plays, then the others in
+    # league-ranking order, never the disabled #1 (BR-061).
+    playing = set().union(*_groups(two))
+    assert len(playing) == 8
+    assert r[0] not in playing
+    assert r[0] not in {_player_of(tournament)[e] for e in two["sitting_out"]}
+    tops = ([r[5]] if r[5] in playing else []) + [
+        p for p in r if p in playing and p != r[5]
+    ]
+    assert sorted(len(g & set(tops[:2])) for g in _groups(two)) == [1, 1]
+
+
+def test_br062_no_repeated_partner_while_avoidable(
+    client: TestClient, league: League, headers: dict[str, str], players: list[str]
+) -> None:
+    tid = _monster(client, league, headers, players[:8])
+    tournament = _started(client, league, tid, headers)
+    rounds = [_round(tournament)]
+    for round_no in (2, 3):
+        _play_round(client, league, tid, rounds[-1], headers)
+        rounds.append(_next_round(client, league, tid, round_no, headers))
+
+    partners = [pair for round_ in rounds for pair in _partners(round_)]
+    assert len(partners) == 12
+    assert len(set(partners)) == 12
+    assert not any(m["is_repeat"] for m in rounds[1]["matches"] + rounds[2]["matches"])
+
+
+def test_br063_who_played_last_round_sits_out_first(
+    client: TestClient, league: League, headers: dict[str, str], twelve: list[str]
+) -> None:
+    tid = _monster(client, league, headers, twelve[:10])
+    tournament = _started(client, league, tid, headers)
+    _play_round(client, league, tid, _round(tournament), headers)
+
+    two = _next_round(client, league, tid, 2, headers)
+
+    # The 2 who sat out round 1 play round 2; 2 of the 8 who played sit out, and
+    # all 8 have no sit-out yet, so the lot picks them (BR-063).
+    assert len(two["sitting_out"]) == 2
+    assert not set(two["sitting_out"]) & set(_round(tournament)["sitting_out"])
+    assert two["is_sit_out_by_lot"] is True
+
+
+def test_br064_disabled_player_is_not_drawn_and_counts_as_sit_out_for_order_only(
+    client: TestClient,
+    session: Session,
+    league: League,
+    headers: dict[str, str],
+    players: list[str],
+    disable: Callable[[str], None],
+) -> None:
+    tid = _monster(client, league, headers, players[:5])
+    tournament = _started(client, league, tid, headers)
+    player_of = _player_of(tournament)
+    entry_of = {p: e for e, p in player_of.items()}
+    [x] = (player_of[e] for e in _round(tournament)["sitting_out"])
+    y = next(p for p in players[:5] if p != x)
+    _play_round(client, league, tid, _round(tournament), headers)
+    disable(entry_of[y])
+
+    two = _next_round(client, league, tid, 2, headers)
+
+    # y is not drawn and does not sit out: 4 players are left, so all of them
+    # play (BR-064), and the sit-out column counts sit-outs only (FR-060).
+    assert two["sitting_out"] == []
+    assert y not in set().union(*_groups(two))
+    status = session.scalar(
+        select(RoundParticipation.status).where(
+            RoundParticipation.round_id == UUID(two["id"]),
+            RoundParticipation.entry_id == UUID(entry_of[y]),
+        )
+    )
+    assert status is not None
+    assert status.value == "disabled"
+    play = _get(client, league, tid, "/play", headers)
+    assert {row["entry_id"]: row["sat_out"] for row in play["standings"]}[
+        entry_of[y]
+    ] == 0
+
+    # Back in the draw, y missed round 2, which counts as a sit-out for the
+    # order only: the one who sits out round 3 is none of those with a sit-out
+    # to their name, x (round 1) and y (round 2) (BR-063, BR-064).
+    _play_round(client, league, tid, two, headers)
+    session.get_one(Entry, UUID(entry_of[y])).is_disabled = False
+    session.flush()
+    three = _next_round(client, league, tid, 3, headers)
+    [out] = (player_of[e] for e in three["sitting_out"])
+    assert out not in {x, y}
+
+
+def test_a_monster_dyp_needs_four_players_who_are_not_disabled(
+    client: TestClient,
+    league: League,
+    headers: dict[str, str],
+    players: list[str],
+    disable: Callable[[str], None],
+) -> None:
+    tid = _monster(client, league, headers, players[:4])
+    tournament = _started(client, league, tid, headers)
+    _play_round(client, league, tid, _round(tournament), headers)
+    disable(next(iter(_player_of(tournament))))
+
+    status, body = _add_round(client, league, tid, 2, headers)
+
+    assert (status, body) == (
+        422,
+        {"code": "not_enough_players", "detail": {"minimum": 4, "given": 3}},
+    )
+
+
+def test_fr046_delete_the_newest_round(
+    client: TestClient, league: League, headers: dict[str, str], players: list[str]
+) -> None:
+    tid = _monster(client, league, headers, players[:9])
+    tournament = _started(client, league, tid, headers)
+    _play_round(client, league, tid, _round(tournament), headers)
+    after_one = _get(client, league, tid, "/play", headers)["standings"]
+    two = _next_round(client, league, tid, 2, headers)
+    _play_round(client, league, tid, two, headers)
+    assert _get(client, league, tid, "/play", headers)["standings"] != after_one
+
+    status, body = _delete_round(client, league, tid, two["id"], headers)
+
+    assert (status, body) == (204, {})
+    assert _get(client, league, tid, "/play", headers)["standings"] == after_one
+    read = _get(client, league, tid, "", headers)
+    assert [r["round_no"] for r in read["rounds"]] == [1]
+    assert read["state"] == "in_progress"
+    again, missing = _delete_round(client, league, tid, two["id"], headers)
+    assert (again, missing["code"]) == (404, "round_not_found")
+    # The round can be drawn again: it is the same draw (ADR-010).
+    assert _next_round(client, league, tid, 2, headers)["matches"]
+
+
+def test_fr046_only_the_newest_round_can_be_deleted(
+    client: TestClient, league: League, headers: dict[str, str], players: list[str]
+) -> None:
+    tid = _monster(client, league, headers, players[:8])
+    tournament = _started(client, league, tid, headers)
+    _play_round(client, league, tid, _round(tournament), headers)
+    two = _next_round(client, league, tid, 2, headers)
+
+    status, body = _delete_round(client, league, tid, _round(tournament)["id"], headers)
+
+    assert status == 409
+    assert body == {"code": "round_not_newest", "detail": {"round_id": two["id"]}}
+
+
+def test_fr046_deleting_round_one_returns_to_setup_and_keeps_marks(
+    client: TestClient,
+    league: League,
+    headers: dict[str, str],
+    players: list[str],
+    disable: Callable[[str], None],
+) -> None:
+    tid = _monster(client, league, headers, players[:8])
+    a, b = players[:2]
+    _put(client, league, tid, "/setup/top-players", {"player_ids": [a, b]}, headers)
+    tournament = _started(client, league, tid, headers)
+    _result(
+        client,
+        league,
+        tid,
+        _round(tournament)["matches"][0]["id"],
+        win("side_1"),
+        headers,
+    )
+    disable(next(iter(_player_of(tournament))))
+
+    status, body = _delete_round(client, league, tid, _round(tournament)["id"], headers)
+
+    assert (status, body) == (204, {})
+    read = _get(client, league, tid, "", headers)
+    assert read["state"] == "setup"
+    assert read["rounds"] == []
+    marked = {e["player_ids"][0] for e in read["entries"] if e["is_top_player"]}
+    assert marked == {a, b}
+    assert not any(e["is_disabled"] for e in read["entries"])
+    setup = _get(client, league, tid, "/setup", headers)
+    assert set(setup["top_player_ids"]) == {a, b}
+    assert _started(client, league, tid, headers)["rounds"]
+
+
+def test_adr008_stale_expected_round_no_is_409(
+    client: TestClient, league: League, headers: dict[str, str], players: list[str]
+) -> None:
+    tid = _monster(client, league, headers, players[:8])
+    tournament = _started(client, league, tid, headers)
+    _play_round(client, league, tid, _round(tournament), headers)
+
+    ahead = _add_round(client, league, tid, 3, headers)
+    _next_round(client, league, tid, 2, headers)
+    repeat = _add_round(client, league, tid, 2, headers)
+
+    expected = {"code": "round_number_changed"}
+    assert ahead[0] == repeat[0] == 409
+    assert ahead[1] == {**expected, "detail": {"current_round_no": 1}}
+    assert repeat[1] == {**expected, "detail": {"current_round_no": 2}}
+    read = _get(client, league, tid, "", headers)
+    assert [r["round_no"] for r in read["rounds"]] == [1, 2]
+
+
+def test_round_not_complete_is_422(
+    client: TestClient, league: League, headers: dict[str, str], players: list[str]
+) -> None:
+    tid = _monster(client, league, headers, players[:8])
+    tournament = _started(client, league, tid, headers)
+    first, _ = _round(tournament)["matches"]
+    _result(client, league, tid, first["id"], win("side_1"), headers)
+
+    status, body = _add_round(client, league, tid, 2, headers)
+
+    assert (status, body) == (
+        422,
+        {"code": "round_not_complete", "detail": {"matches_left": 1}},
+    )

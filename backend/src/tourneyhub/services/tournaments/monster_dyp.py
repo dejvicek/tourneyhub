@@ -116,7 +116,8 @@ def draw_monster(
     standings' positions (BR-060). In rounds 1 and 2 the top players are the
     organizer's marks, then the others, each in league-ranking order, one per
     match (BR-061); disabled players are not drawn (BR-064). `ranking` is the
-    league's (`_ranking`); only the tournament's players count. The draw is
+    league's as of now (`_ranking` in setup, `_current_ranking` after); only the
+    tournament's players count. The draw is
     the same on every call, so the preview shows the round the start stores
     (ADR-010). Fewer than 4 players who are not disabled is 422
     `not_enough_players`.
