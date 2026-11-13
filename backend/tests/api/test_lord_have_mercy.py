@@ -20,7 +20,12 @@ from tourneyhub.db.models.tournaments import Tournament, TournamentPhase
 from tourneyhub.engine.ids import PlayerId
 from tourneyhub.engine.lots import order_by_lot
 from tourneyhub.engine.remix import THIRD_PLACE_PURPOSE, remix_purpose
-from tourneyhub.engine.tournaments import EntryStage, MonsterKnockoutMode, PhaseKind
+from tourneyhub.engine.tournaments import (
+    EntryStage,
+    MonsterKnockoutMode,
+    PhaseKind,
+    TournamentState,
+)
 from tourneyhub.services.tournaments.remix import left_player_ids, remix_knockout
 from tourneyhub.services.tournaments.shared import _load_tournament
 
@@ -1015,3 +1020,244 @@ def test_br146_the_final_and_third_place_are_one_round(
     assert changed[0] == 200, changed[1]
     assert cleared[0] == 200, cleared[1]
     assert still_locked[0] == 422
+
+
+# ---------------------------------------------------------------- delete a round
+
+
+def _delete_round(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    tournament: Json,
+    round_id: str,
+) -> tuple[int, Json | None]:
+    response = client.delete(
+        _t_url(league_id, tournament["id"], f"/knockout/rounds/{round_id}"),
+        headers=headers,
+    )
+    return response.status_code, response.json() if response.content else None
+
+
+def _round_id(tournament: Json, round_no: int) -> str:
+    [found] = [
+        r["id"]
+        for r in _rounds(tournament, _knockout(tournament))
+        if r["round_no"] == round_no
+    ]
+    return str(found)
+
+
+def _pairs(drawn: Json, index: int) -> list[tuple[str, list[list[str]]]]:
+    """The kind and the players of each side of the matches of a drawn round."""
+    return [
+        (match["kind"], [side["player_ids"] for side in match["sides"]])
+        for match in drawn["rounds"][index]["matches"]
+    ]
+
+
+def _three_rounds(
+    client: TestClient,
+    league: League,
+    league_id: UUID,
+    headers: dict[str, str],
+    make_player: Callable[..., Player],
+) -> tuple[Json, Json, Json]:
+    """Twelve players: the tournament with round 1, then rounds 2 and 3 drawn."""
+    twelve = [str(make_player(league=league, name=f"Q{n}").id) for n in range(12)]
+    big = _monster_of(client, league_id, headers, twelve)
+    _, started = _started(client, league_id, headers, big, 12, third_place_match=False)
+    _play(client, league_id, headers, started, _round_one(started))
+    status, second = _draw_round(client, league_id, headers, started, 2)
+    assert status == 201, second
+    _play(client, league_id, headers, started, second["rounds"][1]["matches"])
+    status, third = _draw_round(client, league_id, headers, started, 3)
+    assert status == 201, third
+    return started, second, third
+
+
+def test_fr046_br146_delete_the_newest_knockout_round(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    started, round_1, drawn = _two_rounds(client, league_id, headers, monster)
+    locked = _put_result(
+        client, league_id, headers, started, round_1[0], _win("side_2")
+    )
+
+    deleted = _delete_round(client, league_id, headers, started, _round_id_of(drawn, 2))
+
+    assert locked[0] == 422
+    assert deleted == (204, None)
+    after = _get(client, league_id, monster["id"], "", headers)
+    assert [r["round_no"] for r in _rounds(after, _knockout(after))] == [1]
+    # The round before is unlocked (BR-066): a winner can change, and change back.
+    changed = _put_result(
+        client, league_id, headers, started, round_1[0], _win("side_2")
+    )
+    restored = _put_result(
+        client, league_id, headers, started, round_1[0], _win("side_1")
+    )
+    assert changed[0] == 200, changed[1]
+    assert restored[0] == 200, restored[1]
+    # The same players give the same pairs (BR-156).
+    status, again = _draw_round(client, league_id, headers, started, 2)
+    assert status == 201, again
+    assert _pairs(again, 1) == _pairs(drawn, 1)
+    assert again["rounds"][1]["round_id"] != drawn["rounds"][1]["round_id"]
+
+
+def _round_id_of(drawn: Json, round_no: int) -> str:
+    [found] = [r["round_id"] for r in drawn["rounds"] if r["round_no"] == round_no]
+    return str(found)
+
+
+def test_fr046_deleting_an_older_knockout_round_is_409(
+    client: TestClient,
+    league: League,
+    league_id: UUID,
+    headers: dict[str, str],
+    make_player: Callable[..., Player],
+) -> None:
+    started, second, third = _three_rounds(
+        client, league, league_id, headers, make_player
+    )
+    newest = _round_id_of(third, 3)
+    expected = (409, {"code": "round_not_newest", "detail": {"round_id": newest}})
+
+    two = _delete_round(client, league_id, headers, started, _round_id_of(second, 2))
+    one = _delete_round(client, league_id, headers, started, _round_id(started, 1))
+
+    assert two == expected
+    assert one == expected
+    after = _get(client, league_id, started["id"], "", headers)
+    assert [r["round_no"] for r in _rounds(after, _knockout(after))] == [1, 2, 3]
+
+
+def test_adr008_a_repeated_knockout_round_delete_is_404(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    started, _, drawn = _two_rounds(client, league_id, headers, monster)
+    group = next(p for p in started["phases"] if p["kind"] == "group")
+    [group_round] = _rounds(started, group)
+    gone = {"code": "round_not_found", "detail": {}}
+
+    first = _delete_round(client, league_id, headers, started, _round_id_of(drawn, 2))
+    repeat = _delete_round(client, league_id, headers, started, _round_id_of(drawn, 2))
+    in_group = _delete_round(client, league_id, headers, started, group_round["id"])
+    unknown = _delete_round(client, league_id, headers, started, str(uuid7()))
+
+    assert first[0] == 204
+    assert repeat == (404, gone)
+    assert in_group == (404, gone)
+    assert unknown == (404, gone)
+
+
+def test_fr046_br087_deleting_knockout_round_one_deletes_the_knockout(
+    client: TestClient,
+    session: Session,
+    league_id: UUID,
+    headers: dict[str, str],
+    monster: Json,
+) -> None:
+    _, started = _started(client, league_id, headers, monster)
+    knockout = _knockout(started)
+    round_1 = _round_one(started)
+
+    deleted = _delete_round(client, league_id, headers, started, _round_id(started, 1))
+    repeat = _delete_round(client, league_id, headers, started, _round_id(started, 1))
+
+    assert deleted == (204, None)
+    assert repeat[0] == 404
+    after = _get(client, league_id, monster["id"], "", headers)
+    assert [p["kind"] for p in after["phases"]] == ["group"]
+    assert all(e["stage"] == "main" for e in after["entries"])
+    assert session.get(TournamentPhase, UUID(knockout["id"])) is None
+    assert all(f["match_id"] not in {m["id"] for m in round_1} for f in after["fields"])
+    # The group phase is unlocked again (BR-087).
+    group = after["phases"][0]
+    [group_round] = _rounds(after, group)
+    result = _put_result(
+        client, league_id, headers, after, group_round["matches"][0], _win("side_2")
+    )
+    assert result[0] == 200, result[1]
+
+
+def test_fr046_deleting_the_whole_knockout_with_later_rounds(
+    client: TestClient,
+    session: Session,
+    league: League,
+    league_id: UUID,
+    headers: dict[str, str],
+    make_player: Callable[..., Player],
+) -> None:
+    started, _, _ = _three_rounds(client, league, league_id, headers, make_player)
+    knockout = _knockout(started)
+
+    response = client.delete(
+        _t_url(league_id, started["id"], f"/phases/{knockout['id']}"),
+        headers=headers,
+    )
+
+    assert response.status_code == 204, response.text
+    after = _get(client, league_id, started["id"], "", headers)
+    assert [p["kind"] for p in after["phases"]] == ["group"]
+    assert not [r for r in after["rounds"] if r["phase_id"] == knockout["id"]]
+    left = session.scalars(
+        select(Round).where(Round.phase_id == UUID(knockout["id"]))
+    ).all()
+    assert left == []
+
+
+def test_br095_br112_deleting_the_final_round_of_a_finished_tournament(
+    client: TestClient,
+    session: Session,
+    league_id: UUID,
+    headers: dict[str, str],
+    monster: Json,
+) -> None:
+    started, _, drawn = _two_rounds(client, league_id, headers, monster)
+    _play(client, league_id, headers, started, drawn["rounds"][1]["matches"])
+    # Finishing comes with the places; the state is what deleting must undo.
+    session.get_one(Tournament, UUID(monster["id"])).state = TournamentState.FINISHED
+    session.flush()
+
+    deleted = _delete_round(client, league_id, headers, started, _round_id_of(drawn, 2))
+
+    assert deleted == (204, None)
+    after = _get(client, league_id, monster["id"], "", headers)
+    assert after["state"] == "in_progress"
+    assert [r["round_no"] for r in _rounds(after, _knockout(after))] == [1]
+    # The final's round is drawn again from the same winners.
+    status, again = _draw_round(client, league_id, headers, started, 2)
+    assert status == 201, again
+    assert _pairs(again, 1) == _pairs(drawn, 1)
+
+
+def test_fr046_deleting_a_round_of_a_fixed_pair_knockout_is_422(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    shown = _get(
+        client,
+        league_id,
+        monster["id"],
+        "/knockout/preview?qualifiers=8&third_place_match=false&mode=seeded_pairs",
+        headers,
+    )
+    body = _start_body(monster, shown)
+    body["mode"] = "seeded_pairs"
+    response = client.put(
+        _t_url(league_id, monster["id"], "/knockout"), json=body, headers=headers
+    )
+    assert response.status_code == 200, response.text
+
+    result = _delete_round(
+        client, league_id, headers, response.json(), _round_id(response.json(), 1)
+    )
+
+    assert result == (
+        422,
+        {
+            "code": "format_not_supported",
+            "detail": {"format": "single_elimination", "mode": "seeded_pairs"},
+        },
+    )

@@ -31,12 +31,11 @@ from tourneyhub.errors import (
     NotFoundError,
     RuleViolationError,
 )
-from tourneyhub.services.knockout import _score
+from tourneyhub.services.knockout import _remove_knockout, _score
 from tourneyhub.services.tournaments import Clock
 from tourneyhub.services.tournaments.fields import _fill_fields
 from tourneyhub.services.tournaments.remix import (
     RemixKnockout,
-    is_remix,
     left_player_ids,
     remix_knockout,
 )
@@ -186,22 +185,87 @@ def draw_knockout_round(
     return _remix_view(tournament, _loaded(tournament))
 
 
+def delete_knockout_round(
+    session: Session,
+    *,
+    league_id: UUID,
+    tournament_id: UUID,
+    round_id: UUID,
+    user_id: UUID,
+    clock: Clock,
+) -> None:
+    """Delete the newest round of a Lord have mercy knockout, with its results.
+
+    FR-046, BR-146. The round is named by its id (ADR-008): an unknown one, a
+    group round or a repeated delete is 404 `round_not_found`. A closed season
+    is 409 `season_closed`, a fixed-pair knockout 422 `format_not_supported`
+    (detail `format`, `mode`), a round that is not the newest 409
+    `round_not_newest` (detail `round_id`, the newest round's). There is no
+    check of the tournament's state: deleting the newest round of a finished
+    tournament puts it back in progress (BR-095), and the season standings,
+    computed on read, follow (BR-112).
+
+    The fields let go of the round's matches and take the next ones that can
+    be played (BR-130); the round before is unlocked, since the lock follows
+    the newest round (BR-146), and drawing again gives the same pairs while
+    the players are the same (BR-156). Deleting round 1 deletes the knockout
+    as `DELETE …/phases/{id}` does (BR-087). `is_disabled` stays as it is.
+    """
+    league, tournament = _lock_tournament(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user_id,
+        rounds=True,
+    )
+    _require_open_season(league, tournament)
+    phase = knockout_phase(tournament)
+    round_ = next(
+        (r for r in ([] if phase is None else phase.rounds) if r.id == round_id),
+        None,
+    )
+    if phase is None or round_ is None:
+        raise NotFoundError(ErrorCode.ROUND_NOT_FOUND)
+    remix = _require_remix(tournament)
+    newest = remix.rounds[remix.state.rounds_drawn]
+    if round_ is not newest:
+        raise ConflictError(ErrorCode.ROUND_NOT_NEWEST, round_id=str(newest.id))
+    now = clock()
+    if round_.round_no == 1:
+        _remove_knockout(session, tournament, phase, now)
+        return
+    matches = {match.id for match in round_.matches}
+    for field in tournament.fields:
+        if field.match_id in matches:
+            field.match_id = None
+            field.updated_at = now
+    session.flush()  # the fields let go of the matches before they are deleted
+    phase.rounds.remove(round_)
+    if tournament.state is TournamentState.FINISHED:
+        tournament.state = TournamentState.IN_PROGRESS
+    tournament.updated_at = now
+    session.flush()  # the matches are gone before the free fields take the next ones
+    _fill_fields(tournament, _match_slots(tournament), now)
+    session.flush()
+
+
 def _require_remix(tournament: Tournament) -> RemixKnockout:
     """The tournament's Lord have mercy knockout, else 404 or 422.
 
     No knockout is 404 `knockout_not_found`; a fixed-pair one is 422
     `format_not_supported` (detail `format`, `mode`).
     """
+    remix = remix_knockout(tournament)
+    if remix is not None:
+        return remix
     phase = knockout_phase(tournament)
     if phase is None:
         raise NotFoundError(ErrorCode.KNOCKOUT_NOT_FOUND)
-    if not is_remix(phase):
-        raise RuleViolationError(
-            ErrorCode.FORMAT_NOT_SUPPORTED,
-            format=phase.format,
-            mode=phase.monster_knockout_mode,
-        )
-    return _loaded(tournament)
+    raise RuleViolationError(
+        ErrorCode.FORMAT_NOT_SUPPORTED,
+        format=phase.format,
+        mode=phase.monster_knockout_mode,
+    )
 
 
 def _loaded(tournament: Tournament) -> RemixKnockout:

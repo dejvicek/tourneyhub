@@ -547,6 +547,41 @@ def draw_knockout_round(
 
 
 @router.delete(
+    "/knockout/rounds/{round_id}",
+    status_code=HTTPStatus.NO_CONTENT,
+    responses=_WRITE_ERRORS,
+)
+def delete_knockout_round(
+    league_id: UUID,
+    tournament_id: UUID,
+    round_id: UUID,
+    session: SessionDep,
+    user: CurrentUserDep,
+    clock: ClockDep,
+) -> None:
+    """Delete the newest round of a Lord have mercy knockout, with its results.
+
+    The round is named by its id: an unknown one, a group round or a repeat is
+    404 `round_not_found` (ADR-008). The fields let go of its matches, and
+    the round before is unlocked, so a winner can change; drawing the round
+    again gives the same pairs while the players are the same (FR-046, BR-146,
+    BR-156). Deleting round 1 deletes the knockout (BR-087). A finished
+    tournament is back in progress (BR-095), which recalculates the season
+    standings (BR-112). 409: `season_closed` or `round_not_newest` (detail
+    `round_id`, the newest round's). 422: `format_not_supported` (a
+    fixed-pair knockout; detail `format`, `mode`).
+    """
+    remix_service.delete_knockout_round(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        round_id=round_id,
+        user_id=user.id,
+        clock=clock,
+    )
+
+
+@router.delete(
     "/phases/{phase_id}", status_code=HTTPStatus.NO_CONTENT, responses=_WRITE_ERRORS
 )
 def delete_knockout(

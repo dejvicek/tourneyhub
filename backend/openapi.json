@@ -8090,6 +8090,98 @@
         ]
       }
     },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout/rounds/{round_id}": {
+      "delete": {
+        "description": "Delete the newest round of a Lord have mercy knockout, with its results.\n\nThe round is named by its id: an unknown one, a group round or a repeat is\n404 `round_not_found` (ADR-008). The fields let go of its matches, and\nthe round before is unlocked, so a winner can change; drawing the round\nagain gives the same pairs while the players are the same (FR-046, BR-146,\nBR-156). Deleting round 1 deletes the knockout (BR-087). A finished\ntournament is back in progress (BR-095), which recalculates the season\nstandings (BR-112). 409: `season_closed` or `round_not_newest` (detail\n`round_id`, the newest round's). 422: `format_not_supported` (a\nfixed-pair knockout; detail `format`, `mode`).",
+        "operationId": "delete_knockout_round",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "round_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Round Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Knockout Round",
+        "tags": [
+          "knockout"
+        ]
+      }
+    },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/matches/{match_id}/result": {
       "put": {
         "description": "Enter, replace or clear a match's result (FR-050 to FR-053, FR-094).\n\nThe body is the whole result, so a repeat changes nothing (ADR-008).\nEntering one frees the match's field, which takes the next waiting match\n(BR-130, BR-131). The empty result clears it: the match waits again, not\nput back on its old field (BR-134), and a finished tournament is back in\nprogress (BR-095). The free fields are then filled, so the first match that\ncan be played takes one, the cleared match included.\n\nA closed season is 409 `season_closed`. An unknown match is 404\n`match_not_found`. A match whose sides are not both known is 422\n`match_sides_unknown` (BR-091). A result that breaks a rule is 422:\n`result_does_not_fit_format` (BR-121, detail `format` and `games`),\n`draws_not_allowed` (BR-090), `game_score_mismatch` (BR-092, detail\n`game_no`) or `scores_required` (Swiss and Monster DYP, detail `game_no`).\nA walkover with games is 422 `validation_failed`.\n\nA knockout match after the first round has derived sides: the body names\nthe entries the screen saw in `expected_sides`. Other entries, or a side\nstill to come, are 409 `match_sides_changed` (detail `entry_ids`, the\ncurrent ones); none is 422 `expected_sides_required`.\n\nThe knockout: once it is drawn, a group-phase result is 422\n`group_phase_locked` (BR-053, detail `phase_id`); a knockout result that a\nlater match it feeds has a result for is 422 `result_locked` (BR-094,\ndetail `match_ids`), and a knockout has no draws (BR-090). A new winner\nchanges the later matches' sides. The result that completes the\nknockout finishes the tournament (FR-037). In a Swiss, a result of a\nround before the newest is 422 `round_locked` (BR-065, detail\n`round_no`, the newest round's); deleting the newest round unlocks it\n(BR-066).",
