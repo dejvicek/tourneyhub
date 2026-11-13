@@ -4,9 +4,10 @@
 // sessions. The credentials are fake seed values; the login screen shows
 // them in demo mode only, read through GET /api/v1/demo/account, so they
 // never reach a production bundle.
+import { DEFAULT_PLACEMENT_POINTS } from "@/lib/rules";
+
 import type { UserRead } from "./contract";
 import { DEMO_USER_ID, demoId } from "./ids";
-import { DEFAULT_PLACEMENT_POINTS } from "./rules";
 import type { SeedPart } from "./seed";
 
 /** The demo organizer's password: 15 characters or more, as P2b requires. */

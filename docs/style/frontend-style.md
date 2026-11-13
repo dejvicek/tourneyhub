@@ -1,10 +1,10 @@
 # Frontend Style Guide
 
-| | |
-|---|---|
-| Status | Proposed |
-| Date | 2026-11-10 |
-| Scope | All code in `frontend/`: the app in `src/`, its unit tests, the Playwright tests in `e2e/` and the configuration files. It applies to people and to AI agents; the Claude Code skill `.claude/skills/frontend-style` points here. |
+|        |                                                                                                                                                                                                                                   |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status | Proposed                                                                                                                                                                                                                          |
+| Date   | 2026-11-10                                                                                                                                                                                                                        |
+| Scope  | All code in `frontend/`: the app in `src/`, its unit tests, the Playwright tests in `e2e/` and the configuration files. It applies to people and to AI agents; the Claude Code skill `.claude/skills/frontend-style` points here. |
 
 The ADRs decide what the frontend is built from; this guide decides how its code is written. Where the two disagree, the ADR wins until it is changed; §12 lists the changes this guide proposes. Requirement IDs (FR-, BR-) refer to `PRD.md`. Source IDs in brackets, such as [Q6], refer to §13.
 
@@ -22,16 +22,16 @@ The ADRs decide what the frontend is built from; this guide decides how its code
 
 The configuration CI runs lives in `frontend/`: `package.json` (scripts and lower bounds), `eslint.config.js`, `.prettierrc.json`, `tsconfig.app.json`, `tsconfig.node.json`, `e2e/tsconfig.json`, `vite.config.ts` (Vite and Vitest), `i18next.config.ts` (the text check, §7), `e2e/playwright.config.ts` and `pnpm-workspace.yaml`. The exact versions live in `pnpm-lock.yaml`.
 
-| Tool | Role |
-|---|---|
-| Node.js 26, pnpm 12 | Runtime and packages; the exact versions are in `.nvmrc`, `engines` and `packageManager` (ADR-003) |
-| TypeScript 6.0 | Type check, strict, with `tsc --build` |
-| ESLint 10 | Lint: typescript-eslint `strictTypeChecked` and `stylisticTypeChecked`, react-hooks `recommended`, react-refresh `vite`, jsx-a11y-x `strict`, better-tailwindcss, simple-import-sort, TanStack Query `flat/recommended-strict`, Testing Library `flat/react`, Playwright `flat/recommended` |
-| i18next-cli 1.87 | `i18next-cli lint`, run by `pnpm lint`: user-facing text outside `t()` and `<Trans>` (§7) |
-| Prettier 3.9 | Format, with prettier-plugin-tailwindcss for class order |
-| Vite 8 | Dev server and build |
-| Vitest 5, jsdom, Testing Library | Unit and component tests (§10) |
-| Playwright | End-to-end tests against the production images (§10, ADR-013) |
+| Tool                             | Role                                                                                                                                                                                                                                                                                        |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Node.js 26, pnpm 12              | Runtime and packages; the exact versions are in `.nvmrc`, `engines` and `packageManager` (ADR-003)                                                                                                                                                                                          |
+| TypeScript 6.0                   | Type check, strict, with `tsc --build`                                                                                                                                                                                                                                                      |
+| ESLint 10                        | Lint: typescript-eslint `strictTypeChecked` and `stylisticTypeChecked`, react-hooks `recommended`, react-refresh `vite`, jsx-a11y-x `strict`, better-tailwindcss, simple-import-sort, TanStack Query `flat/recommended-strict`, Testing Library `flat/react`, Playwright `flat/recommended` |
+| i18next-cli 1.87                 | `i18next-cli lint`, run by `pnpm lint`: user-facing text outside `t()` and `<Trans>` (§7)                                                                                                                                                                                                   |
+| Prettier 3.9                     | Format, with prettier-plugin-tailwindcss for class order                                                                                                                                                                                                                                    |
+| Vite 8                           | Dev server and build                                                                                                                                                                                                                                                                        |
+| Vitest 5, jsdom, Testing Library | Unit and component tests (§10)                                                                                                                                                                                                                                                              |
+| Playwright                       | End-to-end tests against the production images (§10, ADR-013)                                                                                                                                                                                                                               |
 
 Run every command from `frontend/`:
 
@@ -49,6 +49,7 @@ pnpm e2e                         # needs the production images running (ADR-013)
 `dev`, `build`, `typecheck`, `lint`, `format` and `test` run `generate:api` first, which writes `src/api/schema.d.ts` from `../backend/openapi.json` (ADR-008). CI (`.github/workflows/ci.yml`) runs `pnpm install --frozen-lockfile`, then `pnpm audit --prod`, `generate:api`, `lint`, `format:check`, `typecheck`, `test` and `build`.
 
 Choices in the configuration that are not obvious:
+
 - `typescript` stays on `~6.0`. TypeScript 7 ships no compiler API [T1], and both typescript-eslint, which supports `>=4.8.4 <6.1.0` [T2], and openapi-typescript (ADR-008) import it. openapi-typescript 7.13 declares `typescript ^5`; `peerDependencyRules` in `pnpm-workspace.yaml` lets it run on 6.
 - The tsconfigs differ from create-vite's `react-ts` template [T10] in these: `strict`, `noUncheckedIndexedAccess` and `noUncheckedSideEffectImports` are on, `paths` maps `@/*` without `baseUrl`, which TypeScript 6 deprecates [T3], `allowArbitraryExtensions` is omitted, and `noUnusedLocals` and `noUnusedParameters` are off (next item). Nothing needs `ignoreDeprecations`.
 - `exactOptionalPropertyTypes` stays off: copied shadcn/ui components fail to compile with it [T4].
@@ -61,7 +62,7 @@ Choices in the configuration that are not obvious:
 - better-tailwindcss reads the theme from `src/index.css`. Its `enforce-consistent-class-order` and `enforce-consistent-line-wrapping` stay off, because Prettier owns both.
 - `index.css` sets `--color-*: initial`. Tailwind's palette is gone, so a class such as `bg-red-500` does not exist [W3] and `no-unknown-classes` fails on it. Black and white keep Tailwind's own values for the copied components; `no-restricted-classes` bans `*-black` and `*-white` outside `src/components/ui/`.
 - `no-restricted-imports` has one block per folder (§11), and each block repeats the full list of banned imports, because a later block replaces the options of an earlier one. `no-restricted-syntax` works the same way: `src/routes.tsx`, `src/main.tsx`, the tests and the demo each have a block that lists every selector group it keeps.
-- `linterOptions` reports an unused `eslint-disable` comment and unused inline configuration as errors, and `--max-warnings=0` fails on warnings, such as `react-hooks/exhaustive-deps`. An `eslint-disable` names its rules and gives a reason after ` -- ` [E3]; `src/test/disableComments.test.ts` checks this, and that `react-hooks/exhaustive-deps` is never disabled.
+- `linterOptions` reports an unused `eslint-disable` comment and unused inline configuration as errors, and `--max-warnings=0` fails on warnings, such as `react-hooks/exhaustive-deps`. An `eslint-disable` names its rules and gives a reason after `--` [E3]; `src/test/disableComments.test.ts` checks this, and that `react-hooks/exhaustive-deps` is never disabled.
 - Prettier and prettier-plugin-tailwindcss are pinned exactly, since both decide the output [E4], and are upgraded in a pull request that reformats the code. Every Prettier option stays at its default [E5]; `.prettierrc.json` holds the plugin, which must load last [E7], and its two options, `tailwindStylesheet` and `tailwindFunctions`. Prettier reads `.gitignore` [E8], so `.prettierignore` lists only `pnpm-lock.yaml`. No `eslint-plugin-prettier` or `prettier-eslint` [E6]; the presets have no formatting rules, so `eslint-config-prettier` is not needed.
 - `pnpm audit --prod` checks only `dependencies` and `optionalDependencies`, what ships to the browser, and fails the CI job on any advisory [E18]. An advisory the project accepts goes in `audit.ignore` in `pnpm-workspace.yaml`, as its `GHSA-…` id with a comment that links an issue. Dev dependencies are not audited; Dependabot's weekly updates cover them.
 - `format` runs `eslint --fix` before `prettier --write`, so that Prettier formats what the import sort moved.
@@ -141,25 +142,25 @@ Checked by tools: ESLint better-tailwindcss `no-unknown-classes`, `no-conflictin
 - `index.html` has one `<meta name="theme-color">` per scheme, with `media="(prefers-color-scheme: …)"` and the `--nav` colour, `#ffffff` and `#151e28`, the colour of the header under the status bar [A22]. Contrast and focus are checked in both themes (§6).
 - The design has no destructive, focus or chart colours. These were added (ratios against page, card and, for the ring, the nav's active fill; light / dark):
 
-  | Token | Light | Dark | Ratios |
-  |---|---|---|---|
-  | `destructive` / `-foreground` | `#b42318` / `#ffffff` | `#ff9c8f` / `#1a2430` | text on page 5.94 / 7.77, on card 6.57 / 6.56; foreground on fill 6.57 / 7.77 |
-  | `ring` | `#1e7a4c` (primary) | `#edf2f6` (primary) | page 4.81 / 13.92, card 5.33 / 11.76, nav active 4.44 / 10.30 |
-  | `chart-1`…`5` | `#1e7a4c` `#e36414` `#2251c9` `#4e6157` `#7a3409` | `#5cc98a` `#f4b740` `#74b9f0` `#a9b8c6` `#f6d9a6` | on card, at least 3.44 / 6.27 |
-  | `team-a-foreground`, `team-b-foreground` | `#1a2430`, `#ffffff` | `#1a2430`, `#1a2430` | on the team colour 4.56 / 8.73, 6.80 / 7.42 |
-  | `field` / `-foreground` | `#1e7a4c` / `#ffffff` | `#1d5a3c` / `#edf2f6`, **provisional** | foreground on field 5.33 / 7.22; field against page 4.81 / 1.93 |
-  | `feature` / `-foreground` | `#ffffff` / `#1e3327` | `#edf2f6` / `#1a2430`, **provisional** | foreground on fill 13.48 / 13.92; the button against the field 5.33 / 7.22 |
+  | Token                                    | Light                                             | Dark                                              | Ratios                                                                        |
+  | ---------------------------------------- | ------------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------- |
+  | `destructive` / `-foreground`            | `#b42318` / `#ffffff`                             | `#ff9c8f` / `#1a2430`                             | text on page 5.94 / 7.77, on card 6.57 / 6.56; foreground on fill 6.57 / 7.77 |
+  | `ring`                                   | `#1e7a4c` (primary)                               | `#edf2f6` (primary)                               | page 4.81 / 13.92, card 5.33 / 11.76, nav active 4.44 / 10.30                 |
+  | `chart-1`…`5`                            | `#1e7a4c` `#e36414` `#2251c9` `#4e6157` `#7a3409` | `#5cc98a` `#f4b740` `#74b9f0` `#a9b8c6` `#f6d9a6` | on card, at least 3.44 / 6.27                                                 |
+  | `team-a-foreground`, `team-b-foreground` | `#1a2430`, `#ffffff`                              | `#1a2430`, `#1a2430`                              | on the team colour 4.56 / 8.73, 6.80 / 7.42                                   |
+  | `field` / `-foreground`                  | `#1e7a4c` / `#ffffff`                             | `#1d5a3c` / `#edf2f6`, **provisional**            | foreground on field 5.33 / 7.22; field against page 4.81 / 1.93               |
+  | `feature` / `-foreground`                | `#ffffff` / `#1e3327`                             | `#edf2f6` / `#1a2430`, **provisional**            | foreground on fill 13.48 / 13.92; the button against the field 5.33 / 7.22    |
 
   Light `field` and `feature` are the design's `field/bg` and `feature/button`; `feature-foreground` is `text/default`, the design's bold label. The design has no dark `field/bg` or `feature/button` (the dark playfield looked transparent), so both dark pairs are provisional until it does: a darker green of the same hue, and the dark primary pair. In the dark theme the field is only 1.93 against the page, so the playfield's edge is not what tells a control apart; the Feature button on it is 7.22. A focus ring on the field relies on its background-coloured offset: the light ring is the field's own green.
 
 - The ring is solid, never `ring/50`, with a 2 px offset in the background colour (technique C40), so it keeps 3:1 next to a primary button of the same colour; `src/components/ui/button.tsx` and the base layer were changed for it. The destructive Button uses its token pair instead of `text-white` and `dark:bg-destructive/60`.
 - Deviations from Figma. The design falls below WCAG 2.2 AA in four places. Three tokens moved, each keeping its hue (HSL hue and saturation) and changing only lightness; ratios measured with a script (WCAG relative luminance), light / dark:
 
-  | Token | Figma | Now | Ratios |
-  |---|---|---|---|
-  | `input` (border) | `#8fa197` / `#5b6f84` | `#7b9085` / `#657c93` | on `input-background` 3.40 / 3.07, on page 3.08 / 3.63 (was 2.72 / 2.56 on the field, 2.46 on the light page) |
-  | `bead-rod` | `#8fa197` light (dark `#5b6f84` unchanged, 3.03 on `bead-empty`) | `#85988d` light | on `bead-empty` 3.06 (was 2.72) |
-  | `nav-active-foreground` | `#1e7a4c` light (dark unchanged) | `#1e784b` light | on `nav-active` 4.56 (was 4.44, for 13 px text) |
+  | Token                   | Figma                                                            | Now                   | Ratios                                                                                                        |
+  | ----------------------- | ---------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------- |
+  | `input` (border)        | `#8fa197` / `#5b6f84`                                            | `#7b9085` / `#657c93` | on `input-background` 3.40 / 3.07, on page 3.08 / 3.63 (was 2.72 / 2.56 on the field, 2.46 on the light page) |
+  | `bead-rod`              | `#8fa197` light (dark `#5b6f84` unchanged, 3.03 on `bead-empty`) | `#85988d` light       | on `bead-empty` 3.06 (was 2.72)                                                                               |
+  | `nav-active-foreground` | `#1e7a4c` light (dark unchanged)                                 | `#1e784b` light       | on `nav-active` 4.56 (was 4.44, for 13 px text)                                                               |
 
   The design maps `secondary-foreground`, `accent-foreground` and `sidebar-accent-foreground` to the same light green as `nav-active-foreground` (`#1e7a4c` on `#e3ede6`, 4.44), so they move with it to `#1e784b` (4.56 on `secondary`, `accent` and `sidebar-accent`); dark values are unchanged.
 
@@ -201,7 +202,7 @@ Checked by tools: ESLint jsx-a11y-x `strict` and `jsx-a11y-x/control-has-associa
 
 Checked by tools: `tsc` (keys of `t()` through `CustomTypeOptions` in `src/i18n/i18next.d.ts`; `cs` has every key of `en`, `_few` and `_many` for every plural, and no other key, through its `CsMessages` type); Vitest `src/i18n/messages.test.ts` (English plural keys end only in `_one` or `_other`); ESLint `no-restricted-properties` (`toLocaleString`, `toLocaleDateString`, `toLocaleTimeString`, `localeCompare`), `no-restricted-syntax` (an `Intl` constructor without a locale or with a literal one; `dangerouslySetInnerHTML`), `no-restricted-imports` (`i18next-browser-languagedetector`); `i18next-cli lint`, part of `pnpm lint`, for user-facing text in JSX elements and attributes outside `t()` and `<Trans>` [I1].
 
-- No hard-coded user-facing text (ADR-003), `aria-label` and `alt` included. A line that is not user-facing, such as a product name, is excused with `i18next-instrument-ignore-next-line` and a reason after ` -- `, as with `eslint-disable`. If the linter gives a false positive that neither `i18next.config.ts` nor that comment can silence, the pull request that hits it downgrades the check to a report and says so here.
+- No hard-coded user-facing text (ADR-003), `aria-label` and `alt` included. A line that is not user-facing, such as a product name, is excused with `i18next-instrument-ignore-next-line` and a reason after `--`, as with `eslint-disable`. If the linter gives a false positive that neither `i18next.config.ts` nor that comment can silence, the pull request that hits it downgrades the check to a report and says so here.
 - `i18next-cli lint` sees only JSX. A string that reaches the screen another way, through state, a prop or a function's return value, goes through `t()` too.
 
   ```tsx
@@ -212,6 +213,7 @@ Checked by tools: `tsc` (keys of `t()` through `CustomTypeOptions` in `src/i18n/
   setStatus(t("fields.edit.added", { number: field.number }));
   return { label: t("players.remove.action"), tone: "destructive" };
   ```
+
 - Texts live in `src/i18n/locales/en.ts`, the reference from which the key types come [I2], and `cs.ts`, in one namespace. Each area keeps its texts in its own module, `en/<area>.ts` and `cs/<area>.ts`, which `en.ts` and `cs.ts` merge; a `cs` module is typed `CsMessages<Messages["<area>"]>`. Keys are semantic and nested by area (`notFound.home`), never English sentences.
 - A sentence is one key with `{{placeholders}}`, never pieces joined in code. `escapeValue: false` is safe because React escapes what it renders; `t()` output never goes into `dangerouslySetInnerHTML` [I3].
 - Markup inside a sentence, such as a link, uses `<Trans>` with named components [I4].
@@ -250,6 +252,7 @@ Checked by tools: ESLint TanStack Query `flat/recommended-strict` (`prefer-query
       onSettled: reload(queryClient, leagueId),
       scope: { id: `league:${leagueId}` },
   ```
+
 - `networkMode` stays `online`. A paused query (`fetchStatus === "paused"`) or mutation (`isPaused`) shows that it waits for the connection, not a spinner [Q10].
 - Screens render the pending, paused and error states themselves, errors inline. Only a screen's main resource uses `throwOnError`, which hands the error to the route's `ErrorBoundary` (§9) [Q12].
 - Reactions the whole app shares live once, in the `onError` of `QueryCache` and `MutationCache`: 403 `password_change_required` opens the new-password screen (ADR-006); 409, and 404 from a delete, say that the data changed elsewhere and was reloaded. A 422 is shown by the form that sent it, built from `code` and `detail` [Q13].
@@ -258,7 +261,8 @@ Checked by tools: ESLint TanStack Query `flat/recommended-strict` (`prefer-query
   ```tsx
   // Wrong: the reload is lost if the sheet unmounts first, and runs only on success
   add.mutate(name, {
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["leagues", leagueId] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["leagues", leagueId] }),
   });
   // Right: playerMutations.add's onSettled reloads the league; the call does the UI
   add.mutate(name, {
@@ -337,7 +341,7 @@ frontend/
 │   ├── lib/              # utils.ts (cn)
 │   ├── pages/            # screens outside any feature: home, not found
 │   ├── features/<area>/  # api.ts, its components and screens
-│   ├── demo/             # demo mode: the fake API, its contract and rules.ts (src/demo/README.md)
+│   ├── demo/             # demo mode: the fake API and its contract (src/demo/README.md)
 │   └── test/             # setup.ts, the MSW server and test helpers
 └── e2e/                  # Playwright: configuration, specs, own tsconfig.json
 ```
@@ -349,7 +353,7 @@ Checked by tools: ESLint `no-restricted-imports` (imports flow one way: `api`, `
 - No barrel files (an `index.ts` that only re-exports): import each module directly [S2].
 - Only `VITE_` environment variables reach the browser, and none holds a secret. The first one adds `src/vite-env.d.ts` with a typed `ImportMetaEnv` [S3].
 
-Demo mode (`pnpm dev:demo`, `src/demo/README.md`) runs every screen against an MSW worker. MSW is a dev dependency; `main.tsx` loads the demo behind a `MODE !== "production"` check that the bundler removes, ESLint lets app code import only `@/demo/rules` and `@/demo/contract`, and Vite's MSW plugin, which serves the worker script, is on only in demo mode. CI fails the frontend job if any text file in `dist` matches `msw|setupWorker|mockServiceWorker`. Provisional API types live in `src/demo/contract.ts` until the backend's routes are generated into `schema.d.ts`; screens call those routes through `provisionalApi` (`src/api/provisional.ts`). Texts are split per area into `src/i18n/locales/{en,cs}/<area>.ts`, merged into the one namespace. The build puts each `src/features/<area>/` into one chunk.
+Demo mode (`pnpm dev:demo`, `src/demo/README.md`) runs every screen against an MSW worker. MSW is a dev dependency; `main.tsx` loads the demo behind a `MODE !== "production"` check that the bundler removes, ESLint lets app code import nothing from `src/demo` (only `src/api/provisional.ts`, `main.tsx` and the tests do), and Vite's MSW plugin, which serves the worker script, is on only in demo mode. CI fails the frontend job if any text file in `dist` matches `msw|setupWorker|mockServiceWorker`. Provisional API paths live in `src/demo/contract.ts` and the hand-written types the screens use in `src/api/provisionalTypes.ts` until the backend's routes are generated into `schema.d.ts`; the open rules of issue #24 are in `src/lib/rules.ts`; screens call those routes through `provisionalApi` (`src/api/provisional.ts`). Texts are split per area into `src/i18n/locales/{en,cs}/<area>.ts`, merged into the one namespace. The build puts each `src/features/<area>/` into one chunk.
 
 ## 12. Proposed changes to other documents
 
@@ -360,6 +364,7 @@ No change is proposed at the moment.
 Each source with one sentence or phrase from it, checked on 2026-11-10.
 
 **TypeScript**
+
 - [T1] https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/ — "While TypeScript 7.0 is here, it does not ship with an API."
 - [T2] https://typescript-eslint.io/users/dependency-versions — "The version range of TypeScript currently supported is `>=4.8.4 <6.1.0`."
 - [T3] https://devblogs.microsoft.com/typescript/announcing-typescript-6-0/ — "`baseUrl` is deprecated and will no longer be considered a look-up root for module resolution."
@@ -372,6 +377,7 @@ Each source with one sentence or phrase from it, checked on 2026-11-10.
 - [T10] https://github.com/vitejs/vite/blob/main/packages/create-vite/template-react-ts/tsconfig.app.json — `"verbatimModuleSyntax": true`, `"erasableSyntaxOnly": true`, and no `strict`
 
 **React**
+
 - [R1] https://react.dev/reference/rules — "We strongly recommend using Strict Mode alongside React's ESLint plugin"
 - [R2] https://react.dev/reference/react/forwardRef — "In React 19, `forwardRef` is no longer necessary."
 - [R3] https://tanstack.com/query/latest/docs/framework/react/guides/does-this-replace-client-state — "TanStack Query is a server-state library, responsible for managing asynchronous operations between your server and client"
@@ -384,6 +390,7 @@ Each source with one sentence or phrase from it, checked on 2026-11-10.
 - [R10] https://github.com/ArnaudBarre/eslint-plugin-react-refresh — the vite config "enables the `allowConstantExport` and `allowCompoundComponents` options which are supported by Vite React plugins."
 
 **Tooling**
+
 - [E1] https://typescript-eslint.io/rules/no-misused-promises/ — "Whether to warn when a Promise is returned from a function typed as returning `void`."
 - [E2] https://typescript-eslint.io/users/configs — "This configuration is not considered "stable" under Semantic Versioning (semver)."
 - [E3] https://eslint.org/docs/latest/use/configure/rules — "Configuration comments can include descriptions to explain why the comment is necessary."
@@ -405,10 +412,12 @@ Each source with one sentence or phrase from it, checked on 2026-11-10.
 - [E19] https://github.com/pnpm/pnpm/releases/tag/v12.0.0 — "it fails the command with `ERR_PNPM_UNRECOGNIZED_WORKSPACE_SETTINGS` when the project pins a pnpm version the running pnpm satisfies"
 
 **ESLint 10 support of the plugins** (peer ranges in the lockfile, checked on 2026-11-10): every plugin names ESLint 10 except two, whose ranges are open-ended.
+
 - `eslint-plugin-playwright`: peer `>=8.40.0`; its repository develops against `eslint ^10.0.0`.
 - `eslint-plugin-simple-import-sort`: peer `>=5.0.0`; https://github.com/lydell/eslint-plugin-simple-import-sort/issues/205, the maintainer — "I did a quick test and the plugin seems to work with ESLint 10."
 
 **Tailwind and shadcn/ui**
+
 - [W1] https://tailwindcss.com/docs/compatibility — "is not designed to be used with CSS preprocessors like Sass, Less, or Stylus."
 - [W2] https://tailwindcss.com/docs/theme — "Use `@theme` when you want a design token to map directly to a utility class, and use `:root` for defining regular CSS variables that shouldn't have corresponding utility classes."
 - [W3] https://tailwindcss.com/docs/theme — "all of the default utilities that use that namespace _(like `bg-red-500`)_ will be removed"
@@ -433,6 +442,7 @@ Each source with one sentence or phrase from it, checked on 2026-11-10.
 - [W22] https://github.com/schoero/eslint-plugin-better-tailwindcss — "Report classes not registered with Tailwind CSS."
 
 **Accessibility**
+
 - [A1] https://www.w3.org/TR/WCAG22/ — "W3C Recommendation 12 December 2024"
 - [A2] https://www.w3.org/TR/WCAG22/ — 2.5.5 (Level AAA): "The size of the target for pointer inputs is at least 44 by 44 CSS pixels except when:"
 - [A3] https://www.w3.org/TR/WCAG22/ — 1.4.3: "a contrast ratio of at least 4.5:1"
@@ -457,6 +467,7 @@ Each source with one sentence or phrase from it, checked on 2026-11-10.
 - [A18] https://github.com/dequelabs/axe-core — "With axe-core, you can find on average 57% of WCAG issues automatically."
 
 **Translations**
+
 - [I1] https://github.com/i18next/i18next-cli — the linter reports "user-facing text in JSX elements and attributes that isn't wrapped in `t()`/`<Trans>`."
 - [I2] https://www.i18next.com/overview/typescript — `resources`: "This is the most important option that is used to infer the appropriate keys and return types."
 - [I3] https://react.i18next.com/latest/i18next-instance — "React escapes what it renders"
@@ -467,6 +478,7 @@ Each source with one sentence or phrase from it, checked on 2026-11-10.
 - [I8] https://www.i18next.com/overview/configuration-options — `fallbackLng`: "Without it (`false`, the default since v27) no fallback language is loaded"
 
 **Data**
+
 - [Q1] https://tanstack.com/query/latest/docs/eslint/prefer-query-options — wrapping queries in `queryOptions` "co-locates the key and function, making queries safer and easier to reuse"
 - [Q2] https://tanstack.com/query/latest/docs/framework/react/guides/query-invalidation — "Invalidate every query with a key that starts with `todos`"
 - [Q3] https://tanstack.com/query/latest/docs/framework/react/guides/query-functions — "the query function **must throw** or return a **rejected Promise**"
@@ -488,6 +500,7 @@ Each source with one sentence or phrase from it, checked on 2026-11-10.
 - [Q19] https://openapi-ts.dev/openapi-react-query/ — "Also eliminates `as` type overrides that can also hide bugs"
 
 **Routing**
+
 - [N1] https://reactrouter.com/start/modes — "Use Data Mode if you: … want data features but also want to have control over bundling, data, and server abstractions"
 - [N2] https://github.com/remix-run/react-router/blob/main/packages/react-router/CHANGELOG.md — "`RouterProvider`/`HydratedRouter` should be imported from `react-router/dom`"
 - [N3] https://reactrouter.com/start/data/installation — "Data Routers should not be held in React state."
@@ -502,6 +515,7 @@ Each source with one sentence or phrase from it, checked on 2026-11-10.
 - [N11] https://reactrouter.com/explanation/state-management — loaders, actions and forms come "with automatic synchronization through revalidation", a second cache next to TanStack Query
 
 **Tests**
+
 - [V1] https://vitest.dev/guide/browser/why — "these tools only simulate a browser environment and not an actual browser"
 - [V2] https://vitest.dev/config/globals — "some libraries, e.g., `@testing-library/react`, rely on globals being present to perform auto cleanup."
 - [V3] https://vitest.dev/config/restoremocks — "This restores all original implementations on spies created manually with `vi.spyOn`."
@@ -516,6 +530,7 @@ Each source with one sentence or phrase from it, checked on 2026-11-10.
 - [V12] https://testing-library.com/docs/queries/about/ — `getByRole`: "This should be your top preference for just about everything."
 
 **Structure**
+
 - [S1] https://legacy.reactjs.org/docs/faq-structure.html — "locate CSS, JS, and tests together inside folders grouped by feature or route" (legacy documentation)
 - [S2] https://vite.dev/guide/performance — "If possible, you should avoid barrel files and import the individual APIs directly"
 - [S3] https://vite.dev/guide/env-and-mode — "`VITE_*` variables should _not_ contain sensitive information such as API keys."

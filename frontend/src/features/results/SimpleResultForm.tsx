@@ -3,8 +3,8 @@ import { useTranslation } from "react-i18next";
 
 import { StickyActions } from "@/components/StickyActions";
 import { Button } from "@/components/ui/button";
-import { MATCH_POINTS } from "@/demo/rules";
 import { sidesOf } from "@/features/tournaments/play/model";
+import { MATCH_POINTS } from "@/lib/rules";
 
 import type { ResultFormContext } from "./formContext";
 import { Playfield } from "./Playfield";

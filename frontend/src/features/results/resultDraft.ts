@@ -1,14 +1,15 @@
 // The result being entered, before it is saved: what it means and the
 // whole result it sends (ADR-008). The server checks it again (BR-090,
 // BR-092, BR-121); these checks only decide what the screen offers.
-import type {
-  GameWrite,
-  MatchFormat,
-  PhaseRead,
-  ResultWrite,
-  Side,
-} from "@/demo/contract";
-import { rules } from "@/demo/rules";
+import type { components } from "@/api/schema";
+import { rules } from "@/lib/rules";
+
+type GameWrite = components["schemas"]["GameWrite"];
+type MatchFormat = components["schemas"]["MatchFormat"];
+type PhaseRead = components["schemas"]["PhaseRead"];
+type ResultWrite = components["schemas"]["ResultWrite"];
+/** One side of a match: the API's outcome without a draw. */
+export type Side = Exclude<components["schemas"]["Outcome"], "draw">;
 
 /** Whether every game needs its score (BR-092), as rules.ts says today. */
 export function scoresRequired(phase: PhaseRead): boolean {

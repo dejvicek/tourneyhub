@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type SubmitEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import type { components } from "@/api/schema";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,7 +23,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { SeasonRead } from "@/demo/contract";
 import { errorCodeOf } from "@/features/auth/apiErrors";
 import { fieldErrors } from "@/features/auth/fieldErrors";
 import { FormField } from "@/features/auth/FormField";
@@ -30,6 +30,8 @@ import { FormField } from "@/features/auth/FormField";
 import { leagueMutations, leagueQueries } from "./api";
 import { SettingsSection } from "./SettingsSection";
 import { useSeasonName } from "./useSeasonName";
+
+type SeasonRead = components["schemas"]["SeasonRead"];
 
 /**
  * FR-020–FR-022: the active season, renamed or followed by a new one, and the

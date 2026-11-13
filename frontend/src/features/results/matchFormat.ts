@@ -1,4 +1,8 @@
-import type { MatchFormat, MatchRead, PhaseRead } from "@/demo/contract";
+import type { components } from "@/api/schema";
+
+type MatchFormat = components["schemas"]["MatchFormat"];
+type MatchRead = components["schemas"]["MatchRead"];
+type PhaseRead = components["schemas"]["PhaseRead"];
 
 /** The parts of a tournament (TournamentRead) that decide a match's format. */
 interface Bracket {

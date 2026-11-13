@@ -4,6 +4,8 @@
 // its knockout under way, a Monster DYP of 15 players after round 5, a Swiss
 // after round 3, and two knockouts without a group phase (8 and 16 spots,
 // with byes). Added to the seed by seed.ts.
+import { rules } from "@/lib/rules";
+
 import type { MatchRead, PhaseRead, RoundRead } from "./contract";
 import {
   createRng,
@@ -21,7 +23,6 @@ import {
   setNote,
   syncBracket,
 } from "./finalsEngine";
-import { rules } from "./rules";
 import type { SeedKit, SeedPart, StoredPlayer, StoredTournament } from "./seed";
 
 /** The kit's builder, with ids as a plain function (the engine takes one). */

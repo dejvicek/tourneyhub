@@ -3,9 +3,10 @@
 // Stand-ins for the engine and the services behind the play screens
 // (screens 6–8): field placements, the waiting order, result checks and the
 // live round-robin standings. They follow PRD.md §7.10–§7.16 loosely and
-// src/demo/rules.ts for the rules still open; none of this is the real
+// src/lib/rules.ts for the rules still open; none of this is the real
 // behaviour (ADR-009).
 import { newId } from "@/lib/newId";
+import { MATCH_POINTS, rules } from "@/lib/rules";
 
 import type {
   ErrorResponse,
@@ -22,7 +23,6 @@ import type {
   TournamentStandingRow,
 } from "./contract";
 import { fillFields, gameDifference } from "./engine";
-import { MATCH_POINTS, rules } from "./rules";
 import type { StoredTournament } from "./seed";
 import { tournamentStandings } from "./store";
 

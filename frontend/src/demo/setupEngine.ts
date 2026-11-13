@@ -10,6 +10,7 @@
 // players, the halves, the doubles pairs) lives in a draft per tournament,
 // keyed on the store's current state so that resetDemoStore() drops it too.
 import type { components } from "@/api/schema";
+import { rules } from "@/lib/rules";
 import { DEFAULT_SIT_OUT_POINTS } from "@/lib/sitOutPoints";
 
 import type { EntryRead, MatchRead, PhaseRead, RoundRead } from "./contract";
@@ -19,7 +20,6 @@ import {
   roundRobinRounds,
   waitingMatches,
 } from "./engine";
-import { rules } from "./rules";
 import type { DemoState, StoredLeague, StoredTournament } from "./seed";
 import { activeSeason, db, seasonStandingsOf } from "./store";
 

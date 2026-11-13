@@ -3,6 +3,8 @@
 // robin tonight (PRD §5.1). The same seed gives the same data every time.
 // The screen areas add their own data through seedParts.ts, each in its own
 // id range (ids.ts).
+import { DEFAULT_PLACEMENT_POINTS } from "@/lib/rules";
+
 import type {
   EntryRead,
   GameRead,
@@ -35,7 +37,6 @@ import {
   SEED_AREAS,
   type SeedArea,
 } from "./ids";
-import { DEFAULT_PLACEMENT_POINTS } from "./rules";
 import { seedParts } from "./seedParts";
 
 /** A league as stored; its seasons are rows of their own. */

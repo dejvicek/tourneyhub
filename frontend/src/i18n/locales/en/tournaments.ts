@@ -41,7 +41,7 @@ export const tournaments = {
     in_progress: "In progress",
     finished: "Finished",
   },
-  // FR-080: the same names in every language (src/demo/rules.ts).
+  // FR-080: the same names in every language (src/lib/rules.ts).
   knockoutModes: {
     seeded_pairs: "Seeded pairs",
     singles: "Singles",

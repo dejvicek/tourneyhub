@@ -27,7 +27,7 @@ The MVP is split into 16 packages, P1 to P16. The critical path is P1 → P5 →
 
 The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. The team now works against the real backend, so the demo goes. Today app code and tests still depend on it, and the screens call 12 routes the backend lacks through `provisionalApi`.
 
-- [ ] D1 Move out of `src/demo` what the app uses: `rules.ts` (with the Lord have mercy filter, so the option stays hidden on the knockout start screen), the types from `contract.ts`, and the helpers of the finals screens (`StartKnockoutPage`, `names.ts`, `score.ts`, `RankingTable`, `TiebreakerSheet`). Done when only `src/api/provisional.ts` and `main.tsx` import from the demo outside `src/demo` and the tests.
+- [x] D1 Move out of `src/demo` what the app uses: `rules.ts` (with the Lord have mercy filter, so the option stays hidden on the knockout start screen), the types from `contract.ts`, and the helpers of the finals screens (`StartKnockoutPage`, `names.ts`, `score.ts`, `RankingTable`, `TiebreakerSheet`). Done when only `src/api/provisional.ts` and `main.tsx` import from the demo outside `src/demo` and the tests. ([#91](https://github.com/dejvicek/tourneyhub/pull/91))
 - [ ] D2 Tests without the demo: Vitest gets its own MSW handlers and test data instead of the demo store and seed. Done when nothing in `src/test/` imports from `@/demo/`.
 - [ ] D3 Move the routes the backend already covers or can cover with little work:
   - [ ] Finishing a tournament on the finals screen calls `POST …/finish` instead of `PUT …/state`.
@@ -36,7 +36,7 @@ The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. 
 - [ ] D4 Routes that come with P12–P14 (section 4). Until they exist, the screens that need them are hidden:
   - [ ] P12, P13: the screens move from the provisional `…/ranking` to `GET …/play` and the public `…/standings`; `PUT …/tiebreakers`, `POST …/rounds` and `DELETE …/rounds/{round_id}` exist in the backend, and the screens still have to switch to them.
   - [ ] P14: `GET …/participants`, `POST …/entries`, `PUT …/entries/{entry_id}/disabled`.
-- [ ] D5 Delete the demo: `src/demo/`, `src/api/provisional.ts`, the `dev:demo` script, the demo settings in `vite.config.ts`, `main.tsx` and CI, and the mentions in `CLAUDE.md` and `docs/style/frontend-style.md`. Done when no demo code is left and lint, typecheck, unit tests, build and e2e pass.
+- [ ] D5 Delete the demo: `src/demo/`, `src/api/provisional.ts`, what is left in `src/api/provisionalTypes.ts`, the exports of `src/lib/rules.ts` only the demo read, the `dev:demo` script, the demo settings in `vite.config.ts`, `main.tsx` and CI, and the mentions in `CLAUDE.md` and `docs/style/frontend-style.md`. Done when no demo code is left and lint, typecheck, unit tests, build and e2e pass.
 
 ## 4. Rest of the MVP
 

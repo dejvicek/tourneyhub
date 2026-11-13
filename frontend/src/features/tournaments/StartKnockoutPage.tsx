@@ -14,13 +14,12 @@ import {
   useSearchParams,
 } from "react-router";
 
+import type { components } from "@/api/schema";
 import { DocumentTitle } from "@/components/DocumentTitle";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
-import type { BracketRoundName, KnockoutWrite } from "@/demo/contract";
-import { type MonsterKnockoutMode, rules } from "@/demo/rules";
 import {
   finalsMutations,
   finalsQueries,
@@ -31,6 +30,7 @@ import { leagueQueries } from "@/features/leagues/api";
 import { tournamentQueries } from "@/features/tournaments/api";
 import { useRouteParam } from "@/hooks/useRouteParam";
 import { paths } from "@/lib/paths";
+import { type MonsterKnockoutMode, rules } from "@/lib/rules";
 import { cn } from "@/lib/utils";
 
 import { errorText } from "./finals/errorText";
@@ -40,6 +40,9 @@ import { ScreenHeader } from "./finals/ScreenHeader";
 import { LoadError, Loading } from "./finals/StateMessage";
 import { usePlaceLabel } from "./finals/usePlaceLabel";
 import { SegmentedControl } from "./setup/SegmentedControl";
+
+type BracketRoundName = components["schemas"]["RoundName"];
+type KnockoutWrite = components["schemas"]["KnockoutWrite"];
 
 const FIRST_ROUND: Record<number, BracketRoundName> = {
   2: "final",

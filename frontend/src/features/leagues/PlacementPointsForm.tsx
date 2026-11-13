@@ -2,14 +2,16 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type SubmitEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import type { components } from "@/api/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { SeasonRead } from "@/demo/contract";
 import { errorCodeOf, validationProblems } from "@/features/auth/apiErrors";
 
 import { leagueMutations } from "./api";
 import { SettingsSection } from "./SettingsSection";
 import { useSeasonName } from "./useSeasonName";
+
+type SeasonRead = components["schemas"]["SeasonRead"];
 
 /** The most places the API accepts (backend/openapi.json: PlacementPoints). */
 const MAX_PLACES = 256;
