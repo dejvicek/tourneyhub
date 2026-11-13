@@ -332,6 +332,7 @@ def set_top_players(
     body: TopPlayersWrite,
     session: SessionDep,
     user: CurrentUserDep,
+    clock: ClockDep,
 ) -> TournamentSetupRead:
     """Mark the Monster DYP top players, the target state (FR-041, BR-061).
 
@@ -345,6 +346,7 @@ def set_top_players(
         tournament_id=tournament_id,
         user_id=user.id,
         player_ids=body.player_ids,
+        clock=clock,
     )
     return TournamentSetupRead.model_validate(setup)
 

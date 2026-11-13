@@ -33,6 +33,7 @@ from tourneyhub.services.tournaments.play import (
     monster_standings_of,
 )
 from tourneyhub.services.tournaments.shared import (
+    Clock,
     _lock_setup,
     _main_entries,
     _ScheduleRows,
@@ -49,6 +50,7 @@ def set_top_players(
     tournament_id: UUID,
     user_id: UUID,
     player_ids: Sequence[UUID],
+    clock: Clock,
 ) -> TournamentSetup:
     """Mark the top players the organizer picks, the target state (FR-041).
 
@@ -56,7 +58,9 @@ def set_top_players(
     per match of round 1, so at most the player count // 4 (422
     `too_many_top_players`, detail `max`). A player not listed loses the mark.
     The marks are filled up from the league ranking when a round is drawn
-    (BR-061), not here.
+    (BR-061), not here. Changing the set of marks increments `draw_counter`, so a
+    start that carries an older counter is stale (ADR-008); the same marks again
+    change nothing.
     """
     league, tournament = _lock_setup(
         session, league_id=league_id, tournament_id=tournament_id, user_id=user_id
@@ -70,9 +74,16 @@ def set_top_players(
     if len(player_ids) > maximum:
         raise RuleViolationError(ErrorCode.TOO_MANY_TOP_PLAYERS, max=maximum)
     marked = set(player_ids)
+    changed = False
     for entry in tournament.entries:
         if entry.stage is EntryStage.MAIN:
-            entry.is_top_player = any(m.player_id in marked for m in entry.members)
+            is_top = any(m.player_id in marked for m in entry.members)
+            if entry.is_top_player != is_top:
+                entry.is_top_player = is_top
+                changed = True
+    if changed:
+        tournament.draw_counter += 1
+        tournament.updated_at = clock()
     session.flush()
     return _setup_of(
         tournament, _ranking(session, league=league, tournament=tournament)
