@@ -52,7 +52,7 @@ Monorepo: `backend/` (Python 3.15, FastAPI, SQLAlchemy 2.1, Alembic, PostgreSQL 
 `api` and `cli` → `services` → `db` → `engine`. Imports only go downwards.
 
 - **`engine/`**: the tournament rules as pure functions over immutable data classes (ADR-009): seeding, DYP draws, schedules, Swiss and Monster DYP pairing, standings, places, season points, fields. No DB, no framework, no clock, no randomness. Needs 100 % coverage. Also holds the domain `StrEnum`s.
-- **`services/<area>.py`**: use cases as module-level functions (`generate_round(session, *, …)`). Take locks, check state, call the engine, raise `AppError`s. Never commit, never import FastAPI.
+- **`services/<area>.py`** (a package `services/<area>/` for a large area, as `services/tournaments/`): use cases as module-level functions (`generate_round(session, *, …)`). Take locks, check state, call the engine, raise `AppError`s. Never commit, never import FastAPI.
 - **`api/<area>.py`**: routers that turn requests into service calls and results into response models. No queries of their own.
 - **`db/models/`**: one module per DATA-MODEL §4 area. Migrations live in `tourneyhub/migrations` (run with `tourneyhub migrate`).
 
