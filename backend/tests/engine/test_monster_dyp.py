@@ -2,7 +2,6 @@ import itertools
 import sys
 from collections import Counter
 from collections.abc import Iterable, Iterator, Sequence
-from dataclasses import replace
 from functools import cache
 from uuid import UUID
 
@@ -18,14 +17,11 @@ from tourneyhub.engine.errors import (
 from tourneyhub.engine.ids import PlayerId
 from tourneyhub.engine.lots import order_by_lot
 from tourneyhub.engine.monster_dyp import (
-    DEFAULT_OPTIONS,
     GroupingMethod,
     MonsterDraw,
-    MonsterDypOptions,
     MonsterMatch,
     MonsterRound,
     MonsterStanding,
-    TopPlayerOrder,
     draw_monster_round,
     knockout_purpose,
     monster_standings,
@@ -105,7 +101,7 @@ def draw_round(
     league_ranking: Sequence[int] | None = None,
     marked: Iterable[int] = (),
     disabled: Iterable[int] = (),
-    options: MonsterDypOptions = DEFAULT_OPTIONS,
+    rng_seed: bytes = SEED,
 ) -> MonsterDraw:
     order = players(count) if standing is None else tuple(map(pid, standing))
     return draw_monster_round(
@@ -116,10 +112,9 @@ def draw_round(
             if league_ranking is None
             else tuple(map(pid, league_ranking))
         ),
-        rng_seed=SEED,
+        rng_seed=rng_seed,
         marked_top_players=map(pid, marked),
         disabled=map(pid, disabled),
-        options=options,
     )
 
 
@@ -528,33 +523,6 @@ def test_br061_round_2_takes_top_players_by_league_ranking() -> None:
     assert numbers(result) == [((1, 3), (5, 6)), ((2, 8), (4, 7))]
 
 
-def test_fr041_the_standing_order_sorts_only_the_marked_top_players() -> None:
-    rounds = rounds_of([((1, 4), (2, 3)), ((5, 8), (6, 7))])
-    by_standing = MonsterDypOptions(top_player_order=TopPlayerOrder.STANDING)
-
-    result = draw_round(
-        8, rounds, standing=(5, 6, 1, 2, 3, 4, 7, 8), marked=[2, 6], options=by_standing
-    )
-
-    assert result.top_players == (pid(6), pid(2))
-    assert numbers(result) == [((6, 3), (5, 1)), ((2, 8), (4, 7))]
-
-
-def test_fr041_unmarked_top_players_always_follow_the_league_ranking() -> None:
-    rounds = rounds_of([((1, 4), (2, 3)), ((5, 8), (6, 7))])
-    by_standing = MonsterDypOptions(top_player_order=TopPlayerOrder.STANDING)
-
-    unmarked = draw_round(
-        8, rounds, standing=(5, 6, 1, 2, 3, 4, 7, 8), options=by_standing
-    )
-    one_marked = draw_round(
-        8, rounds, standing=(5, 6, 1, 2, 3, 4, 7, 8), marked=[6], options=by_standing
-    )
-
-    assert unmarked.top_players == (pid(1), pid(2))
-    assert one_marked.top_players == (pid(6), pid(1))
-
-
 def test_fr041_marked_top_players_come_first() -> None:
     result = draw_round(8, marked=[7])
 
@@ -603,17 +571,7 @@ def test_br063_a_round_needs_four_players_who_are_not_disabled() -> None:
     assert (raised.value.minimum, raised.value.given) == (4, 3)
 
 
-def test_open_rule_top_players_exempt_from_the_sit_out_lot() -> None:
-    exempt = MonsterDypOptions(are_top_players_exempt=True)
-
-    result = draw_round(5, options=exempt)
-
-    lot = order_by_lot(players(5)[1:], rng_seed=SEED, purpose="sit-out:round-1")
-    assert result.sitting_out == lot[:1]
-    assert result.top_players == (pid(1),)
-
-
-def test_open_rule_top_players_not_exempt_by_default() -> None:
+def test_br061_br063_top_players_are_not_exempt_from_sitting_out() -> None:
     result = draw_round(5)
 
     lot = order_by_lot(players(5), rng_seed=SEED, purpose="sit-out:round-1")
@@ -621,20 +579,81 @@ def test_open_rule_top_players_not_exempt_by_default() -> None:
     assert result.top_players == (min(set(players(5)) - set(lot[:1])),)
 
 
-@pytest.mark.parametrize(
-    "avoids", [pytest.param(True, id="avoids"), pytest.param(False, id="prd")]
-)
-def test_open_rule_not_sitting_out_twice_in_a_row(*, avoids: bool) -> None:
+def test_br063_who_sat_out_the_round_before_is_picked_last() -> None:
     # Everyone has sat out once; player 5 sat out the last round.
     rounds = sitting_out_in_turn(5)
-    options = MonsterDypOptions(avoids_sitting_out_twice_in_a_row=avoids)
 
-    result = draw_round(5, rounds, options=options)
+    result = draw_round(5, rounds)
 
-    candidates = players(4) if avoids else players(5)
-    lot = order_by_lot(candidates, rng_seed=SEED, purpose="sit-out:round-6")
+    lot = order_by_lot(players(4), rng_seed=SEED, purpose="sit-out:round-6")
     assert result.sitting_out == lot[:1]
     assert result.is_sit_out_by_lot
+
+
+def test_br063_the_round_before_comes_before_the_fewest_sit_outs() -> None:
+    # Players 1 to 4 sat out twice each, player 5 once, in round 9: player 5
+    # has the fewest sit-outs but sat out the round before, so it plays.
+    turns = (1, 2, 3, 4, 1, 2, 3, 4, 5)
+    rounds = tuple(
+        MonsterRound(
+            round_no=number,
+            matches=(game(*_two_teams(set(range(1, 6)) - {out})),),
+            sat_out=(pid(out),),
+        )
+        for number, out in enumerate(turns, start=1)
+    )
+
+    result = draw_round(5, rounds)
+
+    lot = order_by_lot(players(4), rng_seed=SEED, purpose="sit-out:round-10")
+    assert result.sitting_out == lot[:1]
+
+
+def _two_teams(four: set[int]) -> Teams:
+    a, b, c, d = sorted(four)
+    return (a, d), (b, c)
+
+
+def test_br064_a_missed_round_counts_as_a_sit_out_for_the_order() -> None:
+    # Player 5 was disabled in round 1: it missed the round before, so the
+    # four who played are picked first, and the lot decides among them.
+    rounds = rounds_of([((1, 4), (2, 3))])
+
+    result = draw_round(5, rounds)
+
+    lot = order_by_lot(players(4), rng_seed=SEED, purpose="sit-out:round-2")
+    assert result.sitting_out == lot[:1]
+
+
+@settings(deadline=None, max_examples=25)
+@given(st.binary(min_size=16, max_size=16))
+def test_br063_br067_a_late_7th_player_plays_rounds_7_to_14(seed: bytes) -> None:
+    # The BR-063 example: 6 players play 6 rounds and each sits out twice.
+    # A 7th arrives with 6 missed rounds; from round 7 three sit out each
+    # round, the 7th plays rounds 7 to 14 and the other six sit out every
+    # second round. It holds for every lot.
+    rounds: tuple[MonsterRound, ...] = ()
+    for count in (6,) * 6 + (7,) * 8:
+        drawn = draw_round(count, rounds, rng_seed=seed)
+        rounds = (
+            *rounds,
+            MonsterRound(
+                round_no=drawn.round_no,
+                matches=tuple(
+                    MonsterMatch(team_1=g.team_1, team_2=g.team_2) for g in drawn.groups
+                ),
+                sat_out=drawn.sitting_out,
+            ),
+        )
+
+    early = Counter(p for r in rounds[:6] for p in r.sat_out)
+    assert [early[p] for p in players(6)] == [2] * 6
+    late = rounds[6:]
+    assert all(pid(7) not in r.sat_out for r in late)
+    for player in players(6):
+        out = [player in r.sat_out for r in late]
+        assert out.count(True) == 4
+        assert not any(a and b for a, b in itertools.pairwise(out))
 
 
 # ---------------------------------------------------------------- repeated partners
@@ -991,14 +1010,9 @@ def test_the_knockout_refuses_a_caller_bug(
 @st.composite
 def tournaments(
     draw: st.DrawFn, *, max_players: int = 14, can_disable: bool = True
-) -> tuple[int, int, MonsterDypOptions, frozenset[int], list[frozenset[int]], bytes]:
+) -> tuple[int, int, frozenset[int], list[frozenset[int]], bytes]:
     count = draw(st.integers(min_value=4, max_value=max_players))
     round_count = draw(st.integers(min_value=1, max_value=8))
-    options = MonsterDypOptions(
-        are_top_players_exempt=draw(st.booleans()),
-        top_player_order=draw(st.sampled_from(TopPlayerOrder)),
-        avoids_sitting_out_twice_in_a_row=draw(st.booleans()),
-    )
     marked = draw(st.frozensets(st.integers(min_value=1, max_value=count)))
     off_sets = st.frozensets(
         st.integers(min_value=1, max_value=count), max_size=count - 4
@@ -1007,13 +1021,12 @@ def tournaments(
         draw(off_sets) if can_disable else frozenset() for _ in range(round_count)
     ]
     seed = draw(st.binary(min_size=16, max_size=16))
-    return count, round_count, options, marked, disabled, seed
+    return count, round_count, marked, disabled, seed
 
 
 def play(
     count: int,
     round_count: int,
-    options: MonsterDypOptions,
     marked: frozenset[int],
     disabled: Sequence[frozenset[int]],
     seed: bytes,
@@ -1047,7 +1060,6 @@ def play(
             rng_seed=seed,
             marked_top_players=map(pid, marked),
             disabled=off,
-            options=options,
         )
         history.append((drawn, rounds, off))
         played = tuple(
@@ -1069,9 +1081,7 @@ def play(
 @settings(deadline=None)
 @given(tournaments(), st.data())
 def test_br060_to_br063_hold_in_every_round(
-    tournament: tuple[
-        int, int, MonsterDypOptions, frozenset[int], list[frozenset[int]], bytes
-    ],
+    tournament: tuple[int, int, frozenset[int], list[frozenset[int]], bytes],
     data: st.DataObject,
 ) -> None:
     for drawn, before, off in play(*tournament, data):
@@ -1105,37 +1115,39 @@ def test_br060_to_br063_hold_in_every_round(
         ] == [count > 0 for count in earlier_counts(drawn, before)]
 
 
+def sit_out_order(player: PlayerId, before: Sequence[MonsterRound]) -> tuple[bool, int]:
+    """BR-063 independently: missed the round before, then rounds missed."""
+    missed = [
+        all(player not in (*m.team_1, *m.team_2) for m in r.matches) for r in before
+    ]
+    return bool(missed) and missed[-1], sum(missed)
+
+
 @settings(deadline=None)
 @given(tournaments(), st.data())
 def test_br063_the_players_with_the_fewest_sit_outs_sit_out(
-    tournament: tuple[
-        int, int, MonsterDypOptions, frozenset[int], list[frozenset[int]], bytes
-    ],
+    tournament: tuple[int, int, frozenset[int], list[frozenset[int]], bytes],
     data: st.DataObject,
 ) -> None:
-    count, round_count, options, marked, disabled, seed = tournament
-    # Exempt top players are the one open rule that sits others out instead.
-    options = replace(options, are_top_players_exempt=False)
-    sat_out: Counter[PlayerId] = Counter()
-    history = play(count, round_count, options, marked, disabled, seed, data)
-    for drawn, _, off in history:
+    for drawn, before, off in play(*tournament, data):
         playing = {
             player
             for group in drawn.groups
             for player in (*group.team_1, *group.team_2)
         }
         assert not set(drawn.sitting_out) & off
+
         for sitting in drawn.sitting_out:
-            assert all(sat_out[sitting] <= sat_out[other] for other in playing)
-        sat_out.update(drawn.sitting_out)
+            assert all(
+                sit_out_order(sitting, before) <= sit_out_order(other, before)
+                for other in playing
+            )
 
 
 @settings(deadline=None)
 @given(tournaments(max_players=8, can_disable=False), st.data())
 def test_br062_partnership_counts_stay_balanced_while_repeats_can_be_avoided(
-    tournament: tuple[
-        int, int, MonsterDypOptions, frozenset[int], list[frozenset[int]], bytes
-    ],
+    tournament: tuple[int, int, frozenset[int], list[frozenset[int]], bytes],
     data: st.DataObject,
 ) -> None:
     for drawn, before, _ in play(*tournament, data):
@@ -1165,9 +1177,7 @@ def test_br062_partnership_counts_stay_balanced_while_repeats_can_be_avoided(
 @settings(deadline=None)
 @given(tournaments(max_players=24, can_disable=False), st.data())
 def test_br063_sit_outs_stay_balanced_and_dirac_rounds_never_repeat(
-    tournament: tuple[
-        int, int, MonsterDypOptions, frozenset[int], list[frozenset[int]], bytes
-    ],
+    tournament: tuple[int, int, frozenset[int], list[frozenset[int]], bytes],
     data: st.DataObject,
 ) -> None:
     count = tournament[0]
@@ -1188,12 +1198,10 @@ def test_br063_sit_outs_stay_balanced_and_dirac_rounds_never_repeat(
 @settings(deadline=None)
 @given(tournaments(max_players=10), st.data())
 def test_the_draw_is_deterministic(
-    tournament: tuple[
-        int, int, MonsterDypOptions, frozenset[int], list[frozenset[int]], bytes
-    ],
+    tournament: tuple[int, int, frozenset[int], list[frozenset[int]], bytes],
     data: st.DataObject,
 ) -> None:
-    count, _, options, marked, _, seed = tournament
+    count, _, marked, _, seed = tournament
     *_, (_, before, off) = play(*tournament, data)
     standing = players(count)
 
@@ -1205,7 +1213,6 @@ def test_the_draw_is_deterministic(
             rng_seed=seed,
             marked_top_players=sorted(map(pid, marked), reverse=True),
             disabled=sorted(off),
-            options=options,
         )
 
     assert again(before) == again(tuple(reversed(before)))
@@ -1214,9 +1221,7 @@ def test_the_draw_is_deterministic(
 @settings(deadline=None)
 @given(tournaments(max_players=12), st.data())
 def test_br070_to_br074_standings_are_consistent(
-    tournament: tuple[
-        int, int, MonsterDypOptions, frozenset[int], list[frozenset[int]], bytes
-    ],
+    tournament: tuple[int, int, frozenset[int], list[frozenset[int]], bytes],
     data: st.DataObject,
 ) -> None:
     count, *_, seed = tournament
