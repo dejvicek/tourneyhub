@@ -19,7 +19,7 @@ The MVP is split into 16 packages, P1 to P16. The critical path is P1 → P5 →
 
 ## 2. Small follow-ups
 
-- [ ] Sit-out order: not the round before, then fewest sit-outs (BR-058, BR-063) ([#60](https://github.com/dejvicek/tourneyhub/issues/60)).
+- [x] Sit-out order: not the round before, then fewest sit-outs (BR-058, BR-063) ([#60](https://github.com/dejvicek/tourneyhub/issues/60), [#87](https://github.com/dejvicek/tourneyhub/pull/87)).
 - [x] Game difference in round-robin standings, column only in best of 3 and best of 5 (BR-101) ([#61](https://github.com/dejvicek/tourneyhub/issues/61), [#85](https://github.com/dejvicek/tourneyhub/pull/85)).
 - [ ] Code for the answers from issue #48 ([#75](https://github.com/dejvicek/tourneyhub/issues/75)); its 19 items Q1–Q46 are ticked there.
 
