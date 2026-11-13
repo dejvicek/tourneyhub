@@ -155,6 +155,8 @@ export function roundRobinStandings(
         sat_out: 0,
         points: 0,
         score_difference: 0,
+        bh1: null,
+        bh2: null,
       },
     ]),
   );
