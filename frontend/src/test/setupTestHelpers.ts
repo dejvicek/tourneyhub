@@ -203,3 +203,16 @@ export async function allowDraws() {
     }),
   );
 }
+
+/** Another device marks these top players (FR-041); the screen has not seen it. */
+export async function markTopPlayersElsewhere(
+  tournamentId: string,
+  playerIds: string[],
+) {
+  await dataOf(
+    api.PUT(
+      "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/top-players",
+      { ...at(tournamentId), body: { player_ids: playerIds } },
+    ),
+  );
+}

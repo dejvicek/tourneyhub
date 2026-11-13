@@ -13,6 +13,12 @@ import { db } from "@/test/fake/store";
 import { stubViewport } from "@/test/media";
 import { renderAt } from "@/test/renderApp";
 import { server } from "@/test/server";
+import {
+  createDraft,
+  pickPlayers,
+  startTournament,
+  tournamentOf,
+} from "@/test/setupTestHelpers";
 
 const DYP_EVENING = testId(3200);
 const MONSTER = testId(3300);
@@ -803,6 +809,139 @@ describe("Between rounds (screen 11)", () => {
     renderAt(at(paths.betweenRounds, MONSTER));
     await screen.findByRole("table");
     expect(await violations()).toEqual([]);
+  });
+});
+
+/** A Monster DYP of nine in round 1 (two teams of four play, one sits out), the sit-out worth 2 points. */
+async function monsterOfNine(): Promise<string> {
+  const id = await createDraft({
+    type: "monster_dyp",
+    group_phase: "monster_dyp",
+    sit_out_points: 2,
+  });
+  await pickPlayers(id, 9);
+  await startTournament(id);
+  return id;
+}
+
+/** Gives every match of the tournament a result, side 1 winning 10 : 3. */
+async function playAllMatches(tournamentId: string): Promise<void> {
+  const tournament = await tournamentOf(tournamentId);
+  for (const match of tournament.rounds.flatMap((round) => round.matches)) {
+    const saved = await provisionalApi.PUT(
+      `${root}/matches/{match_id}/result`,
+      {
+        params: {
+          path: { ...ids(tournamentId), match_id: match.id },
+        },
+        body: {
+          walkover_winner: null,
+          games: [{ winner: "side_1", score_1: 10, score_2: 3 }],
+        },
+      },
+    );
+    expect(saved.response.ok).toBe(true);
+  }
+}
+
+describe("Monster DYP between rounds on the real response shapes (screen 11)", () => {
+  it("FR-060, BR-063: names the player behind the sit-out entry id, and scores the sit-out (BR-076)", async () => {
+    const id = await monsterOfNine();
+    const tournament = await tournamentOf(id);
+    const [round] = tournament.rounds;
+    // RoundRead.sitting_out holds main entry ids; a side has no entry id.
+    expect(round?.sitting_out).toHaveLength(1);
+    expect(round?.matches[0]?.sides[0]?.entry_id).toBeNull();
+    const sitter = tournament.entries.find(
+      (e) => e.id === round?.sitting_out[0],
+    );
+    const players = await provisionalApi.GET(
+      "/api/v1/leagues/{league_id}/players",
+      {
+        params: { path: { league_id: TEST_LEAGUE_ID } },
+      },
+    );
+    const full = players.data?.find(
+      (p) => p.id === sitter?.player_ids[0],
+    )?.name;
+    const [first = "", last = ""] = (full ?? "").split(" ");
+    const short = `${first} ${last.charAt(0)}.`;
+
+    renderAt(at(paths.betweenRounds, id));
+
+    expect(await screen.findByText(`Sat out: ${short}`)).toBeInTheDocument();
+    const table = await screen.findByRole("table", { name: /^Standings/ });
+    const row = within(table)
+      .getAllByRole("row")
+      .find((r) => within(r).queryByText(short) !== null);
+    // Points column: the sit-out is worth 2 (FR-039).
+    if (row === undefined) {
+      throw new Error("The sitter has a row");
+    }
+    expect(within(row).getAllByRole("cell")[2]).toHaveTextContent("2");
+  });
+
+  it("FR-060, BR-074: lists one row per player, and level players share the place", async () => {
+    const id = await monsterOfNine();
+    await playAllMatches(id);
+
+    renderAt(at(paths.betweenRounds, id));
+
+    const table = await screen.findByRole("table", { name: /^Standings/ });
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(rows).toHaveLength(9);
+    const places = rows.map(
+      (row) => within(row).getAllByRole("cell")[0]?.textContent,
+    );
+    // The four winners share 1st, the sitter (2 points) is 5th, the four losers share 6th.
+    expect(places).toEqual(["1", "1", "1", "1", "5", "6", "6", "6", "6"]);
+    expect(
+      rows.map((r) => within(r).getAllByRole("cell")[1]?.textContent),
+    ).toHaveLength(9);
+  });
+
+  it("FR-040: finishes without a knockout once the round is complete", async () => {
+    const user = userEvent.setup();
+    const id = await monsterOfNine();
+    await playAllMatches(id);
+    renderAt(at(paths.betweenRounds, id));
+
+    await user.click(
+      await screen.findByRole("button", { name: "Finish the tournament" }),
+    );
+    const dialog = await screen.findByRole("alertdialog");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Finish the tournament" }),
+    );
+
+    expect(
+      await screen.findByRole("region", { name: "Final places" }),
+    ).toBeInTheDocument();
+  });
+
+  it("ADR-008: says the rounds changed on a 409 round_number_changed", async () => {
+    server.use(
+      http.post(
+        "*/api/v1/leagues/:leagueId/tournaments/:tournamentId/rounds",
+        () =>
+          HttpResponse.json(
+            { code: "round_number_changed", detail: { current_round_no: 2 } },
+            { status: 409 },
+          ),
+      ),
+    );
+    const user = userEvent.setup();
+    const id = await monsterOfNine();
+    await playAllMatches(id);
+    renderAt(at(paths.betweenRounds, id));
+
+    await user.click(
+      await screen.findByRole("button", { name: "Add round 2" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The rounds changed on another device, so they were reloaded. Check them and try again.",
+    );
   });
 });
 

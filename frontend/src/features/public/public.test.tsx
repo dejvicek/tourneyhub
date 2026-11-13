@@ -195,6 +195,42 @@ describe("share-link views", () => {
     expect(rows.at(-1)?.[0]).not.toHaveTextContent(/^1$/);
   });
 
+  it("FR-043: a Monster DYP's standings render without form and ahead_by", async () => {
+    const monster = db().tournaments.find((t) => t.name === "Monster DYP");
+    if (monster === undefined) {
+      throw new Error("The seed has a Monster DYP");
+    }
+    const entries = monster.entries.filter((e) => e.stage === "main");
+    // PublicStandingRow has no `form` and no `ahead_by`; one row per player.
+    server.use(
+      http.get(
+        "*/api/v1/public/:token/tournaments/:tournamentId/standings",
+        () =>
+          HttpResponse.json(
+            entries.map((entry, index) => ({
+              place: index + 1,
+              entry_id: entry.id,
+              played: 2,
+              won: 1,
+              drawn: 0,
+              lost: 1,
+              sat_out: 0,
+              points: 3,
+              game_difference: 0,
+              score_difference: 0,
+              bh1: 3,
+              bh2: 6,
+            })),
+          ),
+      ),
+    );
+    renderAt(pageOf("Monster DYP"));
+
+    const table = await screen.findByRole("table", { name: "Standings" });
+    expect(within(table).getAllByRole("row")).toHaveLength(entries.length + 1);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("a Swiss draws the cut line from the knockout's qualifiers when the group phase has none (BR-080)", async () => {
     const swiss = db().tournaments.find((t) => t.name === "Swiss evening");
     if (swiss === undefined) {

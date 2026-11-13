@@ -1,5 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { http, HttpResponse } from "msw";
 import { generatePath } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -8,10 +9,12 @@ import { paths } from "@/lib/paths";
 import { TEST_LEAGUE_ID } from "@/test/fake/ids";
 import { stubViewport } from "@/test/media";
 import { renderAt } from "@/test/renderApp";
+import { server } from "@/test/server";
 import {
   axeViolations,
   createDraft,
   drawElsewhere,
+  markTopPlayersElsewhere,
   nth,
   pickPlayers,
   setupOf,
@@ -226,6 +229,91 @@ describe("setup: draw the pairs (screen 4)", () => {
     await waitFor(() => {
       expect(boxes[5]).toBeDisabled();
     });
+  });
+
+  it("FR-041: with the marks used up, only the marked players keep an enabled checkbox", async () => {
+    const user = userEvent.setup();
+    const id = await createDraft({
+      type: "monster_dyp",
+      group_phase: "monster_dyp",
+    });
+    await pickPlayers(id, 9);
+    renderAt(drawPage(id));
+    await screen.findByRole("heading", { name: "Top players (up to 2)" });
+
+    const boxes = screen.getAllByRole("checkbox");
+    await user.click(nth(boxes, 0));
+    await user.click(nth(boxes, 1));
+
+    await waitFor(() => {
+      expect(boxes.map((box) => box.hasAttribute("disabled"))).toEqual([
+        false,
+        false,
+        ...Array<boolean>(7).fill(true),
+      ]);
+    });
+  });
+
+  it("FR-041: shows a 422 too_many_top_players in an alert with the limit", async () => {
+    server.use(
+      http.put(
+        "*/api/v1/leagues/:leagueId/tournaments/:tournamentId/setup/top-players",
+        () =>
+          HttpResponse.json(
+            { code: "too_many_top_players", detail: { max: 2 } },
+            { status: 422 },
+          ),
+      ),
+    );
+    const user = userEvent.setup();
+    const id = await createDraft({
+      type: "monster_dyp",
+      group_phase: "monster_dyp",
+    });
+    await pickPlayers(id, 9);
+    renderAt(drawPage(id));
+    await screen.findByRole("heading", { name: "Top players (up to 2)" });
+
+    await user.click(nth(screen.getAllByRole("checkbox"), 0));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "At most 2 top players",
+    );
+  });
+
+  it("ADR-008: reloads the section on a 409, so it shows the marks set elsewhere", async () => {
+    const user = userEvent.setup();
+    const id = await createDraft({
+      type: "monster_dyp",
+      group_phase: "monster_dyp",
+    });
+    const picked = await pickPlayers(id, 9);
+    renderAt(drawPage(id));
+    await screen.findByRole("heading", { name: "Top players (up to 2)" });
+    const boxes = screen.getAllByRole("checkbox");
+
+    // Another device marks the last player while this screen still shows none.
+    await markTopPlayersElsewhere(id, [nth(picked.player_ids, 8)]);
+    server.use(
+      http.put(
+        "*/api/v1/leagues/:leagueId/tournaments/:tournamentId/setup/top-players",
+        () =>
+          HttpResponse.json(
+            { code: "tournament_not_in_setup", detail: {} },
+            { status: 409 },
+          ),
+        { once: true },
+      ),
+    );
+    await user.click(nth(boxes, 0));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "This changed on another device",
+    );
+    await waitFor(() => {
+      expect(nth(screen.getAllByRole("checkbox"), 8)).toBeChecked();
+    });
+    expect(nth(screen.getAllByRole("checkbox"), 0)).not.toBeChecked();
   });
 
   it.each([
