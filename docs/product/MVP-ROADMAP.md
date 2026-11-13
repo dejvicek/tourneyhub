@@ -36,7 +36,7 @@ The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. 
 - [ ] D4 Routes that come with P12–P14 (section 4). Until they exist, the screens that need them are hidden:
   - [ ] P12, P13: `GET …/ranking`, `PUT …/tiebreakers`, public `GET /public/{share_token}/tournaments/{tournament_id}/ranking`, `POST …/rounds`, `DELETE …/rounds/{round_id}`.
   - [ ] P14: `GET …/participants`, `POST …/entries`, `PUT …/entries/{entry_id}/disabled`.
-- [ ] D5 Delete the demo: `src/demo/`, `src/api/provisional.ts`, the `dev:demo` script, the demo settings in `vite.config.ts`, `main.tsx` and CI, and the mentions in `CLAUDE.md` and `docs/style/frontend-style.md`. Done when no demo code is left and lint, typecheck, unit tests, build and e2e pass.
+- [ ] D5 Delete the demo: `src/demo/`, `src/api/provisional.ts`, what is left in `src/api/provisionalTypes.ts`, the exports of `src/lib/rules.ts` only the demo read, the `dev:demo` script, the demo settings in `vite.config.ts`, `main.tsx` and CI, and the mentions in `CLAUDE.md` and `docs/style/frontend-style.md`. Done when no demo code is left and lint, typecheck, unit tests, build and e2e pass.
 
 ## 4. Rest of the MVP
 
