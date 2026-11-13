@@ -6,6 +6,9 @@ import { finalsQueries } from "@/features/finals/api";
 
 type EntryRead = components["schemas"]["EntryRead"];
 
+/** The names a screen reads from the league's players and the tournament's entries. */
+export type Roster = ReturnType<typeof useRoster>;
+
 /** "Anna Nováková" → "Anna N.", the form the design shows in tables and brackets. */
 export function shortName(fullName: string): string {
   const [first = fullName, ...rest] = fullName.trim().split(/\s+/);

@@ -149,11 +149,11 @@ export function RemixMatchCard({
   const winner =
     match.outcome === "side_1" ? 0 : match.outcome === "side_2" ? 1 : null;
   if (match.state === "bye") {
-    const kept = match.sides[match.sides[0].is_bye ? 1 : 0];
+    const kept = match.sides.find((side) => !side.is_bye);
     return (
       <p className="rounded-lg border border-dashed border-input px-3 py-2 text-body-sm text-muted-foreground">
         {t("finals.knockout.byeFor", {
-          name: kept.player_ids.map(ctx.playerName).join(", "),
+          name: (kept?.player_ids ?? []).map(ctx.playerName).join(", "),
         })}
       </p>
     );
@@ -177,10 +177,10 @@ export function RemixMatchCard({
         <p className="text-caption text-muted-foreground">{status}</p>
       </header>
       <ul className="space-y-1.5">
-        {([0, 1] as const).map((index) => (
+        {match.sides.map((side, index) => (
           <SideRow
             key={index}
-            side={match.sides[index]}
+            side={side}
             ctx={ctx}
             won={winner === index}
             score={match.score?.[index]}

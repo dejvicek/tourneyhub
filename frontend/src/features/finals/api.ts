@@ -459,9 +459,24 @@ export type TournamentData = QueryData<
   ReturnType<typeof tournamentQueries.detail>
 >;
 
-export type RemixKnockoutData = components["schemas"]["RemixKnockoutRead"];
-export type RemixRoundData = components["schemas"]["RemixRoundRead"];
-export type RemixMatchData = components["schemas"]["RemixMatchRead"];
-export type RemixSideData = components["schemas"]["RemixSideRead"];
-export type PublicRemixKnockoutData =
-  components["schemas"]["PublicRemixKnockoutRead"];
+// Typed from the query like the bracket: openapi-fetch turns the contract's
+// tuples into arrays.
+export type RemixKnockoutData = QueryData<
+  ReturnType<typeof finalsQueries.knockoutRounds>
+>;
+export type RemixRoundData = RemixKnockoutData["rounds"][number];
+export type RemixMatchData = RemixRoundData["matches"][number];
+export type RemixSideData = RemixMatchData["sides"][number];
+
+/**
+ * The share link's rounds view: the organizer's without what only the
+ * organizer sees (`can_draw_next`, `result_count`, `winner_locked`; FR-070).
+ */
+export type PublicRemixKnockoutData = Omit<
+  RemixKnockoutData,
+  "can_draw_next" | "rounds"
+> & {
+  rounds: (Omit<RemixRoundData, "result_count" | "matches"> & {
+    matches: Omit<RemixMatchData, "winner_locked">[];
+  })[];
+};

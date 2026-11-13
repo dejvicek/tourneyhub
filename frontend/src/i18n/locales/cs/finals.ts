@@ -123,6 +123,33 @@ export const finals: CsMessages<Messages["finals"]> = {
     deleteConfirm: "Smazat vyřazovací část",
   },
   remix: {
+    betweenTitle: "Dohráno: {{round}}",
+    drawNext: "Vylosovat: {{name}}",
+    inProgressBody_one: "{{count}} zápas ještě nemá výsledek.",
+    inProgressBody_few: "{{count}} zápasy ještě nemají výsledek.",
+    inProgressBody_many: "{{count}} zápasu ještě nemá výsledek.",
+    inProgressBody_other: "{{count}} zápasů ještě nemá výsledek.",
+    deleteRound: "Smazat kolo: {{round}}",
+    deleteTitle: "Smazat kolo: {{round}}?",
+    deleteBody_one:
+      "Vylosované dvojice a {{count}} výsledek se odstraní. Vítěze předchozího kola půjde znovu změnit.",
+    deleteBody_few:
+      "Vylosované dvojice a {{count}} výsledky se odstraní. Vítěze předchozího kola půjde znovu změnit.",
+    deleteBody_many:
+      "Vylosované dvojice a {{count}} výsledku se odstraní. Vítěze předchozího kola půjde znovu změnit.",
+    deleteBody_other:
+      "Vylosované dvojice a {{count}} výsledků se odstraní. Vítěze předchozího kola půjde znovu změnit.",
+    deleteBodyNone:
+      "Vylosované dvojice se odstraní. Vítěze předchozího kola půjde znovu změnit.",
+    deleteBodyFirst_one:
+      "Vylosované dvojice a {{count}} výsledek se odstraní. Tím se smaže celá vyřazovací část a základní část se odemkne.",
+    deleteBodyFirst_few:
+      "Vylosované dvojice a {{count}} výsledky se odstraní. Tím se smaže celá vyřazovací část a základní část se odemkne.",
+    deleteBodyFirst_many:
+      "Vylosované dvojice a {{count}} výsledku se odstraní. Tím se smaže celá vyřazovací část a základní část se odemkne.",
+    deleteBodyFirst_other:
+      "Vylosované dvojice a {{count}} výsledků se odstraní. Tím se smaže celá vyřazovací část a základní část se odemkne.",
+    leftNotice: "Už nehrají, ale zůstávají v losování: {{names}}",
     winnerFixed: "Vítěz je pevný",
     left: "Už nehraje",
     drawnAfter: "Losuje se po: {{previous}}",

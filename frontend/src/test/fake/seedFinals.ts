@@ -336,6 +336,70 @@ function roundRobinDone(
   return b.tournament;
 }
 
+/**
+ * Screen 9 in Lord have mercy: a Monster DYP of 8 after two rounds, whose
+ * knockout (4 pairs, a third-place match) has round 1 drawn and half played
+ * (BR-140). One semifinal has a result, the other is on Field 1.
+ */
+function lordHaveMercy(
+  players: StoredPlayer[],
+  kit: SeedKit,
+): StoredTournament {
+  const date = "2026-11-10";
+  const rng = createRng(1110);
+  const b = kit.tournament(3900, {
+    name: "Lord have mercy night",
+    date,
+    type: "monster_dyp",
+    state: "in_progress",
+  });
+  const group = b.phase({
+    ...GROUP_BASE,
+    format: "monster_dyp",
+    round_robin_legs: null,
+    sit_out_points: 0,
+    tiebreakers: [...rules.swissTiebreakers],
+    qualifiers: 8,
+    final_match_format: "bo3",
+  });
+  players.slice(0, 8).forEach((p, i) => b.entry([p.id], i + 1));
+  b.fields(2);
+  groupRounds({ b, phase: group, roundCount: 2, rng, date });
+  const knockout = b.phase({
+    ...KNOCKOUT_BASE,
+    qualifiers: 8,
+    third_place_match: true,
+    monster_knockout_mode: "lord_have_mercy",
+    match_format: "bo1",
+  });
+  const pairs = [0, 2, 4, 6].map((i, seed) => {
+    const entry = b.entry(
+      [required(players[i]).id, required(players[i + 1]).id],
+      seed + 1,
+    );
+    entry.stage = "knockout";
+    return entry;
+  });
+  const [first] = drawKnockoutRounds({
+    ids: () => b.id(),
+    phaseId: knockout.id,
+    seeded: pairs,
+    thirdPlace: true,
+  });
+  b.tournament.rounds.push(required(first));
+  const [played, waiting] = required(first).matches;
+  play(
+    required(played),
+    rng,
+    b.tournament.goals_per_game,
+    1,
+    at(date, "21:00"),
+  );
+  required(b.tournament.fields[0]).match_id = required(waiting).id;
+  syncBracket(b.tournament);
+  return b.tournament;
+}
+
 /** The finals screens' tournaments, for the seed (ids 3000–3999). */
 export const seedFinals: SeedPart = {
   area: "finals",
@@ -368,6 +432,7 @@ export const seedFinals: SeedPart = {
         onFieldMatches: 2,
       }),
       roundRobinDone(players, kit),
+      lordHaveMercy(players, kit),
     );
   },
 };
