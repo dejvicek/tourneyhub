@@ -72,7 +72,10 @@ export const roundRobin: CsMessages<Messages["roundRobin"]> = {
     title: "Pořadí",
     place: "Místo",
     entry: "Dvojice nebo hráč",
+    gameDifference: "Rozdíl her",
     difference: "Rozdíl skóre",
+    gamesLabel: "hry",
+    scoreLabel: "skóre",
     points: "Body",
     placeValue: "{{place}}.",
     form: "Forma: {{results}}",
@@ -116,6 +119,18 @@ export const roundRobin: CsMessages<Messages["roundRobin"]> = {
       "Pořadí podle vzájemného zápasu ({{round}}. kolo, {{score}}): {{a}}, potom {{b}}.",
     headToHeadMatch_many:
       "Pořadí podle vzájemného zápasu ({{round}}. kolo, {{score}}): {{a}}, potom {{b}}.",
+    headToHeadMatches_one:
+      "Pořadí podle vzájemných zápasů ({{firstRound}}. kolo {{first}}, {{secondRound}}. kolo {{second}}): {{a}}, potom {{b}}.",
+    headToHeadMatches_other:
+      "Pořadí podle vzájemných zápasů ({{firstRound}}. kolo {{first}}, {{secondRound}}. kolo {{second}}): {{a}}, potom {{b}}.",
+    headToHeadMatches_few:
+      "Pořadí podle vzájemných zápasů ({{firstRound}}. kolo {{first}}, {{secondRound}}. kolo {{second}}): {{a}}, potom {{b}}.",
+    headToHeadMatches_many:
+      "Pořadí podle vzájemných zápasů ({{firstRound}}. kolo {{first}}, {{secondRound}}. kolo {{second}}): {{a}}, potom {{b}}.",
+    gameDifference_one: "Pořadí podle rozdílu her: {{a}}, potom {{b}}.",
+    gameDifference_other: "Pořadí podle rozdílu her: {{a}}, potom {{b}}.",
+    gameDifference_few: "Pořadí podle rozdílu her: {{a}}, potom {{b}}.",
+    gameDifference_many: "Pořadí podle rozdílu her: {{a}}, potom {{b}}.",
     scoreDifference_one: "Pořadí podle rozdílu skóre: {{a}}, potom {{b}}.",
     scoreDifference_other: "Pořadí podle rozdílu skóre: {{a}}, potom {{b}}.",
     scoreDifference_few: "Pořadí podle rozdílu skóre: {{a}}, potom {{b}}.",

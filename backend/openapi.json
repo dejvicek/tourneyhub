@@ -2032,7 +2032,7 @@
         "type": "object"
       },
       "PlayStandingRow": {
-        "description": "One entry's line in the group-phase standings (BR-101, FR-060).\n\n`place` is shared by entries still level (BR-074), and the next place\nskips (BR-104). In Swiss and Monster DYP, `points` include the sit-out\npoints of every round sat out, as soon as the round is drawn (BR-076); a\nround robin gives none (BR-071). `form` lists the latest five\nresults, oldest first. `ahead_by` names what ranks the entry above the\nnext one when both have the same points, and is null when the points\ndecide or the place is shared. `form` and `ahead_by` are the round\nrobin's: a Swiss has an empty `form` and a null `ahead_by`, since its\ntie-breakers are the phase's own, in its order (FR-043, BR-072). `bh1`\nand `bh2` are for Swiss and Monster DYP (BR-073), null in a round robin.\n`sat_out` counts sit-outs, not rounds missed while disabled (FR-060).",
+        "description": "One entry's line in the group-phase standings (BR-101, FR-060).\n\n`place` is shared by entries still level (BR-074), and the next place\nskips (BR-104). In Swiss and Monster DYP, `points` include the sit-out\npoints of every round sat out, as soon as the round is drawn (BR-076); a\nround robin gives none (BR-071). `form` lists the latest five\nresults, oldest first. `ahead_by` names what ranks the entry above the\nnext one when both have the same points, and is null when the points\ndecide or the place is shared. `form` and `ahead_by` are the round\nrobin's: a Swiss has an empty `form` and a null `ahead_by`, since its\ntie-breakers are the phase's own, in its order (FR-043, BR-072). `bh1`\nand `bh2` are for Swiss and Monster DYP (BR-073), null in a round robin.\n`game_difference` ranks in every match format, a walkover counting the\ngames needed to win; the screen shows its column only in BO3 and BO5\n(BR-101). `sat_out` counts sit-outs, not rounds missed while disabled\n(FR-060).",
         "properties": {
           "ahead_by": {
             "anyOf": [
@@ -2082,6 +2082,10 @@
             "title": "Form",
             "type": "array"
           },
+          "game_difference": {
+            "title": "Game Difference",
+            "type": "integer"
+          },
           "lost": {
             "title": "Lost",
             "type": "integer"
@@ -2120,6 +2124,7 @@
           "lost",
           "sat_out",
           "points",
+          "game_difference",
           "score_difference",
           "form",
           "ahead_by",
@@ -2805,7 +2810,7 @@
         "type": "object"
       },
       "PublicStandingRow": {
-        "description": "One entry's line in the group-phase standings, for viewers (FR-060).\n\nA round robin's (BR-101) or a Swiss's (BR-072 to BR-074). `place` is\nshared by entries still level (BR-074), and the next place skips\n(BR-104). `points` come from the matches; in a Swiss they also include\nthe points for sitting out, as soon as the round is drawn (BR-076), and a\nround robin gives none (BR-071). `bh1` and `bh2` are the Swiss's\n(BR-073), null in a round robin. The organizer's extras, the form and\nwhat ranks one entry above the next, are not part of it.",
+        "description": "One entry's line in the group-phase standings, for viewers (FR-060).\n\nA round robin's (BR-101) or a Swiss's (BR-072 to BR-074). `place` is\nshared by entries still level (BR-074), and the next place skips\n(BR-104). `points` come from the matches; in a Swiss they also include\nthe points for sitting out, as soon as the round is drawn (BR-076), and a\nround robin gives none (BR-071). `bh1` and `bh2` are the Swiss's\n(BR-073), null in a round robin. `game_difference` ranks a round robin in\nevery match format; the screen shows its column only in BO3 and BO5\n(BR-101). The organizer's extras, the form and what ranks one entry above\nthe next, are not part of it.",
         "properties": {
           "bh1": {
             "anyOf": [
@@ -2837,6 +2842,10 @@
             "format": "uuid",
             "title": "Entry Id",
             "type": "string"
+          },
+          "game_difference": {
+            "title": "Game Difference",
+            "type": "integer"
           },
           "lost": {
             "title": "Lost",
@@ -2876,6 +2885,7 @@
           "lost",
           "sat_out",
           "points",
+          "game_difference",
           "score_difference",
           "bh1",
           "bh2"
@@ -3154,6 +3164,7 @@
         "description": "What ranks an entry above another level on points (BR-101).",
         "enum": [
           "head_to_head",
+          "game_difference",
           "score_difference"
         ],
         "title": "RoundRobinTiebreaker",

@@ -2769,7 +2769,8 @@ class GroupStandingRow:
     `place` is shared by entries still level (BR-074). `form` and `ahead_by`
     are the round robin's: a Swiss has an empty form and no `ahead_by`, since
     its tie-breakers are the phase's own (FR-043). `bh1` and `bh2` are the
-    Swiss's (BR-073), None in a round robin.
+    Swiss's (BR-073), None in a round robin. `game_difference` is games won
+    minus games lost (BR-101); it ranks only a round robin.
     """
 
     place: int
@@ -2780,6 +2781,7 @@ class GroupStandingRow:
     lost: int
     sat_out: int
     points: int
+    game_difference: int
     score_difference: int
     form: tuple[FormResult, ...]
     ahead_by: RoundRobinTiebreaker | None
@@ -2816,6 +2818,8 @@ def _played_match(match: Match) -> PlayedMatch:
         side_1=EntryId(side_1),
         side_2=EntryId(side_2),
         outcome=match.outcome,
+        games=tuple(game.winner for game in match.games),
+        is_walkover=match.is_walkover,
         scores=tuple(
             (game.score_1, game.score_2)
             for game in match.games
@@ -2844,6 +2848,7 @@ def _standings_of(
             for match in round_.matches
             if match.outcome is not None
         ],
+        match_format=phase.match_format,
         sit_outs=[
             EntryId(row.entry_id)
             for round_ in phase.rounds
@@ -2916,6 +2921,31 @@ def _swiss_standings_of(
     )
 
 
+def _swiss_game_differences(
+    tournament: Tournament, phase: TournamentPhase
+) -> dict[EntryId, int]:
+    """Each entry's games won minus games lost in a Swiss (BR-101).
+
+    Shown only, never a Swiss tie-breaker (BR-072). The round-robin tally
+    counts the games the same way, a walkover counting the games needed to
+    win, so only its `game_difference` is read here.
+    """
+    return {
+        row.entry_id: row.game_difference
+        for row in round_robin_standings(
+            (EntryId(entry.id) for entry in _main_entries(tournament)),
+            matches=[
+                _played_match(match)
+                for round_ in phase.rounds
+                for match in round_.matches
+                if match.outcome is not None
+            ],
+            match_format=phase.match_format,
+            sit_outs=[],
+        )
+    }
+
+
 def group_standings(
     tournament: Tournament, phase: TournamentPhase
 ) -> tuple[GroupStandingRow, ...]:
@@ -2936,6 +2966,7 @@ def group_standings(
                     lost=row.lost,
                     sat_out=row.sat_out,
                     points=row.points,
+                    game_difference=row.game_difference,
                     score_difference=row.score_difference,
                     form=row.form,
                     ahead_by=row.ahead_by,
@@ -2945,6 +2976,7 @@ def group_standings(
                 for row in _standings_of(tournament, phase)
             )
         case PhaseFormat.SWISS:
+            games = _swiss_game_differences(tournament, phase)
             return tuple(
                 GroupStandingRow(
                     place=row.place,
@@ -2955,6 +2987,7 @@ def group_standings(
                     lost=row.lost,
                     sat_out=row.sat_out,
                     points=row.points,
+                    game_difference=games[row.entry_id],
                     score_difference=row.score_difference,
                     form=(),
                     ahead_by=None,

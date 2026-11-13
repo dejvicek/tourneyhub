@@ -599,7 +599,10 @@ class PlayStandingRow(ResponseModel):
     robin's: a Swiss has an empty `form` and a null `ahead_by`, since its
     tie-breakers are the phase's own, in its order (FR-043, BR-072). `bh1`
     and `bh2` are for Swiss and Monster DYP (BR-073), null in a round robin.
-    `sat_out` counts sit-outs, not rounds missed while disabled (FR-060).
+    `game_difference` ranks in every match format, a walkover counting the
+    games needed to win; the screen shows its column only in BO3 and BO5
+    (BR-101). `sat_out` counts sit-outs, not rounds missed while disabled
+    (FR-060).
     """
 
     place: int
@@ -610,6 +613,7 @@ class PlayStandingRow(ResponseModel):
     lost: int
     sat_out: int
     points: int
+    game_difference: int
     score_difference: int
     form: list[FormResult]
     ahead_by: RoundRobinTiebreaker | None

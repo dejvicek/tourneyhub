@@ -86,8 +86,10 @@ class PublicStandingRow(ResponseModel):
     (BR-104). `points` come from the matches; in a Swiss they also include
     the points for sitting out, as soon as the round is drawn (BR-076), and a
     round robin gives none (BR-071). `bh1` and `bh2` are the Swiss's
-    (BR-073), null in a round robin. The organizer's extras, the form and
-    what ranks one entry above the next, are not part of it.
+    (BR-073), null in a round robin. `game_difference` ranks a round robin in
+    every match format; the screen shows its column only in BO3 and BO5
+    (BR-101). The organizer's extras, the form and what ranks one entry above
+    the next, are not part of it.
     """
 
     place: int
@@ -98,6 +100,7 @@ class PublicStandingRow(ResponseModel):
     lost: int
     sat_out: int
     points: int
+    game_difference: int
     score_difference: int
     bh1: int | None
     bh2: int | None

@@ -43,7 +43,7 @@ uv run python -W error -m tourneyhub.openapi > openapi.json && git diff --exit-c
 
 CI (`.github/workflows/ci.yml`) runs the same commands, with `uv run ruff format --check && uv run ruff check` in place of the two that change files, then `alembic upgrade head` and `alembic check` (§7) and `uv audit`.
 
-`uv.lock` and `.python-version` (containing `3.15`) are committed. Dependabot (`package-ecosystem: "uv"`) and `uv audit --preview-features audit-command` (still a preview command) watch them. The engine gate runs from the start, since the skeleton has engine code. The gate for the whole package (90 %, ADR-012) is switched on with the first feature; until then `[tool.coverage.report]` has no `fail_under`.
+`uv.lock` and `.python-version` (containing `3.15`) are committed. Dependabot (`package-ecosystem: "uv"`) and `uv audit --preview-features audit-command` (still a preview command) watch them. Two coverage gates run (ADR-012). The whole package needs 90 %: `fail_under = 90` in `[tool.coverage.report]`, which the plain `coverage report` applies. The engine needs 100 %: the second report passes `--fail-under=100`.
 
 Choices in the configuration that are not obvious:
 - `required-version = ">=0.13.6"`: 0.13.6 is the first uv release that ships CPython 3.15.2.
@@ -151,7 +151,8 @@ The subclass decides the HTTP status, and the code tells the frontend what happe
 | `RuleViolationError` | 422 | The current state refuses the action, and the organizer needs a message: a taken player name (BR-001), too few entries |
 
 - `ErrorCode` also holds the codes for framework errors: `validation_failed` (422), `not_found` and `method_not_allowed` (the router's 404 and 405), `bad_request` (any other HTTP error) and `internal_error` (500).
-- The engine raises its own exceptions, defined in `engine/errors.py` as subclasses of `EngineError` with keyword-only fields (`NotEnoughEntriesError(minimum=4, given=3)`). One function, `services/engine_errors.py:to_app_error()`, translates each into a `RuleViolationError` whose `detail` carries the same fields; services call engine functions inside `except EngineError as err: raise to_app_error(err) from err`.
+- When a rule refuses the input, the engine raises its own exceptions, defined in `engine/errors.py` as subclasses of `EngineError` with keyword-only fields (`NotEnoughEntriesError(minimum=4, given=3)`). One function, `services/engine_errors.py:to_app_error()`, translates each into a `RuleViolationError` (422) whose `detail` carries the same fields; services call engine functions inside `except EngineError as err: raise to_app_error(err) from err`.
+- A caller error (a broken precondition, a bug in the caller) is a plain `ValueError`, in the engine and in services. Nothing translates it: it is a bug, so it ends as 500 `internal_error`, and its English message is for the log. `clean_display_name()` in `services/accounts.py` raises a `ValueError` with an English sentence for the user, which is fine because only the CLI calls it and prints the message.
 - 409 makes the frontend reload, and the reloaded screen shows what changed (ADR-008); a stale `expected_round_no` is 409. 422 makes it show a message built from the code and `detail`, because a reload would change nothing; a player name the league already has is 422.
 - Services check the rules an organizer can break under the lock, before a unique index would fire. Adding a player locks the league and looks the name up with `lower()` (BR-001): any player of that name, a removed one included, is 422 `player_name_taken`, and the organizer restores a removed holder by a separate request (FR-012, DATA-MODEL §4.2). A create with a client id first loads the row with that id and answers as ADR-008 says; only then are its rules checked, so a retry gets its row back instead of a 422 that its own first attempt caused.
 - Services never catch `IntegrityError`; where a race is expected, the query avoids it (`on_conflict_do_nothing`). A violation surfaces at the next flush, at the latest at the commit in `get_session`; either way it reaches the handler uncaught. A handler in `api/errors.py` turns one from a constraint listed in its table, recognized by `err.orig.diag.constraint_name`, into that constraint's 409 code. The table lists only constraints that a race can reach, because no lock covers their check: creating a league has no league row to lock (§7), so `pk_leagues` is listed. Any other violation, including a deferred foreign key or a unique index that a service checks under its lock, is a bug and becomes 500 `internal_error` with the constraint name logged (DATA-MODEL §2). `tests/test_architecture.py` checks that no module but `api/errors.py` names `IntegrityError`.
@@ -376,14 +377,14 @@ def str_enum[E: StrEnum](enum: type[E], *, name: str) -> Enum:
 - Enumerations use `str_enum()`. Without `native_enum=False` SQLAlchemy creates a PostgreSQL enum, without `values_callable` it stores member names, and each column needs its own `name`. Alembic does not notice a value added to an enum, so a test compares every CHECK with its `StrEnum` (DATA-MODEL §2). SQLAlchemy does not document `length=None`, and Alembic does not compare a length with no length, so a second test expects every enum column to be `character varying` without a maximum length in `information_schema.columns`.
 - Server-generated primary keys are `mapped_column(primary_key=True, default=uuid7)`. Ids the client supplies (leagues, tournaments, ADR-008) have no default.
 - `created_at` and `updated_at` have no default; the service sets both to the `now` it was given (§4.3), and a row without `created_at` fails at the flush. With `server_default=func.now()`, `created_at` would come from the database's clock at the start of the transaction, after `NowDep` has read the time.
-- Relationships are `Mapped[list[X]]` or `Mapped[X]` with `back_populates` and `lazy="raise"`. Each query names what it loads: `selectinload` for collections, `joinedload` for many-to-one.
+- Relationships are `Mapped[list[X]]` or `Mapped[X]` with `lazy="raise"`, and with `back_populates` whenever both sides declare the relationship. A one-way collection from a parent to its children has no relationship on the other side, so it has nothing to point back to. Each query names what it loads: `selectinload` for collections, `joinedload` for many-to-one.
 - A relationship along an `ON DELETE CASCADE` foreign key sets `passive_deletes=True`, so deleting a league or a tournament leaves the cascade to PostgreSQL. Without it, the ORM loads the children and sets their foreign keys to `NULL`, which fails.
 - A relationship from `players` or `entries` to the rows that reference them through a deferred foreign key (DATA-MODEL §2) sets `passive_deletes="all"` or does not exist, so the ORM never sets those references to `NULL`. Removing a player sets `removed_at`; the application deletes `players` rows only with their league.
 - `tests/test_architecture.py` inspects the mappers and checks `lazy="raise"` and both `passive_deletes` rules.
 - Queries are 2.0 style: `session.scalars(select(...))`, `session.execute(...)`, `session.get(...)`, `insert(...).returning(...)`. No `session.query()`.
 - In query expressions, compare with `.is_(None)`, `.is_not(None)` and `.is_(True)`, or use the boolean column itself. `column is None` silently becomes `WHERE false`; don't apply ruff's unsafe fixes for E711 and E712 inside queries.
 - Raw SQL only through `text()` with `:name` parameters.
-- A write locks the league row, then the tournament row (ADR-008), always with `populate_existing`:
+- A write locks the league row, then the tournament row (ADR-008). A lock that loads ORM objects sets `populate_existing`:
 
 ```python
 league = session.scalars(
@@ -395,6 +396,7 @@ league = session.scalars(
 ```
 
   - Without `populate_existing`, a row already in the session gets `FOR UPDATE` but keeps its old attributes, and the expected-state check compares stale data.
+  - A lock that selects columns only (`select(RefreshToken.id)`, `select(User.password_hash)`) needs no `populate_existing`: it loads no ORM object, so nothing can be stale.
   - A lock query that joins other tables uses `with_for_update(of=Model)`. Never combine `FOR UPDATE` with `joinedload`; PostgreSQL refuses it on the nullable side of an outer join.
   - The refresh endpoint locks a token family's rows the same way before reading them (ADR-006).
   - Creating a league has no league row to lock, and no ADR names another lock, so its checks run unlocked. Two requests that race with one id meet at the primary key, and the later one gets 409 (§4.4).

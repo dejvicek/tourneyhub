@@ -550,6 +550,7 @@ PUBLIC_STANDING_KEYS = {
     "lost",
     "sat_out",
     "points",
+    "game_difference",
     "score_difference",
     "bh1",
     "bh2",

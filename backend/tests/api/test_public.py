@@ -503,6 +503,7 @@ _PUBLIC_PROPERTIES: dict[str, set[str]] = {
         "bh2",
         "drawn",
         "entry_id",
+        "game_difference",
         "lost",
         "place",
         "played",

@@ -20,7 +20,7 @@ The MVP is split into 16 packages, P1 to P16. The critical path is P1 → P5 →
 ## 2. Small follow-ups
 
 - [ ] Sit-out order: not the round before, then fewest sit-outs (BR-058, BR-063) ([#60](https://github.com/dejvicek/tourneyhub/issues/60)).
-- [ ] Game difference in round-robin standings, column only in best of 3 and best of 5 (BR-101) ([#61](https://github.com/dejvicek/tourneyhub/issues/61)).
+- [x] Game difference in round-robin standings, column only in best of 3 and best of 5 (BR-101) ([#61](https://github.com/dejvicek/tourneyhub/issues/61), [#85](https://github.com/dejvicek/tourneyhub/pull/85)).
 - [ ] Code for the answers from issue #48 ([#75](https://github.com/dejvicek/tourneyhub/issues/75)); its 19 items Q1–Q46 are ticked there.
 
 ## 3. Remove the demo mode
@@ -51,7 +51,7 @@ The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. 
   - [ ] Knockout modes: seeded pairs, singles, A little mercy, Lord have mercy.
   - [ ] Lord have mercy re-mix: data model, engine, API, places per player and a round-by-round view ([#63](https://github.com/dejvicek/tourneyhub/issues/63)).
   - [ ] Screen 13 and marking top players on the real API.
-  - [ ] Which draw to use when every grouping repeats a partner ([#79](https://github.com/dejvicek/tourneyhub/issues/79), waiting for an answer).
+  - [x] Which draw to use when every grouping repeats a partner ([#79](https://github.com/dejvicek/tourneyhub/issues/79), [#83](https://github.com/dejvicek/tourneyhub/pull/83)).
 - [ ] **P14 Late players and disabling** (FR-044, FR-047, FR-048; BR-045, BR-054, BR-064, BR-067)
   - [ ] Disable and enable a participant (written as a target state, ADR-008).
   - [ ] Late entries in Swiss and Monster DYP.

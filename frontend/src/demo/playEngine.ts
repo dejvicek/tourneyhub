@@ -21,7 +21,7 @@ import type {
   Side,
   TournamentStandingRow,
 } from "./contract";
-import { fillFields } from "./engine";
+import { fillFields, gameDifference } from "./engine";
 import { MATCH_POINTS, rules } from "./rules";
 import type { StoredTournament } from "./seed";
 import { tournamentStandings } from "./store";
@@ -584,6 +584,7 @@ function swissStandings(
           lost: 0,
           sat_out: 0,
           points: 0,
+          game_difference: 0,
           score_difference: 0,
           bh1: 0,
           bh2: 0,
@@ -607,6 +608,11 @@ function swissStandings(
       sides.forEach((ids, index) => {
         const mine: Side = index === 0 ? "side_1" : "side_2";
         const others = sides[index === 0 ? 1 : 0] ?? [];
+        const games = gameDifference(
+          match,
+          index === 0 ? 0 : 1,
+          group.match_format,
+        );
         let difference = 0;
         for (const game of match.games) {
           if (game.score_1 !== null && game.score_2 !== null) {
@@ -622,6 +628,7 @@ function swissStandings(
             continue;
           }
           row.played += 1;
+          row.game_difference += games;
           row.score_difference += difference;
           row.opponents.push(...others);
           if (match.outcome === "draw") {
@@ -681,6 +688,7 @@ function swissStandings(
       lost: row.lost,
       sat_out: row.sat_out,
       points: row.points,
+      game_difference: row.game_difference,
       score_difference: row.score_difference,
       bh1: row.bh1,
       bh2: row.bh2,
@@ -724,6 +732,9 @@ function aheadBy(
         }
         break;
       case "game_difference":
+        if (row.game_difference > next.game_difference) {
+          return tiebreaker;
+        }
         break;
     }
   }
