@@ -97,7 +97,7 @@ class SwissStanding:
         lost: Matches lost.
         sat_out: Rounds the entry sat out (BR-058); missed rounds of a
             disabled or late entry do not count here (BR-064, BR-067, FR-060).
-            BR-058 counts them for the sit-out order only; issue #60 adds that.
+            The sit-out order counts them, from the rounds (BR-058).
         is_decided_by_lot: The entry shares its place, so the lot decided its
             position (ADR-009).
     """
@@ -333,8 +333,12 @@ def draw_next_swiss_round(
     """Draw the next round of a Swiss from the standings (BR-056 to BR-058, ADR-011).
 
     1. **Who plays.** Disabled entries are left out (BR-064). With an odd
-       number left, the lowest-placed of those who have sat out the fewest
-       times sits out (BR-058), by `position`, so the lot breaks a tie.
+       number left, one sits out (BR-058): the entries that played the round
+       before are picked first; of those, the ones that have missed the
+       fewest rounds (a sit-out and a missed round both count, BR-064,
+       BR-067); of those, the ones whose sitting out leaves the fewest repeat
+       opponents in the round (BR-057); and of those the lowest by
+       `position`, so the lot breaks a tie (BR-074).
     2. **BR-056.** Top-down, each unpaired entry plays the next entry below
        it that it has not played. If that pairs everyone, it is the draw.
     3. **Fallback (ADR-011).** If BR-056 gets stuck, the whole field is
@@ -391,33 +395,9 @@ def draw_next_swiss_round(
     sitting: SwissStanding | None = None
     is_sit_out_by_lot = False
     if len(active) % 2:
-        # BR-058 picks, in this order: entries that did not sit out the round
-        # before; the fewest sit-outs (a missed round counts as one, BR-064,
-        # BR-067); the entry whose sitting out leaves the fewest repeat
-        # opponents in the round (BR-057); the lowest place; then a lot
-        # (BR-074). This takes the fewest sit-outs and then the lowest place
-        # only. Issue #60 changes it.
-        fewest = min(line.sat_out for line in active)
-        candidates = [line for line in active if line.sat_out == fewest]
-        sitting = candidates[-1]
-        is_sit_out_by_lot = any(line.place == sitting.place for line in candidates[:-1])
+        sitting, is_sit_out_by_lot = _choose_sit_out(active, played_rounds)
     playing = [line for line in active if line is not sitting]
-
-    index = {line.entry_id: number for number, line in enumerate(playing)}
-    met = Counter(
-        (
-            min(index[match.side_1], index[match.side_2]),
-            max(index[match.side_1], index[match.side_2]),
-        )
-        for round_ in played_rounds
-        for match in round_.matches
-        if match.side_1 in index and match.side_2 in index
-    )
-    pairs = _pair_neighbours(len(playing), met)
-    method = PairingMethod.NEIGHBOURS
-    if pairs is None:
-        pairs = _pair_by_matching(len(playing), met)
-        method = PairingMethod.MATCHING
+    pairs, met, method = _pair(playing, played_rounds)
     return SwissDraw(
         round_no=len(played_rounds) + 1,
         pairs=tuple(
@@ -435,6 +415,75 @@ def draw_next_swiss_round(
         is_sit_out_by_lot=is_sit_out_by_lot,
         method=method,
     )
+
+
+def _pair(
+    playing: Sequence[SwissStanding], rounds: Sequence[SwissRound]
+) -> tuple[tuple[Pair, ...], Counter[Pair], PairingMethod]:
+    """Pair the entries that play, best first: BR-056, else the matching (ADR-011).
+
+    Returns:
+        The pairs and the earlier meetings, both as indexes into `playing`,
+        and how the pairs were found.
+    """
+    index = {line.entry_id: number for number, line in enumerate(playing)}
+    met = Counter(
+        (
+            min(index[match.side_1], index[match.side_2]),
+            max(index[match.side_1], index[match.side_2]),
+        )
+        for round_ in rounds
+        for match in round_.matches
+        if match.side_1 in index and match.side_2 in index
+    )
+    pairs = _pair_neighbours(len(playing), met)
+    if pairs is not None:
+        return pairs, met, PairingMethod.NEIGHBOURS
+    return _pair_by_matching(len(playing), met), met, PairingMethod.MATCHING
+
+
+def _choose_sit_out(
+    active: Sequence[SwissStanding], rounds: Sequence[SwissRound]
+) -> tuple[SwissStanding, bool]:
+    """Choose the entry that sits out, and whether the lot decided it (BR-058).
+
+    In this order: the entries that played the round before; of those, the
+    ones that have missed the fewest rounds, sitting out or not drawn (a
+    missed round counts as a sit-out here, BR-064, BR-067); of those, the ones whose sitting out
+    leaves the fewest repeat opponents in the round (BR-057); and of those
+    the lowest by `position`, where the lot orders entries sharing a place
+    (BR-074).
+
+    The repeat-opponent key pairs the round once per candidate. With n
+    entries playing after r rounds, n >= 2r + 2 leaves every candidate a
+    pairing without a repeat (ADR-011, Dirac), so the key is skipped then.
+    """
+    played = Counter(
+        side
+        for round_ in rounds
+        for match in round_.matches
+        for side in (match.side_1, match.side_2)
+    )
+    last = {
+        side for match in rounds[-1].matches for side in (match.side_1, match.side_2)
+    }
+
+    def order(line: SwissStanding) -> tuple[bool, int]:
+        return line.entry_id not in last, len(rounds) - played[line.entry_id]
+
+    best = min(map(order, active))
+    candidates = [line for line in active if order(line) == best]
+    if len(candidates) > 1 and len(active) - 1 < 2 * len(rounds) + 2:
+
+        def repeats(line: SwissStanding) -> int:
+            pairs, met, _ = _pair([e for e in active if e is not line], rounds)
+            return sum(pair in met for pair in pairs)
+
+        counts = {line.entry_id: repeats(line) for line in candidates}
+        fewest = min(counts.values())
+        candidates = [line for line in candidates if counts[line.entry_id] == fewest]
+    sitting = candidates[-1]
+    return sitting, any(line.place == sitting.place for line in candidates[:-1])
 
 
 def _checked_rounds(
