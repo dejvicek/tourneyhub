@@ -108,6 +108,14 @@ export type BracketRead = components["schemas"]["BracketRead"];
 export type KnockoutWrite = components["schemas"]["KnockoutWrite"];
 export type KnockoutPreview = components["schemas"]["KnockoutPreviewRead"];
 
+// The Lord have mercy knockout round by round (P13): generated. The share
+// link's read leaves out what is the organizer's.
+export type RemixRead = components["schemas"]["RemixKnockoutRead"];
+export type RemixRound = components["schemas"]["RemixRoundRead"];
+export type RemixMatch = components["schemas"]["RemixMatchRead"];
+export type RemixSide = components["schemas"]["RemixSideRead"];
+export type PublicRemixRead = components["schemas"]["PublicRemixKnockoutRead"];
+
 // The Swiss rounds and tie-breakers (P12): generated. Adding a round carries
 // the number the organizer expects (ADR-008); the standings come from the
 // play read and the share link's standings.

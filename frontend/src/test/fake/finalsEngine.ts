@@ -32,6 +32,7 @@ import type {
   RoundRead,
 } from "./contract";
 import { createRng, roundRobinStandings, withPoints } from "./engine";
+import { isRemix, remixPlaces, syncRemix } from "./remixEngine";
 import type { StoredTournament } from "./seed";
 
 type Ids = () => string;
@@ -77,7 +78,7 @@ export function setNote(
 
 // ---------------------------------------------------------------- helpers
 
-function shuffled<T>(items: readonly T[], rng: () => number): T[] {
+export function shuffled<T>(items: readonly T[], rng: () => number): T[] {
   const result = [...items];
   for (let i = result.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
@@ -256,6 +257,11 @@ export function syncBracket(t: StoredTournament): void {
   if (!phase) {
     return;
   }
+  if (isRemix(t)) {
+    // BR-140: the pairs of a Lord have mercy round come from the draw, not the feeding.
+    syncRemix(t);
+    return;
+  }
   const rounds = roundsOf(t, phase);
   rounds.forEach((round, index) => {
     const previous = rounds[index - 1];
@@ -292,7 +298,7 @@ export function syncBracket(t: StoredTournament): void {
   }
 }
 
-function formatOf(
+export function formatOf(
   phase: PhaseRead,
   match: MatchRead,
   isFinal: boolean,
@@ -302,7 +308,7 @@ function formatOf(
     : phase.match_format;
 }
 
-function scoreOf(
+export function scoreOf(
   match: MatchRead,
   format: MatchFormat,
 ): [number, number] | null {
@@ -648,7 +654,7 @@ function groupOrder(
 
 // ---------------------------------------------------------------- places
 
-function reasonOf(
+export function reasonOf(
   kind: PlaceReason["kind"],
   extra: Partial<PlaceReason> = {},
 ): PlaceReason {
@@ -678,6 +684,9 @@ export function placesOf(
   const knockout = knockoutPhase(t);
   if (!knockout && group?.format === "round_robin") {
     return undefined;
+  }
+  if (isRemix(t)) {
+    return remixPlaces(t, table);
   }
   const complete = t.state === "finished";
   const order = groupOrder(t);

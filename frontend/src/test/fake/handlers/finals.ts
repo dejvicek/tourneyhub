@@ -31,6 +31,14 @@ import {
   syncBracket,
 } from "../finalsEngine";
 import { testId } from "../ids";
+import {
+  canDrawNext,
+  drawRemixRound,
+  isRemix,
+  remixMatchesLeft,
+  remixRead,
+  remixRounds,
+} from "../remixEngine";
 import { apiError, route } from "../route";
 import type { StoredTournament } from "../seed";
 import { leagueRanking } from "../setupEngine";
@@ -106,6 +114,49 @@ function groupLocked(t: StoredTournament) {
     : undefined;
 }
 
+/** 404 or 422: the tournament has no Lord have mercy knockout (BR-155). */
+export function notRemix(t: StoredTournament): Response | undefined {
+  const phase = knockoutPhase(t);
+  if (!phase) {
+    return apiError(404, "knockout_not_found", {});
+  }
+  return isRemix(t)
+    ? undefined
+    : apiError(422, "format_not_supported", {
+        format: phase.format,
+        mode: phase.monster_knockout_mode,
+      });
+}
+
+/** 422: a Lord have mercy knockout has no bracket; its rounds are read round by round. */
+export function noBracket(t: StoredTournament): Response | undefined {
+  const phase = knockoutPhase(t);
+  return phase && isRemix(t)
+    ? apiError(422, "format_not_supported", {
+        format: phase.format,
+        mode: phase.monster_knockout_mode,
+      })
+    : undefined;
+}
+
+/** BR-087, FR-046: the knockout goes, with its entries and results; the group phase is open again. */
+function removeKnockout(t: StoredTournament, phaseId: string): void {
+  const gone = new Set(
+    t.rounds
+      .filter((r) => r.phase_id === phaseId)
+      .flatMap((r) => r.matches.map((m) => m.id)),
+  );
+  t.rounds = t.rounds.filter((r) => r.phase_id !== phaseId);
+  t.phases = t.phases.filter((p) => p.id !== phaseId);
+  t.entries = t.entries.filter((e) => e.stage !== "knockout");
+  t.fields = t.fields.map((field) =>
+    field.match_id !== null && gone.has(field.match_id)
+      ? { ...field, match_id: null }
+      : field,
+  );
+  t.state = "in_progress";
+}
+
 function participant(
   t: StoredTournament,
   entryId: string,
@@ -124,8 +175,11 @@ export const finalsHandlers = [
       }
       // Results are entered through the result route, which does not know the
       // bracket: the winners move on, and the tournament finishes, when read.
-      syncBracket(t);
-      return bracketOf(t) ?? apiError(404, "knockout_not_found", {});
+      return (
+        noBracket(t) ??
+        (syncBracket(t),
+        bracketOf(t) ?? apiError(404, "knockout_not_found", {}))
+      );
     },
   ),
 
@@ -412,10 +466,10 @@ export const finalsHandlers = [
       if (!t || !group) {
         return notFound(params);
       }
-      const existing = bracketOf(t);
+      const existing = knockoutPhase(t);
       if (existing) {
         return apiError(409, "current_phase_changed", {
-          current_phase_id: existing.phase_id,
+          current_phase_id: existing.id,
         });
       }
       if (group.format !== "monster_dyp") {
@@ -441,11 +495,11 @@ export const finalsHandlers = [
       if (!t || !group) {
         return notFound(params);
       }
-      const existing = bracketOf(t);
+      const existing = knockoutPhase(t);
       if (existing) {
         // ADR-008: the start expected the group phase to be the current one.
         return apiError(409, "current_phase_changed", {
-          current_phase_id: existing.phase_id,
+          current_phase_id: existing.id,
         });
       }
       if (t.state !== "in_progress" || !roundIsComplete(t)) {
@@ -515,13 +569,17 @@ export const finalsHandlers = [
         t.entries.push(entry);
         return entry;
       });
+      const drawn = drawKnockoutRounds({
+        ids,
+        phaseId: phase.id,
+        seeded: seeded.flatMap((entry) => entry ?? []),
+        thirdPlace: body.third_place_match,
+      });
+      // BR-140: a Lord have mercy knockout starts with round 1 only.
       t.rounds.push(
-        ...drawKnockoutRounds({
-          ids,
-          phaseId: phase.id,
-          seeded: seeded.flatMap((entry) => entry ?? []),
-          thirdPlace: body.third_place_match,
-        }),
+        ...(mode === "lord_have_mercy"
+          ? drawn.filter((round) => round.round_no === 1)
+          : drawn),
       );
       syncBracket(t);
       refillFields(t);
@@ -538,21 +596,94 @@ export const finalsHandlers = [
       if (phase?.id !== params.phase_id || !t) {
         return apiError(404, "phase_not_found", {});
       }
-      // BR-087: the group phase is unlocked and the organizer chooses again.
-      const gone = new Set(
-        t.rounds
-          .filter((r) => r.phase_id === phase.id)
-          .flatMap((r) => r.matches.map((m) => m.id)),
-      );
-      t.rounds = t.rounds.filter((r) => r.phase_id !== phase.id);
-      t.phases = t.phases.filter((p) => p.id !== phase.id);
-      t.entries = t.entries.filter((e) => e.stage !== "knockout");
+      removeKnockout(t, phase.id);
+      return null;
+    },
+  ),
+
+  route(
+    "get",
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout/rounds",
+    ({ params }) => {
+      const t = findTournament(params.league_id, params.tournament_id);
+      if (!t) {
+        return apiError(404, "tournament_not_found", {});
+      }
+      return notRemix(t) ?? remixRead(t);
+    },
+  ),
+
+  // BR-140: draws the next round once the round before is complete.
+  route(
+    "post",
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout/rounds",
+    ({ params, body }) => {
+      const t = findTournament(params.league_id, params.tournament_id);
+      if (!t) {
+        return apiError(404, "tournament_not_found", {});
+      }
+      if (t.state !== "in_progress") {
+        return apiError(409, "tournament_not_in_progress", { state: t.state });
+      }
+      const refusal = notRemix(t);
+      if (refusal) {
+        return refusal;
+      }
+      const drawn = remixRounds(t).length;
+      if (body.expected_round_no !== drawn + 1) {
+        return apiError(409, "round_number_changed", {
+          current_round_no: drawn,
+        });
+      }
+      if (!canDrawNext(t)) {
+        return apiError(422, "round_not_complete", {
+          matches_left: remixMatchesLeft(t),
+        });
+      }
+      drawRemixRound(t, idFactory());
+      refillFields(t);
+      return remixRead(t);
+    },
+    201,
+  ),
+
+  // FR-046: only the newest round goes; round 1 takes the knockout with it.
+  route(
+    "delete",
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout/rounds/{round_id}",
+    ({ params }) => {
+      const t = findTournament(params.league_id, params.tournament_id);
+      if (!t) {
+        return apiError(404, "tournament_not_found", {});
+      }
+      const rounds = remixRounds(t);
+      const round = rounds.find((r) => r.id === params.round_id);
+      if (!round) {
+        return apiError(404, "round_not_found", {});
+      }
+      const refusal = notRemix(t);
+      if (refusal) {
+        return refusal;
+      }
+      const newest = need(rounds.at(-1));
+      if (round.id !== newest.id) {
+        return apiError(409, "round_not_newest", { round_id: newest.id });
+      }
+      if (round.round_no === 1) {
+        removeKnockout(t, round.phase_id);
+        return null;
+      }
+      const gone = new Set(round.matches.map((m) => m.id));
+      t.rounds = t.rounds.filter((r) => r.id !== round.id);
       t.fields = t.fields.map((field) =>
         field.match_id !== null && gone.has(field.match_id)
           ? { ...field, match_id: null }
           : field,
       );
-      t.state = "in_progress";
+      if (t.state === "finished") {
+        t.state = "in_progress";
+      }
+      refillFields(t);
       return null;
     },
   ),

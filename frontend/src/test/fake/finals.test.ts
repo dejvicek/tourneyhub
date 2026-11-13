@@ -11,7 +11,7 @@ import {
   startBody,
   tournamentOf,
 } from "../setupTestHelpers";
-import { TEST_LEAGUE_ID, testId } from "./ids";
+import { TEST_LEAGUE_ID, TEST_SHARE_TOKEN, testId } from "./ids";
 
 // Ids of the finals seed (seedFinals.ts).
 const DYP_EVENING = testId(3200);
@@ -474,11 +474,15 @@ describe("the finals in the fake API", () => {
             body: { ...KNOCKOUT, third_place_match: true, mode },
           }),
         );
-        const drawn = await dataOf(
-          provisionalApi.GET(`${root}/bracket`, {
-            params: { path: base(MONSTER) },
-          }),
-        );
+        // BR-155: a Lord have mercy knockout has no bracket, only its rounds.
+        const drawn =
+          mode === "lord_have_mercy"
+            ? await dataOf(
+                api.GET(`${root}/knockout/rounds`, {
+                  params: { path: base(MONSTER) },
+                }),
+              )
+            : await bracket(MONSTER);
         expect(drawn.size).toBe(paired ? 4 : 8);
         expect(drawn.third_place_match).toBe(true);
         const tournament = await dataOf(
@@ -492,9 +496,6 @@ describe("the finals in the fake API", () => {
       });
     },
   );
-
-  // Turns green in Task 3 of the P13 PR 5 plan, when the fake draws round 1 only.
-  it.todo("starts a Lord have mercy knockout with round 1 only (BR-140)");
 
   it("deletes the knockout and unlocks the group phase (FR-046, BR-087)", async () => {
     const drawn = await dataOf(
@@ -528,5 +529,349 @@ describe("the finals in the fake API", () => {
     expect(result.complete).toBe(true);
     expect(result.rows).toHaveLength(9);
     expect(result.rows[0]).toMatchObject({ place: 1, points_per_player: 10 });
+  });
+});
+
+describe("the Lord have mercy knockout in the fake API", () => {
+  const remixRoot = `${root}/knockout/rounds` as const;
+  const remixBase = base(MONSTER);
+
+  /** BR-084: 8 qualifiers make 4 pairs, so 2 semifinals, then the final and the third-place match. */
+  const startRemix = () =>
+    dataOf(
+      provisionalApi.PUT(`${root}/knockout`, {
+        params: { path: remixBase },
+        body: {
+          ...KNOCKOUT,
+          third_place_match: true,
+          mode: "lord_have_mercy",
+        },
+      }),
+    );
+  const readRounds = () =>
+    dataOf(api.GET(remixRoot, { params: { path: remixBase } }));
+  const drawRound = (expected: number) =>
+    dataOf(
+      api.POST(remixRoot, {
+        params: { path: remixBase },
+        body: { expected_round_no: expected },
+      }),
+    );
+  const resultPath = (matchId: string) => ({
+    ...remixBase,
+    match_id: matchId,
+  });
+  const enter = (
+    matchId: string,
+    winner: "side_1" | "side_2" = "side_1",
+    score = 10,
+  ) =>
+    dataOf(
+      provisionalApi.PUT(`${root}/matches/{match_id}/result`, {
+        params: { path: resultPath(matchId) },
+        body: {
+          walkover_winner: null,
+          games: [
+            winner === "side_1"
+              ? { winner, score_1: score, score_2: 3 }
+              : { winner, score_1: 3, score_2: score },
+          ],
+        },
+      }),
+    );
+  const clear = (matchId: string) =>
+    dataOf(
+      provisionalApi.PUT(`${root}/matches/{match_id}/result`, {
+        params: { path: resultPath(matchId) },
+        body: { walkover_winner: null, games: [] },
+      }),
+    );
+  /** Plays every match of the newest round, side 1 winning. */
+  async function playNewest(): Promise<void> {
+    const read = await readRounds();
+    for (const match of read.rounds.at(-1)?.matches ?? []) {
+      await enter(match.match_id);
+    }
+  }
+
+  it("starts a Lord have mercy knockout with round 1 only (BR-140)", async () => {
+    const tournament = await startRemix();
+    const knockout = tournament.phases.find((p) => p.kind === "knockout");
+    expect(knockout?.monster_knockout_mode).toBe("lord_have_mercy");
+    const read = await readRounds();
+    expect(read).toMatchObject({
+      size: 4,
+      round_count: 2,
+      third_place_match: true,
+      can_draw_next: false,
+      left_player_ids: [],
+    });
+    expect(read.rounds).toHaveLength(1);
+    const [first] = read.rounds;
+    expect(first).toMatchObject({
+      round_no: 1,
+      name: "semifinal",
+      result_count: 0,
+    });
+    expect(first?.matches).toHaveLength(2);
+    for (const match of first?.matches ?? []) {
+      expect(match.sides.map((s) => s.player_ids.length)).toEqual([2, 2]);
+      expect(match).toMatchObject({ kind: "standard", winner_locked: false });
+    }
+    // BR-140: the other rounds do not exist yet.
+    expect(
+      tournament.rounds.filter((r) => r.phase_id === knockout?.id),
+    ).toHaveLength(1);
+  });
+
+  it("refuses the next round until round 1 is complete (BR-140)", async () => {
+    await startRemix();
+    const [one, two] = (await readRounds()).rounds[0]?.matches ?? [];
+    await expect(drawRound(2)).rejects.toMatchObject({
+      status: 422,
+      code: "round_not_complete",
+      detail: { matches_left: 2 },
+    });
+    await enter(one?.match_id ?? "");
+    await expect(drawRound(2)).rejects.toMatchObject({
+      detail: { matches_left: 1 },
+    });
+    expect((await readRounds()).can_draw_next).toBe(false);
+    await enter(two?.match_id ?? "");
+    const ready = await readRounds();
+    expect(ready.can_draw_next).toBe(true);
+    const drawn = await drawRound(2);
+    expect(drawn.rounds).toHaveLength(2);
+    expect(drawn.can_draw_next).toBe(false);
+    // BR-141, BR-144: the final's round has the final and the third-place match.
+    const finalRound = drawn.rounds[1];
+    expect(finalRound).toMatchObject({ round_no: 2, name: "final" });
+    expect(finalRound?.matches.map((m) => m.kind)).toEqual([
+      "standard",
+      "third_place",
+    ]);
+    // BR-141: the winners are mixed into new pairs.
+    const winners = (drawn.rounds[0]?.matches ?? []).flatMap((m) =>
+      m.sides.slice(0, 1).flatMap((s) => s.player_ids),
+    );
+    const inFinal = finalRound?.matches[0]?.sides.flatMap((s) => s.player_ids);
+    expect([...(inFinal ?? [])].sort()).toEqual([...winners].sort());
+  });
+
+  it("refuses a stale expected_round_no with 409 round_number_changed", async () => {
+    await startRemix();
+    for (const expected of [1, 3]) {
+      await expect(drawRound(expected)).rejects.toMatchObject({
+        status: 409,
+        code: "round_number_changed",
+        detail: { current_round_no: 1 },
+      });
+    }
+  });
+
+  it("locks the winners of the round before and refuses a flipped winner with round_locked (BR-146)", async () => {
+    await startRemix();
+    await playNewest();
+    const drawn = await drawRound(2);
+    const locked = drawn.rounds[0]?.matches ?? [];
+    expect(locked.every((m) => m.winner_locked)).toBe(true);
+    expect(drawn.rounds[1]?.matches.every((m) => !m.winner_locked)).toBe(true);
+    const first = locked[0]?.match_id ?? "";
+    await expect(enter(first, "side_2")).rejects.toMatchObject({
+      status: 422,
+      code: "round_locked",
+      detail: { round_no: 2 },
+    });
+    await expect(clear(first)).rejects.toMatchObject({
+      status: 422,
+      code: "round_locked",
+      detail: { round_no: 2 },
+    });
+    // The newest round can be changed and cleared.
+    const final = drawn.rounds[1]?.matches[0]?.match_id ?? "";
+    await enter(final);
+    await clear(final);
+  });
+
+  it("allows a corrected score with the same winner (BR-146)", async () => {
+    await startRemix();
+    await playNewest();
+    const drawn = await drawRound(2);
+    const first = drawn.rounds[0]?.matches[0]?.match_id ?? "";
+    await enter(first, "side_1", 7);
+    const read = await readRounds();
+    expect(read.rounds[0]?.matches[0]).toMatchObject({
+      outcome: "side_1",
+      score: [7, 3],
+      winner_locked: true,
+    });
+  });
+
+  it("deletes only the newest round; round 1 deletes the knockout (FR-046, BR-087)", async () => {
+    await startRemix();
+    await playNewest();
+    const drawn = await drawRound(2);
+    const [one, two] = drawn.rounds;
+    const remove = (roundId: string) =>
+      dataOf(
+        api.DELETE(`${remixRoot}/{round_id}`, {
+          params: { path: { ...remixBase, round_id: roundId } },
+        }),
+      );
+    await expect(remove(one?.round_id ?? "")).rejects.toMatchObject({
+      status: 409,
+      code: "round_not_newest",
+      detail: { round_id: two?.round_id },
+    });
+    await expect(remove(testId(999_999))).rejects.toMatchObject({
+      status: 404,
+      code: "round_not_found",
+    });
+    await remove(two?.round_id ?? "");
+    const after = await readRounds();
+    expect(after.rounds).toHaveLength(1);
+    // BR-146: the round before is unlocked again.
+    expect(after.rounds[0]?.matches.every((m) => !m.winner_locked)).toBe(true);
+    expect(after.can_draw_next).toBe(true);
+    await remove(one?.round_id ?? "");
+    await expect(readRounds()).rejects.toMatchObject({
+      status: 404,
+      code: "knockout_not_found",
+    });
+    const tournament = await dataOf(
+      provisionalApi.GET(root, { params: { path: remixBase } }),
+    );
+    expect(tournament.phases.some((p) => p.kind === "knockout")).toBe(false);
+    expect(tournament.state).toBe("in_progress");
+  });
+
+  it("finishes after the final and the third-place match (FR-037)", async () => {
+    await startRemix();
+    await playNewest();
+    const drawn = await drawRound(2);
+    const [final, third] = drawn.rounds[1]?.matches ?? [];
+    const state = async () =>
+      (await dataOf(provisionalApi.GET(root, { params: { path: remixBase } })))
+        .state;
+    await enter(final?.match_id ?? "");
+    expect(await state()).toBe("in_progress");
+    await enter(third?.match_id ?? "");
+    expect(await state()).toBe("finished");
+    // Clearing a result, or deleting the round, reopens it (BR-095).
+    await clear(third?.match_id ?? "");
+    expect(await state()).toBe("in_progress");
+    await enter(third?.match_id ?? "");
+    expect(await state()).toBe("finished");
+    await dataOf(
+      api.DELETE(`${remixRoot}/{round_id}`, {
+        params: {
+          path: { ...remixBase, round_id: drawn.rounds[1]?.round_id ?? "" },
+        },
+      }),
+    );
+    expect(await state()).toBe("in_progress");
+  });
+
+  it("gives places per player with the partner (BR-145)", async () => {
+    await startRemix();
+    await playNewest();
+    const drawn = await drawRound(2);
+    expect((await places(MONSTER)).rows).toEqual([]);
+    for (const match of drawn.rounds[1]?.matches ?? []) {
+      await enter(match.match_id);
+    }
+    const result = await places(MONSTER);
+    expect(result.complete).toBe(true);
+    const tournament = await dataOf(
+      provisionalApi.GET(root, { params: { path: remixBase } }),
+    );
+    const main = tournament.entries.filter((e) => e.stage === "main");
+    // One row per player, not per pair.
+    expect(result.rows).toHaveLength(main.length);
+    const knockout = result.rows.filter((r) => r.reason.kind !== "group_place");
+    expect(knockout.map((r) => r.place)).toEqual([1, 1, 2, 2, 3, 3, 4, 4]);
+    expect(knockout.map((r) => r.reason.kind)).toEqual([
+      "won_final",
+      "won_final",
+      "lost_final",
+      "lost_final",
+      "won_third_place",
+      "won_third_place",
+      "lost_third_place",
+      "lost_third_place",
+    ]);
+    const byEntry = new Map(result.rows.map((r) => [r.entry_id, r]));
+    for (const row of knockout) {
+      expect(row.reason.opponent_entry_id).toBeNull();
+      const partner = byEntry.get(row.reason.partner_entry_id ?? "");
+      expect(partner?.place).toBe(row.place);
+      expect(partner?.reason.partner_entry_id).toBe(row.entry_id);
+    }
+    // BR-103: the others follow, each counting as one, with no partner.
+    const rest = result.rows.filter((r) => r.reason.kind === "group_place");
+    expect(rest.length).toBeGreaterThan(0);
+    expect(rest.every((r) => r.reason.partner_entry_id === null)).toBe(true);
+    expect(Math.min(...rest.map((r) => r.place))).toBe(5);
+  });
+
+  it("answers 422 format_not_supported on the bracket", async () => {
+    await startRemix();
+    const expected = {
+      status: 422,
+      code: "format_not_supported",
+      detail: { format: "single_elimination", mode: "lord_have_mercy" },
+    };
+    await expect(bracket(MONSTER)).rejects.toMatchObject(expected);
+    await expect(
+      dataOf(
+        provisionalApi.GET(
+          "/api/v1/public/{share_token}/tournaments/{tournament_id}/bracket",
+          {
+            params: {
+              path: {
+                share_token: TEST_SHARE_TOKEN,
+                tournament_id: MONSTER,
+              },
+            },
+          },
+        ),
+      ),
+    ).rejects.toMatchObject(expected);
+  });
+
+  it("answers the rounds read of a fixed-pair or missing knockout with a refusal", async () => {
+    await expect(readRounds()).rejects.toMatchObject({
+      status: 404,
+      code: "knockout_not_found",
+    });
+    await dataOf(
+      provisionalApi.PUT(`${root}/knockout`, {
+        params: { path: remixBase },
+        body: { ...KNOCKOUT, mode: "seeded_pairs" },
+      }),
+    );
+    await expect(readRounds()).rejects.toMatchObject({
+      status: 422,
+      code: "format_not_supported",
+      detail: { format: "single_elimination", mode: "seeded_pairs" },
+    });
+  });
+
+  it("serves the share link a read without the organizer's fields (FR-070)", async () => {
+    await startRemix();
+    const read = await dataOf(
+      api.GET(
+        "/api/v1/public/{share_token}/tournaments/{tournament_id}/knockout/rounds",
+        {
+          params: {
+            path: { share_token: TEST_SHARE_TOKEN, tournament_id: MONSTER },
+          },
+        },
+      ),
+    );
+    expect(read.rounds).toHaveLength(1);
+    expect(read).not.toHaveProperty("can_draw_next");
+    expect(read.rounds[0]).not.toHaveProperty("result_count");
+    expect(read.rounds[0]?.matches[0]).not.toHaveProperty("winner_locked");
   });
 });
