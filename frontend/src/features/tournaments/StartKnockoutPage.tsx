@@ -168,6 +168,9 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
   const drawKnockout = useMutation(
     finalsMutations.drawKnockout(queryClient, leagueId, tournamentId),
   );
+  const drawAgain = useMutation(
+    finalsMutations.drawKnockoutAgain(queryClient, leagueId, tournamentId),
+  );
 
   if (preview.isError) {
     return (
@@ -451,6 +454,19 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
             </li>
           ))}
         </ol>
+        {(effectiveMode === "a_little_mercy" ||
+          effectiveMode === "lord_have_mercy") && (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={drawAgain.isPending}
+            onClick={() => {
+              drawAgain.mutate({ expected_draw_counter: plan.draw_counter });
+            }}
+          >
+            {t("finals.start.drawAgain")}
+          </Button>
+        )}
       </section>
       <section aria-labelledby="first-round-heading" className="space-y-2">
         <h2
@@ -541,6 +557,11 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
           {t("finals.start.tooFew")}
         </p>
       )}
+      {drawAgain.isError && (
+        <p role="alert" className="text-body-sm">
+          {errorText(t, drawAgain.error)}
+        </p>
+      )}
       {drawKnockout.isError && (
         <p role="alert" className="text-body-sm">
           {errorText(t, drawKnockout.error)}
@@ -558,8 +579,9 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
               // The draw counter the preview showed (ADR-008).
               expected_draw_counter: plan.draw_counter,
               // The entries the preview shows going through, in seed order.
+              // Every member of every pair (BR-081).
               expected_qualifier_ids: plan.entries.flatMap((entry) =>
-                entry.members.slice(0, 1).map((member) => member.entry_id),
+                entry.members.map((member) => member.entry_id),
               ),
               qualifiers: shown,
               third_place_match: thirdPlace,

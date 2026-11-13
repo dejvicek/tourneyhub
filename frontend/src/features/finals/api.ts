@@ -14,6 +14,7 @@ import { tournamentQueries } from "@/features/tournaments/api";
 import type { MonsterKnockoutMode } from "@/lib/rules";
 
 type KnockoutWrite = components["schemas"]["KnockoutWrite"];
+type KnockoutDrawWrite = components["schemas"]["KnockoutDrawWrite"];
 
 type FinalFormatWrite = components["schemas"]["FinalFormatWrite"];
 
@@ -295,6 +296,23 @@ export const finalsMutations = {
         dataOf(
           api.PUT(
             "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout",
+            { params: { path: pathOf(leagueId, tournamentId).path }, body },
+          ),
+        ),
+      onSettled: () => settle(queryClient, leagueId),
+    }),
+  /** FR-045: draws the knockout's pairs again; ADR-008 carries the counter the screen saw. */
+  drawKnockoutAgain: (
+    queryClient: QueryClient,
+    leagueId: string,
+    tournamentId: string,
+  ) =>
+    mutationOptions({
+      scope: scope(leagueId),
+      mutationFn: (body: KnockoutDrawWrite) =>
+        dataOf(
+          api.POST(
+            "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout/draw",
             { params: { path: pathOf(leagueId, tournamentId).path }, body },
           ),
         ),

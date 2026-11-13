@@ -21,6 +21,8 @@ const CODE_TEXTS = {
   not_enough_entries: "finals.errors.notEnoughEntries",
   not_enough_players: "finals.errors.notEnoughPlayers",
   group_phase_locked: "finals.errors.groupPhaseLocked",
+  knockout_mode_required: "finals.errors.modeRequired",
+  qualifiers_odd: "finals.errors.qualifiersOdd",
 } as const satisfies Partial<Record<ErrorCode, string>>;
 
 function hasText(code: ErrorCode | undefined): code is keyof typeof CODE_TEXTS {
