@@ -551,6 +551,8 @@ PUBLIC_STANDING_KEYS = {
     "sat_out",
     "points",
     "score_difference",
+    "bh1",
+    "bh2",
 }
 SEASON_STANDING_KEYS = {
     "place",

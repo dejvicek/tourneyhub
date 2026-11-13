@@ -79,12 +79,15 @@ class PublicTournamentRead(ResponseModel):
 
 
 class PublicStandingRow(ResponseModel):
-    """One entry's line in a round robin's standings, for viewers (FR-060, BR-101).
+    """One entry's line in the group-phase standings, for viewers (FR-060).
 
-    `place` is shared by entries still level (BR-074), and the next place
-    skips (BR-104). `points` come from the matches: a round robin gives no
-    points for sitting out (BR-071). The organizer's extras, the form and what ranks one entry above
-    the next, are not part of it.
+    A round robin's (BR-101) or a Swiss's (BR-072 to BR-074). `place` is
+    shared by entries still level (BR-074), and the next place skips
+    (BR-104). `points` come from the matches; in a Swiss they also include
+    the points for sitting out, as soon as the round is drawn (BR-076), and a
+    round robin gives none (BR-071). `bh1` and `bh2` are the Swiss's
+    (BR-073), null in a round robin. The organizer's extras, the form and
+    what ranks one entry above the next, are not part of it.
     """
 
     place: int
@@ -96,6 +99,8 @@ class PublicStandingRow(ResponseModel):
     sat_out: int
     points: int
     score_difference: int
+    bh1: int | None
+    bh2: int | None
 
 
 class PublicSeasonStandingRow(ResponseModel):
@@ -223,11 +228,11 @@ def read_public_season_standings(
 def read_public_standings(
     share_token: str, tournament_id: UUID, session: SessionDep
 ) -> list[PublicStandingRow]:
-    """Return a round robin's standings as they are now (FR-060, FR-070).
+    """Return the group phase's standings as they are now (FR-060, FR-070).
 
-    A tournament in a format without a standings table yet, such as Swiss, has
-    an empty list. A tournament in setup is 404 `tournament_not_found`, like an
-    unknown one or one of another league.
+    A round robin's or a Swiss's; a tournament without a group phase, or a
+    Monster DYP, has an empty list. A tournament in setup is 404
+    `tournament_not_found`, like an unknown one or one of another league.
     """
     rows = public_service.read_shared_standings(
         session, share_token=share_token, tournament_id=tournament_id
@@ -246,8 +251,8 @@ def read_public_places(
 
     Before the tournament finishes, `complete` is false and there are no rows.
     With a knockout, its entries take the top places by BR-102, the others
-    follow in their group-phase order (BR-103); a Swiss or a Monster DYP is
-    422 `format_not_supported` until they are played. A tournament in setup
+    follow in their group-phase order (BR-103); a Monster DYP is 422
+    `format_not_supported` until it is played. A tournament in setup
     is 404 `tournament_not_found`.
     """
     places = public_service.read_shared_places(

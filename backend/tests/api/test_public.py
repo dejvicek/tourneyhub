@@ -499,6 +499,8 @@ _PUBLIC_PROPERTIES: dict[str, set[str]] = {
         "tournaments_played",
     },
     "PublicStandingRow": {
+        "bh1",
+        "bh2",
         "drawn",
         "entry_id",
         "lost",
