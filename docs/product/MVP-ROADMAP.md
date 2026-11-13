@@ -51,7 +51,7 @@ The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. 
   - [ ] Knockout modes: seeded pairs, singles, A little mercy, Lord have mercy.
   - [ ] Lord have mercy re-mix: data model, engine, API, places per player and a round-by-round view ([#63](https://github.com/dejvicek/tourneyhub/issues/63)).
   - [ ] Screen 13 and marking top players on the real API.
-  - [ ] Which draw to use when every grouping repeats a partner ([#79](https://github.com/dejvicek/tourneyhub/issues/79), waiting for an answer).
+  - [x] Which draw to use when every grouping repeats a partner ([#79](https://github.com/dejvicek/tourneyhub/issues/79), [#83](https://github.com/dejvicek/tourneyhub/pull/83)).
 - [ ] **P14 Late players and disabling** (FR-044, FR-047, FR-048; BR-045, BR-054, BR-064, BR-067)
   - [ ] Disable and enable a participant (written as a target state, ADR-008).
   - [ ] Late entries in Swiss and Monster DYP.
