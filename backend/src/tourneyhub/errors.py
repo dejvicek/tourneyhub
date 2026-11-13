@@ -63,7 +63,7 @@ class ErrorCode(StrEnum):
     # Start and back to setup
     TOURNAMENT_NOT_IN_PROGRESS = "tournament_not_in_progress"
     TOURNAMENT_HAS_RESULTS = "tournament_has_results"  # FR-036
-    FORMAT_NOT_SUPPORTED = "format_not_supported"  # until its rounds are served
+    FORMAT_NOT_SUPPORTED = "format_not_supported"  # Monster DYP, until it is served
     PLAYERS_WITHOUT_PARTNER = "players_without_partner"  # Doubles (BR-030)
     # FR-032: 64 entries today, 16 after the #48 follow-up (issue to open after
     # approval).
@@ -86,6 +86,12 @@ class ErrorCode(StrEnum):
     PHASE_NOT_DELETABLE = "phase_not_deletable"  # only a knockout after a group phase
     KNOCKOUT_NOT_FOUND = "knockout_not_found"  # the tournament has no knockout
     KNOCKOUT_MODE_NOT_APPLICABLE = "knockout_mode_not_applicable"  # Monster DYP only
+    # Swiss rounds (FR-040, FR-046)
+    ROUND_NOT_FOUND = "round_not_found"
+    ROUND_NUMBER_CHANGED = "round_number_changed"  # the expected new number is stale
+    ROUND_NOT_COMPLETE = "round_not_complete"  # the newest round has a match left
+    ROUND_NOT_NEWEST = "round_not_newest"  # only the newest round can be deleted
+    ROUND_LOCKED = "round_locked"  # a result of a round before the newest (BR-065)
     # Fields (FR-090 to FR-094)
     FIELD_NOT_FOUND = "field_not_found"
     FIELD_NUMBER_CHANGED = "field_number_changed"  # the expected new number is stale

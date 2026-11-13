@@ -111,7 +111,7 @@ class KnockoutWrite(RequestModel):
     `match_format` (BR-120).
     BO2 is never a knockout's (BR-121). `mode` is how the teams are formed
     after Monster DYP rounds (BR-081 to BR-084) and null after any other
-    group phase; a mode after a round robin is 422
+    group phase; a mode after a round robin or a Swiss is 422
     `knockout_mode_not_applicable`.
     """
 
@@ -270,9 +270,9 @@ def read_knockout_preview(
     Writes nothing. A knockout that cannot start is still 200, with the
     `problem` its start would answer: `tournament_not_in_progress`,
     `current_phase_changed` (the knockout exists), `season_closed`,
-    `format_not_supported` (Swiss, Monster DYP, no group phase),
+    `format_not_supported` (Monster DYP, no group phase),
     `group_phase_not_done` or `knockout_mode_not_applicable` (a `mode` after a
-    round robin).
+    round robin or a Swiss).
     """
     preview = knockout_service.preview_knockout(
         session,
@@ -308,18 +308,18 @@ def start_knockout(
     user: CurrentUserDep,
     clock: ClockDep,
 ) -> TournamentRead:
-    """Draw the knockout after the round robin and start it (FR-045).
+    """Draw the knockout after the round robin or the Swiss and start it (FR-045).
 
     The best entries of the standings go through as they are, seeded by their
     place; entries still level are ordered by lot (BR-074, BR-080, BR-085).
     The byes go to the top seeds (BR-040 to BR-042); the first matches take
-    the free fields, and the round robin's results lock (BR-053).
+    the free fields, and the group phase's results lock (BR-053, BR-065).
 
     409: `tournament_not_in_progress` (detail `state`), `current_phase_changed`
     (the knockout already exists, detail `current_phase_id`),
     `qualifiers_changed` (the cut or the seeds are not the previewed ones,
     detail `entry_ids`, the current ones) or `season_closed`. 422:
-    `format_not_supported` (Swiss, Monster DYP, or no group phase; detail
+    `format_not_supported` (Monster DYP, or no group phase; detail
     `format`), `group_phase_not_done` (detail `matches_left`),
     `qualifiers_out_of_range` (detail `minimum`, `maximum`, `given`) or
     `knockout_mode_not_applicable` (detail `format`).
@@ -384,8 +384,9 @@ def delete_knockout(
 ) -> None:
     """Delete the knockout that follows the group phase, with its results (FR-046).
 
-    The group phase's results unlock and the organizer chooses again what
-    comes next (BR-087); a finished tournament is back in progress. The
+    The group phase unlocks, all of a round robin's results or a Swiss's
+    newest round, and the organizer chooses again what comes next (BR-087,
+    BR-065: a Swiss can then also add a round); a finished tournament is back in progress. The
     phase is named by its id: a repeat is 404 `phase_not_found` (ADR-008).
     409 `season_closed`. 422 `phase_not_deletable` for a group phase or a
     knockout without a group phase (detail `kind`).

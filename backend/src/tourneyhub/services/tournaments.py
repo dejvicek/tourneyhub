@@ -10,11 +10,11 @@ states (ADR-008); the standings and places are computed on read (ADR-009).
 """
 
 import secrets
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date, datetime
 from enum import StrEnum
-from typing import Literal
+from typing import Literal, assert_never
 from uuid import UUID, uuid7
 
 from pydantic import JsonValue
@@ -79,6 +79,7 @@ from tourneyhub.engine.ranking import PlayerRecord, RankedPlayer, rank_league
 from tourneyhub.engine.results import Game, match_outcome
 from tourneyhub.engine.schedule import (
     MAX_ROUND_ROBIN_ENTRIES,
+    ScheduledMatch,
     ScheduledRound,
     check_entry_count,
     round_robin,
@@ -88,10 +89,20 @@ from tourneyhub.engine.season_points import PlayerPoints, season_points
 from tourneyhub.engine.season_standings import SeasonStandingRow, season_standings
 from tourneyhub.engine.seeding import SeedingEntry, seed_by_lot, seed_by_ranking
 from tourneyhub.engine.standings import (
+    FormResult,
     PlayedMatch,
+    RoundRobinTiebreaker,
     StandingRow,
     round_robin_standings,
-    standing_of,
+)
+from tourneyhub.engine.swiss import (
+    SwissDraw,
+    SwissMatch,
+    SwissRound,
+    SwissStanding,
+    draw_first_swiss_round,
+    draw_next_swiss_round,
+    swiss_standings,
 )
 from tourneyhub.engine.tournaments import (
     DEFAULT_SIT_OUT_POINTS,
@@ -103,6 +114,7 @@ from tourneyhub.engine.tournaments import (
     KnockoutMatchFormat,
     MatchFormat,
     MatchKind,
+    MatchOutcome,
     MonsterKnockoutMode,
     Outcome,
     Participation,
@@ -126,6 +138,13 @@ from tourneyhub.services.leagues import active_season, get_league, lock_league
 
 MATCH_SIDES = 2
 """A match has two sides, side 1 and side 2 (DATA-MODEL §4.5)."""
+
+PLAYED_GROUP_FORMATS = frozenset({PhaseFormat.ROUND_ROBIN, PhaseFormat.SWISS})
+"""The group formats whose rounds the backend plays; Monster DYP comes later."""
+
+ROUND_BY_ROUND_FORMATS = frozenset({PhaseFormat.SWISS, PhaseFormat.MONSTER_DYP})
+"""Group formats drawn one round at a time, with tie-breakers of their own (FR-040,
+FR-043)."""
 
 type Clock = Callable[[], datetime]
 
@@ -1476,6 +1495,32 @@ class RoundView:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class DrawnMatchView(MatchView):
+    """A match of a Swiss round just drawn, with what a lot decided (ADR-009).
+
+    `is_repeat`: the two have met before, as no draw without a repeat existed
+    (BR-057). `is_decided_by_lot`: a lot placed either entry in the standings
+    the pair was drawn from (BR-074).
+    """
+
+    is_repeat: bool
+    is_decided_by_lot: bool
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DrawnRoundView(RoundView):
+    """A Swiss round just drawn, with what a lot decided (ADR-009).
+
+    `is_sit_out_by_lot`: a lot picked the entry that sits out from candidates
+    that share its place (BR-058, BR-074). Only the draw knows these marks;
+    nothing stores them.
+    """
+
+    matches: tuple[DrawnMatchView, ...]
+    is_sit_out_by_lot: bool
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class FieldView:
     id: UUID
     number: int
@@ -1809,16 +1854,21 @@ def view_tournament(
 def _check_ready(tournament: Tournament, phase: TournamentPhase) -> None:
     """Refuse a start whose setup is not complete (FR-032, FR-033, BR-030 to BR-032).
 
-    A round robin and a knockout without a group phase are generated so far;
-    Swiss and Monster DYP are 422 `format_not_supported`. Doubles needs every
+    A round robin, a Swiss and a knockout without a group phase are generated
+    so far; Monster DYP is 422 `format_not_supported`. Doubles needs every
     picked player in a pair (422 `players_without_partner`); DYP needs its
     halves and pairs (the 422s of a new DYP draw); every type needs FR-032's
     minimum of entries, 4 for a knockout with a third-place match (422
     `not_enough_entries`). A round robin takes at most
     `MAX_ROUND_ROBIN_ENTRIES` (422 `too_many_entries_for_round_robin`), a
-    knockout `MAX_KNOCKOUT_ENTRIES` (422 `too_many_entries_for_knockout`).
+    knockout `MAX_KNOCKOUT_ENTRIES` (422 `too_many_entries_for_knockout`); a
+    Swiss has no maximum (FR-032).
     """
-    if phase.format not in {PhaseFormat.ROUND_ROBIN, PhaseFormat.SINGLE_ELIMINATION}:
+    if phase.format not in {
+        PhaseFormat.ROUND_ROBIN,
+        PhaseFormat.SWISS,
+        PhaseFormat.SINGLE_ELIMINATION,
+    }:
         raise RuleViolationError(ErrorCode.FORMAT_NOT_SUPPORTED, format=phase.format)
     if tournament.type is TournamentType.DOUBLES:
         paired = {m.player_id for entry in tournament.entries for m in entry.members}
@@ -1843,7 +1893,7 @@ def _check_ready(tournament: Tournament, phase: TournamentPhase) -> None:
             raise RuleViolationError(
                 ErrorCode.TOO_MANY_ENTRIES_FOR_KNOCKOUT, limit=MAX_KNOCKOUT_ENTRIES
             )
-    elif given > MAX_ROUND_ROBIN_ENTRIES:
+    elif phase.format is PhaseFormat.ROUND_ROBIN and given > MAX_ROUND_ROBIN_ENTRIES:
         raise RuleViolationError(
             ErrorCode.TOO_MANY_ENTRIES_FOR_ROUND_ROBIN, limit=MAX_ROUND_ROBIN_ENTRIES
         )
@@ -1864,6 +1914,38 @@ def _round_robin_of(
         seed_order((EntryId(entry.id), entry.seed) for entry in main),
         legs=phase.round_robin_legs or 1,  # the CHECK sets it for a round robin
     )
+
+
+def _swiss_round_of(draw: SwissDraw) -> ScheduledRound:
+    """A drawn Swiss round as the rows of a schedule take it (BR-055 to BR-058)."""
+    return ScheduledRound(
+        round_no=draw.round_no,
+        matches=tuple(
+            ScheduledMatch(side_1=pair.side_1, side_2=pair.side_2)
+            for pair in draw.pairs
+        ),
+        sitting_out=draw.sitting_out,
+    )
+
+
+def _group_schedule(
+    main: Sequence[Entry], phase: TournamentPhase
+) -> tuple[ScheduledRound, ...]:
+    """What the start writes for a group phase, and the preview shows.
+
+    A round robin's every round (BR-050 to BR-052); a Swiss's round 1 from
+    the seeds, the lowest seed sitting out with an odd number (BR-055,
+    BR-058). Fewer than 2 entries is 422 `not_enough_entries`.
+    """
+    if phase.format is not PhaseFormat.SWISS:
+        return _round_robin_of(main, phase)
+    try:
+        draw = draw_first_swiss_round(
+            seed_order((EntryId(entry.id), entry.seed) for entry in main)
+        )
+    except EngineError as err:
+        raise to_app_error(err) from err
+    return (_swiss_round_of(draw),)
 
 
 def _bracket_from_seeds(main: Sequence[Entry], phase: TournamentPhase) -> Bracket:
@@ -1943,12 +2025,16 @@ def _schedule_rows(
     schedule: Sequence[ScheduledRound],
     members: Mapping[UUID, Sequence[UUID]],
     now: datetime,
+    *,
+    disabled: Collection[UUID] = frozenset(),
 ) -> _ScheduleRows:
     """The rounds of the schedule with their matches, sides and participation.
 
-    Every main entry gets a participation row in every round (D5), and every
-    stored side lists its players (D2). The slots are the matches as the field
-    queue sees them, so no row needs loading to fill the fields.
+    Every main entry in `members` gets a participation row in every round
+    (D5): `sat_out` for the one sitting out, `disabled` for a disabled entry,
+    which is not drawn (BR-064), and `played` for the others. Every stored
+    side lists its players (D2). The slots are the matches as the field queue
+    sees them, so no row needs loading to fill the fields.
     """
     rows = _ScheduleRows(
         rounds=[], matches=[], sides=[], side_players=[], participation=[], slots=[]
@@ -2018,6 +2104,8 @@ def _schedule_rows(
                 "entry_id": entry_id,
                 "status": Participation.SAT_OUT
                 if entry_id == scheduled_round.sitting_out
+                else Participation.DISABLED
+                if entry_id in disabled
                 else Participation.PLAYED,
                 "created_at": now,
             }
@@ -2079,13 +2167,15 @@ def start_tournament(
     a seed order that is not the entries' current one, seed 1 first, is 409
     `seed_order_changed`: the schedule is never drawn from a setup the
     organizer did not see. The seeds follow the entries, so the same check
-    covers a change to the players or to their pairs. A round
-    robin and a knockout without a group phase are generated so far; Swiss and
-    Monster DYP are 422 `format_not_supported`. An incomplete setup is a 422
-    (`_check_ready`).
+    covers a change to the players or to their pairs. A round robin, a Swiss
+    and a knockout without a group phase are generated so far; Monster DYP is
+    422 `format_not_supported`. An incomplete setup is a 422 (`_check_ready`).
 
-    The round robin follows the seeds (BR-050 to BR-052); every main entry gets
-    a participation row in every round (D5). A knockout without a group phase
+    The round robin follows the seeds (BR-050 to BR-052); a Swiss gets round 1
+    only, top half of the seeds against the bottom half, the lowest seed
+    sitting out with an odd number (BR-055, BR-058), and its later rounds are
+    added one at a time (`add_round`, FR-040). Every main entry gets a
+    participation row in every round (D5). A knockout without a group phase
     (FR-031) is drawn from the setup seeds into the setup's phase: every
     bracket match at once, the byes for the top seeds in round 1 and the
     third-place match in the final's round (BR-040 to BR-044); only the first
@@ -2127,7 +2217,7 @@ def start_tournament(
     members = {
         entry.id: sorted(member.player_id for member in entry.members) for entry in main
     }
-    schedule = _round_robin_of(main, phase)
+    schedule = _group_schedule(main, phase)
     now = clock()
     rows = _schedule_rows(phase, schedule, members, now)
     _insert_schedule(session, rows)  # the matches exist before a field references one
@@ -2180,7 +2270,8 @@ class SchedulePreview:
 
     With a `problem` there are no rounds, no counts and no `seed_order`.
     `draw_counter` and `seed_order`, the main entries with seed 1 first, are
-    the ones the start must carry (ADR-008). A round robin lists all its rounds. A
+    the ones the start must carry (ADR-008). A round robin lists all its rounds;
+    a Swiss its round 1, without counts, since its rounds come one at a time. A
     knockout without a group phase lists its first round, with the byes, and
     counts every match of the bracket (the third-place match too, no byes)
     and its rounds; `bracket_size` is its number of first-round spots.
@@ -2217,10 +2308,12 @@ def preview_schedule(
 ) -> SchedulePreview:
     """Return what `start_tournament` would create, writing nothing (FR-035).
 
-    Read without a lock, like the setup. The checks and the round robin are the
-    start's own (`_check_ready`, `_round_robin_of`), so a preview that can start
+    Read without a lock, like the setup. The checks and the schedule are the
+    start's own (`_check_ready`, `_group_schedule`), so a preview that can start
     is the schedule the start writes for the same draw counter. A refusal comes
-    back as the `problem`, not as an error: the review screen shows it.
+    back as the `problem`, not as an error: the review screen shows it. A
+    Swiss shows round 1 only and no counts: its later rounds are drawn one at a
+    time from the standings (FR-040).
     """
     league = get_league(session, league_id=league_id, user_id=user_id)
     tournament = session.scalars(_tournament_query(league, tournament_id)).one_or_none()
@@ -2246,7 +2339,7 @@ def preview_schedule(
         return _bracket_preview(
             tournament.draw_counter, _main_entries(tournament), phase, players
         )
-    schedule = _round_robin_of(_main_entries(tournament), phase)
+    schedule = _group_schedule(_main_entries(tournament), phase)
     rounds = tuple(
         PreviewRound(
             round_no=scheduled.round_no,
@@ -2260,13 +2353,14 @@ def preview_schedule(
         )
         for scheduled in schedule
     )
+    swiss = phase.format is PhaseFormat.SWISS  # its rounds come one at a time
     return SchedulePreview(
         draw_counter=tournament.draw_counter,
         seed_order=tuple(_seed_order_of(_main_entries(tournament))),
         problem=None,
         rounds=rounds,
-        match_count=sum(len(r.matches) for r in rounds),
-        round_count=len(rounds),
+        match_count=None if swiss else sum(len(r.matches) for r in rounds),
+        round_count=None if swiss else len(rounds),
         bracket_size=None,
     )
 
@@ -2348,7 +2442,20 @@ def back_to_setup(
     )
     if results:
         raise RuleViolationError(ErrorCode.TOURNAMENT_HAS_RESULTS, results=results)
-    now = clock()
+    _reset_to_setup(session, tournament, clock())
+    return read_tournament(
+        session, league_id=league_id, tournament_id=tournament.id, user_id=user_id
+    )
+
+
+def _reset_to_setup(session: Session, tournament: Tournament, now: datetime) -> None:
+    """Delete every round and put the tournament back in setup (FR-036, FR-046).
+
+    The fields are freed and the rounds go with their matches, results and
+    participation; the phases, entries, seeds and draws stay, and every
+    disabled flag is cleared (DATA-MODEL §4.4, §4.5). Going back to setup and
+    deleting a Swiss's round 1 share it.
+    """
     for field in tournament.fields:
         if field.match_id is not None:
             field.match_id = None
@@ -2361,9 +2468,6 @@ def back_to_setup(
     tournament.state = TournamentState.SETUP
     tournament.updated_at = now
     session.flush()
-    return read_tournament(
-        session, league_id=league_id, tournament_id=tournament.id, user_id=user_id
-    )
 
 
 # ---------------------------------------------------------------- results
@@ -2499,7 +2603,8 @@ def set_match_result(
     on the next read; a match on a field whose side is no longer known leaves
     it (BR-130). The result that completes the knockout, the final's or the
     third-place match's, finishes the tournament in the same transaction
-    (FR-037).
+    (FR-037). In a Swiss, every round but the newest is locked (BR-065):
+    422 `round_locked` with the newest `round_no`.
     """
     league, tournament = _lock_tournament(
         session,
@@ -2518,14 +2623,14 @@ def set_match_result(
     now = clock()
     if result.is_empty:
         if match.outcome is not None:
-            _require_unlocked(tournament, phase, match)
+            _require_unlocked(tournament, phase, round_, match)
         _clear_result(tournament, match, now)
     else:
         outcome = _outcome_of(
             result, league=league, phase=phase, round_=round_, match=match
         )
         if not _same_result(match, result, outcome):
-            _require_unlocked(tournament, phase, match)
+            _require_unlocked(tournament, phase, round_, match)
             _write_result(session, tournament, match, result, outcome, now)
             _finish_with_knockout(tournament, now)
     session.flush()
@@ -2576,11 +2681,22 @@ def _require_expected_sides(
 
 
 def _require_unlocked(
-    tournament: Tournament, phase: TournamentPhase, match: Match
+    tournament: Tournament, phase: TournamentPhase, round_: Round, match: Match
 ) -> None:
-    """Refuse a change to a locked result (BR-053, BR-065, BR-094): 422."""
+    """Refuse a change to a locked result (BR-053, BR-065, BR-094): 422.
+
+    Once the knockout is drawn, every group-phase result is locked,
+    `group_phase_locked`. Before that, a Swiss locks every round but the
+    newest, `round_locked` with the newest `round_no` (BR-065); deleting the
+    newest round unlocks the one before (BR-066), since the newest round is
+    found on every write. A knockout result is locked while a later match it
+    feeds has a result, `result_locked` with those `match_ids` (BR-094).
+    """
     knockout = knockout_bracket(tournament)
     if knockout is None:
+        newest = phase.rounds[-1]
+        if phase.format in ROUND_BY_ROUND_FORMATS and round_ is not newest:
+            raise RuleViolationError(ErrorCode.ROUND_LOCKED, round_no=newest.round_no)
         return
     if phase.kind is PhaseKind.GROUP:
         raise RuleViolationError(
@@ -2672,15 +2788,45 @@ class WaitingMatch:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class GroupStandingRow:
+    """One entry's line in the group-phase standings, of any format (FR-060).
+
+    A round robin's rows come from BR-101, a Swiss's from BR-070 to BR-074.
+    `place` is shared by entries still level (BR-074). `form` and `ahead_by`
+    are the round robin's: a Swiss has an empty form and no `ahead_by`, since
+    its tie-breakers are the phase's own (FR-043). `bh1` and `bh2` are the
+    Swiss's (BR-073), None in a round robin. `game_difference` is games won
+    minus games lost (BR-101); it ranks only a round robin.
+    """
+
+    place: int
+    entry_id: EntryId
+    played: int
+    won: int
+    drawn: int
+    lost: int
+    sat_out: int
+    points: int
+    game_difference: int
+    score_difference: int
+    form: tuple[FormResult, ...]
+    ahead_by: RoundRobinTiebreaker | None
+    bh1: int | None
+    bh2: int | None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class PlayView:
     """The running group phase as the play screens read it, computed on read.
 
-    `standings` are the round robin's (BR-101); other group formats have
-    none yet. `group_done` says every group-phase match has a result (FR-040).
+    `standings` are the group phase's: a round robin's (BR-101) or a Swiss's
+    (BR-070 to BR-074); a Monster DYP has none yet. `group_done` says every
+    group-phase match has a result (FR-040); in a Swiss, every match of the
+    newest round, since the rounds before it are complete.
     """
 
     waiting: tuple[WaitingMatch, ...]
-    standings: tuple[StandingRow, ...]
+    standings: tuple[GroupStandingRow, ...]
     group_done: bool
 
 
@@ -2737,6 +2883,161 @@ def _standings_of(
             if row.status is Participation.SAT_OUT
         ],
     )
+
+
+def _swiss_rounds(phase: TournamentPhase) -> tuple[SwissRound, ...]:
+    """A Swiss phase's stored rounds as the engine reads them (D5, D11).
+
+    A match's score difference sums the games that have a score (BR-073); a
+    walkover has none. The entries sitting a round out are its `sat_out` rows;
+    a disabled or not yet joined entry is in neither list (BR-064, BR-067).
+    """
+    rounds: list[SwissRound] = []
+    for round_ in phase.rounds:
+        matches: list[SwissMatch] = []
+        for match in round_.matches:
+            side_1, side_2 = (side.entry_id for side in match.sides)
+            if side_1 is None or side_2 is None:
+                msg = f"Swiss match {match.id} has a side without an entry"
+                raise ValueError(msg)
+            matches.append(
+                SwissMatch(
+                    side_1=EntryId(side_1),
+                    side_2=EntryId(side_2),
+                    outcome=None
+                    if match.outcome is None
+                    else MatchOutcome(match.outcome),
+                    score_difference=sum(
+                        game.score_1 - game.score_2
+                        for game in match.games
+                        if game.score_1 is not None and game.score_2 is not None
+                    ),
+                )
+            )
+        rounds.append(
+            SwissRound(
+                round_no=round_.round_no,
+                matches=tuple(matches),
+                sat_out=tuple(
+                    EntryId(row.entry_id)
+                    for row in sorted(round_.participation, key=lambda r: r.entry_id)
+                    if row.status is Participation.SAT_OUT
+                ),
+            )
+        )
+    return tuple(rounds)
+
+
+def _swiss_standings_of(
+    tournament: Tournament, phase: TournamentPhase
+) -> tuple[SwissStanding, ...]:
+    """The Swiss standings now, by position (BR-070 to BR-074, BR-076, FR-043).
+
+    Every main entry is in them, disabled ones included (BR-064). A sit-out
+    earns the phase's points as soon as its round is drawn (BR-076); the
+    tie-breakers are the phase's, in its order; the lot uses the tournament's
+    seed (ADR-010).
+    """
+    return swiss_standings(
+        (EntryId(entry.id) for entry in _main_entries(tournament)),
+        _swiss_rounds(phase),
+        tiebreakers=[Tiebreaker(t) for t in phase.tiebreakers or ()],
+        sit_out_points=phase.sit_out_points or 0,  # the CHECK sets it for Swiss
+        rng_seed=tournament.rng_seed,
+    )
+
+
+def _swiss_game_differences(
+    tournament: Tournament, phase: TournamentPhase
+) -> dict[EntryId, int]:
+    """Each entry's games won minus games lost in a Swiss (BR-101).
+
+    Shown only, never a Swiss tie-breaker (BR-072). The round-robin tally
+    counts the games the same way, a walkover counting the games needed to
+    win, so only its `game_difference` is read here.
+    """
+    return {
+        row.entry_id: row.game_difference
+        for row in round_robin_standings(
+            (EntryId(entry.id) for entry in _main_entries(tournament)),
+            matches=[
+                _played_match(match)
+                for round_ in phase.rounds
+                for match in round_.matches
+                if match.outcome is not None
+            ],
+            match_format=phase.match_format,
+            sit_outs=[],
+        )
+    }
+
+
+def group_standings(
+    tournament: Tournament, phase: TournamentPhase
+) -> tuple[GroupStandingRow, ...]:
+    """The group phase's standings now, best first (FR-060, ADR-009).
+
+    A round robin's by BR-101 (`_standings_of`), a Swiss's by BR-070 to
+    BR-074 (`_swiss_standings_of`). A Monster DYP has none yet.
+    """
+    match phase.format:
+        case PhaseFormat.ROUND_ROBIN:
+            return tuple(
+                GroupStandingRow(
+                    place=row.place,
+                    entry_id=row.entry_id,
+                    played=row.played,
+                    won=row.won,
+                    drawn=row.drawn,
+                    lost=row.lost,
+                    sat_out=row.sat_out,
+                    points=row.points,
+                    game_difference=row.game_difference,
+                    score_difference=row.score_difference,
+                    form=row.form,
+                    ahead_by=row.ahead_by,
+                    bh1=None,
+                    bh2=None,
+                )
+                for row in _standings_of(tournament, phase)
+            )
+        case PhaseFormat.SWISS:
+            games = _swiss_game_differences(tournament, phase)
+            return tuple(
+                GroupStandingRow(
+                    place=row.place,
+                    entry_id=row.entry_id,
+                    played=row.played,
+                    won=row.won,
+                    drawn=row.drawn,
+                    lost=row.lost,
+                    sat_out=row.sat_out,
+                    points=row.points,
+                    game_difference=games[row.entry_id],
+                    score_difference=row.score_difference,
+                    form=(),
+                    ahead_by=None,
+                    bh1=row.bh1,
+                    bh2=row.bh2,
+                )
+                for row in _swiss_standings_of(tournament, phase)
+            )
+        case PhaseFormat.MONSTER_DYP | PhaseFormat.SINGLE_ELIMINATION:
+            return ()
+        case _:
+            assert_never(phase.format)
+
+
+def tie_groups(rows: Iterable[GroupStandingRow]) -> tuple[tuple[EntryId, ...], ...]:
+    """The standings as tie groups by place, best first (BR-074, BR-103).
+
+    The knockout's cut and the places take these; where a strict order is
+    needed, they apply their own lot (BR-074).
+    """
+    groups: dict[int, list[EntryId]] = {}
+    for row in rows:
+        groups.setdefault(row.place, []).append(row.entry_id)
+    return tuple(tuple(groups[place]) for place in sorted(groups))
 
 
 def _load_tournament(
@@ -2798,10 +3099,9 @@ def read_play(
         for slot in waiting_order(matches=slots, fields=fields)
     )
     group = _group_phase(tournament)
-    round_robin = group is not None and group.format is PhaseFormat.ROUND_ROBIN
     return PlayView(
         waiting=waiting,
-        standings=_standings_of(tournament, group) if group and round_robin else (),
+        standings=() if group is None else group_standings(tournament, group),
         group_done=group is not None and bool(group.rounds) and _is_done(group),
     )
 
@@ -3044,18 +3344,266 @@ def place_matches(
     )
 
 
+# ---------------------------------------------------------------- Swiss rounds
+
+
+def _require_swiss(tournament: Tournament) -> TournamentPhase:
+    """The Swiss group phase whose rounds are added and deleted (FR-040, FR-046).
+
+    Any other group phase, or none, is 422 `format_not_supported` (detail
+    `format`); Monster DYP rounds come later.
+    """
+    group = _group_phase(tournament)
+    if group is None or group.format is not PhaseFormat.SWISS:
+        format_ = tournament.phases[0].format if group is None else group.format
+        raise RuleViolationError(ErrorCode.FORMAT_NOT_SUPPORTED, format=format_)
+    return group
+
+
+def _require_no_knockout(tournament: Tournament) -> None:
+    """Refuse a change to the group phase once the knockout is drawn (BR-053).
+
+    422 `group_phase_locked` with the knockout's `phase_id`; deleting the
+    knockout unlocks it (BR-087).
+    """
+    knockout = knockout_bracket(tournament)
+    if knockout is not None:
+        raise RuleViolationError(
+            ErrorCode.GROUP_PHASE_LOCKED, phase_id=str(knockout.phase.id)
+        )
+
+
+def add_round(
+    session: Session,
+    *,
+    league_id: UUID,
+    tournament_id: UUID,
+    user_id: UUID,
+    expected_round_no: int,
+    clock: Clock,
+) -> DrawnRoundView:
+    """Draw the next round of a Swiss from the standings (FR-040, FR-042).
+
+    The request carries the number the new round expects, the newest round's
+    plus one: any other is 409 `round_number_changed` (detail
+    `current_round_no`, the newest round's), so a repeat draws nothing
+    (ADR-008). A closed season is 409 `season_closed`, a tournament not in
+    progress 409 `tournament_not_in_progress`. A group phase that is not a
+    Swiss is 422 `format_not_supported`; once the knockout is drawn, 422
+    `group_phase_locked`. A match of the newest round without a result is 422
+    `round_not_complete` (detail `matches_left`), and fewer than 2 entries
+    that are not disabled 422 `not_enough_entries`.
+
+    The round is drawn from the standings over every stored round (BR-056 to
+    BR-058, ADR-011), leaving out disabled entries, whose participation is
+    `disabled` (BR-064). The rounds before it are locked from now on
+    (BR-065), and its first matches take the free fields (BR-130). The round
+    comes back with what a lot decided and which pairs repeat (ADR-009).
+    """
+    league, tournament = _lock_tournament(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user_id,
+        rounds=True,
+    )
+    _require_open_season(league, tournament)
+    if tournament.state is not TournamentState.IN_PROGRESS:
+        raise ConflictError(
+            ErrorCode.TOURNAMENT_NOT_IN_PROGRESS, state=tournament.state
+        )
+    group = _require_swiss(tournament)
+    _require_no_knockout(tournament)
+    newest = group.rounds[-1]  # a running Swiss has round 1 (FR-046)
+    if expected_round_no != newest.round_no + 1:
+        raise ConflictError(
+            ErrorCode.ROUND_NUMBER_CHANGED, current_round_no=newest.round_no
+        )
+    left = sum(match.outcome is None for match in _played(newest))
+    if left:
+        raise RuleViolationError(ErrorCode.ROUND_NOT_COMPLETE, matches_left=left)
+    main = _main_entries(tournament)
+    disabled = {EntryId(entry.id) for entry in main if entry.is_disabled}
+    try:
+        draw = draw_next_swiss_round(
+            _swiss_standings_of(tournament, group),
+            _swiss_rounds(group),
+            disabled=sorted(disabled),
+        )
+    except EngineError as err:
+        raise to_app_error(err) from err
+    now = clock()
+    members = {
+        entry.id: sorted(member.player_id for member in entry.members) for entry in main
+    }
+    rows = _schedule_rows(
+        group, [_swiss_round_of(draw)], members, now, disabled=disabled
+    )
+    _insert_schedule(session, rows)  # the matches exist before a field references one
+    tournament.updated_at = now
+    _fill_fields(tournament, [*_match_slots(tournament), *rows.slots], now)
+    session.flush()
+    round_id = rows.rounds[0]["id"]
+    view = read_tournament(
+        session, league_id=league_id, tournament_id=tournament.id, user_id=user_id
+    )
+    round_ = next(round_ for round_ in view.rounds if round_.id == round_id)
+    # The schedule rows number the matches in the order of the pairs, from 1.
+    pairs = dict(enumerate(draw.pairs, start=1))
+    return DrawnRoundView(
+        id=round_.id,
+        phase_id=round_.phase_id,
+        round_no=round_.round_no,
+        matches=tuple(
+            DrawnMatchView(
+                id=match.id,
+                round_id=match.round_id,
+                position=match.position,
+                kind=match.kind,
+                sides=match.sides,
+                outcome=match.outcome,
+                is_walkover=match.is_walkover,
+                games=match.games,
+                result_entered_at=match.result_entered_at,
+                is_repeat=pairs[match.position].is_repeat,
+                is_decided_by_lot=pairs[match.position].is_decided_by_lot,
+            )
+            for match in round_.matches
+        ),
+        sitting_out=round_.sitting_out,
+        is_sit_out_by_lot=draw.is_sit_out_by_lot,
+    )
+
+
+def delete_round(
+    session: Session,
+    *,
+    league_id: UUID,
+    tournament_id: UUID,
+    round_id: UUID,
+    user_id: UUID,
+    clock: Clock,
+) -> None:
+    """Delete the newest round of a Swiss, with any results in it (FR-046, BR-066).
+
+    The round is named by its id (ADR-008): an unknown one, one of another
+    tournament or a repeated delete is 404 `round_not_found`. A closed season
+    is 409 `season_closed`, a tournament not in progress 409
+    `tournament_not_in_progress`. A round of another group format is 422
+    `format_not_supported`; once the knockout is drawn, 422
+    `group_phase_locked` (delete the knockout first, BR-087). A round that is
+    not the newest is 409 `round_not_newest` (detail `round_id`, the newest
+    round's).
+
+    The fields let go of its matches, and its matches and participation go
+    with it; the round before it is unlocked (BR-066), since the newest round
+    is found on every write. Deleting round 1 takes the tournament back to
+    setup, as "back to setup" does but with results allowed (FR-036, FR-046):
+    every round goes, the entries, seeds and draws stay, and every disabled
+    flag is cleared. Late entries, which would become ordinary entries of the
+    setup and be drawn again (DATA-MODEL §4.5), come with P14.
+    """
+    league, tournament = _lock_tournament(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user_id,
+        rounds=True,
+    )
+    _require_open_season(league, tournament)
+    group = _group_phase(tournament)
+    round_ = next(
+        (r for r in ([] if group is None else group.rounds) if r.id == round_id),
+        None,
+    )
+    if group is None or round_ is None:
+        raise NotFoundError(ErrorCode.ROUND_NOT_FOUND)
+    if tournament.state is not TournamentState.IN_PROGRESS:
+        raise ConflictError(
+            ErrorCode.TOURNAMENT_NOT_IN_PROGRESS, state=tournament.state
+        )
+    _require_swiss(tournament)
+    _require_no_knockout(tournament)
+    newest = group.rounds[-1]
+    if round_ is not newest:
+        raise ConflictError(ErrorCode.ROUND_NOT_NEWEST, round_id=str(newest.id))
+    now = clock()
+    if round_.round_no == 1:
+        _reset_to_setup(session, tournament, now)
+        return
+    matches = {match.id for match in round_.matches}
+    for field in tournament.fields:
+        if field.match_id in matches:
+            field.match_id = None
+            field.updated_at = now
+    session.flush()  # the fields let go of the matches before they are deleted
+    group.rounds.remove(round_)
+    tournament.updated_at = now
+    session.flush()  # the matches are gone before the free fields take the next ones
+    _fill_fields(tournament, _match_slots(tournament), now)
+    session.flush()
+
+
+def set_tiebreakers(
+    session: Session,
+    *,
+    league_id: UUID,
+    tournament_id: UUID,
+    user_id: UUID,
+    tiebreakers: Sequence[Tiebreaker],
+    clock: Clock,
+) -> TournamentView:
+    """Set which tie-breakers a Swiss or Monster DYP uses, in order (FR-043, BR-072).
+
+    The target state: the enabled tie-breakers, first one first; an empty
+    list orders entries level on points by lot alone (BR-074). A repeat
+    changes nothing (ADR-008). Allowed in setup and while the tournament runs,
+    since the standings are computed on read (ADR-009). A finished tournament
+    is 409 `tournament_not_in_progress`, a closed season 409 `season_closed`.
+    A group phase that is not a Swiss or a Monster DYP, or none, is 422
+    `format_not_supported`; once the knockout is drawn the group standing is
+    fixed, 422 `group_phase_locked` (BR-053).
+    """
+    league, tournament = _lock_tournament(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user_id,
+        rounds=True,
+    )
+    _require_open_season(league, tournament)
+    if tournament.state is TournamentState.FINISHED:
+        raise ConflictError(
+            ErrorCode.TOURNAMENT_NOT_IN_PROGRESS, state=tournament.state
+        )
+    group = _group_phase(tournament)
+    if group is None or group.format not in ROUND_BY_ROUND_FORMATS:
+        format_ = tournament.phases[0].format if group is None else group.format
+        raise RuleViolationError(ErrorCode.FORMAT_NOT_SUPPORTED, format=format_)
+    _require_no_knockout(tournament)
+    if group.tiebreakers != list(tiebreakers):
+        now = clock()
+        group.tiebreakers = list(tiebreakers)
+        group.updated_at = now
+        tournament.updated_at = now
+        session.flush()
+    return read_tournament(
+        session, league_id=league_id, tournament_id=tournament.id, user_id=user_id
+    )
+
+
 # ---------------------------------------------------------------- finishing
 
 
 def _require_group_only(tournament: Tournament) -> TournamentPhase:
-    """The round robin of a tournament without a knockout (FR-040).
+    """The round robin or Swiss of a tournament without a knockout (FR-040).
 
-    A knockout finishes by itself (FR-037), and Swiss and Monster DYP are not
-    played yet: 422 `format_not_supported` until they are.
+    A knockout finishes by itself (FR-037), and Monster DYP is not played
+    yet: 422 `format_not_supported` until it is.
     """
     group = _group_phase(tournament)
     last = tournament.phases[-1]
-    if group is not last or group.format is not PhaseFormat.ROUND_ROBIN:
+    if group is not last or group.format not in PLAYED_GROUP_FORMATS:
         raise RuleViolationError(ErrorCode.FORMAT_NOT_SUPPORTED, format=last.format)
     return group
 
@@ -3068,7 +3616,7 @@ def finish_tournament(
     user_id: UUID,
     clock: Clock,
 ) -> TournamentView:
-    """Finish a round robin without a knockout; the UI asks first (FR-040, FR-037).
+    """Finish a round robin or a Swiss without a knockout; the UI asks first (FR-040).
 
     The request expects the tournament in progress; in any other state it is
     409 `tournament_not_in_progress`, so a repeat changes nothing (ADR-008). A
@@ -3142,14 +3690,13 @@ class PlacesView:
     rows: tuple[PlaceView, ...]
 
 
-def _require_round_robin(tournament: Tournament) -> TournamentPhase:
-    """The round robin of a tournament, with or without a knockout after it.
+def _require_played_group(tournament: Tournament) -> TournamentPhase:
+    """The round robin or Swiss of a tournament, with or without a knockout after it.
 
-    Swiss and Monster DYP are not played yet: 422 `format_not_supported`
-    until they are.
+    Monster DYP is not played yet: 422 `format_not_supported` until it is.
     """
     group = _group_phase(tournament)
-    if group is None or group.format is not PhaseFormat.ROUND_ROBIN:
+    if group is None or group.format not in PLAYED_GROUP_FORMATS:
         last = tournament.phases[-1]
         raise RuleViolationError(ErrorCode.FORMAT_NOT_SUPPORTED, format=last.format)
     return group
@@ -3168,7 +3715,7 @@ def _placing_entries(tournament: Tournament) -> list[PlacingEntry]:
 
 def knockout_places(
     tournament: Tournament,
-    standings: Sequence[StandingRow],
+    standings: Sequence[GroupStandingRow],
     knockout: KnockoutBracket,
 ) -> tuple[EntryPlace, ...]:
     """Place a tournament whose knockout has every result (BR-102, BR-103).
@@ -3178,7 +3725,7 @@ def knockout_places(
     """
     return place_entries(
         _placing_entries(tournament),
-        standing=standing_of(standings),
+        standing=tie_groups(standings),
         knockout=knockout_results(knockout.played.values()),
         third_place_match=knockout.bracket.third_place_match,
     )
@@ -3249,7 +3796,7 @@ class _Placed:
     """A finished tournament's group standings, places and season points."""
 
     group: TournamentPhase | None
-    standings: tuple[StandingRow, ...]
+    standings: tuple[GroupStandingRow, ...]
     knockout: KnockoutBracket | None
     places: tuple[EntryPlace, ...]
     points: tuple[PlayerPoints, ...]
@@ -3258,24 +3805,25 @@ class _Placed:
 def _placed(tournament: Tournament, placement_points: Sequence[int]) -> _Placed:
     """Place a finished tournament's entries and give them the table's points.
 
-    Without a knockout the round robin's standings are the places (BR-101,
-    BR-103); with one, the knockout entries take the top places by BR-102 and
-    the rest follow in their group-phase order (BR-103). A knockout without a
-    group phase places every entry by BR-102 alone (FR-031). Each player earns
-    the placement points of their place, entries sharing a place the average
-    of the places they cover, rounded down (BR-110, BR-111). Swiss and Monster
-    DYP are 422 `format_not_supported` until they are played.
+    Without a knockout the group phase's standings are the places (BR-101,
+    BR-103; a Swiss's by BR-072 to BR-074); with one, the knockout entries
+    take the top places by BR-102 and the rest follow in their group-phase
+    order (BR-103). A knockout without a group phase places every entry by
+    BR-102 alone (FR-031). Each player earns the placement points of their
+    place, entries sharing a place the average of the places they cover,
+    rounded down (BR-110, BR-111). Monster DYP is 422 `format_not_supported`
+    until it is played.
     """
     group = _group_phase(tournament)
     knockout = knockout_bracket(tournament)
     if group is None and knockout is not None:
-        standings: tuple[StandingRow, ...] = ()  # a knockout from the start
+        standings: tuple[GroupStandingRow, ...] = ()  # a knockout from the start
     else:
-        group = _require_round_robin(tournament)
-        standings = _standings_of(tournament, group)
+        group = _require_played_group(tournament)
+        standings = group_standings(tournament, group)
     if knockout is None:
         places = place_entries(
-            _placing_entries(tournament), standing=standing_of(standings)
+            _placing_entries(tournament), standing=tie_groups(standings)
         )
     else:
         places = knockout_places(tournament, standings, knockout)
@@ -3303,7 +3851,7 @@ def view_places(
 
     Read without a lock and computed on read (D1), with the season's table
     (BR-110, BR-111). A tournament not yet finished has no places. Without a
-    knockout the round robin's standings are the places; with one, the knockout
+    knockout the group phase's standings are the places; with one, the knockout
     entries take the top places by BR-102 and the rest follow in their
     group-phase order (BR-103). With `past_setup`, a tournament in setup is 404
     `tournament_not_found`, like an unknown one (FR-070).
@@ -3368,19 +3916,18 @@ def view_places(
 
 def view_group_standings(
     session: Session, *, league: League, tournament_id: UUID, past_setup: bool = False
-) -> tuple[StandingRow, ...]:
-    """Return the round robin's standings now, none for other formats (FR-060).
+) -> tuple[GroupStandingRow, ...]:
+    """Return the group phase's standings now: a round robin's or a Swiss's (FR-060).
 
-    The same standings as the play read's (`read_play`). With `past_setup`, a
-    tournament in setup is 404 `tournament_not_found` (FR-070).
+    The same standings as the play read's (`read_play`); none without a group
+    phase or for a Monster DYP. With `past_setup`, a tournament in setup is
+    404 `tournament_not_found` (FR-070).
     """
     tournament = _load_tournament(
         session, league=league, tournament_id=tournament_id, past_setup=past_setup
     )
     group = _group_phase(tournament)
-    if group is None or group.format is not PhaseFormat.ROUND_ROBIN:
-        return ()
-    return _standings_of(tournament, group)
+    return () if group is None else group_standings(tournament, group)
 
 
 def finished_season_points(

@@ -187,6 +187,8 @@ export function roundRobinStandings(
         points: 0,
         game_difference: 0,
         score_difference: 0,
+        bh1: null,
+        bh2: null,
       },
     ]),
   );

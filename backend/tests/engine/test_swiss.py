@@ -515,16 +515,55 @@ def test_adr011_a_forced_repeat_keeps_the_other_pairs_close_in_the_standings() -
 def test_br058_the_lowest_placed_of_those_with_fewest_sit_outs_sits_out() -> None:
     lines = [*table(1, 2, 3, 4), line(5, 5, sat_out=1)]
 
-    draw = draw_next_swiss_round(lines, met((1, 2)))
+    draw = draw_next_swiss_round(
+        lines, [round_(1, match(1, 2), match(3, 4), sat_out=5)]
+    )
 
     assert draw.sitting_out == eid(4)
     assert pairs(draw) == [(1, 3), (2, 5)]
 
 
+def test_br058_who_sat_out_the_round_before_is_picked_last() -> None:
+    # 5 is placed lowest but sat out round 1, so the lowest of the others sits out.
+    rounds = [round_(1, match(1, 2), match(3, 4), sat_out=5)]
+
+    draw = draw_next_swiss_round(table(1, 2, 3, 4, 5), rounds)
+
+    assert draw.sitting_out == eid(4)
+
+
+def test_br058_br067_a_missed_round_counts_as_a_sit_out() -> None:
+    # 5 joined after round 1: it missed the round before, so it plays.
+    rounds = [round_(1, match(1, 2), match(3, 4))]
+
+    draw = draw_next_swiss_round(table(1, 2, 3, 4, 5), rounds)
+
+    assert draw.sitting_out == eid(4)
+    assert pairs(draw) == [(1, 3), (2, 5)]
+
+
+def test_br058_the_round_before_comes_before_the_fewest_sit_outs() -> None:
+    # 1 to 4 sat out twice each, 5 once, in round 9: 5 has the fewest
+    # sit-outs and the lowest place, but sat out the round before, so it plays.
+    # Of 1 to 4, only 1 sitting out forces a repeat (2, 3, 4 and 5 have all
+    # met), so the lowest of 2 to 4 sits out.
+    turns = (1, 2, 3, 4, 1, 2, 3, 4, 5)
+    rounds = []
+    for number, out in enumerate(turns, start=1):
+        a, b, c, d = sorted(set(range(1, 6)) - {out})
+        rounds.append(round_(number, match(a, d), match(b, c), sat_out=out))
+
+    draw = draw_next_swiss_round(table(1, 2, 3, 4, 5), rounds)
+
+    assert draw.sitting_out == eid(4)
+    assert not draw.is_sit_out_by_lot
+
+
 def test_br058_the_lot_decides_the_sit_out_between_entries_sharing_a_place() -> None:
     lines = [*table(1, 2, 3), line(4, 4, place=4), line(5, 5, place=4)]
+    rounds = [round_(1, match(1, 2), match(4, 5), sat_out=3)]
 
-    draw = draw_next_swiss_round(lines, met((1, 2)))
+    draw = draw_next_swiss_round(lines, rounds)
 
     assert draw.sitting_out == eid(5)
     assert draw.is_sit_out_by_lot
@@ -534,10 +573,15 @@ def test_br058_the_lot_decides_the_sit_out_between_entries_sharing_a_place() -> 
 def test_br058_a_lot_between_entries_with_other_sit_out_counts_decides_nothing() -> (
     None
 ):
+    # 3 and 4 share 3rd, but 3 has sat out once and 4 never: 4 sits out.
     lines = [*table(1, 2), line(3, 3, place=3, sat_out=1), line(4, 4, place=3)]
     lines.append(line(5, 5, sat_out=1))
+    rounds = [
+        round_(1, match(1, 2), match(4, 5), sat_out=3),
+        round_(2, match(1, 3), match(2, 4), sat_out=5),
+    ]
 
-    draw = draw_next_swiss_round(lines, met((1, 2)))
+    draw = draw_next_swiss_round(lines, rounds)
 
     assert draw.sitting_out == eid(4)
     assert not draw.is_sit_out_by_lot
@@ -550,12 +594,16 @@ def test_br064_disabled_entries_are_not_drawn_and_do_not_sit_out() -> None:
     assert pairs(draw) == [(1, 3), (2, 4)]
 
 
-def test_br058_disabled_entries_do_not_count_for_the_sit_out() -> None:
-    draw = draw_next_swiss_round(table(1, 2, 3, 4, 5), met((1, 2)), disabled=ids(5, 4))
+def test_br058_the_sit_out_leaves_the_fewest_repeat_opponents() -> None:
+    # 4 and 5 are disabled and do not count. If 3, the lowest, sat out, 1 and
+    # 2 would meet again; with 2 out, 1 v 3 is new, so 2 sits out.
+    rounds = [round_(1, match(1, 2), match(3, 4), sat_out=5)]
 
-    assert draw.sitting_out == eid(3)
-    assert pairs(draw) == [(1, 2)]
-    assert draw.pairs[0].is_repeat
+    draw = draw_next_swiss_round(table(1, 2, 3, 4, 5), rounds, disabled=ids(5, 4))
+
+    assert draw.sitting_out == eid(2)
+    assert pairs(draw) == [(1, 3)]
+    assert not draw.pairs[0].is_repeat
 
 
 @pytest.mark.parametrize("disabled", [ids(1, 2), ids(2)])
@@ -861,15 +909,34 @@ def test_br058_every_entry_plays_once_or_sits_out(
     assert (result.sitting_out is not None) == (len(active) % 2 == 1)
     assert Counter(drawn) == Counter(playing_entries(lines, disabled, result))
     if result.sitting_out is not None:
-        # BR-058: the lowest-placed of those with the fewest sit-outs.
-        fewest = min(s.sat_out for s in active)
-        candidates = [s for s in active if s.sat_out == fewest]
+        # BR-058: those who played the round before, then the fewest missed
+        # rounds, then the fewest repeat opponents left, then the lowest place.
+        def key(entry: EntryId) -> tuple[bool, int]:
+            missed = [
+                all(entry not in (m.side_1, m.side_2) for m in r.matches)
+                for r in rounds
+            ]
+            return missed[-1], sum(missed)
+
+        best = min(key(s.entry_id) for s in active)
+        candidates = [s for s in active if key(s.entry_id) == best]
         sitting = next(s for s in lines if s.entry_id == result.sitting_out)
         assert sitting in candidates
-        assert all(sitting.place >= s.place for s in candidates)
-        assert result.is_sit_out_by_lot == any(
-            s.place == sitting.place for s in candidates if s is not sitting
-        )
+        if len(active) <= 11:  # the brute force of `min_repeats`
+            met = met_pairs(rounds)
+            ids_ = [s.entry_id for s in active]
+            left = {
+                s.entry_id: min_repeats([e for e in ids_ if e != s.entry_id], met)
+                for s in candidates
+            }
+            candidates = [
+                s for s in candidates if left[s.entry_id] == min(left.values())
+            ]
+            assert sitting in candidates
+            assert all(sitting.place >= s.place for s in candidates)
+            assert result.is_sit_out_by_lot == any(
+                s.place == sitting.place for s in candidates if s is not sitting
+            )
 
 
 @settings(deadline=None)
@@ -1096,4 +1163,27 @@ def test_adr011_benchmark_64_entries_over_7_rounds_take_under_a_second() -> None
     elapsed = perf_counter() - start
 
     assert len(rounds) == 7
+    assert elapsed < 1.0
+
+
+@pytest.mark.benchmark
+def test_br058_benchmark_the_repeat_key_below_dirac_takes_under_a_second() -> None:
+    # The slowest case of BR-058's repeat-opponent key (ADR-011): 39 entries
+    # in round 20, the largest odd field below n >= 2r + 2 within 20 rounds.
+    # 40 entries played rounds 1 to 19 and one is disabled now, so all 39 are
+    # level on the first two keys, and the round is paired once per entry.
+    rounds = run_swiss(40, 19, SEED)
+    lines = swiss_standings(
+        ids(*range(1, 41)),
+        rounds,
+        tiebreakers=DEFAULT_TIEBREAKERS,
+        sit_out_points=0,
+        rng_seed=SEED,
+    )
+
+    start = perf_counter()
+    drawn = draw_next_swiss_round(lines, rounds, disabled=[eid(40)])
+    elapsed = perf_counter() - start
+
+    assert drawn.sitting_out is not None
     assert elapsed < 1.0

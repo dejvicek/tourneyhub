@@ -651,6 +651,35 @@ def test_fr037_a_knockout_is_not_finished_by_hand(
     }
 
 
+def test_fr045_a_knockout_without_a_group_phase_draws_no_second_knockout(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    started: Callable[..., Json],
+) -> None:
+    tournament = started(4)
+
+    response = client.put(
+        _t_url(league_id, tournament["id"], "/knockout"),
+        json={
+            "expected_current_phase_id": tournament["current_phase_id"],
+            "expected_qualifier_ids": [],
+            "qualifiers": 2,
+            "third_place_match": False,
+            "match_format": None,
+            "final_match_format": None,
+            "mode": None,
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "code": "format_not_supported",
+        "detail": {"format": "single_elimination"},
+    }
+
+
 def test_fr054_the_final_gets_a_format_of_its_own_after_a_knockout_only_start(
     client: TestClient,
     league_id: UUID,

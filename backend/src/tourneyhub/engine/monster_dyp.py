@@ -42,28 +42,6 @@ type Team = tuple[PlayerId, PlayerId]
 """Two partners: the side of a Monster DYP match (DATA-MODEL D2)."""
 
 
-class TopPlayerOrder(StrEnum):
-    """Which players count as top players first (FR-041, BR-061).
-
-    Players marked by the organizer come first, then the others; the first as
-    many as the round has matches are its top players. The unmarked ones are
-    always taken from the league ranking (FR-041); this order only sorts the
-    marked ones.
-
-    The PRD has settled it: the marked players who play count in league-ranking
-    order (BR-061, FR-041), so `LEAGUE_RANKING` is the only rule and there is no
-    setting. This enum and `MonsterDypOptions.top_player_order` stay until
-    issue #60 removes them.
-    """
-
-    LEAGUE_RANKING = "league_ranking"
-    """The league ranking (BR-020), as ADR-011 and DATA-MODEL propose."""
-
-    STANDING = "standing"
-    """The marked players in the order the round is drawn from: the league
-    ranking in round 1, the current standing in round 2."""
-
-
 class GroupingMethod(StrEnum):
     """How a round's groups were found (BR-060 to BR-062, ADR-011)."""
 
@@ -75,45 +53,6 @@ class GroupingMethod(StrEnum):
 
     MATCHING = "matching"
     """The swaps got stuck; a minimum-cost matching formed the teams (ADR-011)."""
-
-
-@dataclass(frozen=True, slots=True, kw_only=True)
-class MonsterDypOptions:
-    """Rules once left open, as parameters (BR-061, BR-063, issue #24).
-
-    The PRD has since settled all three (BR-061, BR-063 as reviewed in #46):
-    top players are not exempt from the sit-out lot, the marked players count in
-    league-ranking order, and players who did not sit out the round before are
-    picked to sit out first, before the fewest sit-outs. So the options are
-    obsolete: the first two are always off and `LEAGUE_RANKING`, and
-    `avoids_sitting_out_twice_in_a_row` is always on, with that priority (the
-    code below puts the fewest sit-outs first). Issue #60 removes the options and
-    follows BR-063, including a missed round counting as a sit-out for the order
-    (BR-064, BR-067).
-
-    Attributes:
-        are_top_players_exempt: In rounds 1 and 2, the top players never sit
-            out; the sit-out lot is drawn among the others. Off, as BR-061
-            and BR-063 say: the top players are chosen after the sit-outs.
-        top_player_order: In which order the marked players count first as top
-            players (FR-041); the unmarked always follow the league ranking.
-        avoids_sitting_out_twice_in_a_row: Among players with as few
-            sit-outs, those who sat out the previous round sit out last
-            (issue #24). BR-063 always puts the round-before rule first,
-            before the fewest sit-outs; issue #60 makes the engine follow
-            that.
-    """
-
-    are_top_players_exempt: bool = False
-    top_player_order: TopPlayerOrder = TopPlayerOrder.LEAGUE_RANKING
-    avoids_sitting_out_twice_in_a_row: bool = False
-
-
-DEFAULT_OPTIONS = MonsterDypOptions()
-"""No exemption and the league ranking, as BR-061 and BR-063 say.
-
-The round-before rule of BR-063 stays off until issue #60 changes the engine.
-"""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -177,7 +116,7 @@ class MonsterStanding:
         lost: Matches lost.
         sat_out: Rounds the player sat out (BR-063); missed rounds of a
             disabled or late player do not count here (BR-064, BR-067, FR-060).
-            BR-063 counts them for the sit-out order only; issue #60 adds that.
+            The sit-out order counts them, from the rounds (BR-063).
         is_decided_by_lot: The player shares their place, so the lot decided
             their position (ADR-009).
     """
@@ -423,19 +362,19 @@ def draw_monster_round(
     rng_seed: bytes,
     marked_top_players: Iterable[PlayerId] = (),
     disabled: Iterable[PlayerId] = (),
-    options: MonsterDypOptions = DEFAULT_OPTIONS,
 ) -> MonsterDraw:
     """Draw the next round of a Monster DYP (FR-041, FR-042, BR-060 to BR-063).
 
     1. **Who plays.** Disabled players are left out (BR-064). With m matches
        (the players left, divided by 4, rounded down), the extra one to three
-       sit out: those who have sat out the fewest times, the lot
-       `sit-out:round-<n>` deciding ties (BR-063).
+       sit out (BR-063): those who played the round before first, then those
+       who have missed the fewest rounds (a sit-out and a missed round both
+       count, BR-064, BR-067), the lot `sit-out:round-<n>` deciding ties.
     2. **Top players, rounds 1 and 2 (BR-061, FR-041).** The first m playing
-       players, those marked by the organizer first, in
-       `options.top_player_order`, and then the others in league-ranking
-       order. A marked player who sits out or is disabled is replaced by the
-       next one.
+       players, those marked by the organizer first and then the others, each
+       in league-ranking order. A marked player who sits out or is disabled
+       is replaced by the next one; top players are not exempt from sitting
+       out.
     3. **Groups (BR-060, BR-061).** In rounds 1 and 2, group g is the g-th
        top player and then the next three other players in standing order;
        from round 3, the playing players in standing order, four at a time.
@@ -471,7 +410,6 @@ def draw_monster_round(
         marked_top_players: The players the organizer marked as top players
             (FR-041, `entries.is_top_player`).
         disabled: The players disabled now (FR-044).
-        options: The rules the PRD leaves open.
 
     Raises:
         NotEnoughPlayersError: Fewer than 4 players are not disabled.
@@ -499,33 +437,23 @@ def draw_monster_round(
     if len(active) < MINIMUM_PLAYERS:
         raise NotEnoughPlayersError(minimum=MINIMUM_PLAYERS, given=len(active))
     match_count = len(active) // GROUP_SIZE
-    marked_order = (
-        ranking if options.top_player_order is TopPlayerOrder.LEAGUE_RANKING else order
-    )
 
     def pick_top_players(candidates: Iterable[PlayerId]) -> tuple[PlayerId, ...]:
         pool = set(candidates)
-        first = [player for player in marked_order if player in pool & marked]
+        first = [player for player in ranking if player in pool & marked]
         rest = [player for player in ranking if player in pool - marked]
         return tuple((first + rest)[:match_count])
 
     has_top_players = round_no <= TOP_PLAYER_ROUNDS
-    exempt = (
-        pick_top_players(active)
-        if has_top_players and options.are_top_players_exempt
-        else ()
-    )
     sitting_out, is_sit_out_by_lot = _choose_sit_outs(
         active,
         played_rounds,
         count=len(active) - GROUP_SIZE * match_count,
-        exempt=exempt,
         rng_seed=rng_seed,
         purpose=sit_out_purpose(round_no),
-        avoids_twice_in_a_row=options.avoids_sitting_out_twice_in_a_row,
     )
     playing = [player for player in active if player not in sitting_out]
-    top_players = (exempt or pick_top_players(playing)) if has_top_players else ()
+    top_players = pick_top_players(playing) if has_top_players else ()
     if top_players:
         others = [player for player in playing if player not in top_players]
         start = [
@@ -766,30 +694,39 @@ def _choose_sit_outs(
     rounds: Sequence[MonsterRound],
     *,
     count: int,
-    exempt: Iterable[PlayerId],
     rng_seed: bytes,
     purpose: str,
-    avoids_twice_in_a_row: bool,
 ) -> tuple[tuple[PlayerId, ...], bool]:
     """Choose who sits out, and whether the lot decided it (BR-063, ADR-009).
 
-    BR-063 picks first the players who did not sit out the round before, then
-    those with the fewest sit-outs (a missed round counts as one), then a lot.
-    This code puts the fewest sit-outs first and the round before second, only
-    when `avoids_twice_in_a_row` is set, and counts no missed round. Issue #60
-    changes it.
+    BR-063 picks first the players who played the round before, then those
+    who have missed the fewest rounds, then a lot. A missed round counts as
+    a sit-out here (BR-064, BR-067): a player who was not drawn into a round,
+    because they sat out, were disabled or had not joined, missed it.
     """
     if count == 0:
         return (), False
-    sat_out = Counter(player for round_ in rounds for player in round_.sat_out)
-    last = set(rounds[-1].sat_out) if rounds and avoids_twice_in_a_row else set()
+    played = Counter(
+        player
+        for round_ in rounds
+        for match in round_.matches
+        for player in (*match.team_1, *match.team_2)
+    )
+    last = (
+        {
+            player
+            for match in rounds[-1].matches
+            for player in (*match.team_1, *match.team_2)
+        }
+        if rounds
+        else set(active)
+    )
 
-    def rule(player: PlayerId) -> tuple[int, bool]:
-        return sat_out[player], player in last
+    def rule(player: PlayerId) -> tuple[bool, int]:
+        return player not in last, len(rounds) - played[player]
 
-    excluded = set(exempt)
     candidates = sorted(
-        (player for player in active if player not in excluded),
+        active,
         key=lambda player: (
             rule(player),
             lot_digest(rng_seed=rng_seed, purpose=purpose, candidate=player),

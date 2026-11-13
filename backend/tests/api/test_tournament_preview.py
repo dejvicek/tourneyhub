@@ -190,7 +190,9 @@ def test_br051_the_preview_names_the_players_who_sit_out_each_round(
     [
         pytest.param({}, 1, id="FR-032"),
         pytest.param({"type": "dyp"}, 3, id="BR-031"),
-        pytest.param({"group_phase": "swiss", "round_robin_legs": None}, 4, id="swiss"),
+        pytest.param(
+            {"group_phase": "swiss", "round_robin_legs": None}, 1, id="swiss-FR-032"
+        ),
         pytest.param(
             {
                 "group_phase": "none",

@@ -171,13 +171,25 @@ type DefinedMethods<T> = {
 
 /** "path method" for each method that both the contract and the generated schema define. */
 type Contract = ProvisionalPaths & SetupPaths;
-type Duplicates = {
-  [P in keyof Contract & keyof GeneratedPaths]: `${P} ${DefinedMethods<
-    Contract[P]
-  > &
-    DefinedMethods<GeneratedPaths[P]> &
-    string}`;
-}[keyof Contract & keyof GeneratedPaths];
+/**
+ * Swiss routes the backend serves since P12 but whose screens still call the
+ * demo version (same path, other response shape for the tie-breakers). The
+ * demo wins in MergePaths. Remove them with the screens' switch (step D4).
+ */
+type SwitchedLater =
+  | "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/rounds post"
+  | "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/rounds/{round_id} delete"
+  | "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/tiebreakers put";
+type Duplicates = Exclude<
+  {
+    [P in keyof Contract & keyof GeneratedPaths]: `${P} ${DefinedMethods<
+      Contract[P]
+    > &
+      DefinedMethods<GeneratedPaths[P]> &
+      string}`;
+  }[keyof Contract & keyof GeneratedPaths],
+  SwitchedLater
+>;
 
 /**
  * Fails `pnpm typecheck` once the backend serves a route the contract still
