@@ -3625,6 +3625,146 @@
         "title": "StartWrite",
         "type": "object"
       },
+      "SwissMatchRead": {
+        "description": "A match of a Swiss round just drawn, with what a lot decided (ADR-009).\n\n`is_repeat`: the two have met before, as no draw without a repeat existed\n(BR-057). `is_decided_by_lot`: a lot placed either entry in the standings\nthe pair was drawn from (BR-074).",
+        "properties": {
+          "games": {
+            "items": {
+              "$ref": "#/components/schemas/GameRead"
+            },
+            "title": "Games",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_decided_by_lot": {
+            "title": "Is Decided By Lot",
+            "type": "boolean"
+          },
+          "is_repeat": {
+            "title": "Is Repeat",
+            "type": "boolean"
+          },
+          "is_walkover": {
+            "title": "Is Walkover",
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MatchKind"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Outcome"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "result_entered_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Entered At"
+          },
+          "round_id": {
+            "format": "uuid",
+            "title": "Round Id",
+            "type": "string"
+          },
+          "sides": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "$ref": "#/components/schemas/MatchSideRead"
+              },
+              {
+                "$ref": "#/components/schemas/MatchSideRead"
+              }
+            ],
+            "title": "Sides",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "round_id",
+          "position",
+          "kind",
+          "sides",
+          "outcome",
+          "is_walkover",
+          "games",
+          "result_entered_at",
+          "is_repeat",
+          "is_decided_by_lot"
+        ],
+        "title": "SwissMatchRead",
+        "type": "object"
+      },
+      "SwissRoundRead": {
+        "description": "A Swiss round just drawn: a `RoundRead` with what a lot decided (ADR-009).\n\n`is_sit_out_by_lot`: a lot picked the entry that sits out from candidates\nthat share its place (BR-058, BR-074). Only the draw returns these marks;\nthe tournament read shows the round without them.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_sit_out_by_lot": {
+            "title": "Is Sit Out By Lot",
+            "type": "boolean"
+          },
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/SwissMatchRead"
+            },
+            "title": "Matches",
+            "type": "array"
+          },
+          "phase_id": {
+            "format": "uuid",
+            "title": "Phase Id",
+            "type": "string"
+          },
+          "round_no": {
+            "title": "Round No",
+            "type": "integer"
+          },
+          "sitting_out": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Sitting Out",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "phase_id",
+          "round_no",
+          "matches",
+          "sitting_out",
+          "is_sit_out_by_lot"
+        ],
+        "title": "SwissRoundRead",
+        "type": "object"
+      },
       "Tiebreaker": {
         "description": "A tie-breaker of a Swiss or Monster DYP phase (FR-043, BR-073).",
         "enum": [
@@ -7781,7 +7921,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/rounds": {
       "post": {
-        "description": "Draw the next round of a Swiss from the current standings (FR-040, FR-042).\n\nEntries play their neighbour in the standings without meeting anyone\ntwice while that can be avoided (BR-056, BR-057, ADR-011); with an odd\nnumber one sits out (BR-058). Disabled entries are not drawn (BR-064).\nThe rounds before it lock (BR-065), and its first matches take the free\nfields (BR-130). Returns the new round.\n\n409: `round_number_changed` (the body's `expected_round_no` is not the\nnewest round's number plus one; detail `current_round_no`, the newest\nround's), `tournament_not_in_progress` (detail `state`) or\n`season_closed`. 422: `format_not_supported` (not a Swiss; detail\n`format`), `group_phase_locked` (the knockout is drawn; detail\n`phase_id`), `round_not_complete` (a match of the newest round has no\nresult; detail `matches_left`) or `not_enough_entries` (fewer than 2\nentries that are not disabled).",
+        "description": "Draw the next round of a Swiss from the current standings (FR-040, FR-042).\n\nEntries play their neighbour in the standings without meeting anyone\ntwice while that can be avoided (BR-056, BR-057, ADR-011); with an odd\nnumber one sits out (BR-058). Disabled entries are not drawn (BR-064).\nThe rounds before it lock (BR-065), and its first matches take the free\nfields (BR-130). Returns the new round, with what a lot decided and\nwhich pairs repeat (ADR-009).\n\n409: `round_number_changed` (the body's `expected_round_no` is not the\nnewest round's number plus one; detail `current_round_no`, the newest\nround's), `tournament_not_in_progress` (detail `state`) or\n`season_closed`. 422: `format_not_supported` (not a Swiss; detail\n`format`), `group_phase_locked` (the knockout is drawn; detail\n`phase_id`), `round_not_complete` (a match of the newest round has no\nresult; detail `matches_left`) or `not_enough_entries` (fewer than 2\nentries that are not disabled).",
         "operationId": "add_round",
         "parameters": [
           {
@@ -7820,7 +7960,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RoundRead"
+                  "$ref": "#/components/schemas/SwissRoundRead"
                 }
               }
             },

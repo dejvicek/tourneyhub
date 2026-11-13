@@ -433,6 +433,34 @@ class RoundRead(ResponseModel):
     sitting_out: list[UUID]
 
 
+class SwissMatchRead(MatchRead):
+    """A match of a Swiss round just drawn, with what a lot decided (ADR-009).
+
+    `is_repeat`: the two have met before, as no draw without a repeat existed
+    (BR-057). `is_decided_by_lot`: a lot placed either entry in the standings
+    the pair was drawn from (BR-074).
+    """
+
+    is_repeat: bool
+    is_decided_by_lot: bool
+
+
+class SwissRoundRead(ResponseModel):
+    """A Swiss round just drawn: a `RoundRead` with what a lot decided (ADR-009).
+
+    `is_sit_out_by_lot`: a lot picked the entry that sits out from candidates
+    that share its place (BR-058, BR-074). Only the draw returns these marks;
+    the tournament read shows the round without them.
+    """
+
+    id: UUID
+    phase_id: UUID
+    round_no: int
+    matches: list[SwissMatchRead]
+    sitting_out: list[UUID]
+    is_sit_out_by_lot: bool
+
+
 class FieldRead(ResponseModel):
     """A field and the match being played on it, null while it is free (D10)."""
 
@@ -1219,14 +1247,15 @@ def add_round(
     session: SessionDep,
     user: CurrentUserDep,
     clock: ClockDep,
-) -> RoundRead:
+) -> SwissRoundRead:
     """Draw the next round of a Swiss from the current standings (FR-040, FR-042).
 
     Entries play their neighbour in the standings without meeting anyone
     twice while that can be avoided (BR-056, BR-057, ADR-011); with an odd
     number one sits out (BR-058). Disabled entries are not drawn (BR-064).
     The rounds before it lock (BR-065), and its first matches take the free
-    fields (BR-130). Returns the new round.
+    fields (BR-130). Returns the new round, with what a lot decided and
+    which pairs repeat (ADR-009).
 
     409: `round_number_changed` (the body's `expected_round_no` is not the
     newest round's number plus one; detail `current_round_no`, the newest
@@ -1245,7 +1274,7 @@ def add_round(
         expected_round_no=body.expected_round_no,
         clock=clock,
     )
-    return RoundRead.model_validate(round_)
+    return SwissRoundRead.model_validate(round_)
 
 
 @router.delete(

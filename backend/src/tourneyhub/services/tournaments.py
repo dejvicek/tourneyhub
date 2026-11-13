@@ -1495,6 +1495,32 @@ class RoundView:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class DrawnMatchView(MatchView):
+    """A match of a Swiss round just drawn, with what a lot decided (ADR-009).
+
+    `is_repeat`: the two have met before, as no draw without a repeat existed
+    (BR-057). `is_decided_by_lot`: a lot placed either entry in the standings
+    the pair was drawn from (BR-074).
+    """
+
+    is_repeat: bool
+    is_decided_by_lot: bool
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DrawnRoundView(RoundView):
+    """A Swiss round just drawn, with what a lot decided (ADR-009).
+
+    `is_sit_out_by_lot`: a lot picked the entry that sits out from candidates
+    that share its place (BR-058, BR-074). Only the draw knows these marks;
+    nothing stores them.
+    """
+
+    matches: tuple[DrawnMatchView, ...]
+    is_sit_out_by_lot: bool
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class FieldView:
     id: UUID
     number: int
@@ -3355,7 +3381,7 @@ def add_round(
     user_id: UUID,
     expected_round_no: int,
     clock: Clock,
-) -> RoundView:
+) -> DrawnRoundView:
     """Draw the next round of a Swiss from the standings (FR-040, FR-042).
 
     The request carries the number the new round expects, the newest round's
@@ -3371,7 +3397,8 @@ def add_round(
     The round is drawn from the standings over every stored round (BR-056 to
     BR-058, ADR-011), leaving out disabled entries, whose participation is
     `disabled` (BR-064). The rounds before it are locked from now on
-    (BR-065), and its first matches take the free fields (BR-130).
+    (BR-065), and its first matches take the free fields (BR-130). The round
+    comes back with what a lot decided and which pairs repeat (ADR-009).
     """
     league, tournament = _lock_tournament(
         session,
@@ -3420,7 +3447,32 @@ def add_round(
     view = read_tournament(
         session, league_id=league_id, tournament_id=tournament.id, user_id=user_id
     )
-    return next(round_ for round_ in view.rounds if round_.id == round_id)
+    round_ = next(round_ for round_ in view.rounds if round_.id == round_id)
+    # The schedule rows number the matches in the order of the pairs, from 1.
+    pairs = dict(enumerate(draw.pairs, start=1))
+    return DrawnRoundView(
+        id=round_.id,
+        phase_id=round_.phase_id,
+        round_no=round_.round_no,
+        matches=tuple(
+            DrawnMatchView(
+                id=match.id,
+                round_id=match.round_id,
+                position=match.position,
+                kind=match.kind,
+                sides=match.sides,
+                outcome=match.outcome,
+                is_walkover=match.is_walkover,
+                games=match.games,
+                result_entered_at=match.result_entered_at,
+                is_repeat=pairs[match.position].is_repeat,
+                is_decided_by_lot=pairs[match.position].is_decided_by_lot,
+            )
+            for match in round_.matches
+        ),
+        sitting_out=round_.sitting_out,
+        is_sit_out_by_lot=draw.is_sit_out_by_lot,
+    )
 
 
 def delete_round(

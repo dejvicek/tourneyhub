@@ -82,6 +82,16 @@ def by_entry(rows: list[Json]) -> dict[str, Json]:
     return {row["entry_id"]: row for row in rows}
 
 
+def unmarked(round_: Json) -> Json:
+    """A drawn round without the marks only the draw returns (ADR-009)."""
+    matches = [
+        {k: v for k, v in match.items() if k not in {"is_repeat", "is_decided_by_lot"}}
+        for match in round_["matches"]
+    ]
+    rest = {k: v for k, v in round_.items() if k != "is_sit_out_by_lot"}
+    return {**rest, "matches": matches}
+
+
 @pytest.fixture
 def league(make_league: Callable[..., League]) -> League:
     return make_league()
@@ -685,10 +695,73 @@ def test_br056_the_next_round_pairs_neighbours_in_the_standings(
         [frozenset({one, two}), frozenset({three, four})], key=sorted
     )
     after = read(tournament["id"])
-    assert round_of(after, 2) == round_2
+    assert round_of(after, 2) == unmarked(round_2)
     assert {f["match_id"] for f in after["fields"]} == {
         m["id"] for m in round_2["matches"]
     }
+
+
+@pytest.mark.parametrize(
+    ("scores", "by_lot"),
+    [([(10, 5), (10, 5)], True), ([(10, 1), (10, 5)], False)],
+    ids=["level", "apart"],
+)
+def test_adr009_br056_a_pair_whose_place_a_lot_decided_is_marked(
+    swiss: Callable[..., Json],
+    play_round: Callable[..., Json],
+    add_round: Callable[[str, int], tuple[int, Json]],
+    scores: list[tuple[int, int]],
+    by_lot: bool,
+) -> None:
+    tournament = swiss(4)
+    play_round(tournament["id"], 1, scores)
+
+    status, round_2 = add_round(tournament["id"], 2)
+
+    # Level scores leave the two winners, and the two losers, sharing a place.
+    assert status == 201, round_2
+    assert [m["is_decided_by_lot"] for m in round_2["matches"]] == [by_lot, by_lot]
+    assert [m["is_repeat"] for m in round_2["matches"]] == [False, False]
+
+
+def test_adr009_br057_a_repeat_no_draw_avoids_is_marked(
+    swiss: Callable[..., Json],
+    play_round: Callable[..., Json],
+    add_round: Callable[[str, int], tuple[int, Json]],
+) -> None:
+    tournament = swiss(4)
+    repeats = []
+    for round_no in (2, 3, 4):
+        play_round(tournament["id"], round_no - 1)
+        status, drawn = add_round(tournament["id"], round_no)
+        assert status == 201, drawn
+        repeats.append([m["is_repeat"] for m in drawn["matches"]])
+
+    # Rounds 1 to 3 hold every pair of 4 entries, so round 4 repeats (BR-057).
+    assert repeats == [[False, False], [False, False], [True, True]]
+
+
+@pytest.mark.parametrize(
+    ("scores", "by_lot"),
+    [([(10, 5), (10, 5)], True), ([(10, 1), (10, 5)], False)],
+    ids=["level", "apart"],
+)
+def test_adr009_br058_a_sit_out_a_lot_decided_is_marked(
+    swiss: Callable[..., Json],
+    play_round: Callable[..., Json],
+    add_round: Callable[[str, int], tuple[int, Json]],
+    scores: list[tuple[int, int]],
+    by_lot: bool,
+) -> None:
+    tournament = swiss(5)
+    play_round(tournament["id"], 1, scores)
+
+    status, round_2 = add_round(tournament["id"], 2)
+
+    # The two losers of round 1 are the lowest that have not sat out yet.
+    assert status == 201, round_2
+    assert len(round_2["sitting_out"]) == 1
+    assert round_2["is_sit_out_by_lot"] is by_lot
 
 
 def test_adr008_a_stale_expected_round_number_is_409(
