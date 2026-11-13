@@ -15,13 +15,11 @@ from tourneyhub.db.models.accounts import User
 from tourneyhub.db.models.entries import Entry
 from tourneyhub.db.models.leagues import League, Player
 from tourneyhub.db.models.matches import Match, MatchGame, Round
-from tourneyhub.db.models.tournaments import Field, Tournament, TournamentPhase
+from tourneyhub.db.models.tournaments import Field, Tournament
 from tourneyhub.engine.accounts import Language
 from tourneyhub.engine.tournaments import (
-    DEFAULT_TIEBREAKERS,
     GroupPhase,
     Outcome,
-    PhaseFormat,
     SeedingMethod,
     TournamentType,
 )
@@ -349,10 +347,10 @@ def test_adr008_a_start_from_a_seed_order_the_review_did_not_show_is_stale(
         ),
         pytest.param(
             {"group_phase": "swiss", "round_robin_legs": None},
-            4,
-            "format_not_supported",
-            {"format": "swiss"},
-            id="swiss-later",
+            1,
+            "not_enough_entries",
+            {"minimum": 2, "given": 1},
+            id="FR-032-swiss",
         ),
         pytest.param(
             {
@@ -481,25 +479,6 @@ S1_WINS: Json = {
 }
 
 
-def _as_swiss(session: Session, setup: Json, *, points: int) -> None:
-    """Make the started tournament's phase a Swiss one that has these sit-out points.
-
-    The backend does not generate Swiss rounds yet, so a running Swiss phase is made
-    from a started round robin: its rounds and matches stay, the phase's settings
-    change (BR-071: Swiss and Monster DYP score a sit-out, a round robin does not).
-    """
-    phase = session.scalars(
-        select(TournamentPhase)
-        .where(TournamentPhase.tournament_id == UUID(setup["tournament_id"]))
-        .execution_options(populate_existing=True)
-    ).one()
-    phase.format = PhaseFormat.SWISS
-    phase.round_robin_legs = None
-    phase.tiebreakers = list(DEFAULT_TIEBREAKERS)
-    phase.sit_out_points = points
-    session.flush()
-
-
 def _sit_out(
     client: TestClient, league: League, headers: dict[str, str], tournament: Json
 ) -> int | None:
@@ -527,15 +506,18 @@ def _first_result(
 
 
 def test_br075_the_sit_out_points_cannot_change_while_the_phase_has_a_result(
-    client: TestClient,
-    league: League,
-    headers: dict[str, str],
-    players: list[str],
-    session: Session,
+    client: TestClient, league: League, headers: dict[str, str], players: list[str]
 ) -> None:
-    setup = _setup(client, league, headers, players[:3])
+    setup = _setup(
+        client,
+        league,
+        headers,
+        players[:3],
+        group_phase="swiss",
+        round_robin_legs=None,
+        sit_out_points=2,
+    )
     started = _started(client, league, setup, headers)
-    _as_swiss(session, setup, points=2)
     _first_result(client, league, headers, started)
 
     refused = client.put(

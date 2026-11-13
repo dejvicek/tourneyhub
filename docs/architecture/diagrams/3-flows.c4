@@ -138,22 +138,32 @@ views "III. Flows" {
     variant sequence
     title "11. Next round in a Swiss"
     order 13
-    description "ADR-011: BR-056 top-down; when it gets stuck, blossom matching on pairs that have not met. A round can be added once every match in the round has a result (FR-040)."
+    description "ADR-011: BR-056 top-down; when it gets stuck, blossom matching on pairs that have not met. Round 1 comes with the start, from the seeds (BR-055, BR-058). A round can be added once every match in the newest round has a result (FR-040); the rounds before it lock (BR-065). Deleting the newest round unlocks the one before (BR-066); deleting round 1 goes back to setup (FR-046). The standings and their tie-breakers are computed on read (ADR-009), so the order of the tie-breakers can change while the tournament runs (FR-043)."
     organizer -> tourneyhub.spa.organizerUi "add a round"
-    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "POST round with the expected round_no"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "POST …/rounds with the expected round_no"
     tourneyhub.api.tournamentsApi -> tourneyhub.db.leagues "locks the league"
-    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the tournament"
-    tourneyhub.api.tournamentsApi -> tourneyhub.db.play "checks round_no (otherwise 409) and the round's results, loads matches and participation"
-    tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "standings, sit-out (BR-058), BR-056 pairing, fallback matching if needed"
-    tourneyhub.api.tournamentsApi -> tourneyhub.db.play "stores the round, matches and round_participation"
-    tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "new round"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the tournament: not a Swiss or a knockout drawn 422"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.play "checks round_no (otherwise 409 round_number_changed) and the newest round's results (422 round_not_complete), loads matches and participation"
+    tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "standings, sit-out (BR-058), BR-056 pairing, fallback matching if needed; disabled entries left out (BR-064)"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.play "stores the round, matches and round_participation (disabled for a disabled entry); free fields take its matches"
+    tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "201: the new round"
+    opt "the organizer deletes the newest round" {
+      tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "DELETE …/rounds/{round_id}; a repeat 404, an older round 409 round_not_newest"
+      tourneyhub.api.tournamentsApi -> tourneyhub.db.play "frees its fields, deletes the round with its matches and participation; round 1: back to setup"
+      tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "204"
+    }
+    opt "the organizer reorders the tie-breakers" {
+      tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "PUT …/tiebreakers with the enabled ones in order"
+      tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "stores the phase's tiebreakers; a finished tournament 409, a knockout drawn 422"
+      tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: the tournament; GET …/play shows the new order"
+    }
   }
 
   dynamic view shareLink {
     variant sequence
     title "12. Viewer through the share link"
     order 14
-    description "FR-070 to FR-072: no account, read-only. The league, a season's tournaments and a tournament (P11); the season standings, a round robin's standings and the places (P10a) and the bracket (P10b), computed on every read (ADR-009). Every answer carries Cache-Control: no-store and Referrer-Policy: no-referrer, and the api logs the path as /public/***."
+    description "FR-070 to FR-072: no account, read-only. The league, a season's tournaments and a tournament (P11); the season standings, a round robin's or a Swiss's standings and the places (P10a, P12) and the bracket (P10b), computed on every read (ADR-009). Every answer carries Cache-Control: no-store and Referrer-Policy: no-referrer, and the api logs the path as /public/***."
     viewer -> tourneyhub.spa.publicUi "opens the link from the organizer"
     tourneyhub.spa.publicUi -> tourneyhub.api.publicApi "GET /api/v1/public/{share_token}, …/seasons/{season_id}/tournaments, …/seasons/{season_id}/standings, …/tournaments/{tournament_id}, …/tournaments/{tournament_id}/standings, …/tournaments/{tournament_id}/places, …/tournaments/{tournament_id}/bracket"
     tourneyhub.api.publicApi -> tourneyhub.db.leagues "finds the league by share token: one lookup on the unique index"
@@ -500,15 +510,15 @@ views "III. Flows" {
 
   dynamic view knockoutAfterRoundRobin {
     variant sequence
-    title "22. Knockout after a round robin"
+    title "22. Knockout after a round robin or a Swiss"
     order 26
-    description "FR-037, FR-045, FR-046, FR-054, BR-040 to BR-044, BR-053, BR-074, BR-080, BR-085, BR-087, BR-094, BR-102, BR-103, BR-120, ADR-008 and DATA-MODEL D4: the preview shows the cut, the seeds and the byes; the start carries the phase the screen saw as current. Knockout entries continue the qualifiers, every bracket match is created, and only the first round stores its sides; later sides are derived from the winners on every read. The final's own format can change while the final has no result. A result is locked while a later match it feeds has one; the last result finishes the tournament. Deleting the knockout by its phase id unlocks the round robin."
-    organizer -> tourneyhub.spa.organizerUi "round robin done: Draw the knockout, picks the number, the third-place match and the formats"
+    description "FR-037, FR-045, FR-046, FR-054, BR-040 to BR-044, BR-053, BR-074, BR-080, BR-085, BR-087, BR-094, BR-102, BR-103, BR-120, ADR-008 and DATA-MODEL D4: the preview shows the cut, the seeds and the byes; the start carries the phase the screen saw as current. Knockout entries continue the qualifiers, every bracket match is created, and only the first round stores its sides; later sides are derived from the winners on every read. The final's own format can change while the final has no result. A result is locked while a later match it feeds has one; the last result finishes the tournament. Deleting the knockout by its phase id unlocks the round robin, or a Swiss's newest round."
+    organizer -> tourneyhub.spa.organizerUi "group phase done: Draw the knockout, picks the number, the third-place match and the formats"
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "GET …/knockout/preview"
     tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "standings, the cut with the lot knockout-seeding for a tie, byes for the top seeds"
     tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: seeds, first round, bracket size, or the start's problem"
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "PUT …/knockout expecting the group phase as current"
-    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the league, then the tournament: another current phase 409; Swiss, Monster DYP or matches left 422"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the league, then the tournament: another current phase 409; Monster DYP or matches left 422"
     tourneyhub.api.tournamentsApi -> tourneyhub.db.play "the knockout phase, its entries, every match, the first round's sides; free fields take the playable matches"
     tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: the tournament"
     opt "the organizer changes the final's format" {
