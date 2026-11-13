@@ -3,6 +3,7 @@
 // unknown token is 404 share_link_not_found with an empty detail, as the
 // backend answers it; the token is never echoed.
 import { bracketOf, rankingOf, syncBracket } from "../finalsEngine";
+import { publicStandings } from "../playEngine";
 import { apiError, route } from "../route";
 import type { StoredTournament } from "../seed";
 import {
@@ -13,7 +14,6 @@ import {
   seasonStandingsOf,
   sharedLeague,
   tournamentRead,
-  tournamentStandings,
 } from "../store";
 
 /** A tournament of the share token's league that viewers may see (FR-070). */
@@ -88,7 +88,7 @@ export const publicHandlers = [
     ({ params }) => {
       const t = visibleTournament(params.share_token, params.tournament_id);
       return t
-        ? tournamentStandings(t)
+        ? publicStandings(t)
         : apiError(404, "not_found", { tournament_id: params.tournament_id });
     },
   ),
