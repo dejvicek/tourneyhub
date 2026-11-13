@@ -1,3 +1,4 @@
+import itertools
 from collections.abc import Iterable
 from dataclasses import replace
 from uuid import UUID
@@ -328,6 +329,30 @@ def test_br101_the_standings_are_ordered_and_balanced(
     assert sum(row.score_difference for row in rows) == 0
     for index, row in enumerate(rows):
         assert row.place in {index + 1, rows[index - 1].place}
+
+
+@given(results())
+def test_br101_level_entries_go_by_game_then_score_difference(
+    matches: list[PlayedMatch],
+) -> None:
+    rows = rank(ENTRIES, matches=matches)
+
+    for upper, lower in itertools.pairwise(rows):
+        if upper.points != lower.points:
+            continue
+        upper_key = (upper.game_difference, upper.score_difference)
+        lower_key = (lower.game_difference, lower.score_difference)
+        match upper.ahead_by:
+            case RoundRobinTiebreaker.HEAD_TO_HEAD:
+                continue  # exactly two level, decided by their matches
+            case RoundRobinTiebreaker.GAME_DIFFERENCE:
+                assert upper.game_difference > lower.game_difference
+            case RoundRobinTiebreaker.SCORE_DIFFERENCE:
+                assert upper.game_difference == lower.game_difference
+                assert upper.score_difference > lower.score_difference
+            case None:
+                assert upper_key == lower_key
+                assert upper.place == lower.place
 
 
 @given(results())
