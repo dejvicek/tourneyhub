@@ -24,6 +24,7 @@ from tourneyhub.services.tournaments.shared import (
     ROUND_BY_ROUND_FORMATS,
     Clock,
     _group_phase,
+    _insert_schedule,
     _lock_tournament,
     _main_entries,
     _match_slots,
@@ -32,7 +33,6 @@ from tourneyhub.services.tournaments.shared import (
     knockout_bracket,
 )
 from tourneyhub.services.tournaments.start import (
-    _insert_schedule,
     _reset_to_setup,
     _schedule_rows,
     _swiss_round_of,

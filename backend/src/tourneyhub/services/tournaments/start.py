@@ -6,22 +6,16 @@ from datetime import datetime
 from uuid import UUID, uuid7
 
 from pydantic import JsonValue
-from sqlalchemy import insert
 from sqlalchemy.orm import Session
 
 from tourneyhub.db.models.entries import Entry, EntryMember
-from tourneyhub.db.models.matches import (
-    Match,
-    MatchSide,
-    MatchSidePlayer,
-    Round,
-    RoundParticipation,
-)
+from tourneyhub.db.models.matches import Match, MatchSide, MatchSidePlayer, Round
 from tourneyhub.db.models.tournaments import Tournament, TournamentPhase
 from tourneyhub.engine.errors import EngineError
 from tourneyhub.engine.fields import MatchSlot
 from tourneyhub.engine.ids import EntryId, MatchId, PlayerId
 from tourneyhub.engine.knockout import MAX_KNOCKOUT_ENTRIES, Bracket, draw_bracket
+from tourneyhub.engine.ranking import RankedPlayer
 from tourneyhub.engine.schedule import (
     MAX_ROUND_ROBIN_ENTRIES,
     ScheduledMatch,
@@ -50,12 +44,20 @@ from tourneyhub.services.engine_errors import to_app_error
 from tourneyhub.services.leagues import get_league
 from tourneyhub.services.tournaments.entries import _check_dyp_draw
 from tourneyhub.services.tournaments.fields import _fill_fields
+from tourneyhub.services.tournaments.monster_dyp import (
+    draw_monster,
+    monster_schedule_rows,
+    ranked_entry_ids,
+)
 from tourneyhub.services.tournaments.places import _ranking
+from tourneyhub.services.tournaments.play import _player_of
 from tourneyhub.services.tournaments.shared import (
     Clock,
+    _insert_schedule,
     _lock_tournament,
     _main_entries,
     _match_slots,
+    _ScheduleRows,
     _tournament_query,
 )
 from tourneyhub.services.tournaments.views import (
@@ -68,11 +70,10 @@ from tourneyhub.services.tournaments.views import (
 def _check_ready(tournament: Tournament, phase: TournamentPhase) -> None:
     """Refuse a start whose setup is not complete (FR-032, FR-033, BR-030 to BR-032).
 
-    A round robin, a Swiss and a knockout without a group phase are generated
-    so far; Monster DYP is 422 `format_not_supported`. Doubles needs every
-    picked player in a pair (422 `players_without_partner`); DYP needs its
-    halves and pairs (the 422s of a new DYP draw); every type needs FR-032's
-    minimum of entries, 4 for a knockout with a third-place match (422
+    Doubles needs every picked player in a pair (422
+    `players_without_partner`); DYP needs its halves and pairs (the 422s of a
+    new DYP draw); every type needs FR-032's minimum of entries, 4 for a
+    knockout with a third-place match and 4 players for a Monster DYP (422
     `not_enough_entries`). A round robin takes at most
     `MAX_ROUND_ROBIN_ENTRIES` (422 `too_many_entries_for_round_robin`), a
     knockout `MAX_KNOCKOUT_ENTRIES` (422 `too_many_entries_for_knockout`); a
@@ -81,8 +82,9 @@ def _check_ready(tournament: Tournament, phase: TournamentPhase) -> None:
     if phase.format not in {
         PhaseFormat.ROUND_ROBIN,
         PhaseFormat.SWISS,
+        PhaseFormat.MONSTER_DYP,
         PhaseFormat.SINGLE_ELIMINATION,
-    }:
+    }:  # every format; a new one is refused until it is generated
         raise RuleViolationError(ErrorCode.FORMAT_NOT_SUPPORTED, format=phase.format)
     if tournament.type is TournamentType.DOUBLES:
         paired = {m.player_id for entry in tournament.entries for m in entry.members}
@@ -218,18 +220,6 @@ def _bracket_rounds(
     return rounds
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
-class _ScheduleRows:
-    """The rows of a round robin, one list per table, in insert order (D2, D5)."""
-
-    rounds: list[dict[str, object]]
-    matches: list[dict[str, object]]
-    sides: list[dict[str, object]]
-    side_players: list[dict[str, object]]
-    participation: list[dict[str, object]]
-    slots: list[MatchSlot]
-
-
 def _schedule_rows(
     phase: TournamentPhase,
     schedule: Sequence[ScheduledRound],
@@ -324,22 +314,6 @@ def _schedule_rows(
     return rows
 
 
-def _insert_schedule(session: Session, rows: _ScheduleRows) -> None:
-    """Write the schedule's rows in bulk, parents first.
-
-    A 64-entry double round robin has 4,032 matches and some 20,000 to 30,000
-    other rows; one ORM object per row would be far too slow.
-    """
-    for model, table_rows in (
-        (Round, rows.rounds),
-        (Match, rows.matches),
-        (MatchSide, rows.sides),
-        (MatchSidePlayer, rows.side_players),
-        (RoundParticipation, rows.participation),
-    ):
-        session.execute(insert(model), table_rows)
-
-
 def start_tournament(
     session: Session,
     *,
@@ -359,22 +333,26 @@ def start_tournament(
     a seed order that is not the entries' current one, seed 1 first, is 409
     `seed_order_changed`: the schedule is never drawn from a setup the
     organizer did not see. The seeds follow the entries, so the same check
-    covers a change to the players or to their pairs. A round robin, a Swiss
-    and a knockout without a group phase are generated so far; Monster DYP is
-    422 `format_not_supported`. An incomplete setup is a 422 (`_check_ready`).
+    covers a change to the players or to their pairs. A Monster DYP has no
+    seeds: its order is the main entries in league-ranking order, which round 1
+    is drawn from (`ranked_entry_ids`). An incomplete setup is a 422
+    (`_check_ready`).
 
     The round robin follows the seeds (BR-050 to BR-052); a Swiss gets round 1
     only, top half of the seeds against the bottom half, the lowest seed
     sitting out with an odd number (BR-055, BR-058), and its later rounds are
-    added one at a time (`add_round`, FR-040). Every main entry gets a
-    participation row in every round (D5). A knockout without a group phase
+    added one at a time (`add_round`, FR-040). A Monster DYP gets round 1
+    only: groups of four by the league ranking, a top player leading each
+    (BR-060, BR-061), the extra players sitting out (BR-063); its teams have
+    no entry (D2). Every main entry gets a participation row in every round
+    (D5). A knockout without a group phase
     (FR-031) is drawn from the setup seeds into the setup's phase: every
     bracket match at once, the byes for the top seeds in round 1 and the
     third-place match in the final's round (BR-040 to BR-044); only the first
     round stores its sides (D4). The first matches take the free fields in
     schedule order (BR-130). The draws stay as they are (ADR-010).
     """
-    _, tournament = _lock_tournament(
+    league, tournament = _lock_tournament(
         session,
         league_id=league_id,
         tournament_id=tournament_id,
@@ -390,6 +368,19 @@ def start_tournament(
     phase = tournament.phases[0]  # setup holds exactly one phase (D9)
     _check_ready(tournament, phase)
     main = _main_entries(tournament)
+    if phase.format is PhaseFormat.MONSTER_DYP:
+        # The ranking of setup, before the start makes it a lot (`_ranking`).
+        ranking = _ranking(session, league=league, tournament=tournament)
+        if list(expected_seed_order) != ranked_entry_ids(tournament, ranking):
+            raise ConflictError(ErrorCode.SEED_ORDER_CHANGED)
+        draw = draw_monster(tournament, phase, ranking=ranking)
+        now = clock()
+        rows = monster_schedule_rows(
+            phase, draw, {_player_of(entry): entry.id for entry in main}, now
+        )
+        return _write_group_start(
+            session, tournament, rows, now, league_id=league_id, user_id=user_id
+        )
     if list(expected_seed_order) != _seed_order_of(main):
         raise ConflictError(ErrorCode.SEED_ORDER_CHANGED)
     if phase.kind is PhaseKind.KNOCKOUT:
@@ -412,6 +403,21 @@ def start_tournament(
     schedule = _group_schedule(main, phase)
     now = clock()
     rows = _schedule_rows(phase, schedule, members, now)
+    return _write_group_start(
+        session, tournament, rows, now, league_id=league_id, user_id=user_id
+    )
+
+
+def _write_group_start(
+    session: Session,
+    tournament: Tournament,
+    rows: _ScheduleRows,
+    now: datetime,
+    *,
+    league_id: UUID,
+    user_id: UUID,
+) -> TournamentView:
+    """Store a group phase's first rounds, start, and fill the fields (BR-130)."""
     _insert_schedule(session, rows)  # the matches exist before a field references one
     tournament.state = TournamentState.IN_PROGRESS
     tournament.updated_at = now
@@ -462,8 +468,9 @@ class SchedulePreview:
 
     With a `problem` there are no rounds, no counts and no `seed_order`.
     `draw_counter` and `seed_order`, the main entries with seed 1 first, are
-    the ones the start must carry (ADR-008). A round robin lists all its rounds;
-    a Swiss its round 1, without counts, since its rounds come one at a time. A
+    the ones the start must carry (ADR-008), a Monster DYP's in league-ranking
+    order. A round robin lists all its rounds; a Swiss and a Monster DYP their
+    round 1, without counts, since their rounds come one at a time. A
     knockout without a group phase lists its first round, with the byes, and
     counts every match of the bracket (the third-place match too, no byes)
     and its rounds; `bracket_size` is its number of first-round spots.
@@ -504,11 +511,15 @@ def preview_schedule(
     start's own (`_check_ready`, `_group_schedule`), so a preview that can start
     is the schedule the start writes for the same draw counter. A refusal comes
     back as the `problem`, not as an error: the review screen shows it. A
-    Swiss shows round 1 only and no counts: its later rounds are drawn one at a
-    time from the standings (FR-040).
+    Swiss and a Monster DYP show round 1 only and no counts: their later rounds
+    are drawn one at a time from the standings (FR-040). A Monster DYP's round
+    1 is the start's own draw (`draw_monster`): its teams as player lists and
+    each player who sits out alone.
     """
     league = get_league(session, league_id=league_id, user_id=user_id)
-    tournament = session.scalars(_tournament_query(league, tournament_id)).one_or_none()
+    tournament = session.scalars(
+        _tournament_query(league, tournament_id, rounds=True)  # a draw reads them
+    ).one_or_none()
     if tournament is None:
         raise NotFoundError(ErrorCode.TOURNAMENT_NOT_FOUND)
     problem = _start_problem(tournament)
@@ -522,11 +533,12 @@ def preview_schedule(
             round_count=None,
             bracket_size=None,
         )
-    setup = _setup_of(
-        tournament, _ranking(session, league=league, tournament=tournament)
-    )
+    ranking = _ranking(session, league=league, tournament=tournament)
+    setup = _setup_of(tournament, ranking)
     players = {entry.id: entry.player_ids for entry in setup.entries}
     phase = tournament.phases[0]
+    if phase.format is PhaseFormat.MONSTER_DYP:
+        return _monster_preview(tournament, phase, ranking)
     if phase.kind is PhaseKind.KNOCKOUT:
         return _bracket_preview(
             tournament.draw_counter, _main_entries(tournament), phase, players
@@ -553,6 +565,31 @@ def preview_schedule(
         rounds=rounds,
         match_count=None if swiss else sum(len(r.matches) for r in rounds),
         round_count=None if swiss else len(rounds),
+        bracket_size=None,
+    )
+
+
+def _monster_preview(
+    tournament: Tournament, phase: TournamentPhase, ranking: Sequence[RankedPlayer]
+) -> SchedulePreview:
+    """The preview of a Monster DYP: round 1 as the start draws it (BR-060 to BR-063)."""
+    draw = draw_monster(tournament, phase, ranking=ranking)
+    return SchedulePreview(
+        draw_counter=tournament.draw_counter,
+        seed_order=tuple(ranked_entry_ids(tournament, ranking)),
+        problem=None,
+        rounds=(
+            PreviewRound(
+                round_no=draw.round_no,
+                matches=tuple(
+                    PreviewMatch(sides=(group.team_1, group.team_2))
+                    for group in draw.groups
+                ),
+                sitting_out=tuple((player_id,) for player_id in draw.sitting_out),
+            ),
+        ),
+        match_count=None,
+        round_count=None,
         bracket_size=None,
     )
 

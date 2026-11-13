@@ -7,11 +7,19 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from tourneyhub.db.models.entries import Entry
 from tourneyhub.db.models.leagues import League
-from tourneyhub.db.models.matches import Match
+from tourneyhub.db.models.matches import Match, MatchSide
 from tourneyhub.db.models.tournaments import Tournament, TournamentPhase
 from tourneyhub.engine.fields import waiting_order
-from tourneyhub.engine.ids import EntryId
+from tourneyhub.engine.ids import EntryId, PlayerId
+from tourneyhub.engine.monster_dyp import (
+    MonsterMatch,
+    MonsterRound,
+    MonsterStanding,
+    Team,
+    monster_standings,
+)
 from tourneyhub.engine.standings import (
     FormResult,
     PlayedMatch,
@@ -237,6 +245,85 @@ def _swiss_game_differences(
             sit_outs=[],
         )
     }
+
+
+def _player_of(entry: Entry) -> PlayerId:
+    """The one player of a Monster DYP main entry (DATA-MODEL §4.4)."""
+    [member] = entry.members
+    return PlayerId(member.player_id)
+
+
+def _team(side: MatchSide) -> Team:
+    """A Monster DYP side's two players (DATA-MODEL D2)."""
+    players = sorted(PlayerId(row.player_id) for row in side.players)
+    if len(players) != 2:  # noqa: PLR2004  (a team is two partners, BR-060)
+        msg = f"side {side.side} of match {side.match_id} has {len(players)} players"
+        raise ValueError(msg)
+    return players[0], players[1]
+
+
+def monster_rounds(
+    tournament: Tournament, group: TournamentPhase
+) -> tuple[MonsterRound, ...]:
+    """A Monster DYP phase's stored rounds as the engine reads them (D2, D5, D11).
+
+    A team is the players of a side, which has no entry (D2). A match's score
+    difference sums the games that have a score (BR-073); a walkover has
+    none. The players who sat a round out are those of its `sat_out` rows; a
+    disabled or not yet joined player is in neither list (BR-064, BR-067).
+    """
+    player_of = {entry.id: _player_of(entry) for entry in _main_entries(tournament)}
+    rounds: list[MonsterRound] = []
+    for round_ in group.rounds:
+        matches: list[MonsterMatch] = []
+        for match in round_.matches:
+            side_1, side_2 = sorted(match.sides, key=lambda side: side.side)
+            matches.append(
+                MonsterMatch(
+                    team_1=_team(side_1),
+                    team_2=_team(side_2),
+                    outcome=None
+                    if match.outcome is None
+                    else MatchOutcome(match.outcome),
+                    score_difference=sum(
+                        game.score_1 - game.score_2
+                        for game in match.games
+                        if game.score_1 is not None and game.score_2 is not None
+                    ),
+                )
+            )
+        rounds.append(
+            MonsterRound(
+                round_no=round_.round_no,
+                matches=tuple(matches),
+                sat_out=tuple(
+                    player_of[row.entry_id]
+                    for row in sorted(round_.participation, key=lambda r: r.entry_id)
+                    if row.status is Participation.SAT_OUT
+                ),
+            )
+        )
+    return tuple(rounds)
+
+
+def monster_standings_of(
+    tournament: Tournament, group: TournamentPhase
+) -> tuple[MonsterStanding, ...]:
+    """The Monster DYP standings now, one line per player, by position.
+
+    Every main entry's player is in them, disabled ones included (BR-064).
+    Both players of a team get its points (BR-070), and a player who sits out
+    gets the phase's points as soon as the round is drawn (BR-076, BR-077);
+    the tie-breakers are the phase's, in its order (BR-072, FR-043); the lot
+    uses the tournament's seed (BR-074, ADR-010).
+    """
+    return monster_standings(
+        (_player_of(entry) for entry in _main_entries(tournament)),
+        monster_rounds(tournament, group),
+        tiebreakers=[Tiebreaker(t) for t in group.tiebreakers or ()],
+        sit_out_points=group.sit_out_points or 0,  # the CHECK sets it for Monster DYP
+        rng_seed=tournament.rng_seed,
+    )
 
 
 def group_standings(

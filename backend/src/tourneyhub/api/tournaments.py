@@ -153,11 +153,15 @@ def start_tournament(
     (BR-130). A started tournament is 409 `tournament_not_in_setup`; a stale
     `expected_draw_counter` is 409 `draw_counter_changed`, and an
     `expected_seed_order` that is not the entries' current order, seed 1
-    first, 409 `seed_order_changed`: the review shows the new setup. Monster
-    DYP is 422 `format_not_supported` for now. An incomplete setup is 422:
+    first, 409 `seed_order_changed`: the review shows the new setup. A Monster
+    DYP gets round 1, groups of four by the league ranking with a top player
+    leading each, the extra players sitting out (BR-060, BR-061, BR-063); its
+    `expected_seed_order` is the preview's, the entries in league-ranking
+    order. An incomplete setup is 422:
     `players_without_partner` (Doubles), `not_enough_players`,
     `dyp_halves_incomplete`, `dyp_halves_unequal`, `too_many_left_out` (DYP),
-    `not_enough_entries` (FR-032: 2, or 4 with a third-place match),
+    `not_enough_entries` (FR-032: 2, 4 with a third-place match, 4 players
+    in a Monster DYP),
     `too_many_entries_for_round_robin` (detail `limit`: 64) or
     `too_many_entries_for_knockout` (detail `limit`: 256).
     """
@@ -404,7 +408,7 @@ def read_schedule_preview(
     `problem`: `players_without_partner`, `not_enough_entries`,
     `too_many_entries_for_round_robin` (detail `limit`: 64),
     `too_many_entries_for_knockout` (detail `limit`: 256),
-    `format_not_supported` (Monster DYP), the DYP codes of a draw that cannot be made, or
+    the DYP codes of a draw that cannot be made, or
     `tournament_not_in_setup` for a started tournament. Another league's
     tournament is 404.
     """
