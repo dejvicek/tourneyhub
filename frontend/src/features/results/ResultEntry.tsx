@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { finalsQueries } from "@/features/finals/api";
 import { leagueQueries } from "@/features/leagues/api";
 import { resultMutations } from "@/features/results/api";
+import { isLordHaveMercy } from "@/features/tournaments/finals/remix";
 import { type PlayModel, sidesOf } from "@/features/tournaments/play/model";
 import { Notice } from "@/features/tournaments/play/Notice";
 import { useNames } from "@/features/tournaments/play/useNames";
@@ -58,10 +59,19 @@ function hasText(code: ErrorCode | undefined): code is keyof typeof CODE_TEXTS {
   return code !== undefined && code in CODE_TEXTS;
 }
 
-function useResultError(error: ApiError | null): string | null {
+function useResultError(
+  error: ApiError | null,
+  inKnockout: boolean,
+): string | null {
   const { t } = useTranslation();
   if (error === null) {
     return null;
+  }
+  // BR-146: in a Lord have mercy knockout the lock keeps the winner, not the round.
+  if (error.code === "round_locked" && inKnockout) {
+    return t("results.errors.lockedWinner", {
+      round: Number(error.detail.round_no),
+    });
   }
   if (hasText(error.code)) {
     return t(CODE_TEXTS[error.code], {
@@ -91,16 +101,26 @@ export function ResultEntry({
   const save = useMutation(
     resultMutations.save(leagueId, model.tournament.id, matchId),
   );
-  const errorText = useResultError(save.error);
   const info = model.matches.get(matchId);
+  const inKnockout = info?.phase.kind === "knockout";
+  const errorText = useResultError(save.error, inKnockout);
+  // BR-084: a Lord have mercy knockout has no bracket (it answers 422), so
+  // its rounds give the lock instead (BR-146).
+  const remix = isLordHaveMercy(model.tournament.phases);
   // A knockout match's bracket gives its seeds and whether a later match
   // locks it (BR-094); the group phase needs neither.
-  const inKnockout = info?.phase.kind === "knockout";
   const bracket = useQuery({
     ...finalsQueries.bracket(leagueId, model.tournament.id),
-    enabled: inKnockout,
+    enabled: inKnockout && !remix,
+  });
+  const rounds = useQuery({
+    ...finalsQueries.knockoutRounds(leagueId, model.tournament.id),
+    enabled: inKnockout && remix,
   });
   const bracketMatch = bracket.data?.rounds
+    .flatMap((round) => round.matches)
+    .find((m) => m.match_id === matchId);
+  const remixMatch = rounds.data?.rounds
     .flatMap((round) => round.matches)
     .find((m) => m.match_id === matchId);
   const [walkover, setWalkover] = useState(info?.match.is_walkover ?? false);
@@ -116,13 +136,18 @@ export function ResultEntry({
   }
   // BR-053: the round robin's results lock once the knockout is drawn;
   // BR-094: a knockout result locks once a later match has one.
+  // BR-146: a fixed winner can still get a corrected score, so that form
+  // stays open; only clearing and a walkover are gone.
   const lock =
     phase.kind === "group" && model.knockout !== undefined
       ? "group"
       : bracketMatch?.result_locked === true
         ? "knockout"
-        : null;
-  const locked = lock !== null;
+        : remixMatch?.winner_locked === true
+          ? "winner"
+          : null;
+  const locked = lock === "group" || lock === "knockout";
+  const winnerFixed = lock === "winner";
   // ADR-008: a result names the entries the screen saw on both sides, so a
   // later match whose sides have changed since is refused, not decided for
   // someone else (BR-094).
@@ -136,12 +161,15 @@ export function ResultEntry({
     );
   };
   // The bracket's seeds, as the bracket shows them (BR-042), not the setup's.
+  // Lord have mercy pairs have no bracket seed.
   const seedOf = (entryId: string | null, index: 0 | 1) =>
-    bracketMatch !== undefined
-      ? (bracketMatch.sides[index]?.seed ?? null)
-      : entryId === null || inKnockout
-        ? null
-        : (model.entries.get(entryId)?.seed ?? null);
+    remix
+      ? null
+      : bracketMatch !== undefined
+        ? (bracketMatch.sides[index]?.seed ?? null)
+        : entryId === null || inKnockout
+          ? null
+          : (model.entries.get(entryId)?.seed ?? null);
   const actions = (
     <>
       {errorText !== null && (
@@ -149,7 +177,7 @@ export function ResultEntry({
           {errorText}
         </p>
       )}
-      {!walkover && !locked && (
+      {!walkover && !locked && !winnerFixed && (
         <Button
           type="button"
           variant="text"
@@ -161,7 +189,7 @@ export function ResultEntry({
           {t("results.walkover.open")}
         </Button>
       )}
-      {match.outcome !== null && !locked && (
+      {match.outcome !== null && !locked && !winnerFixed && (
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button
@@ -219,7 +247,9 @@ export function ResultEntry({
     <div className="space-y-4">
       {lock !== null && (
         <Notice variant="warning" title={t(`results.locked.${lock}.title`)}>
-          {t(`results.locked.${lock}.body`)}
+          {t(`results.locked.${lock}.body`, {
+            round: rounds.data?.rounds.at(-1)?.round_no ?? 0,
+          })}
         </Notice>
       )}
       {walkover ? (

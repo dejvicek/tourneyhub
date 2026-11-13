@@ -1,9 +1,15 @@
+import { MutationObserver, QueryClient } from "@tanstack/react-query";
 import { configure, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { beforeEach, describe, expect, it } from "vitest";
+import { generatePath } from "react-router";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { finalsMutations } from "@/features/finals/api";
+import { resultMutations } from "@/features/results/api";
 import { i18n } from "@/i18n";
+import { TEST_LEAGUE_ID, testId } from "@/test/fake/ids";
+import { db } from "@/test/fake/store";
 import { onField, paths, playPath, runningDyp } from "@/test/play";
 import { renderAt } from "@/test/renderApp";
 import { server } from "@/test/server";
@@ -341,4 +347,160 @@ describe("result entry (screens 7 and 7b)", () => {
       });
     },
   );
+});
+
+describe("result entry in a Lord have mercy knockout (BR-146)", () => {
+  const LHM = testId(3900);
+  const SWISS = testId(3450);
+  const resultUrl =
+    "/api/v1/leagues/:leagueId/tournaments/:tournamentId/matches/:matchId/result";
+
+  beforeEach(async () => {
+    await i18n.changeLanguage("en");
+  });
+
+  afterEach(() => {
+    server.events.removeAllListeners();
+  });
+
+  /** Plays semifinal 2 and draws the final, which fixes both winners. */
+  async function drawFinal(): Promise<{ matchId: string }> {
+    const queryClient = new QueryClient();
+    const semis = db()
+      .tournaments.find((t) => t.id === LHM)
+      ?.rounds.at(-1)?.matches;
+    const open = semis?.find((m) => m.outcome === null);
+    const played = semis?.find((m) => m.outcome !== null);
+    if (open === undefined || played === undefined) {
+      throw new Error("The seed has one played and one open semifinal");
+    }
+    await new MutationObserver(
+      queryClient,
+      resultMutations.save(TEST_LEAGUE_ID, LHM, open.id),
+    ).mutate({
+      walkover_winner: null,
+      games: [{ winner: "side_1", score_1: 10, score_2: 3 }],
+    });
+    await new MutationObserver(
+      queryClient,
+      finalsMutations.drawKnockoutRound(queryClient, TEST_LEAGUE_ID, LHM),
+    ).mutate({ expected_round_no: 2 });
+    return { matchId: played.id };
+  }
+  const knockoutResult = (matchId: string) =>
+    generatePath(paths.knockoutResult, {
+      leagueId: TEST_LEAGUE_ID,
+      tournamentId: LHM,
+      matchId,
+    });
+
+  it("corrects a fixed winner's score but offers no clear (BR-146)", async () => {
+    const asked: string[] = [];
+    server.events.on("request:start", ({ request }) => {
+      asked.push(new URL(request.url).pathname);
+    });
+    const user = userEvent.setup();
+    const { matchId } = await drawFinal();
+    renderAt(knockoutResult(matchId));
+
+    const sheet = await screen.findByRole("dialog");
+    expect(
+      await within(sheet).findByText("The winner is fixed"),
+    ).toBeInTheDocument();
+    expect(sheet).toHaveTextContent(
+      "Round 2 of the knockout is drawn. You can correct the score while the same pair wins. To change the winner, delete the newest knockout round.",
+    );
+    expect(
+      within(sheet).queryByRole("button", { name: "Clear result" }),
+    ).toBeNull();
+    expect(
+      within(sheet).queryByRole("button", {
+        name: "Record a walkover instead",
+      }),
+    ).toBeNull();
+
+    // The score stays editable: side 1 keeps winning with another score.
+    const match = db()
+      .tournaments.find((t) => t.id === LHM)
+      ?.rounds.flatMap((r) => r.matches)
+      .find((m) => m.id === matchId);
+    const winner = match?.outcome === "side_2" ? 1 : 0;
+    const boxes = await within(sheet).findAllByRole("textbox");
+    const loser = boxes[1 - winner] ?? sheet;
+    expect(loser).toBeEnabled();
+    await user.clear(loser);
+    await user.type(loser, "4");
+    await user.click(
+      within(sheet).getByRole("button", { name: "Save result" }),
+    );
+    await waitFor(() => {
+      expect(match?.games[0]).toMatchObject({
+        [winner === 0 ? "score_2" : "score_1"]: 4,
+      });
+    });
+    expect(asked.filter((path) => path.endsWith("/bracket"))).toEqual([]);
+  });
+
+  it("explains round_locked in the knockout (BR-146)", async () => {
+    const user = userEvent.setup();
+    const { matchId } = await drawFinal();
+    server.use(
+      http.put(resultUrl, () =>
+        HttpResponse.json(
+          { code: "round_locked", detail: { round_no: 2 } },
+          { status: 422 },
+        ),
+      ),
+    );
+    renderAt(knockoutResult(matchId));
+
+    const sheet = await screen.findByRole("dialog");
+    const beads = await within(sheet).findAllByRole("radio", {
+      name: /^10 goals for/,
+    });
+    await user.click(beads[0] ?? sheet);
+    await user.click(
+      within(sheet).getByRole("button", { name: "Save result" }),
+    );
+
+    expect(await within(sheet).findByRole("alert")).toHaveTextContent(
+      "The winner is fixed because round 2 is drawn. Correct the score, or delete the newest knockout round to change the winner.",
+    );
+  });
+
+  it("keeps the Swiss round_locked text (BR-065)", async () => {
+    server.use(
+      http.put(resultUrl, () =>
+        HttpResponse.json(
+          { code: "round_locked", detail: { round_no: 3 } },
+          { status: 422 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    const match = db()
+      .tournaments.find((t) => t.id === SWISS)
+      ?.rounds.flatMap((r) => r.matches)
+      .find((m) => m.sides.every((side) => side.player_ids.length > 0));
+    renderAt(
+      generatePath(paths.roundsResult, {
+        leagueId: TEST_LEAGUE_ID,
+        tournamentId: SWISS,
+        matchId: match?.id ?? "",
+      }),
+    );
+
+    const sheet = await screen.findByRole("dialog");
+    const beads = await within(sheet).findAllByRole("radio", {
+      name: /^10 goals for/,
+    });
+    await user.click(beads[0] ?? sheet);
+    await user.click(
+      within(sheet).getByRole("button", { name: "Save result" }),
+    );
+
+    expect(await within(sheet).findByRole("alert")).toHaveTextContent(
+      "This round is locked because round 3 is drawn. Delete the newer rounds to change it.",
+    );
+  });
 });
