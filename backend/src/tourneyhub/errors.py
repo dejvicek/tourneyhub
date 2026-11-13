@@ -89,8 +89,10 @@ class ErrorCode(StrEnum):
     KNOCKOUT_NOT_FOUND = "knockout_not_found"  # the tournament has no knockout
     KNOCKOUT_MODE_NOT_APPLICABLE = "knockout_mode_not_applicable"  # Monster DYP only
     # Swiss rounds (FR-040, FR-046)
+    ROUND_NOT_FOUND = "round_not_found"
     ROUND_NUMBER_CHANGED = "round_number_changed"  # the expected new number is stale
     ROUND_NOT_COMPLETE = "round_not_complete"  # the newest round has a match left
+    ROUND_NOT_NEWEST = "round_not_newest"  # only the newest round can be deleted
     # Fields (FR-090 to FR-094)
     FIELD_NOT_FOUND = "field_not_found"
     FIELD_NUMBER_CHANGED = "field_number_changed"  # the expected new number is stale

@@ -2416,7 +2416,20 @@ def back_to_setup(
     )
     if results:
         raise RuleViolationError(ErrorCode.TOURNAMENT_HAS_RESULTS, results=results)
-    now = clock()
+    _reset_to_setup(session, tournament, clock())
+    return read_tournament(
+        session, league_id=league_id, tournament_id=tournament.id, user_id=user_id
+    )
+
+
+def _reset_to_setup(session: Session, tournament: Tournament, now: datetime) -> None:
+    """Delete every round and put the tournament back in setup (FR-036, FR-046).
+
+    The fields are freed and the rounds go with their matches, results and
+    participation; the phases, entries, seeds and draws stay, and every
+    disabled flag is cleared (DATA-MODEL §4.4, §4.5). Going back to setup and
+    deleting a Swiss's round 1 share it.
+    """
     for field in tournament.fields:
         if field.match_id is not None:
             field.match_id = None
@@ -2429,9 +2442,6 @@ def back_to_setup(
     tournament.state = TournamentState.SETUP
     tournament.updated_at = now
     session.flush()
-    return read_tournament(
-        session, league_id=league_id, tournament_id=tournament.id, user_id=user_id
-    )
 
 
 # ---------------------------------------------------------------- results
@@ -3378,6 +3388,75 @@ def add_round(
         session, league_id=league_id, tournament_id=tournament.id, user_id=user_id
     )
     return next(round_ for round_ in view.rounds if round_.id == round_id)
+
+
+def delete_round(
+    session: Session,
+    *,
+    league_id: UUID,
+    tournament_id: UUID,
+    round_id: UUID,
+    user_id: UUID,
+    clock: Clock,
+) -> None:
+    """Delete the newest round of a Swiss, with any results in it (FR-046, BR-066).
+
+    The round is named by its id (ADR-008): an unknown one, one of another
+    tournament or a repeated delete is 404 `round_not_found`. A closed season
+    is 409 `season_closed`, a tournament not in progress 409
+    `tournament_not_in_progress`. A round of another group format is 422
+    `format_not_supported`; once the knockout is drawn, 422
+    `group_phase_locked` (delete the knockout first, BR-087). A round that is
+    not the newest is 409 `round_not_newest` (detail `round_id`, the newest
+    round's).
+
+    The fields let go of its matches, and its matches and participation go
+    with it; the round before it is unlocked (BR-066), since the newest round
+    is found on every write. Deleting round 1 takes the tournament back to
+    setup, as "back to setup" does but with results allowed (FR-036, FR-046):
+    every round goes, the entries, seeds and draws stay, and every disabled
+    flag is cleared. Late entries, which would become ordinary entries of the
+    setup and be drawn again (DATA-MODEL §4.5), come with P14.
+    """
+    league, tournament = _lock_tournament(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user_id,
+        rounds=True,
+    )
+    _require_open_season(league, tournament)
+    group = _group_phase(tournament)
+    round_ = next(
+        (r for r in ([] if group is None else group.rounds) if r.id == round_id),
+        None,
+    )
+    if group is None or round_ is None:
+        raise NotFoundError(ErrorCode.ROUND_NOT_FOUND)
+    if tournament.state is not TournamentState.IN_PROGRESS:
+        raise ConflictError(
+            ErrorCode.TOURNAMENT_NOT_IN_PROGRESS, state=tournament.state
+        )
+    _require_swiss(tournament)
+    _require_no_knockout(tournament)
+    newest = group.rounds[-1]
+    if round_ is not newest:
+        raise ConflictError(ErrorCode.ROUND_NOT_NEWEST, round_id=str(newest.id))
+    now = clock()
+    if round_.round_no == 1:
+        _reset_to_setup(session, tournament, now)
+        return
+    matches = {match.id for match in round_.matches}
+    for field in tournament.fields:
+        if field.match_id in matches:
+            field.match_id = None
+            field.updated_at = now
+    session.flush()  # the fields let go of the matches before they are deleted
+    group.rounds.remove(round_)
+    tournament.updated_at = now
+    session.flush()  # the matches are gone before the free fields take the next ones
+    _fill_fields(tournament, _match_slots(tournament), now)
+    session.flush()
 
 
 # ---------------------------------------------------------------- finishing
