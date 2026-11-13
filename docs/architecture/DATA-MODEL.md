@@ -465,7 +465,7 @@ Fields change nothing the engine computes for standings, places, points or sit-o
 | A CLI action has no admin; setting the sign-up code has no target | One-way CHECKs on `admin_actions` |
 | A player row is deleted only with its league (D6); an entry with matches is not deleted on its own | Deferred foreign keys (§2) |
 | No new season with an unfinished tournament (BR-010); closed seasons frozen (BR-011) | Application, under the league lock, which every write in a league takes before the tournament lock |
-| Draws allowed, scores required, result locking (BR-053, BR-065, BR-090, BR-092, BR-094) | Application, under the league and tournament locks |
+| Draws allowed, scores required, result locking (BR-053, BR-065, BR-090, BR-092, BR-094; BR-146 in a Lord have mercy knockout) | Application, under the league and tournament locks |
 | Repeated and stale requests (FR-021, FR-040, FR-046, FR-093, BR-132, new draws, creating a league or a tournament) | Application: expected state checked under the lock, 409 on a mismatch; client-supplied ids for creates (§2) |
 | Entries in `round_participation` and `match_sides` belong to the same tournament and have the phase's stage; `source_entry_id` stays in the tournament; a field's match belongs to the field's tournament; players in entries, DYP halves and sides belong to the tournament's league | Application: every id in a request is loaded through the league and tournament the operation locked |
 | A side's players equal its entry's members (D2); a bye side has no players | Application, checked by invariant queries |
