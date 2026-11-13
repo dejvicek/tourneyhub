@@ -43,7 +43,7 @@ uv run python -W error -m tourneyhub.openapi > openapi.json && git diff --exit-c
 
 CI (`.github/workflows/ci.yml`) runs the same commands, with `uv run ruff format --check && uv run ruff check` in place of the two that change files, then `alembic upgrade head` and `alembic check` (§7) and `uv audit`.
 
-`uv.lock` and `.python-version` (containing `3.15`) are committed. Dependabot (`package-ecosystem: "uv"`) and `uv audit --preview-features audit-command` (still a preview command) watch them. The engine gate runs from the start, since the skeleton has engine code. The gate for the whole package (90 %, ADR-012) is switched on with the first feature; until then `[tool.coverage.report]` has no `fail_under`.
+`uv.lock` and `.python-version` (containing `3.15`) are committed. Dependabot (`package-ecosystem: "uv"`) and `uv audit --preview-features audit-command` (still a preview command) watch them. Two coverage gates run (ADR-012). The whole package needs 90 %: `fail_under = 90` in `[tool.coverage.report]`, which the plain `coverage report` applies. The engine needs 100 %: the second report passes `--fail-under=100`.
 
 Choices in the configuration that are not obvious:
 - `required-version = ">=0.13.6"`: 0.13.6 is the first uv release that ships CPython 3.15.2.

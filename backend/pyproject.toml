@@ -171,6 +171,7 @@ branch = true
 source_pkgs = ["tourneyhub"]
 
 [tool.coverage.report]
+fail_under = 90                     # the whole package (ADR-012); the engine's 100 % is a second report
 show_missing = true
 skip_covered = true
 exclude_also = ["raise NotImplementedError", "assert_never\\(", "@overload"]
