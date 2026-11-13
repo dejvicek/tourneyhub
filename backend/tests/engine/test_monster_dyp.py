@@ -536,6 +536,16 @@ def test_fr041_more_marked_than_matches_take_the_league_ranking_order() -> None:
     assert result.top_players == (pid(3), pid(5))
 
 
+def test_fr041_br061_round_2_takes_the_marked_players_by_league_ranking() -> None:
+    # The standing puts 7 and 5 above 2, but the marked players count in
+    # league-ranking order: 2 and 5 are the top players, not 7 and 5.
+    rounds = rounds_of([((1, 4), (2, 3)), ((5, 8), (6, 7))])
+
+    result = draw_round(8, rounds, standing=(7, 5, 6, 8, 1, 2, 3, 4), marked=[2, 5, 7])
+
+    assert result.top_players == (pid(2), pid(5))
+
+
 # ---------------------------------------------------------------- sit-outs
 
 
