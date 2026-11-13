@@ -1168,23 +1168,22 @@ def test_adr011_benchmark_64_entries_over_7_rounds_take_under_a_second() -> None
 
 @pytest.mark.benchmark
 def test_br058_benchmark_the_repeat_key_below_dirac_takes_under_a_second() -> None:
-    # The slowest case of BR-058's repeat-opponent key (ADR-011): 39 entries,
-    # the largest odd field that stays below n >= 2r + 2 within 20 rounds, so
-    # from round 19 the round is paired once per sit-out candidate.
-    entries = ids(*range(1, 40))
-    rounds = [play(draw_first_swiss_round(entries), 1)]
-    slowest = 0.0
-    for round_no in range(2, 21):
-        lines = swiss_standings(
-            entries,
-            rounds,
-            tiebreakers=DEFAULT_TIEBREAKERS,
-            sit_out_points=0,
-            rng_seed=SEED,
-        )
-        start = perf_counter()
-        drawn = draw_next_swiss_round(lines, rounds)
-        slowest = max(slowest, perf_counter() - start)
-        rounds.append(play(drawn, round_no))
+    # The slowest case of BR-058's repeat-opponent key (ADR-011): 39 entries
+    # in round 20, the largest odd field below n >= 2r + 2 within 20 rounds.
+    # 40 entries played rounds 1 to 19 and one is disabled now, so all 39 are
+    # level on the first two keys, and the round is paired once per entry.
+    rounds = run_swiss(40, 19, SEED)
+    lines = swiss_standings(
+        ids(*range(1, 41)),
+        rounds,
+        tiebreakers=DEFAULT_TIEBREAKERS,
+        sit_out_points=0,
+        rng_seed=SEED,
+    )
 
-    assert slowest < 1.0
+    start = perf_counter()
+    drawn = draw_next_swiss_round(lines, rounds, disabled=[eid(40)])
+    elapsed = perf_counter() - start
+
+    assert drawn.sitting_out is not None
+    assert elapsed < 1.0
