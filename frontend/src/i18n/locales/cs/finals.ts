@@ -159,6 +159,7 @@ export const finals: CsMessages<Messages["finals"]> = {
     title: "Dohráno",
     winners: "Vítězové",
     wonFinal: "Finále {{score}}, soupeř: {{opponent}}",
+    wonFinalScore: "Finále {{score}}",
     wonStandings: "První v tabulce",
     earnsEach_one: "Oba dostanou {{count}} bod do sezóny.",
     earnsEach_few: "Oba dostanou {{count}} body do sezóny.",

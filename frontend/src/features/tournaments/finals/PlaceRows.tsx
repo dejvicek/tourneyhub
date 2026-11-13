@@ -5,13 +5,14 @@ import type { PlaceData } from "@/features/finals/api";
 type PlaceDetail = PlaceData;
 type PlaceReason = PlaceData["reason"];
 
+import { pairPlaces, useGroupName } from "./placePairs";
 import { usePlaceLabel } from "./usePlaceLabel";
 
 interface PlaceRowsProps {
   rows: readonly PlaceDetail[];
   entryName: (entryId: string) => string;
-  /** Whether an entry is a pair (the points are "each"). */
-  isPair: (entryId: string) => boolean;
+  /** Whether a row is a pair (the points are "each"). */
+  isPair: (row: PlaceDetail) => boolean;
 }
 
 /** One line telling why an entry got its place ("Won the final 10:7"). */
@@ -56,15 +57,18 @@ export function PlaceRows({ rows, entryName, isPair }: PlaceRowsProps) {
   const { t } = useTranslation();
   const placeLabel = usePlaceLabel();
   const reasonText = useReasonText();
-  const places = [...new Set(rows.map((row) => row.place))];
+  const groupName = useGroupName(entryName);
+  const groups = pairPlaces(rows);
+  const places = [...new Set(groups.map((group) => group.place))];
   return (
     <ol className="divide-y divide-border border-t border-b border-border">
       {places.map((place) => {
-        const group = rows.filter((row) => row.place === place);
-        const first = group[0];
-        if (first === undefined) {
+        const inPlace = groups.filter((group) => group.place === place);
+        const head = inPlace[0];
+        if (head === undefined) {
           return null;
         }
+        const first = head.first;
         const points = first.points_per_player;
         return (
           <li
@@ -75,22 +79,22 @@ export function PlaceRows({ rows, entryName, isPair }: PlaceRowsProps) {
               {placeLabel(place)}
             </span>
             <div className="min-w-0 space-y-1">
-              {group.map((row) => (
+              {inPlace.map((group) => (
                 <p
-                  key={row.entry_id}
+                  key={group.entryIds.join()}
                   className="text-body-sm font-bold break-words"
                 >
-                  {entryName(row.entry_id)}
+                  {groupName(group.entryIds)}
                 </p>
               ))}
               <p className="text-body-sm text-muted-foreground">
-                {reasonText(first.reason, group.length > 1)}
+                {reasonText(first.reason, inPlace.length > 1)}
               </p>
             </div>
             <span className="text-body-md font-bold text-primary">
               {points === 0
                 ? t("finals.finished.pointsNone")
-                : isPair(first.entry_id)
+                : isPair(first) || head.entryIds.length > 1
                   ? t("finals.finished.pointsEach", { points })
                   : t("finals.finished.pointsOwn", { points })}
             </span>

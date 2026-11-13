@@ -5,7 +5,7 @@ import { generatePath, Link } from "react-router";
 
 import { DocumentTitle } from "@/components/DocumentTitle";
 import { Button } from "@/components/ui/button";
-import { finalsQueries } from "@/features/finals/api";
+import { finalsQueries, type PlaceData } from "@/features/finals/api";
 import { leagueQueries } from "@/features/leagues/api";
 import { CopyShareLink } from "@/features/leagues/CopyShareLink";
 import { useSeasonName } from "@/features/leagues/useSeasonName";
@@ -16,6 +16,7 @@ import { paths } from "@/lib/paths";
 
 import { localDate, useRoster } from "./finals/names";
 import { Notice } from "./finals/Notice";
+import { pairPlaces, useGroupName } from "./finals/placePairs";
 import { PlaceRows } from "./finals/PlaceRows";
 import { ScreenHeader } from "./finals/ScreenHeader";
 import { LoadError, Loading } from "./finals/StateMessage";
@@ -43,6 +44,7 @@ function FinishedContent() {
   const seasons = useQuery(leagueQueries.seasons(leagueId));
   const seasonName = useSeasonName();
   const roster = useRoster(leagueId, tournament.data?.entries);
+  const groupName = useGroupName(roster.entry);
 
   if (tournament.isError || places.isError) {
     return (
@@ -75,10 +77,11 @@ function FinishedContent() {
   const season = seasons.data?.find((s) => s.id === data.season_id);
   const entryOf = (entryId: string) =>
     data.entries.find((e) => e.id === entryId);
-  const isPair = (entryId: string) =>
-    (entryOf(entryId)?.player_ids.length ?? 1) > 1;
-  const winners = result.rows.filter((row) => row.place === 1);
-  const first = winners[0];
+  const isPair = (row: PlaceData) =>
+    row.reason.partner_entry_id !== null ||
+    (entryOf(row.entry_id)?.player_ids.length ?? 1) > 1;
+  const winners = pairPlaces(result.rows).filter((group) => group.place === 1);
+  const first = winners[0]?.first;
   const points = season?.placement_points ?? [];
   const list = new Intl.ListFormat(i18n.resolvedLanguage, {
     style: "short",
@@ -86,23 +89,34 @@ function FinishedContent() {
   });
   const playerNames = roster.player;
 
+  const wonFinal = (reason: PlaceData["reason"]): string => {
+    const score =
+      reason.score === null
+        ? ""
+        : `${String(reason.score[0])}:${String(reason.score[1])}`;
+    // Lord have mercy has no single opponent (BR-145): say only the score.
+    if (reason.opponent_entry_id === null) {
+      return score === ""
+        ? t("finals.finished.reason.won_final_noscore")
+        : t("finals.finished.wonFinalScore", { score });
+    }
+    return t("finals.finished.wonFinal", {
+      score,
+      opponent: roster.entry(reason.opponent_entry_id),
+    });
+  };
+
   const earn =
     first === undefined
       ? null
-      : isPair(first.entry_id)
+      : isPair(first)
         ? t("finals.finished.earnsEach", { count: first.points_per_player })
         : t("finals.finished.earnsOwn", { count: first.points_per_player });
   const how =
     first === undefined
       ? null
       : first.reason.kind === "won_final"
-        ? t("finals.finished.wonFinal", {
-            score:
-              first.reason.score === null
-                ? ""
-                : `${String(first.reason.score[0])}:${String(first.reason.score[1])}`,
-            opponent: roster.entry(first.reason.opponent_entry_id),
-          })
+        ? wonFinal(first.reason)
         : t("finals.finished.wonStandings");
 
   const placesSection = (
@@ -222,12 +236,12 @@ function FinishedContent() {
         >
           {t("finals.finished.winners")}
         </h2>
-        {winners.map((row) => (
+        {winners.map((group) => (
           <p
-            key={row.entry_id}
+            key={group.entryIds.join()}
             className="font-display text-display-name break-words"
           >
-            {roster.entry(row.entry_id)}
+            {groupName(group.entryIds)}
           </p>
         ))}
         <p className="text-body-md">{how}</p>

@@ -291,6 +291,49 @@ describe("share-link views", () => {
     expect(within(shared).getAllByRole("paragraph")).toHaveLength(2);
   });
 
+  it("public places show partners together (BR-145)", async () => {
+    const october = db().tournaments.find((t) => t.name === "October Singles");
+    const [a, b, c, d] = october?.entries ?? [];
+    if (
+      a === undefined ||
+      b === undefined ||
+      c === undefined ||
+      d === undefined
+    ) {
+      throw new Error("The seed has four entries");
+    }
+    const reason = (partner: string) => ({
+      kind: "lost_in_round",
+      round: "semifinal",
+      score: null,
+      opponent_entry_id: null,
+      partner_entry_id: partner,
+    });
+    const row = (entry: { id: string }, partner: { id: string }) => ({
+      entry_id: entry.id,
+      place: 3,
+      points_per_player: 5,
+      reason: reason(partner.id),
+    });
+    server.use(
+      http.get("*/api/v1/public/:token/tournaments/:id/places", () =>
+        HttpResponse.json({
+          complete: true,
+          rows: [row(a, b), row(b, a), row(c, d), row(d, c)],
+        }),
+      ),
+    );
+    renderAt(pageOf("October Singles"));
+
+    const section = await screen.findByRole("region", {
+      name: "Final places",
+    });
+    const lines = within(section).getAllByRole("paragraph");
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toHaveTextContent(" / ");
+    expect(lines[1]).toHaveTextContent(" / ");
+  });
+
   it("D03: a knockout shows its bracket and byes as byes, not as 0 : 0 matches", async () => {
     stubViewport(1280);
     renderAt(pageOf("Spring Cup"));

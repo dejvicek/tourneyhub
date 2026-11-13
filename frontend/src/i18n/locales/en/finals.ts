@@ -150,6 +150,7 @@ export const finals = {
     title: "Finished",
     winners: "Winners",
     wonFinal: "Won the final {{score}} against {{opponent}}",
+    wonFinalScore: "Won the final {{score}}",
     wonStandings: "First in the standings",
     earnsEach_one: "Both get {{count}} season point.",
     earnsEach_other: "Both get {{count}} season points.",

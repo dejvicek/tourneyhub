@@ -8,10 +8,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { provisionalApi } from "@/api/provisional";
 import { finalsMutations, finalsQueries } from "@/features/finals/api";
+import { shortName } from "@/features/tournaments/finals/names";
 import { i18n } from "@/i18n";
 import { paths } from "@/lib/paths";
 import { TEST_LEAGUE_ID, testId } from "@/test/fake/ids";
-import { db } from "@/test/fake/store";
+import { db, tournamentRead } from "@/test/fake/store";
 import { stubViewport } from "@/test/media";
 import { renderAt } from "@/test/renderApp";
 import { server } from "@/test/server";
@@ -739,6 +740,93 @@ describe("Lots in the bracket (BR-074, ADR-009)", () => {
     renderAt(at(paths.knockout, DYP_EVENING));
 
     expect(await screen.findAllByText("By lot")).toHaveLength(1);
+  });
+});
+
+describe("Finished in Lord have mercy (screen 10, BR-145)", () => {
+  /** Per-player place rows, partners sharing a place, as the backend sends them. */
+  function lordHaveMercyPlaces() {
+    const tournament = db().tournaments.find((t) => t.id === LHM);
+    const singles = (tournament?.entries ?? []).filter(
+      (e) => e.player_ids.length === 1,
+    );
+    const name = (index: number) => {
+      const id = singles[index]?.player_ids[0];
+      const player = db().players.find((p) => p.id === id);
+      return shortName(player?.name ?? "");
+    };
+    const row = (
+      index: number,
+      place: number,
+      partner: number,
+      kind: "won_final" | "lost_final" | "lost_in_round",
+    ) => ({
+      entry_id: singles[index]?.id ?? "",
+      place,
+      points_per_player: 10 - place,
+      reason: {
+        kind,
+        round: kind === "lost_in_round" ? "semifinal" : "final",
+        score: kind === "won_final" ? [10, 3] : null,
+        opponent_entry_id: null,
+        partner_entry_id: singles[partner]?.id ?? null,
+        group_place: null,
+        group_format: null,
+      },
+    });
+    server.use(
+      // The fake cannot finish a knockout it did not play, so the detail says so.
+      http.get("*/api/v1/leagues/:league/tournaments/:tournament", () =>
+        HttpResponse.json({
+          ...(tournament === undefined ? {} : tournamentRead(tournament)),
+          state: "finished",
+        }),
+      ),
+      http.get("*/api/v1/leagues/:league/tournaments/:tournament/places", () =>
+        HttpResponse.json({
+          complete: true,
+          rows: [
+            row(0, 1, 1, "won_final"),
+            row(1, 1, 0, "won_final"),
+            row(2, 2, 3, "lost_final"),
+            row(3, 2, 2, "lost_final"),
+            row(4, 3, 5, "lost_in_round"),
+            row(5, 3, 4, "lost_in_round"),
+            row(6, 3, 7, "lost_in_round"),
+            row(7, 3, 6, "lost_in_round"),
+          ],
+        }),
+      ),
+    );
+    return { name };
+  }
+
+  it("Finished: Lord have mercy winners read 'Both get' and name no unknown opponent", async () => {
+    const { name } = lordHaveMercyPlaces();
+    renderAt(at(paths.finished, LHM));
+
+    const winners = await screen.findByRole("region", { name: "Winners" });
+    expect(winners).toHaveTextContent(`${name(0)} / ${name(1)}`);
+    expect(within(winners).getAllByText(/ \/ /)).toHaveLength(1);
+    expect(winners).toHaveTextContent("Won the final 10:3");
+    expect(winners).not.toHaveTextContent("Unknown");
+    expect(winners).not.toHaveTextContent("against");
+    expect(winners).toHaveTextContent("Both get 9 season points.");
+  });
+
+  it("lists partners on one line and does not call two pairs on a place shared (BR-145)", async () => {
+    const { name } = lordHaveMercyPlaces();
+    renderAt(at(paths.finished, LHM));
+
+    const places = await screen.findByRole("region", { name: "Final places" });
+    const rows = within(places).getAllByRole("listitem");
+    expect(rows).toHaveLength(3);
+    expect(rows[1]).toHaveTextContent(`${name(2)} / ${name(3)}`);
+    expect(rows[1]).not.toHaveTextContent("Shared");
+    expect(rows[1]).toHaveTextContent("+8 each");
+    expect(rows[2]).toHaveTextContent(`${name(4)} / ${name(5)}`);
+    expect(rows[2]).toHaveTextContent(`${name(6)} / ${name(7)}`);
+    expect(rows[2]).toHaveTextContent("Shared. Lost in the semifinals.");
   });
 });
 
