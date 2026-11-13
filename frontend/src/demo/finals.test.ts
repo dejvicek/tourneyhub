@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { ApiError, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
+import { rules } from "@/lib/rules";
 
 import { DEMO_LEAGUE_ID, demoId } from "./ids";
-import { rules } from "./rules";
 
 // Ids of the finals seed (seedFinals.ts).
 const DYP_EVENING = demoId(3200);

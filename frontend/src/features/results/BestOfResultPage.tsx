@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { Side } from "@/demo/contract";
-import { MATCH_POINTS } from "@/demo/rules";
+import { MATCH_POINTS } from "@/lib/rules";
 import { cn } from "@/lib/utils";
 
 import type { ResultFormContext } from "./formContext";

@@ -5,6 +5,13 @@
 // DYP standings with BH1 and BH2, naive pairing of the next round, and the
 // knockout formed after Monster DYP rounds. Minimal and deterministic; the
 // open rules of issue #24 are read from rules.ts.
+import {
+  MATCH_POINTS,
+  type MonsterKnockoutMode,
+  rules,
+  type SwissTiebreaker,
+} from "@/lib/rules";
+
 import type {
   BracketMatch,
   BracketRead,
@@ -27,12 +34,6 @@ import type {
   SwissRankingRow,
 } from "./contract";
 import { createRng, roundRobinStandings, withPoints } from "./engine";
-import {
-  MATCH_POINTS,
-  type MonsterKnockoutMode,
-  rules,
-  type SwissTiebreaker,
-} from "./rules";
 import type { StoredTournament } from "./seed";
 
 type Ids = () => string;

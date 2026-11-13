@@ -4,6 +4,8 @@
 // knockout. The logic is finalsEngine.ts (`// demo only, the engine decides`).
 // A write sends the target state, or the number it expects (ADR-008); an
 // expectation that is stale answers 409, which the screens meet with a reload.
+import { MONSTER_KNOCKOUT_MODES, rules } from "@/lib/rules";
+
 import type { MatchRead, ParticipantRead, TournamentRead } from "../contract";
 import { fillFields, waitingMatches } from "../engine";
 import {
@@ -25,7 +27,6 @@ import {
 } from "../finalsEngine";
 import { demoId } from "../ids";
 import { apiError, route } from "../route";
-import { MONSTER_KNOCKOUT_MODES, rules } from "../rules";
 import type { StoredTournament } from "../seed";
 import { db, findTournament, placesRead, tournamentRead } from "../store";
 

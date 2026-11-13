@@ -2,8 +2,10 @@
 //
 // Simple stand-ins for the tournament engine (backend tourneyhub.engine,
 // ADR-009), so that the fake API returns schedules, draws, standings and
-// places that look plausible. They follow PRD.md loosely and src/demo/rules.ts
+// places that look plausible. They follow PRD.md loosely and src/lib/rules.ts
 // for the rules still open; none of this is the real behaviour.
+import { MATCH_POINTS, type RoundRobinOrder, rules } from "@/lib/rules";
+
 import type {
   FieldRead,
   MatchFormat,
@@ -14,7 +16,6 @@ import type {
   SeasonStandingRow,
   TournamentStandingRow,
 } from "./contract";
-import { MATCH_POINTS, type RoundRobinOrder, rules } from "./rules";
 
 /** A seeded pseudo-random generator (mulberry32), so every seed is the same. */
 export function createRng(seed: number): () => number {

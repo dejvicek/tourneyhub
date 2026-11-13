@@ -13,11 +13,11 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
-import { rules, type SwissTiebreaker } from "@/demo/rules";
 import {
   finalsMutations,
   type RankingData as RankingRead,
 } from "@/features/finals/api";
+import { rules, type SwissTiebreaker } from "@/lib/rules";
 
 import { errorText } from "./errorText";
 

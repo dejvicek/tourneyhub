@@ -9,8 +9,7 @@
 // snake_case, UUIDs, enumerations as string literals. Routes are grouped by
 // area, like the handlers in src/demo/handlers/.
 import type { components, paths as GeneratedPaths } from "@/api/schema";
-
-import type { SwissTiebreaker } from "./rules";
+import type { SwissTiebreaker } from "@/lib/rules";
 
 type Uuid = string;
 

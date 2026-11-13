@@ -3,10 +3,10 @@
 // follow its schema (src/api/schema.d.ts) so the demo and the tests still
 // answer them.
 import { newId } from "@/lib/newId";
+import { DEFAULT_PLACEMENT_POINTS } from "@/lib/rules";
 
 import { nameProblem, type Problem, validationFailed } from "../outsideErrors";
 import { apiError, route } from "../route";
-import { DEFAULT_PLACEMENT_POINTS } from "../rules";
 import {
   activeSeason,
   db,

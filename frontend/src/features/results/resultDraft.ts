@@ -8,7 +8,7 @@ import type {
   ResultWrite,
   Side,
 } from "@/demo/contract";
-import { rules } from "@/demo/rules";
+import { rules } from "@/lib/rules";
 
 /** Whether every game needs its score (BR-092), as rules.ts says today. */
 export function scoresRequired(phase: PhaseRead): boolean {

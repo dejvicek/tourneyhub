@@ -16,8 +16,8 @@ import type {
   RoundAddWrite,
   TiebreakersWrite,
 } from "@/demo/contract";
-import type { MonsterKnockoutMode } from "@/demo/rules";
 import { tournamentQueries } from "@/features/tournaments/api";
+import type { MonsterKnockoutMode } from "@/lib/rules";
 
 type FinalFormatWrite = components["schemas"]["FinalFormatWrite"];
 
