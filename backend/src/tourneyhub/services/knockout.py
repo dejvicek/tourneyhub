@@ -1029,12 +1029,28 @@ def _decided_by_lot(
 
     Nothing is stored (ADR-010): the cut is computed again from the group
     phase, whose results are locked since the start (BR-053), so it is the one
-    that was drawn.
+    that was drawn. After Monster DYP rounds that is the phase's own
+    `qualifiers` and `monster_knockout_mode` with the tournament's draw
+    counter, which draw again cannot change once the knockout exists (FR-045).
     """
     group = _group_phase(tournament)
+    entries = [e for e in tournament.entries if e.stage is EntryStage.KNOCKOUT]
+    if group is not None and group.format is PhaseFormat.MONSTER_DYP:
+        phase = knockout.phase
+        if phase.qualifiers is None or phase.monster_knockout_mode is None:
+            msg = "a knockout after Monster DYP rounds stores its qualifiers and mode"
+            raise ValueError(msg)
+        draw = _draw(
+            tournament,
+            group,
+            qualifiers=phase.qualifiers,
+            third_place_match=knockout.bracket.third_place_match,
+            mode=phase.monster_knockout_mode,
+        )
+        by_lot = {drawn.seed for drawn in draw.entries if drawn.decided_by_lot}
+        return frozenset(entry.id for entry in entries if entry.seed in by_lot)
     if group is None or group.format not in PLAYED_GROUP_FORMATS:
         return frozenset()
-    entries = [e for e in tournament.entries if e.stage is EntryStage.KNOCKOUT]
     cut = _cut(
         tournament,
         group_standings(tournament, group),
