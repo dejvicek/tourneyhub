@@ -77,6 +77,13 @@ const demoInternals = {
   message:
     "Only main.tsx starts the demo; app code imports nothing from src/demo (the rules are in @/lib/rules, provisional types in @/api/provisionalTypes).",
 };
+// src/api/provisional.ts types provisionalApi with the demo's contract, and
+// only that, until D3 and D4 generate those routes.
+const demoBesidesContract = {
+  regex: "^(@/|(\\.\\./)+)demo/(?!contract$)",
+  message:
+    "src/api/provisional.ts imports only the demo's contract (@/demo/contract).",
+};
 // Imports flow one way: shared code → features → the app (guide §11).
 const appFromShared = {
   regex: "^(@/|(\\.\\./)+)(App|main|routes|pages|features)(/|$)",
@@ -400,9 +407,14 @@ export default defineConfig([
     },
   },
   {
-    // Typed by the demo's contract until its routes are generated (D5).
+    // Typed by the demo's contract until D3 and D4 generate its routes.
     files: ["src/api/provisional.ts"],
-    rules: { "no-restricted-imports": restrictImports(appFromShared) },
+    rules: {
+      "no-restricted-imports": restrictImports(
+        appFromShared,
+        demoBesidesContract,
+      ),
+    },
   },
   {
     files: ["src/features/*/api.ts"],
