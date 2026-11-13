@@ -34,6 +34,7 @@ import { errorText } from "./finals/errorText";
 import { resultPath } from "./finals/links";
 import { localDate, useRoster } from "./finals/names";
 import { Notice } from "./finals/Notice";
+import { qualifiersOf } from "./finals/qualifiers";
 import { RankingTable } from "./finals/RankingTable";
 import { scoreOf } from "./finals/score";
 import { ScreenHeader } from "./finals/ScreenHeader";
@@ -126,6 +127,7 @@ function RoundsContent() {
   );
   // BR-072: the organizer's tie-breakers in their order; none is null.
   const tiebreakers = group.tiebreakers ?? [];
+  const qualifiers = qualifiersOf(data.phases);
   const active = mainEntries.filter((e) => !e.is_disabled).length;
   const open = latest?.matches.filter((m) => m.outcome === null).length ?? 0;
   const disabledNames = (participants.data ?? [])
@@ -389,9 +391,9 @@ function RoundsContent() {
   );
 
   const standingsHeading =
-    group.qualifiers === null
+    qualifiers === null
       ? t("finals.rounds.standings")
-      : t("finals.rounds.standingsQualifiers", { count: group.qualifiers });
+      : t("finals.rounds.standingsQualifiers", { count: qualifiers });
   const standingsSection = (
     <section aria-labelledby="standings-heading" className="space-y-3">
       <h2 id="standings-heading" className="font-display text-display-section">
@@ -401,7 +403,7 @@ function RoundsContent() {
         caption={standingsHeading}
         rows={standings.standings}
         tiebreakers={tiebreakers}
-        qualifiers={group.qualifiers}
+        qualifiers={qualifiers}
         disabled={disabled}
         participants={participants.data ?? []}
         entryName={(entryId) => roster.entry(entryId)}

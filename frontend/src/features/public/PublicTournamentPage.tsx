@@ -5,6 +5,7 @@ import { generatePath, Link } from "react-router";
 import { DocumentTitle } from "@/components/DocumentTitle";
 import { PageFallback } from "@/components/PageFallback";
 import { Badge } from "@/components/ui/badge";
+import { qualifiersOf } from "@/features/tournaments/finals/qualifiers";
 import { RankingTable } from "@/features/tournaments/finals/RankingTable";
 import { useRouteParam } from "@/hooks/useRouteParam";
 import { paths } from "@/lib/paths";
@@ -296,7 +297,7 @@ function RankingStandings({
       <RankingTable
         rows={standings.data}
         tiebreakers={group?.tiebreakers ?? []}
-        qualifiers={group?.qualifiers ?? null}
+        qualifiers={qualifiersOf(tournament.phases)}
         disabled={disabled}
         participants={[]}
         entryName={names.ofEntry}

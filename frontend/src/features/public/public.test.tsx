@@ -49,6 +49,30 @@ function addSetupTournament(): string {
   return id;
 }
 
+/**
+ * The backend's shape (DATA-MODEL §4): the group phase has no `qualifiers`;
+ * the knockout's row, which exists once the knockout is drawn, has them.
+ */
+function qualifiersOnTheKnockout(tournamentId: string, qualifiers: number) {
+  const tournament = db().tournaments.find((t) => t.id === tournamentId);
+  const group = tournament?.phases.find((phase) => phase.kind === "group");
+  if (tournament === undefined || group === undefined) {
+    throw new Error("The seed has this tournament with a group phase");
+  }
+  group.qualifiers = null;
+  tournament.phases.push({
+    ...group,
+    id: demoId(4501, "outside"),
+    position: 2,
+    kind: "knockout",
+    format: "single_elimination",
+    sit_out_points: null,
+    tiebreakers: null,
+    qualifiers,
+    third_place_match: false,
+  });
+}
+
 describe("share-link views", () => {
   beforeEach(async () => {
     // The season standings and the places are the demo's routes only.
@@ -169,6 +193,22 @@ describe("share-link views", () => {
     expect(rows.at(0)?.[3]).toHaveTextContent(String(expected[0]?.bh1));
     // Not everyone shares the first place.
     expect(rows.at(-1)?.[0]).not.toHaveTextContent(/^1$/);
+  });
+
+  it("a Swiss draws the cut line from the knockout's qualifiers when the group phase has none (BR-080)", async () => {
+    const swiss = db().tournaments.find((t) => t.name === "Swiss evening");
+    if (swiss === undefined) {
+      throw new Error("The seed has a Swiss evening");
+    }
+    qualifiersOnTheKnockout(swiss.id, 3);
+    renderAt(pageOf("Swiss evening"));
+
+    const table = await screen.findByRole("table", { name: "Standings" });
+    const rows = within(table).getAllByRole("row");
+    // The line falls under the third row of players, after the header.
+    expect(rows.filter((row) => row.classList.contains("border-b-2"))).toEqual([
+      rows[3],
+    ]);
   });
 
   it("the places list a shared place once, with every entry under it", async () => {
