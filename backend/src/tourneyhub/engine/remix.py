@@ -382,10 +382,13 @@ def _check_round(
     ):
         msg = f"round {round_no} does not have its {size >> round_no} matches"
         raise ValueError(msg)
-    if third and third[0].key != MatchKey(
-        round_no=round_count, is_third_place=True, position=1
-    ):
-        msg = f"the third-place match {third[0].key} is not in the final's round"
+    stray = [
+        match.key
+        for match in third
+        if match.key != MatchKey(round_no=round_count, is_third_place=True, position=1)
+    ]
+    if stray:
+        msg = f"the third-place matches {stray} are not in the final's round"
         raise ValueError(msg)
     ensure_distinct(player_id for match in matches for player_id in match.players)
     if round_no > 1:

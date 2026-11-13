@@ -559,6 +559,23 @@ def test_br145_a_pair_that_had_a_bye_is_placed_by_its_last_match() -> None:
     assert by_player[1] in {1, 2, 3, 4}  # pair 1 had a bye in round 1
 
 
+def test_br103_br145_after_byes_the_best_non_qualifier_follows_the_pairs() -> None:
+    matches = play_out(6, third_place_match=True)
+    state = remix_state(matches, third_place_match=True)
+
+    rows = place_remix_players(
+        state, entries=entries_for(range(1, 14)), standing=standing_of(range(1, 14))
+    )
+    points = {
+        row.player_id.int: row.points
+        for row in remix_season_points(rows, DEFAULT_TABLE)
+    }
+
+    # 6 pairs: 1st, 2nd, 3rd, 4th, two round-1 losing pairs share 5th.
+    assert places_of(rows)[13] == 7
+    assert points[13] == 0
+
+
 def test_br104_shared_places_list_pairs_by_match_and_players_by_standing() -> None:
     matches = play_out(8, third_place_match=False)
     state = remix_state(matches, third_place_match=False)
@@ -739,6 +756,16 @@ def test_remix_state_refuses_a_third_place_match_at_another_position() -> None:
 
     with pytest.raises(ValueError, match="not in the final's round"):
         remix_state([*FOUR_PAIRS_ROUND_1, final, moved], third_place_match=True)
+
+
+def test_remix_state_refuses_a_second_third_place_match() -> None:
+    final, third_place = final_round_state().newest_round
+    extra = match(2, 2, (90, 91), (92, 93), third=True)
+
+    with pytest.raises(ValueError, match="not in the final's round"):
+        remix_state(
+            [*FOUR_PAIRS_ROUND_1, final, third_place, extra], third_place_match=True
+        )
 
 
 def test_remix_state_refuses_a_player_twice_in_round_1() -> None:
