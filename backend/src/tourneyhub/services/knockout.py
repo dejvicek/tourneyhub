@@ -62,7 +62,6 @@ from tourneyhub.services.tournaments import (
     GroupStandingRow,
     KnockoutBracket,
     TournamentView,
-    _bracket_rounds,
     _match_format,
     group_standings,
     knockout_bracket,
@@ -79,6 +78,7 @@ from tourneyhub.services.tournaments.shared import (
     _played,
     _require_open_season,
 )
+from tourneyhub.services.tournaments.start import _bracket_rounds
 
 # ---------------------------------------------------------------- the cut
 
