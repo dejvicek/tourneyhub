@@ -15,9 +15,10 @@ from tourneyhub.engine.tournaments import (
     PhaseKind,
 )
 from tourneyhub.services import tournaments as tournament_service
-from tourneyhub.services.tournaments import SideView, _match_format, _match_view
+from tourneyhub.services.tournaments import SideView, _match_format
 from tourneyhub.services.tournaments import play as tournament_play
 from tourneyhub.services.tournaments.shared import _match_slots
+from tourneyhub.services.tournaments.views import _match_view
 
 NOW = datetime(2026, 11, 12, tzinfo=UTC)
 
