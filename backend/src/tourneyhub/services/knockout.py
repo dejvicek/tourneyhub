@@ -36,7 +36,6 @@ from tourneyhub.engine.knockout import (
     minimum_qualifiers,
     round_name,
 )
-from tourneyhub.engine.standings import StandingRow, standing_of
 from tourneyhub.engine.tournaments import (
     EntryStage,
     KnockoutMatchFormat,
@@ -58,7 +57,9 @@ from tourneyhub.services.engine_errors import to_app_error
 from tourneyhub.services.leagues import get_league
 from tourneyhub.services.public import _shared_league
 from tourneyhub.services.tournaments import (
+    PLAYED_GROUP_FORMATS,
     Clock,
+    GroupStandingRow,
     KnockoutBracket,
     TournamentView,
     _bracket_rounds,
@@ -71,9 +72,10 @@ from tourneyhub.services.tournaments import (
     _match_slots,
     _played,
     _require_open_season,
-    _standings_of,
+    group_standings,
     knockout_bracket,
     read_tournament,
+    tie_groups,
 )
 
 # ---------------------------------------------------------------- the cut
@@ -129,14 +131,14 @@ class KnockoutPreview:
     is_cut_by_lot: bool
 
 
-def _round_robin_group(tournament: Tournament) -> TournamentPhase:
-    """The round robin a knockout follows; Swiss and Monster DYP come later.
+def _played_group(tournament: Tournament) -> TournamentPhase:
+    """The round robin or Swiss a knockout follows; Monster DYP comes later.
 
-    Without a group phase, or after a Swiss or a Monster DYP, it is 422
+    Without a group phase, or after a Monster DYP, it is 422
     `format_not_supported` (detail `format`).
     """
     group = _group_phase(tournament)
-    if group is None or group.format is not PhaseFormat.ROUND_ROBIN:
+    if group is None or group.format not in PLAYED_GROUP_FORMATS:
         format_ = tournament.phases[0].format if group is None else group.format
         raise RuleViolationError(ErrorCode.FORMAT_NOT_SUPPORTED, format=format_)
     return group
@@ -161,7 +163,7 @@ def _require_group_done(group: TournamentPhase) -> None:
 
 def _cut(
     tournament: Tournament,
-    standings: Sequence[StandingRow],
+    standings: Sequence[GroupStandingRow],
     *,
     qualifiers: int,
     third_place_match: bool,
@@ -169,7 +171,7 @@ def _cut(
     """The engine's cut of the standings (BR-074, BR-080, BR-085); 422 out of range."""
     try:
         return cut_standing(
-            standing_of(standings),
+            tie_groups(standings),
             qualifiers=qualifiers,
             third_place_match=third_place_match,
             rng_seed=tournament.rng_seed,
@@ -205,7 +207,7 @@ def preview_knockout(
     tournament = _load_tournament(session, league=league, tournament_id=tournament_id)
     problem = _start_problem(league, tournament, mode=mode)
     group = _group_phase(tournament)
-    if group is None or group.format is not PhaseFormat.ROUND_ROBIN:
+    if group is None or group.format not in PLAYED_GROUP_FORMATS:
         return KnockoutPreview(
             problem=problem,
             max_qualifiers=0,
@@ -217,7 +219,7 @@ def preview_knockout(
             skipped_entry_ids=(),
             is_cut_by_lot=False,
         )
-    standings = _standings_of(tournament, group)
+    standings = group_standings(tournament, group)
     eligible = sum(
         not entry.is_disabled
         for entry in tournament.entries
@@ -296,7 +298,7 @@ def _start_problem(
             detail={"current_phase_id": None if current is None else str(current.id)},
         )
     try:
-        group = _round_robin_group(tournament)
+        group = _played_group(tournament)
         _require_no_mode(group, mode)
         _require_group_done(group)
     except RuleViolationError as err:
@@ -336,14 +338,14 @@ def start_knockout(
     start: KnockoutStart,
     clock: Clock,
 ) -> TournamentView:
-    """Draw the knockout after a round robin and start it (FR-045).
+    """Draw the knockout after a round robin or a Swiss and start it (FR-045).
 
     The request carries the phase the screen saw as the current one, the
     group phase: once the knockout exists it is 409 `current_phase_changed`
     (detail `current_phase_id`), so a repeat draws nothing (ADR-008). A
     tournament not in progress is 409 `tournament_not_in_progress`, a closed
-    season 409 `season_closed`. A Swiss, a Monster DYP or a tournament
-    without a group phase is 422 `format_not_supported`, a group-phase match
+    season 409 `season_closed`. A Monster DYP or a tournament without a
+    group phase is 422 `format_not_supported`, a group-phase match
     without a result 422 `group_phase_not_done`, and a number of qualifiers
     out of range 422 `qualifiers_out_of_range` (detail `minimum`, `maximum`,
     `given`; BR-080). The request also carries the qualifying entries in seed
@@ -359,7 +361,7 @@ def start_knockout(
     match in the final's round (BR-044). The phase gets its match format,
     the league's default unless the request names one, and the final its own
     or none (BR-120). The first matches take the free fields (BR-130), and
-    the round robin's results are locked from now on (BR-053).
+    the group phase's results are locked from now on (BR-053, BR-065).
     """
     league, tournament = _lock_tournament(
         session,
@@ -379,12 +381,12 @@ def start_knockout(
             ErrorCode.CURRENT_PHASE_CHANGED,
             current_phase_id=None if current is None else str(current.id),
         )
-    group = _round_robin_group(tournament)
+    group = _played_group(tournament)
     _require_no_mode(group, start.mode)
     _require_group_done(group)
     cut = _cut(
         tournament,
-        _standings_of(tournament, group),
+        group_standings(tournament, group),
         qualifiers=start.qualifiers,
         third_place_match=start.third_place_match,
     )
@@ -757,12 +759,12 @@ def _decided_by_lot(
     that was drawn.
     """
     group = _group_phase(tournament)
-    if group is None or group.format is not PhaseFormat.ROUND_ROBIN:
+    if group is None or group.format not in PLAYED_GROUP_FORMATS:
         return frozenset()
     entries = [e for e in tournament.entries if e.stage is EntryStage.KNOCKOUT]
     cut = _cut(
         tournament,
-        _standings_of(tournament, group),
+        group_standings(tournament, group),
         qualifiers=len(entries),
         third_place_match=knockout.bracket.third_place_match,
     )

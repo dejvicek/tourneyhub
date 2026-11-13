@@ -26,7 +26,6 @@ from tourneyhub.engine.results import Game
 from tourneyhub.engine.tournaments import (
     GroupPhase,
     Outcome,
-    PhaseFormat,
     SeedingMethod,
     TournamentType,
 )
@@ -554,25 +553,6 @@ def test_br011_a_closed_season_is_the_previews_problem_and_the_starts_409(
     assert preview["can_start"] is False
     assert preview["problem"] == {"code": "season_closed", "detail": {}}
     assert (status, body) == (409, {"code": "season_closed", "detail": {}})
-
-
-def test_fr045_a_knockout_after_swiss_is_not_supported_yet(
-    played_group: Callable[..., Json],
-    start_knockout: Callable[..., tuple[int, Json]],
-    session: Session,
-) -> None:
-    tournament = played_group(4)
-    phase = session.get_one(TournamentPhase, UUID(group_of(tournament)["id"]))
-    phase.format = PhaseFormat.SWISS
-    phase.round_robin_legs = None
-    phase.sit_out_points = 0
-    phase.tiebreakers = ["bh1"]
-    session.flush()
-
-    status, body = start_knockout(tournament, qualifiers=4)
-
-    assert status == 422
-    assert body == {"code": "format_not_supported", "detail": {"format": "swiss"}}
 
 
 def test_adr008_a_knockout_of_a_tournament_in_setup_is_409(
