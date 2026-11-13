@@ -394,6 +394,35 @@ describe("result entry in a Lord have mercy knockout (BR-146)", () => {
       matchId,
     });
 
+  it("offers no clear or walkover while the rounds are not loaded (BR-146)", async () => {
+    server.use(
+      http.get(
+        "/api/v1/leagues/:leagueId/tournaments/:tournamentId/knockout/rounds",
+        () => new Promise<never>(() => undefined),
+      ),
+    );
+    const played = db()
+      .tournaments.find((t) => t.id === LHM)
+      ?.rounds.at(-1)
+      ?.matches.find((m) => m.outcome !== null);
+    if (played === undefined) throw new Error("The seed has a played match");
+    renderAt(knockoutResult(played.id));
+
+    const sheet = await screen.findByRole("dialog");
+    expect(
+      await within(sheet).findByRole("button", { name: "Save result" }),
+    ).toBeInTheDocument();
+    expect(
+      within(sheet).queryByRole("button", { name: "Clear result" }),
+    ).toBeNull();
+    expect(
+      within(sheet).queryByRole("button", {
+        name: "Record a walkover instead",
+      }),
+    ).toBeNull();
+    expect(within(sheet).queryByText("The winner is fixed")).toBeNull();
+  });
+
   it("corrects a fixed winner's score but offers no clear (BR-146)", async () => {
     const asked: string[] = [];
     server.events.on("request:start", ({ request }) => {

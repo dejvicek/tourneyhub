@@ -106,7 +106,7 @@ export const results: CsMessages<Messages["results"]> = {
       body: "Pozdější zápas už má výsledek. Chcete-li změnit tento, nejdřív smažte ten.",
     },
     winner: {
-      title: "Vítěz je pevný",
+      title: "Vítěz je už určený",
       body: "Kolo {{round}} vyřazovací části je vylosované. Skóre můžete opravit, dokud vyhrává stejná dvojice. Chcete-li změnit vítěze, smažte nejnovější kolo vyřazovací části.",
     },
   },

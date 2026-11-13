@@ -393,6 +393,40 @@ describe("Knockout in Lord have mercy (screen 9, BR-155)", () => {
     ).not.toEqual([]);
   });
 
+  it("reads a bye as the pair in the team format, then the bye (BR-155)", async () => {
+    const read = await readRounds();
+    const [first, second] = read.rounds.at(-1)?.matches ?? [];
+    if (first === undefined || second === undefined) {
+      throw new Error("The seed has no two matches in the newest round.");
+    }
+    const kept = second.sides[0];
+    if (kept === undefined) throw new Error("The match has no side.");
+    const byeMatch = {
+      ...second,
+      state: "bye" as const,
+      sides: [
+        kept,
+        { entry_id: null, player_ids: [], is_bye: true, left_player_ids: [] },
+      ],
+    };
+    const bye = { ...read.rounds.at(-1), matches: [first, byeMatch] };
+    server.use(
+      http.get(
+        "/api/v1/leagues/:leagueId/tournaments/:tournamentId/knockout/rounds",
+        () =>
+          HttpResponse.json({
+            ...read,
+            rounds: [...read.rounds.slice(0, -1), bye],
+          }),
+      ),
+    );
+    renderAt(knockoutPath());
+
+    expect(kept.player_ids).toHaveLength(2);
+    const text = await screen.findByText(/, bye$/);
+    expect(text).toHaveTextContent(/^.+ \/ .+, bye$/);
+  });
+
   it("shows the rounds side by side on a desktop, the rounds not drawn yet muted (BR-155)", async () => {
     stubViewport(1280);
     renderAt(knockoutPath());

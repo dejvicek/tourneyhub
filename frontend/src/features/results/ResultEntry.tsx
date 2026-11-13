@@ -147,7 +147,10 @@ export function ResultEntry({
           ? "winner"
           : null;
   const locked = lock === "group" || lock === "knockout";
-  const winnerFixed = lock === "winner";
+  // Until a Lord have mercy match's rounds are known (loading or failed),
+  // the lock is unknown and counts as set, so nothing is cleared by mistake.
+  const winnerFixed =
+    lock === "winner" || (remix && inKnockout && rounds.data === undefined);
   // ADR-008: a result names the entries the screen saw on both sides, so a
   // later match whose sides have changed since is refused, not decided for
   // someone else (BR-094).

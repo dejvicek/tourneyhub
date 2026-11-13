@@ -1,3 +1,4 @@
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router";
 
@@ -47,7 +48,7 @@ function Dot({ filled }: { filled: boolean }) {
 
 /** The players of a side. A pair reads as on every screen (finals.common.names.team), each name with its own "left" badge. */
 function Players({ side, ctx }: { side: RemixSide; ctx: RemixContext }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const one = (id: string) => (
     <>
       {ctx.playerName(id)}
@@ -64,9 +65,17 @@ function Players({ side, ctx }: { side: RemixSide; ctx: RemixContext }) {
     second === undefined ||
     side.player_ids.length !== 2
   ) {
-    return side.player_ids.map((id, index) => (
+    // Not a pair: the language's own list separator joins the names.
+    const ids = side.player_ids;
+    const separators = new Intl.ListFormat(i18n.language, {
+      type: "unit",
+      style: "narrow",
+    })
+      .formatToParts(ids.map(String))
+      .filter((part) => part.type === "literal");
+    return ids.map((id, index) => (
       <span key={id}>
-        {index > 0 && ", "}
+        {index > 0 && (separators[index - 1]?.value ?? " ")}
         {one(id)}
       </span>
     ));
@@ -86,6 +95,27 @@ function Players({ side, ctx }: { side: RemixSide; ctx: RemixContext }) {
       part
     ),
   );
+}
+
+/** A side's names as plain text; a pair reads as on every screen. */
+function teamName(
+  t: TFunction,
+  language: string,
+  playerIds: readonly string[],
+  ctx: RemixContext,
+): string {
+  const [first, second] = playerIds;
+  if (first !== undefined && second !== undefined && playerIds.length === 2) {
+    return t("finals.common.names.team", {
+      first: ctx.playerName(first),
+      second: ctx.playerName(second),
+      interpolation: { escapeValue: false },
+    });
+  }
+  return new Intl.ListFormat(language, {
+    type: "unit",
+    style: "narrow",
+  }).format(playerIds.map(ctx.playerName));
 }
 
 function SideRow({
@@ -142,7 +172,7 @@ export function RemixMatchCard({
   match: RemixMatch;
   ctx: RemixContext;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const title = useMatchTitle(roundName, match);
   const href = ctx.resultHref(match);
   const played = match.state === "played";
@@ -153,7 +183,7 @@ export function RemixMatchCard({
     return (
       <p className="rounded-lg border border-dashed border-input px-3 py-2 text-body-sm text-muted-foreground">
         {t("finals.knockout.byeFor", {
-          name: (kept?.player_ids ?? []).map(ctx.playerName).join(", "),
+          name: teamName(t, i18n.language, kept?.player_ids ?? [], ctx),
         })}
       </p>
     );
