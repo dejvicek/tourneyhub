@@ -512,6 +512,48 @@ def test_br083_a_little_mercy_pairs_a_top_half_player_with_a_bottom_half_player(
     ]
 
 
+def test_adr008_stale_pair_qualifiers_are_409_with_every_member(
+    client: TestClient,
+    session: Session,
+    league_id: UUID,
+    headers: dict[str, str],
+    monster: Json,
+) -> None:
+    shown = _monster_preview(
+        client, league_id, headers, monster, mode="seeded_pairs", qualifiers=8
+    )
+    flat = [member for members in _members(shown) for member in members]
+
+    response = client.put(
+        _t_url(league_id, monster["id"], "/knockout"),
+        json={
+            "expected_current_phase_id": monster["current_phase_id"],
+            "expected_qualifier_ids": flat[::-1],
+            "expected_draw_counter": shown["draw_counter"],
+            "qualifiers": 8,
+            "third_place_match": False,
+            "match_format": "bo1",
+            "final_match_format": None,
+            "mode": "seeded_pairs",
+        },
+        headers=headers,
+    )
+
+    assert (response.status_code, response.json()) == (
+        409,
+        {"code": "qualifiers_changed", "detail": {"entry_ids": flat}},
+    )
+    knockouts = session.scalar(
+        select(func.count())
+        .select_from(TournamentPhase)
+        .where(
+            TournamentPhase.tournament_id == UUID(monster["id"]),
+            TournamentPhase.kind == PhaseKind.KNOCKOUT,
+        )
+    )
+    assert knockouts == 0
+
+
 @pytest.mark.parametrize(("mode", "qualifiers"), MODES)
 def test_fr045_the_start_writes_the_previewed_pairs(
     client: TestClient,
