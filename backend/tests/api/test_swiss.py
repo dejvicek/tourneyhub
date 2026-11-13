@@ -864,7 +864,7 @@ def test_br065_a_result_of_an_earlier_round_is_locked(
     cleared = put_result(tournament["id"], match["id"], EMPTY)
     repeated = put_result(tournament["id"], match["id"], win("side_1"))
 
-    locked = (422, {"code": "result_locked", "detail": {"round_no": 2}})
+    locked = (422, {"code": "round_locked", "detail": {"round_no": 2}})
     assert changed == locked
     assert cleared == locked
     assert repeated[0] == 200
@@ -1124,7 +1124,7 @@ def test_br087_deleting_the_knockout_unlocks_the_newest_swiss_round(
         tournament["id"], round_of(played, 1)["matches"][0]["id"], win("side_2")
     )
     assert newest[0] == 200, newest
-    assert earlier == (422, {"code": "result_locked", "detail": {"round_no": 2}})
+    assert earlier == (422, {"code": "round_locked", "detail": {"round_no": 2}})
     assert add_round(tournament["id"], 3)[0] == 201
 
 

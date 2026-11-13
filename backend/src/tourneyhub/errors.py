@@ -78,9 +78,7 @@ class ErrorCode(StrEnum):
     EXPECTED_SIDES_REQUIRED = "expected_sides_required"  # a derived match needs them
     GROUP_PHASE_NOT_DONE = "group_phase_not_done"  # FR-040
     GROUP_PHASE_LOCKED = "group_phase_locked"  # the knockout is drawn (BR-053)
-    # A later knockout match has a result (BR-094), or a later Swiss round is
-    # drawn (BR-065)
-    RESULT_LOCKED = "result_locked"
+    RESULT_LOCKED = "result_locked"  # a later knockout match has a result (BR-094)
     CURRENT_PHASE_CHANGED = "current_phase_changed"  # the knockout was drawn (FR-045)
     QUALIFIERS_OUT_OF_RANGE = "qualifiers_out_of_range"  # BR-080
     QUALIFIERS_CHANGED = "qualifiers_changed"  # the cut is not the one previewed
@@ -93,6 +91,7 @@ class ErrorCode(StrEnum):
     ROUND_NUMBER_CHANGED = "round_number_changed"  # the expected new number is stale
     ROUND_NOT_COMPLETE = "round_not_complete"  # the newest round has a match left
     ROUND_NOT_NEWEST = "round_not_newest"  # only the newest round can be deleted
+    ROUND_LOCKED = "round_locked"  # a result of a round before the newest (BR-065)
     # Fields (FR-090 to FR-094)
     FIELD_NOT_FOUND = "field_not_found"
     FIELD_NUMBER_CHANGED = "field_number_changed"  # the expected new number is stale

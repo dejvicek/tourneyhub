@@ -1165,7 +1165,7 @@ def set_match_result(
     detail `match_ids`), and a knockout has no draws (BR-090). A new winner
     changes the later matches' sides. The result that completes the
     knockout finishes the tournament (FR-037). In a Swiss, a result of a
-    round before the newest is 422 `result_locked` (BR-065, detail
+    round before the newest is 422 `round_locked` (BR-065, detail
     `round_no`, the newest round's); deleting the newest round unlocks it
     (BR-066).
     """
