@@ -555,6 +555,8 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
           drawKnockout.mutate(
             {
               expected_current_phase_id: data.current_phase_id ?? group.id,
+              // The draw counter the preview showed (ADR-008).
+              expected_draw_counter: plan.draw_counter,
               // The entries the preview shows going through, in seed order.
               expected_qualifier_ids: plan.entries.flatMap((entry) =>
                 entry.members.slice(0, 1).map((member) => member.entry_id),
