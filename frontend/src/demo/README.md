@@ -2,15 +2,15 @@
 
 `pnpm dev:demo` (or `VITE_DEMO=true pnpm dev`) runs the app against a fake API: an MSW worker in the browser answers every `/api/v1/…` request from an in-memory store. A reload starts again from the seed. A production build never contains it: `main.tsx` imports `browser.ts` dynamically, behind a `MODE !== "production"` check the bundler removes, and ESLint stops app code from importing anything here (only `src/api/provisional.ts` and the tests still do).
 
-| File                 | What it holds                                                                                                                                            |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `contract.ts`        | Provisional paths for routes the backend does not have yet, in openapi-typescript's shape; their hand-written types are in `src/api/provisionalTypes.ts` |
-| `ids.ts`             | `demoId()` and each area's id range                                                                                                                      |
-| `seed.ts`            | One league, 16 players, Season 1, two finished tournaments and a DYP running its round robin                                                             |
-| `seedParts.ts`       | The screen areas' own seed files, which `seed.ts` applies after its own data                                                                             |
-| `store.ts`           | The in-memory data and what the backend would compute on read                                                                                            |
-| `engine.ts`          | Stand-ins for schedules, draws, standings and places (`// demo only, the engine decides`)                                                                |
-| `handlers/<area>.ts` | The fake API, one module per area; `allHandlers.ts` lists them                                                                                           |
+| File                 | What it holds                                                                                                                                                          |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `contract.ts`        | Provisional paths for routes the backend does not have yet, in openapi-typescript's shape; the hand-written types the screens use are in `src/api/provisionalTypes.ts` |
+| `ids.ts`             | `demoId()` and each area's id range                                                                                                                                    |
+| `seed.ts`            | One league, 16 players, Season 1, two finished tournaments and a DYP running its round robin                                                                           |
+| `seedParts.ts`       | The screen areas' own seed files, which `seed.ts` applies after its own data                                                                                           |
+| `store.ts`           | The in-memory data and what the backend would compute on read                                                                                                          |
+| `engine.ts`          | Stand-ins for schedules, draws, standings and places (`// demo only, the engine decides`)                                                                              |
+| `handlers/<area>.ts` | The fake API, one module per area; `allHandlers.ts` lists them                                                                                                         |
 
 The Vitest tests use the same handlers (`src/test/server.ts`).
 

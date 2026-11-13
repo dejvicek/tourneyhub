@@ -1,7 +1,7 @@
 // Stand-ins for the request and response types of routes the backend does
 // not have yet: the Swiss and Monster DYP ranking, the participants, adding
 // and deleting a round, late players and disabling, and the tie-breakers
-// (FR-043, P12). The demo's contract (src/demo/contract.ts) builds its
+// (FR-043; P12, P13, P14). The demo's contract (src/demo/contract.ts) builds its
 // provisional paths on them, and the screens read them from here. Each type
 // goes away once its route is generated into schema.d.ts (D3, D4).
 import type { components } from "./schema";
