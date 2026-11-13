@@ -22,6 +22,44 @@ export async function accessTokenOf(
   return body.access_token;
 }
 
+/**
+ * Signs up over HTTP with the instance's sign-up code (FR-001) and returns an
+ * access token: for a spec whose UI coverage starts later in the evening.
+ */
+export async function signUp(
+  request: APIRequestContext,
+  signupCode: string,
+  { email, password }: Organizer,
+  displayName: string,
+): Promise<string> {
+  const response = await request.post("/api/v1/auth/signup", {
+    data: {
+      signup_code: signupCode,
+      email,
+      display_name: displayName,
+      password,
+    },
+  });
+  expect(response.status(), "signing up").toBe(201);
+  const body = (await response.json()) as { access_token: string };
+  return body.access_token;
+}
+
+/** Creates a league with its Season 1 (FR-010) and returns its id. */
+export async function createLeague(
+  request: APIRequestContext,
+  token: string,
+  name: string,
+): Promise<string> {
+  const response = await request.post("/api/v1/leagues", {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { id: uuid7(), name },
+  });
+  expect(response.status(), "creating the league").toBe(201);
+  const body = (await response.json()) as { id: string };
+  return body.id;
+}
+
 /** Adds the players to the league's list, one request each, in order. */
 export async function addPlayers(
   request: APIRequestContext,
@@ -174,6 +212,65 @@ export async function startDypRoundRobin(
       type: "dyp",
       group_phase: "round_robin",
       round_robin_legs: 1,
+      sit_out_points: null,
+      group_match_format: "bo1",
+      knockout_match_format: null,
+      final_match_format: null,
+      third_place_match: null,
+      goals_per_game: 10,
+      field_count: 2,
+    },
+  });
+  expect(created.status(), "creating the tournament").toBe(201);
+  const { tournament_id: tournamentId } = (await created.json()) as {
+    tournament_id: string;
+  };
+  const picked = await request.put(`${base}/${tournamentId}/setup/players`, {
+    headers,
+    data: { player_ids: playerIds },
+  });
+  expect(picked.status(), "picking the players").toBe(200);
+  const setup = (await picked.json()) as {
+    draw_counter: number;
+    entries: { id: string; seed: number | null }[];
+  };
+  const started = await request.post(`${base}/${tournamentId}/start`, {
+    headers,
+    data: {
+      expected_draw_counter: setup.draw_counter,
+      expected_seed_order: setup.entries
+        .toSorted((a, b) => (a.seed ?? 0) - (b.seed ?? 0))
+        .map((entry) => entry.id),
+    },
+  });
+  expect(started.status(), "starting the tournament").toBe(200);
+  return tournamentId;
+}
+
+/**
+ * Creates a Singles Swiss of the given players on two fields, BO1 and the
+ * default sit-out points, lets the league ranking seed them and starts it
+ * (FR-035): round 1 pairs the top half against the bottom half, and with an
+ * odd number the lowest seed sits out (BR-055, BR-058). Returns the
+ * tournament's id.
+ */
+export async function startSinglesSwiss(
+  request: APIRequestContext,
+  token: string,
+  leagueId: string,
+  { name, playerIds }: { name: string; playerIds: readonly string[] },
+): Promise<string> {
+  const headers = { Authorization: `Bearer ${token}` };
+  const base = `/api/v1/leagues/${leagueId}/tournaments`;
+  const created = await request.post(base, {
+    headers,
+    data: {
+      id: uuid7(),
+      name,
+      date: new Date().toISOString().slice(0, 10),
+      type: "singles",
+      group_phase: "swiss",
+      round_robin_legs: null,
       sit_out_points: null,
       group_match_format: "bo1",
       knockout_match_format: null,
