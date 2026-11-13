@@ -4,6 +4,7 @@
 |---|---|---|
 | `product/` | [PRD.md](product/PRD.md) | What the MVP does: users, glossary, requirements (`FR-`) and business rules (`BR-`). |
 | | [ROADMAP.md](product/ROADMAP.md) | What comes after the MVP (`RM-`), in stages. |
+| | [MVP-ROADMAP.md](product/MVP-ROADMAP.md) | What is left before the MVP is done, as a checklist that follows issue #84. |
 | `architecture/` | [ADR.md](architecture/ADR.md) | How it is built: the architecture decision records (ADR-001 onwards). |
 | | [DATA-MODEL.md](architecture/DATA-MODEL.md) | The PostgreSQL schema and what the database enforces. |
 | | [diagrams/](architecture/diagrams/README.md) | A LikeC4 picture of the ADRs, the PRD and the data model. |
