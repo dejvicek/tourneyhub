@@ -15,7 +15,7 @@ from tourneyhub.api.deps import SessionDep
 from tourneyhub.api.leagues import SeasonRead
 from tourneyhub.api.public_headers import PUBLIC_PREFIX
 from tourneyhub.api.schemas import ErrorResponse, ResponseModel
-from tourneyhub.api.tournaments import (
+from tourneyhub.api.tournament_models import (
     EntryRead,
     FieldRead,
     PhaseRead,
