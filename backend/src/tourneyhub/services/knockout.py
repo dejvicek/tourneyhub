@@ -63,13 +63,13 @@ from tourneyhub.services.tournaments import (
     KnockoutBracket,
     TournamentView,
     _bracket_rounds,
-    _fill_fields,
     _match_format,
     group_standings,
     knockout_bracket,
     read_tournament,
     tie_groups,
 )
+from tourneyhub.services.tournaments.fields import _fill_fields
 from tourneyhub.services.tournaments.shared import (
     _current_phase,
     _group_phase,
