@@ -34,7 +34,7 @@ The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. 
   - [ ] `GET …/players/{player_id}/tournaments` (BR-002, FR-012), together with Q25.
   - [ ] `PUT …/setup/top-players` (FR-041), together with Q11.
 - [ ] D4 Routes that come with P12–P14 (section 4). Until they exist, the screens that need them are hidden:
-  - [ ] P12, P13: the screens move from the provisional `…/ranking` to `GET …/play` and the public `…/standings`; `PUT …/tiebreakers`, `POST …/rounds` and `DELETE …/rounds/{round_id}` exist in the backend, and the screens still have to switch to them.
+  - [x] P12, P13: the screens move from the provisional `…/ranking` to `GET …/play` and the public `…/standings`; `PUT …/tiebreakers`, `POST …/rounds` and `DELETE …/rounds/{round_id}` exist in the backend, and the screens still have to switch to them.
   - [ ] P14: `GET …/participants`, `POST …/entries`, `PUT …/entries/{entry_id}/disabled`.
 - [ ] D5 Delete the demo: `src/demo/`, `src/api/provisional.ts`, what is left in `src/api/provisionalTypes.ts`, the exports of `src/lib/rules.ts` only the demo read, the `dev:demo` script, the demo settings in `vite.config.ts`, `main.tsx` and CI, and the mentions in `CLAUDE.md` and `docs/style/frontend-style.md`. Done when no demo code is left and lint, typecheck, unit tests, build and e2e pass.
 
@@ -43,7 +43,7 @@ The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. 
 - [ ] **P12 Swiss** (FR-040, FR-042, FR-043, FR-046; BR-055 – BR-058, BR-065, BR-066, BR-068, BR-072 – BR-074; ADR-011)
   - [x] Engine: pairing, standings with BH1 and BH2, recommended number of rounds ([#38](https://github.com/dejvicek/tourneyhub/pull/38), [#43](https://github.com/dejvicek/tourneyhub/pull/43)).
   - [x] Services and API: start a Swiss phase, add a round against an expected number, delete a round, the order of tie-breakers ([#90](https://github.com/dejvicek/tourneyhub/pull/90)).
-  - [ ] Screen 11 (between rounds) on the real API.
+  - [x] Screen 11 (between rounds) on the real API.
   - [ ] Property tests and the benchmark (ADR-011 Timing).
   - [ ] Tie-breaker order after the knockout draw, and the game-difference column in a Swiss ([#92](https://github.com/dejvicek/tourneyhub/issues/92), waiting for an answer).
 - [ ] **P13 Monster DYP** (FR-041, FR-045; BR-060 – BR-063, BR-081 – BR-084; ADR-010, ADR-011)
