@@ -53,7 +53,7 @@ describe("the texts for a refused start or back to setup", () => {
     [
       "cs",
       refused(422, "too_many_top_players", { max: 3 }),
-      "Nasazených hráčů může být nejvýše 3: jeden na zápas prvního kola.",
+      "Nejlepších hráčů může být nejvýše 3: jeden na zápas prvního kola.",
     ],
     [
       "en",

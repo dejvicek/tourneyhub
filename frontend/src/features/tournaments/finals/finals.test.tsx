@@ -715,6 +715,7 @@ describe("Between rounds (screen 11)", () => {
     );
   });
 
+  // The Swiss fixture stands in for the between-rounds screen that Monster DYP shares.
   it("says how many players another round needs (FR-046)", async () => {
     server.use(
       http.post(
