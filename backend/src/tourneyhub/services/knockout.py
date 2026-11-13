@@ -22,7 +22,6 @@ from sqlalchemy.orm import Session
 
 from tourneyhub.db.models.entries import Entry, EntryMember
 from tourneyhub.db.models.leagues import League
-from tourneyhub.db.models.matches import Match
 from tourneyhub.db.models.tournaments import Tournament, TournamentPhase
 from tourneyhub.engine.errors import EngineError
 from tourneyhub.engine.ids import EntryId
@@ -73,7 +72,6 @@ from tourneyhub.services.tournaments import (
 )
 from tourneyhub.services.tournaments.fields import _fill_fields
 from tourneyhub.services.tournaments.play import _player_of, monster_standings_of
-from tourneyhub.services.tournaments.results import _match_format
 from tourneyhub.services.tournaments.shared import (
     _current_phase,
     _group_phase,
@@ -85,6 +83,8 @@ from tourneyhub.services.tournaments.shared import (
     _require_open_season,
     final_round_no,
     knockout_phase,
+    match_format_of,
+    match_score,
 )
 from tourneyhub.services.tournaments.start import _bracket_rounds
 
@@ -1008,8 +1008,8 @@ def _bracket_view(tournament: Tournament, knockout: KnockoutBracket) -> BracketV
             ),
             outcome=row.outcome,
             is_walkover=row.is_walkover,
-            score=_score(row),
-            match_format=_match_format(
+            score=match_score(row),
+            match_format=match_format_of(
                 knockout.phase, rounds_by_no[match.key.round_no], row
             ),
             field_number=on_field.get(row.id),
@@ -1105,23 +1105,6 @@ def _state(match: BracketMatch, field_number: int | None) -> MatchState:
     if not match.is_playable:
         return "waiting"
     return "ready" if field_number is None else "on_field"
-
-
-def _score(match: Match) -> tuple[int, int] | None:
-    """Side 1's score: a BO1 game's goals, else the games won; None before a result."""
-    if match.outcome is None or not match.games:
-        return None
-    first = match.games[0]
-    if (
-        len(match.games) == 1
-        and first.score_1 is not None
-        and first.score_2 is not None
-    ):
-        return (first.score_1, first.score_2)
-    return (
-        sum(game.winner is Outcome.SIDE_1 for game in match.games),
-        sum(game.winner is Outcome.SIDE_2 for game in match.games),
-    )
 
 
 def read_shared_bracket(

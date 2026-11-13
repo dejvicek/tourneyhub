@@ -14,8 +14,6 @@ from tourneyhub.engine.knockout import is_complete, locked_by
 from tourneyhub.engine.remix import allows_result
 from tourneyhub.engine.results import Game, match_outcome
 from tourneyhub.engine.tournaments import (
-    MatchFormat,
-    MatchKind,
     Outcome,
     PhaseFormat,
     PhaseKind,
@@ -34,9 +32,9 @@ from tourneyhub.services.tournaments.shared import (
     _match_players,
     _match_slots,
     _require_open_season,
-    final_round_no,
     knockout_bracket,
     knockout_phase,
+    match_format_of,
 )
 from tourneyhub.services.tournaments.views import MatchView, _match_view, _setup_of
 
@@ -60,22 +58,6 @@ class MatchResult:
         return self.walkover_winner is None and not self.games
 
 
-def _match_format(phase: TournamentPhase, round_: Round, match: Match) -> MatchFormat:
-    """The format a match plays: its phase's, or the final's own (BR-120).
-
-    The final is the standard match of the bracket's last round (D4), which a
-    Lord have mercy knockout draws last: until then no stored round holds it.
-    """
-    is_final = (
-        phase.kind is PhaseKind.KNOCKOUT
-        and match.kind is MatchKind.STANDARD
-        and round_.round_no == final_round_no(phase)
-    )
-    if is_final and phase.final_match_format is not None:
-        return MatchFormat(phase.final_match_format)
-    return phase.match_format
-
-
 def _outcome_of(
     result: MatchResult,
     *,
@@ -90,7 +72,7 @@ def _outcome_of(
     try:
         return match_outcome(
             result.games,
-            match_format=_match_format(phase, round_, match),
+            match_format=match_format_of(phase, round_, match),
             draws_allowed=league.draws_allowed and phase.kind is PhaseKind.GROUP,
             scores_required=phase.format
             in {PhaseFormat.SWISS, PhaseFormat.MONSTER_DYP},

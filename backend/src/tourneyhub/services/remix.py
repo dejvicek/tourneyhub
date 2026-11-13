@@ -31,7 +31,7 @@ from tourneyhub.errors import (
     NotFoundError,
     RuleViolationError,
 )
-from tourneyhub.services.knockout import _remove_knockout, _score
+from tourneyhub.services.knockout import _remove_knockout
 from tourneyhub.services.tournaments import Clock
 from tourneyhub.services.tournaments.fields import _fill_fields
 from tourneyhub.services.tournaments.remix import (
@@ -39,13 +39,14 @@ from tourneyhub.services.tournaments.remix import (
     left_player_ids,
     remix_knockout,
 )
-from tourneyhub.services.tournaments.results import _match_format
 from tourneyhub.services.tournaments.shared import (
     _lock_tournament,
     _match_slots,
     _played,
     _require_open_season,
     knockout_phase,
+    match_format_of,
+    match_score,
 )
 
 type RemixMatchState = Literal["bye", "played", "on_field", "ready"]
@@ -365,8 +366,8 @@ def _remix_view(tournament: Tournament, remix: RemixKnockout) -> RemixKnockoutVi
             sides=(side_view(side_1), side_view(side_2)),
             outcome=row.outcome,
             is_walkover=row.is_walkover,
-            score=_score(row),
-            match_format=_match_format(remix.phase, round_, row),
+            score=match_score(row),
+            match_format=match_format_of(remix.phase, round_, row),
             field_number=field_number,
             winner_locked=not match.has_bye
             and not allows_result(state, match.key, None),
