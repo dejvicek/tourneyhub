@@ -946,8 +946,10 @@ def view_bracket(
 ) -> BracketView:
     """Return one of the league's knockouts, read without a lock.
 
-    A tournament without a knockout is 404 `knockout_not_found`; an unknown
-    one, one of another league and, with `past_setup`, one in setup are 404
+    A tournament without a knockout is 404 `knockout_not_found`; a Lord have
+    mercy knockout, which has no fixed bracket (BR-084, BR-155), is 422
+    `format_not_supported` (detail `format`, `mode`); an unknown tournament,
+    one of another league and, with `past_setup`, one in setup are 404
     `tournament_not_found` (FR-070).
     """
     tournament = _load_tournament(session, league=league, tournament_id=tournament_id)
@@ -955,7 +957,15 @@ def view_bracket(
         raise NotFoundError(ErrorCode.TOURNAMENT_NOT_FOUND)
     knockout = knockout_bracket(tournament)
     if knockout is None:
-        raise NotFoundError(ErrorCode.KNOCKOUT_NOT_FOUND)
+        phase = knockout_phase(tournament)
+        if phase is None:
+            raise NotFoundError(ErrorCode.KNOCKOUT_NOT_FOUND)
+        # Lord have mercy has no fixed bracket: `…/knockout/rounds` serves it.
+        raise RuleViolationError(
+            ErrorCode.FORMAT_NOT_SUPPORTED,
+            format=phase.format,
+            mode=phase.monster_knockout_mode,
+        )
     return _bracket_view(tournament, knockout)
 
 

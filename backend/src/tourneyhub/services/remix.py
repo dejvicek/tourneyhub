@@ -14,6 +14,7 @@ from uuid import UUID, uuid7
 
 from sqlalchemy.orm import Session
 
+from tourneyhub.db.models.leagues import League
 from tourneyhub.db.models.matches import Match, MatchSide, MatchSidePlayer, Round
 from tourneyhub.db.models.tournaments import Tournament
 from tourneyhub.engine.knockout import RoundName, round_name
@@ -32,6 +33,8 @@ from tourneyhub.errors import (
     RuleViolationError,
 )
 from tourneyhub.services.knockout import _remove_knockout
+from tourneyhub.services.leagues import get_league
+from tourneyhub.services.public import _shared_league
 from tourneyhub.services.tournaments import Clock
 from tourneyhub.services.tournaments.fields import _fill_fields
 from tourneyhub.services.tournaments.remix import (
@@ -40,6 +43,7 @@ from tourneyhub.services.tournaments.remix import (
     remix_knockout,
 )
 from tourneyhub.services.tournaments.shared import (
+    _load_tournament,
     _lock_tournament,
     _match_slots,
     _played,
@@ -248,6 +252,52 @@ def delete_knockout_round(
     session.flush()  # the matches are gone before the free fields take the next ones
     _fill_fields(tournament, _match_slots(tournament), now)
     session.flush()
+
+
+def read_knockout_rounds(
+    session: Session, *, league_id: UUID, tournament_id: UUID, user_id: UUID
+) -> RemixKnockoutView:
+    """Return the organizer's Lord have mercy knockout round by round (BR-155).
+
+    Read without a lock. See `view_knockout_rounds` for the refusals.
+    """
+    league = get_league(session, league_id=league_id, user_id=user_id)
+    return view_knockout_rounds(session, league=league, tournament_id=tournament_id)
+
+
+def view_knockout_rounds(
+    session: Session,
+    *,
+    league: League,
+    tournament_id: UUID,
+    past_setup: bool = False,
+) -> RemixKnockoutView:
+    """Return one of the league's Lord have mercy knockouts, read without a lock.
+
+    A tournament without a knockout is 404 `knockout_not_found`; a fixed-pair
+    knockout is 422 `format_not_supported` (detail `format`, `mode`), and its
+    rounds are read with `…/bracket`. An unknown tournament, one of another
+    league and, with `past_setup`, one in setup are 404 `tournament_not_found`
+    (FR-070).
+    """
+    tournament = _load_tournament(
+        session, league=league, tournament_id=tournament_id, past_setup=past_setup
+    )
+    return _remix_view(tournament, _require_remix(tournament))
+
+
+def read_shared_knockout_rounds(
+    session: Session, *, share_token: str, tournament_id: UUID
+) -> RemixKnockoutView:
+    """Return a Lord have mercy knockout through the share link (FR-070, ADR-008).
+
+    The league is found by its token first (404 `share_link_not_found`); a
+    tournament in setup is 404 `tournament_not_found`, like an unknown one.
+    """
+    league = _shared_league(session, share_token=share_token)
+    return view_knockout_rounds(
+        session, league=league, tournament_id=tournament_id, past_setup=True
+    )
 
 
 def _require_remix(tournament: Tournament) -> RemixKnockout:

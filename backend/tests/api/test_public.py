@@ -532,6 +532,31 @@ _PUBLIC_PROPERTIES: dict[str, set[str]] = {
     },
     "PublicPlacesRead": {"complete", "rows"},
     "PublicPlayerRead": {"id", "name"},
+    "PublicRemixKnockoutRead": {
+        "final_match_format",
+        "left_player_ids",
+        "match_format",
+        "phase_id",
+        "round_count",
+        "rounds",
+        "size",
+        "third_place_match",
+    },
+    "PublicRemixMatchRead": {
+        "field_number",
+        "is_walkover",
+        "kind",
+        "match_format",
+        "match_id",
+        "number",
+        "outcome",
+        "position",
+        "score",
+        "sides",
+        "state",
+    },
+    "PublicRemixRoundRead": {"matches", "name", "round_id", "round_no"},
+    "PublicRemixSideRead": {"entry_id", "is_bye", "left_player_ids", "player_ids"},
     "PublicSeasonStandingRow": {
         "place",
         "player_id",
@@ -637,7 +662,7 @@ def test_fr071_public_schemas_carry_nothing_only_the_organizer_sees(
         reachable,
     )
 
-    assert len(public) == 7
+    assert len(public) == 8
     assert all(set(item) == {"get"} for item in public.values())  # FR-072
     assert {
         name: set(schemas[name]["properties"])
