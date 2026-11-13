@@ -79,6 +79,7 @@ from tourneyhub.engine.ranking import PlayerRecord, RankedPlayer, rank_league
 from tourneyhub.engine.results import Game, match_outcome
 from tourneyhub.engine.schedule import (
     MAX_ROUND_ROBIN_ENTRIES,
+    ScheduledMatch,
     ScheduledRound,
     check_entry_count,
     round_robin,
@@ -95,9 +96,11 @@ from tourneyhub.engine.standings import (
     round_robin_standings,
 )
 from tourneyhub.engine.swiss import (
+    SwissDraw,
     SwissMatch,
     SwissRound,
     SwissStanding,
+    draw_first_swiss_round,
     swiss_standings,
 )
 from tourneyhub.engine.tournaments import (
@@ -1820,16 +1823,21 @@ def view_tournament(
 def _check_ready(tournament: Tournament, phase: TournamentPhase) -> None:
     """Refuse a start whose setup is not complete (FR-032, FR-033, BR-030 to BR-032).
 
-    A round robin and a knockout without a group phase are generated so far;
-    Swiss and Monster DYP are 422 `format_not_supported`. Doubles needs every
+    A round robin, a Swiss and a knockout without a group phase are generated
+    so far; Monster DYP is 422 `format_not_supported`. Doubles needs every
     picked player in a pair (422 `players_without_partner`); DYP needs its
     halves and pairs (the 422s of a new DYP draw); every type needs FR-032's
     minimum of entries, 4 for a knockout with a third-place match (422
     `not_enough_entries`). A round robin takes at most
     `MAX_ROUND_ROBIN_ENTRIES` (422 `too_many_entries_for_round_robin`), a
-    knockout `MAX_KNOCKOUT_ENTRIES` (422 `too_many_entries_for_knockout`).
+    knockout `MAX_KNOCKOUT_ENTRIES` (422 `too_many_entries_for_knockout`); a
+    Swiss has no maximum (FR-032).
     """
-    if phase.format not in {PhaseFormat.ROUND_ROBIN, PhaseFormat.SINGLE_ELIMINATION}:
+    if phase.format not in {
+        PhaseFormat.ROUND_ROBIN,
+        PhaseFormat.SWISS,
+        PhaseFormat.SINGLE_ELIMINATION,
+    }:
         raise RuleViolationError(ErrorCode.FORMAT_NOT_SUPPORTED, format=phase.format)
     if tournament.type is TournamentType.DOUBLES:
         paired = {m.player_id for entry in tournament.entries for m in entry.members}
@@ -1854,7 +1862,7 @@ def _check_ready(tournament: Tournament, phase: TournamentPhase) -> None:
             raise RuleViolationError(
                 ErrorCode.TOO_MANY_ENTRIES_FOR_KNOCKOUT, limit=MAX_KNOCKOUT_ENTRIES
             )
-    elif given > MAX_ROUND_ROBIN_ENTRIES:
+    elif phase.format is PhaseFormat.ROUND_ROBIN and given > MAX_ROUND_ROBIN_ENTRIES:
         raise RuleViolationError(
             ErrorCode.TOO_MANY_ENTRIES_FOR_ROUND_ROBIN, limit=MAX_ROUND_ROBIN_ENTRIES
         )
@@ -1875,6 +1883,38 @@ def _round_robin_of(
         seed_order((EntryId(entry.id), entry.seed) for entry in main),
         legs=phase.round_robin_legs or 1,  # the CHECK sets it for a round robin
     )
+
+
+def _swiss_round_of(draw: SwissDraw) -> ScheduledRound:
+    """A drawn Swiss round as the rows of a schedule take it (BR-055 to BR-058)."""
+    return ScheduledRound(
+        round_no=draw.round_no,
+        matches=tuple(
+            ScheduledMatch(side_1=pair.side_1, side_2=pair.side_2)
+            for pair in draw.pairs
+        ),
+        sitting_out=draw.sitting_out,
+    )
+
+
+def _group_schedule(
+    main: Sequence[Entry], phase: TournamentPhase
+) -> tuple[ScheduledRound, ...]:
+    """What the start writes for a group phase, and the preview shows.
+
+    A round robin's every round (BR-050 to BR-052); a Swiss's round 1 from
+    the seeds, the lowest seed sitting out with an odd number (BR-055,
+    BR-058). Fewer than 2 entries is 422 `not_enough_entries`.
+    """
+    if phase.format is not PhaseFormat.SWISS:
+        return _round_robin_of(main, phase)
+    try:
+        draw = draw_first_swiss_round(
+            seed_order((EntryId(entry.id), entry.seed) for entry in main)
+        )
+    except EngineError as err:
+        raise to_app_error(err) from err
+    return (_swiss_round_of(draw),)
 
 
 def _bracket_from_seeds(main: Sequence[Entry], phase: TournamentPhase) -> Bracket:
@@ -2090,13 +2130,15 @@ def start_tournament(
     a seed order that is not the entries' current one, seed 1 first, is 409
     `seed_order_changed`: the schedule is never drawn from a setup the
     organizer did not see. The seeds follow the entries, so the same check
-    covers a change to the players or to their pairs. A round
-    robin and a knockout without a group phase are generated so far; Swiss and
-    Monster DYP are 422 `format_not_supported`. An incomplete setup is a 422
-    (`_check_ready`).
+    covers a change to the players or to their pairs. A round robin, a Swiss
+    and a knockout without a group phase are generated so far; Monster DYP is
+    422 `format_not_supported`. An incomplete setup is a 422 (`_check_ready`).
 
-    The round robin follows the seeds (BR-050 to BR-052); every main entry gets
-    a participation row in every round (D5). A knockout without a group phase
+    The round robin follows the seeds (BR-050 to BR-052); a Swiss gets round 1
+    only, top half of the seeds against the bottom half, the lowest seed
+    sitting out with an odd number (BR-055, BR-058), and its later rounds are
+    added one at a time (`add_round`, FR-040). Every main entry gets a
+    participation row in every round (D5). A knockout without a group phase
     (FR-031) is drawn from the setup seeds into the setup's phase: every
     bracket match at once, the byes for the top seeds in round 1 and the
     third-place match in the final's round (BR-040 to BR-044); only the first
@@ -2138,7 +2180,7 @@ def start_tournament(
     members = {
         entry.id: sorted(member.player_id for member in entry.members) for entry in main
     }
-    schedule = _round_robin_of(main, phase)
+    schedule = _group_schedule(main, phase)
     now = clock()
     rows = _schedule_rows(phase, schedule, members, now)
     _insert_schedule(session, rows)  # the matches exist before a field references one
@@ -2191,7 +2233,8 @@ class SchedulePreview:
 
     With a `problem` there are no rounds, no counts and no `seed_order`.
     `draw_counter` and `seed_order`, the main entries with seed 1 first, are
-    the ones the start must carry (ADR-008). A round robin lists all its rounds. A
+    the ones the start must carry (ADR-008). A round robin lists all its rounds;
+    a Swiss its round 1, without counts, since its rounds come one at a time. A
     knockout without a group phase lists its first round, with the byes, and
     counts every match of the bracket (the third-place match too, no byes)
     and its rounds; `bracket_size` is its number of first-round spots.
@@ -2228,10 +2271,12 @@ def preview_schedule(
 ) -> SchedulePreview:
     """Return what `start_tournament` would create, writing nothing (FR-035).
 
-    Read without a lock, like the setup. The checks and the round robin are the
-    start's own (`_check_ready`, `_round_robin_of`), so a preview that can start
+    Read without a lock, like the setup. The checks and the schedule are the
+    start's own (`_check_ready`, `_group_schedule`), so a preview that can start
     is the schedule the start writes for the same draw counter. A refusal comes
-    back as the `problem`, not as an error: the review screen shows it.
+    back as the `problem`, not as an error: the review screen shows it. A
+    Swiss shows round 1 only and no counts: its later rounds are drawn one at a
+    time from the standings (FR-040).
     """
     league = get_league(session, league_id=league_id, user_id=user_id)
     tournament = session.scalars(_tournament_query(league, tournament_id)).one_or_none()
@@ -2257,7 +2302,7 @@ def preview_schedule(
         return _bracket_preview(
             tournament.draw_counter, _main_entries(tournament), phase, players
         )
-    schedule = _round_robin_of(_main_entries(tournament), phase)
+    schedule = _group_schedule(_main_entries(tournament), phase)
     rounds = tuple(
         PreviewRound(
             round_no=scheduled.round_no,
@@ -2271,13 +2316,14 @@ def preview_schedule(
         )
         for scheduled in schedule
     )
+    swiss = phase.format is PhaseFormat.SWISS  # its rounds come one at a time
     return SchedulePreview(
         draw_counter=tournament.draw_counter,
         seed_order=tuple(_seed_order_of(_main_entries(tournament))),
         problem=None,
         rounds=rounds,
-        match_count=sum(len(r.matches) for r in rounds),
-        round_count=len(rounds),
+        match_count=None if swiss else sum(len(r.matches) for r in rounds),
+        round_count=None if swiss else len(rounds),
         bracket_size=None,
     )
 
