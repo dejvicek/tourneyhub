@@ -441,21 +441,22 @@ def draw_monster_round(
        from round 3, the playing players in standing order, four at a time.
        In each group the 1st and 4th play the 2nd and 3rd.
     4. **Swaps (BR-062, ADR-011).** While a team repeats a partnership, the
-       swap of two players' places that leaves the fewest repeats is made;
-       among those, the one that leaves the smallest sum of earlier counts
-       (how many times each team has been partners before); among those, the
-       one that moves players least far from their places in step 3; and of
-       those the first by the lot `monster-swap:round-<n>`. Top players are
-       not swapped in rounds 1 and 2. The swaps stop when no repeat is left
-       or none improves the draw.
+       swap of two players' places that leaves the better draw is made. A
+       draw is the better the fewer of its teams would partner for the
+       highest time (a third time, say), then the fewer at the next count
+       down, and so on down to the second time. Among equally good swaps,
+       the one that moves players least far from their places in step 3 is
+       made, and of those the first by the lot `monster-swap:round-<n>`. Top
+       players are not swapped in rounds 1 and 2. The swaps stop when no
+       repeat is left or none improves the draw.
     5. **Matching (ADR-011).** If repeats are left, a minimum-cost matching
-       of all the players, where a team costs more the more often it has been
-       partners (the number of repeats first, then the sum of the counts),
-       tells whether a better draw exists. If so, its teams replace the
-       others, placed where their players move least. Every draw therefore
-       has the fewest repeated partners possible, and of those the smallest
-       sum of earlier counts. This happens only from round 3: in rounds 1 and
-       2 the swaps always remove every repeat.
+       of all the players, where a team's cost grows with a power of how
+       often it has been partners, tells whether a better draw exists. If
+       so, its teams replace the others, placed where their players move
+       least. Every draw is therefore the best possible in the order of
+       step 4, so no repeat is left while one can be avoided. This happens
+       only from round 3: in rounds 1 and 2 the swaps always remove every
+       repeat.
 
     Repeated opponents are allowed. The result depends only on the inputs
     and the seed, so the same round is drawn on every call.
@@ -811,9 +812,16 @@ class _Grouping:
 
     Slot `4g + k` is the (k + 1)th player of group g. `home` is each player's
     slot in the groups of BR-060 and BR-061; how far a grouping moves the
-    players from it is the sum of the distances. A grouping is the better the
-    fewer teams repeat a partnership, and of those the smaller the sum of how
-    many times its teams have been partners before.
+    players from it is the sum of the distances.
+
+    A grouping is the better the fewer of its teams would partner for the
+    highest time, then the fewer at the next count down, and so on down to
+    the second time (ADR-011): no team plays together a third time while
+    another grouping has teams play together only a second time. `weight`
+    turns that order into a sum: a team that has partnered `c` times before
+    weighs `base ** c`, and `base` is above the number of teams in the
+    round, so one team at a count weighs more than every team at the counts
+    below it together.
     """
 
     def __init__(
@@ -827,6 +835,11 @@ class _Grouping:
         self.home = {player: slot for slot, player in enumerate(start)}
         self.partners = partners
         self.fixed = fixed
+        self.base = len(self.slots) // 2 + 1
+
+    def weight(self, earlier: int) -> int:
+        """Weigh a team that has been partners `earlier` times before."""
+        return self.base**earlier if earlier else 0
 
     def earlier(self, slot: int) -> int:
         """Count how many times the team at `slot` have been partners before."""
@@ -868,14 +881,14 @@ class _Grouping:
         return is_by_lot
 
     def _best_swaps(self) -> list[Pair]:
-        """Return the swaps that reduce repeats the most and move players least."""
+        """Return the swaps that improve the draw the most and move players least."""
         repeated = {
             slot
             for slot in range(len(self.slots))
             if slot not in self.fixed and self.is_repeat(slot)
         }
         best: list[Pair] = []
-        best_key = (0, 0, 0)
+        best_key = (0, 0)
         for first in sorted(repeated):
             for second in range(len(self.slots)):
                 if (
@@ -885,7 +898,7 @@ class _Grouping:
                 ):
                     continue
                 key = self._swap_effect(first, second)
-                if key[:2] >= (0, 0):
+                if key[0] >= 0:
                     continue
                 if not best or key < best_key:
                     best, best_key = [(first, second)], key
@@ -893,11 +906,11 @@ class _Grouping:
                     best.append((first, second))
         return best
 
-    def _swap_effect(self, first: int, second: int) -> tuple[int, int, int]:
-        """Return how a swap changes the repeats, the earlier counts and the distance.
+    def _swap_effect(self, first: int, second: int) -> tuple[int, int]:
+        """Return how a swap changes the draw's weight and the distance moved.
 
-        The change in repeats is compared first, then the change in the sum of
-        the earlier counts, then the change in the distance moved from home.
+        The change in weight is compared first, then the change in the
+        distance moved from home.
         """
         a, b = self.slots[first], self.slots[second]
         mate_a = self.slots[_partner_slot(first)]
@@ -907,23 +920,21 @@ class _Grouping:
             self.partners[frozenset((b, mate_a))],
             self.partners[frozenset((a, mate_b))],
         )
-        repeats = sum(count > 0 for count in after) - sum(count > 0 for count in now)
+        weight = sum(map(self.weight, after)) - sum(map(self.weight, now))
         moved = (
             abs(first - self.home[b])
             + abs(second - self.home[a])
             - abs(first - self.home[a])
             - abs(second - self.home[b])
         )
-        return repeats, sum(after) - sum(now), moved
+        return weight, moved
 
     def match(self) -> bool:
         """Re-form the teams by a minimum-cost matching if that is a better draw.
 
-        A pair costs more than every sum of counts together if it repeats a
-        partnership, plus the number of times it has: so the matching has the
-        fewest repeats, and of those the smallest sum of earlier counts. Of
-        equally good matchings, the one that keeps the most teams as they
-        stand is taken.
+        A pair costs its `weight`, so the matching is the best draw in the
+        order of ADR-011. Of equally good matchings, the one that keeps the
+        most teams as they stand is taken.
 
         It runs only from round 3, where no player is fixed. In rounds 1 and
         2 every player has had at most one partner, so a repeated team
@@ -937,17 +948,12 @@ class _Grouping:
         if not self.repeats():
             return False
         count = len(self.slots)
-        # More than the sum of all the teams' counts, `count / 2` teams with
-        # at most the highest count each.
-        repeat_cost = count // 2 * max(self.partners.values()) + 1
-
         # The costs are multiplied to leave room for one more per team that
         # does not stand as it is.
         scale = count // 2 + 1
 
         def worth(u: int, v: int) -> int:
-            earlier = self.partners[frozenset((self.slots[u], self.slots[v]))]
-            return repeat_cost * (earlier > 0) + earlier
+            return self.weight(self.partners[frozenset((self.slots[u], self.slots[v]))])
 
         def cost(u: int, v: int) -> int:
             return scale * worth(u, v) + (v != _partner_slot(u))

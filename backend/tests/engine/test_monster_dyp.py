@@ -1,4 +1,5 @@
 import itertools
+import sys
 from collections import Counter
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import replace
@@ -147,34 +148,41 @@ def repeats(draw: MonsterDraw, before: Iterable[MonsterRound]) -> int:
     return sum(count > 0 for count in earlier_counts(draw, before))
 
 
-def fewest_repeats(
+def repeat_order(counts: Iterable[int]) -> tuple[int, ...]:
+    """The earlier counts of the repeated teams, highest first (ADR-011).
+
+    Of two draws, the one whose tuple is less is the better: it has fewer
+    teams at the highest count, then at the next count down, and so on, and
+    with the same counts a draw with fewer repeated teams is a prefix.
+    """
+    return tuple(sorted((count for count in counts if count), reverse=True))
+
+
+def best_repeat_order(
     playing: Sequence[PlayerId],
     partners: Counter[frozenset[PlayerId]],
     top_players: Iterable[PlayerId] = (),
-) -> tuple[int, int]:
-    """The least (repeated teams, sum of earlier counts) of any teams.
+) -> tuple[int, ...]:
+    """The best `repeat_order` of any teams; empty when no team must repeat.
 
     Two top players are never together.
     """
     tops = set(top_players)
 
     @cache
-    def best(free: frozenset[PlayerId]) -> tuple[int, int]:
+    def best(free: frozenset[PlayerId]) -> tuple[int, ...]:
         if not free:
-            return 0, 0
+            return ()
         first = min(free)
         rest = free - {first}
         return min(
             (
-                (
-                    (partners[frozenset((first, other))] > 0) + tail[0],
-                    partners[frozenset((first, other))] + tail[1],
-                )
+                repeat_order((partners[frozenset((first, other))], *tail))
                 for other in rest
                 if not (first in tops and other in tops)
                 for tail in (best(rest - {other}),)
             ),
-            default=(len(playing), 0),  # a dead end: worse than any real grouping
+            default=(sys.maxsize,),  # a dead end: worse than any real grouping
         )
 
     return best(frozenset(playing))
@@ -683,9 +691,9 @@ def test_br062_when_every_grouping_repeats_the_draw_has_the_fewest() -> None:
 
     assert result.method is GroupingMethod.MATCHING
     assert numbers(result) == [((1, 6), (2, 4)), ((7, 8), (3, 5))]
-    fewest = fewest_repeats(players(8), partnerships(rounds))
-    assert fewest[0] > 0
-    assert (repeats(result, rounds), sum(earlier_counts(result, rounds))) == fewest
+    best = best_repeat_order(players(8), partnerships(rounds))
+    assert best
+    assert repeat_order(earlier_counts(result, rounds)) == best
 
 
 def test_br062_a_partnership_played_twice_is_avoided_before_one_played_once() -> None:
@@ -706,12 +714,11 @@ def test_br062_a_partnership_played_twice_is_avoided_before_one_played_once() ->
     assert result.method is GroupingMethod.SWAPS
 
 
-def test_br062_fewer_repeated_teams_come_before_lower_earlier_counts() -> None:
-    # Hypothesis found this case (6 players, round 7). 1, 3, 4 and 5 play, and
-    # every grouping repeats a partner: 3+4 have partnered twice, 1+5 never and
-    # the other four teams once. One repeated team is fewer than two (ADR-011),
-    # so 1 and 5 get a new partner, although the counts would be more even
-    # with two teams that each partner a second time.
+def test_br062_adr011_no_third_time_while_teams_could_partner_a_second_time() -> None:
+    # Issue #79 (6 players, round 7). 1, 3, 4 and 5 play, and every grouping
+    # repeats a partner: 3+4 have partnered twice, 1+5 never and the other four
+    # teams once. 1+5 v 3+4 would have 3+4 partner a third time, so two teams
+    # that each partner a second time are drawn instead.
     rounds = rounds_of(
         [((6, 1), (5, 2))],
         [((3, 4), (2, 6))],
@@ -723,9 +730,16 @@ def test_br062_fewer_repeated_teams_come_before_lower_earlier_counts() -> None:
 
     result = draw_round(6, rounds, standing=(1, 4, 5, 3, 2, 6), disabled=(2, 6))
 
-    assert numbers(result) == [((1, 5), (4, 3))]
-    assert earlier_counts(result, rounds) == [0, 2]
-    assert result.method is GroupingMethod.SWAPS
+    assert numbers(result) == [((1, 3), (4, 5))]
+    assert earlier_counts(result, rounds) == [1, 1]
+    assert result.method is GroupingMethod.STANDING
+
+    # From 1+5 v 3+4, the swaps leave it too.
+    swapped = draw_round(6, rounds, standing=(1, 3, 4, 5, 2, 6), disabled=(2, 6))
+
+    assert numbers(swapped) in ([((1, 3), (4, 5))], [((1, 4), (3, 5))])
+    assert earlier_counts(swapped, rounds) == [1, 1]
+    assert swapped.method is GroupingMethod.SWAPS
 
 
 # ---------------------------------------------------------------- draw caller bugs
@@ -1079,9 +1093,9 @@ def test_br060_to_br063_hold_in_every_round(
             assert drawn.method is not GroupingMethod.MATCHING
         else:
             assert drawn.top_players == ()
-        # BR-062: as few repeated partners as any grouping allows.
-        assert (repeats(drawn, before), sum(earlier_counts(drawn, before))) == (
-            fewest_repeats(playing, partnerships(before), drawn.top_players)
+        # BR-062 and ADR-011: no grouping has fewer teams at a higher count.
+        assert repeat_order(earlier_counts(drawn, before)) == best_repeat_order(
+            playing, partnerships(before), drawn.top_players
         )
         # The flags the engine reports are the same teams, counted separately.
         assert [
@@ -1138,10 +1152,9 @@ def test_br062_partnership_counts_stay_balanced_while_repeats_can_be_avoided(
             for team in (group.team_1, group.team_2)
         ]
         counts = partnerships(before)
-        if fewest_repeats(playing, counts)[0]:
+        if best_repeat_order(playing, counts):
             # Every grouping repeats a partner. BR-062 does not rule on that
-            # case; ADR-011 does, and it takes the fewest repeated teams, which
-            # are not always the most even counts.
+            # case; ADR-011 does, checked in test_br060_to_br063_hold_in_every_round.
             continue
 
         assert spread(counts, teams, tournament[0]) <= min(
