@@ -57,14 +57,14 @@ describe("wording and numbers", () => {
     renderAt(at(paths.betweenRounds, "Monster DYP"));
     const table = await screen.findByRole("table");
     const rows = within(table).getAllByRole("row");
-    // The 8th place is disabled and doesn't go through: the line falls
-    // under the next active player, the 9th.
+    // The 4th place is disabled and doesn't go through: the line falls
+    // under the 9th place, the 8th active player.
     const cut = rows.filter((row) =>
       row.className.includes("border-b-primary"),
     );
     expect(cut).toHaveLength(1);
     expect(cut[0]).toHaveTextContent(/^9/);
-    expect(within(rows[8] ?? table).getByText("Disabled")).toBeInTheDocument();
+    expect(within(rows[4] ?? table).getByText("Disabled")).toBeInTheDocument();
   });
 
   it("D22: Czech counts wins and losses with the right plural", async () => {

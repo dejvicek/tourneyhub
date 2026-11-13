@@ -168,7 +168,6 @@ export const finalsHandlers = [
       if (t.state !== "in_progress") {
         return apiError(409, "tournament_not_in_progress", { state: t.state });
       }
-      // The demo keeps drawing Monster DYP rounds, which the backend cannot yet (P13).
       if (!usesRounds(t)) {
         return apiError(422, "format_not_supported", { format: group.format });
       }
@@ -183,6 +182,15 @@ export const finalsHandlers = [
             (m) => m.outcome === null,
           ).length,
         });
+      }
+      if (group.format === "monster_dyp") {
+        // BR-063: a round needs four players who are not disabled.
+        const given = t.entries.filter(
+          (e) => e.stage === "main" && !e.is_disabled,
+        ).length;
+        if (given < 4) {
+          return apiError(422, "not_enough_players", { minimum: 4, given });
+        }
       }
       const drawn = drawNextRound(t);
       if (drawn.matches.length === 0) {

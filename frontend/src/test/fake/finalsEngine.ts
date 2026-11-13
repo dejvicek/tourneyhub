@@ -991,10 +991,19 @@ export function drawNextRound(t: StoredTournament): DrawnRound {
 
   // Monster DYP.
   const groups = Math.floor(ordered.length / 4);
+  // BR-061: the marked players first, then the league order (the seeds),
+  // at most one per match.
+  const leagueOrder = [...ordered].sort(
+    (a, b) => (seedOf.get(a) ?? 0) - (seedOf.get(b) ?? 0),
+  );
+  const pickTops = (pool: readonly string[]) => {
+    const inPool = leagueOrder.filter((id) => pool.includes(id));
+    const marked = inPool.filter((id) => entryById.get(id)?.is_top_player);
+    const rest = inPool.filter((id) => !entryById.get(id)?.is_top_player);
+    return [...marked, ...rest].slice(0, groups);
+  };
   const tops = new Set(
-    roundNo <= 2 && rules.topPlayersSitOutExempt
-      ? ordered.slice(0, groups)
-      : [],
+    roundNo <= 2 && rules.topPlayersSitOutExempt ? pickTops(ordered) : [],
   );
   const sitting = chooseSitOuts({
     ordered,
@@ -1008,8 +1017,10 @@ export function drawNextRound(t: StoredTournament): DrawnRound {
   const buckets: string[][] = [];
   if (roundNo <= 2) {
     // BR-061: the top players lead different groups.
-    const leaders = playing.slice(0, groups);
-    const rest = playing.slice(groups, groups * 4);
+    const leaders = pickTops(playing);
+    const rest = playing
+      .filter((id) => !leaders.includes(id))
+      .slice(0, groups * 3);
     leaders.forEach((leader, g) => {
       buckets.push([leader, ...rest.slice(g * 3, g * 3 + 3)]);
     });

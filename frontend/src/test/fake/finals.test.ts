@@ -4,6 +4,13 @@ import { api, ApiError, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
 import { rules } from "@/lib/rules";
 
+import {
+  createDraft,
+  pickPlayers,
+  setupOf,
+  startBody,
+  tournamentOf,
+} from "../setupTestHelpers";
 import { TEST_LEAGUE_ID, testId } from "./ids";
 
 // Ids of the finals seed (seedFinals.ts).
@@ -139,6 +146,128 @@ describe("the finals in the fake API", () => {
     await expect(add(5)).rejects.toMatchObject({
       status: 422,
       code: "round_not_complete",
+    });
+  });
+
+  it("fr046 fake monster needs four players", async () => {
+    const entries = await dataOf(
+      provisionalApi.GET(`${root}/participants`, {
+        params: { path: base(MONSTER) },
+      }),
+    );
+    const playing = entries.filter((e) => e.state !== "disabled");
+    for (const entry of playing.slice(3)) {
+      await dataOf(
+        provisionalApi.PUT(`${root}/entries/{entry_id}/disabled`, {
+          params: { path: { ...base(MONSTER), entry_id: entry.entry_id } },
+          body: { disabled: true },
+        }),
+      );
+    }
+    const tournament = await dataOf(
+      provisionalApi.GET(root, { params: { path: base(MONSTER) } }),
+    );
+
+    await expect(
+      dataOf(
+        api.POST(`${root}/rounds`, {
+          params: { path: base(MONSTER) },
+          body: { expected_round_no: tournament.rounds.length + 1 },
+        }),
+      ),
+    ).rejects.toMatchObject({
+      status: 422,
+      code: "not_enough_players",
+      detail: { minimum: 4, given: 3 },
+    });
+  });
+
+  describe("the second Monster DYP round's top players (BR-061)", () => {
+    /** Starts a Monster DYP of the first `count` players with the given ranks marked. */
+    async function startMonster(count: number, marked: number[], keep = count) {
+      const id = await createDraft({
+        type: "monster_dyp",
+        group_phase: "monster_dyp",
+      });
+      const picked = (await pickPlayers(id, count)).ranking
+        .slice(0, count)
+        .map((row) => row.player_id);
+      const marks = marked.map((rank) => picked[rank] ?? "");
+      await dataOf(
+        api.PUT(`${root}/setup/top-players`, {
+          params: { path: base(id) },
+          body: { player_ids: marks },
+        }),
+      );
+      // Fewer players than marks allow (FR-041): the marks stay with the ones kept.
+      if (keep < count) {
+        await dataOf(
+          api.PUT(`${root}/setup/players`, {
+            params: { path: base(id) },
+            body: { player_ids: picked.slice(0, keep) },
+          }),
+        );
+      }
+      await dataOf(
+        api.POST(`${root}/start`, {
+          params: { path: base(id) },
+          body: startBody(await setupOf(id)),
+        }),
+      );
+      return { id, marks };
+    }
+
+    /** Plays round 1, adds round 2 and gives the players of each of its matches. */
+    async function secondRound(id: string) {
+      const first = (await tournamentOf(id)).rounds[0];
+      for (const match of first?.matches ?? []) {
+        await dataOf(
+          provisionalApi.PUT(`${root}/matches/{match_id}/result`, {
+            params: { path: { ...base(id), match_id: match.id } },
+            body: {
+              walkover_winner: null,
+              games: [{ winner: "side_1", score_1: 10, score_2: 3 }],
+            },
+          }),
+        );
+      }
+      const second = await dataOf(
+        api.POST(`${root}/rounds`, {
+          params: { path: base(id) },
+          body: { expected_round_no: 2 },
+        }),
+      );
+      return second.matches.map((match) =>
+        match.sides.flatMap((side) => side.player_ids),
+      );
+    }
+
+    it("br061 fake marked players lead different groups", async () => {
+      const { id, marks } = await startMonster(9, [7, 8]);
+
+      const groups = await secondRound(id);
+
+      expect(groups).toHaveLength(2);
+      // One of the 9 sits out. A marked player who plays leads a group of his
+      // own (the first player of a group is its top player); one who sits out
+      // is replaced by the next in the league order (BR-063).
+      const leaders = groups.map((group) => group[0]);
+      const playing = marks.filter((mark) => groups.flat().includes(mark));
+      expect(playing.length).toBeGreaterThan(0);
+      for (const mark of playing) {
+        expect(leaders).toContain(mark);
+      }
+      expect(new Set(leaders).size).toBe(2);
+    });
+
+    it("br061 fake surplus marks at start", async () => {
+      // Two marks, but 7 players make one match: only the first marked one leads.
+      const { id, marks } = await startMonster(9, [5, 6], 7);
+
+      const groups = await secondRound(id);
+
+      expect(groups).toHaveLength(1);
+      expect(groups[0]).toContain(marks[0]);
     });
   });
 
