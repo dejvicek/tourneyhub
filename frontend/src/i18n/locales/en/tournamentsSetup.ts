@@ -347,7 +347,7 @@ export const tournamentsSetup = {
       br032Incomplete: "Put every player in a half first.",
       fr036: "Going back to setup is possible only until the first result.",
       fr041Max:
-        "At most {{max}} top players: one per match of the first round.",
+        "Too many top players: at most {{max}}, one per match of the first round.",
     },
   },
 };

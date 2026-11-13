@@ -277,7 +277,7 @@ describe("setup: draw the pairs (screen 4)", () => {
     await user.click(nth(screen.getAllByRole("checkbox"), 0));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "At most 2 top players",
+      "Too many top players: at most 2",
     );
   });
 
@@ -292,7 +292,7 @@ describe("setup: draw the pairs (screen 4)", () => {
     await screen.findByRole("heading", { name: "Top players (up to 2)" });
     const boxes = screen.getAllByRole("checkbox");
 
-    // Another device marks the last player while this screen still shows none.
+    // Another device started the tournament while this screen still shows setup.
     await markTopPlayersElsewhere(id, [nth(picked.player_ids, 8)]);
     server.use(
       http.put(

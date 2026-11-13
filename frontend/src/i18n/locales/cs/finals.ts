@@ -44,7 +44,7 @@ export const finals: CsMessages<Messages["finals"]> = {
     notEnoughEntries:
       "Další kolo potřebuje aspoň 2 hráče nebo dvojice, kteří nejsou vyřazeni ze hry.",
     notEnoughPlayers:
-      "Pro další kolo je potřeba aspoň {{minimum}} hráčů, kteří nejsou vyřazeni ze hry.",
+      "Další kolo potřebuje aspoň {{minimum}} hráče, kteří nejsou vyřazeni ze hry.",
     groupPhaseLocked:
       "Vyřazovací fáze je vylosovaná, takže kola i rozhodující pravidla jsou pevná. Nejdřív vyřazovací fázi smažte.",
   },

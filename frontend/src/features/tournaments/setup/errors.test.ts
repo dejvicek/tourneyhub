@@ -48,12 +48,12 @@ describe("the texts for a refused start or back to setup", () => {
     [
       "en",
       refused(422, "too_many_top_players", { max: 2 }),
-      "At most 2 top players: one per match of the first round.",
+      "Too many top players: at most 2, one per match of the first round.",
     ],
     [
       "cs",
       refused(422, "too_many_top_players", { max: 3 }),
-      "Nejlepších hráčů může být nejvýše 3: jeden na zápas prvního kola.",
+      "Příliš mnoho nejlepších hráčů: nejvýš 3, jeden na zápas prvního kola.",
     ],
     [
       "en",
