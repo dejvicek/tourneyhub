@@ -6,14 +6,12 @@ import {
 } from "@tanstack/react-query";
 
 import { api, dataOf } from "@/api/client";
-import { provisionalApi } from "@/api/provisional";
 import type { components } from "@/api/schema";
 
 type Schemas = components["schemas"];
 
 // ---- setup (screens 1-5). The backend serves the setup, "Generate and
-// start", "Back to setup" and the schedule preview; the top players are still
-// a provisional route (SetupPaths in src/api/provisionalPaths.ts). Every
+// start", "Back to setup", the schedule preview and the top players. Every
 // write sends the target state or the state it expects (ADR-008).
 
 const tournamentPath = (leagueId: string, tournamentId: string) => ({
@@ -134,7 +132,7 @@ export const setupMutations = {
   topPlayers: (leagueId: string, tournamentId: string) =>
     leagueWrite(leagueId, (playerIds: string[]) =>
       dataOf(
-        provisionalApi.PUT(
+        api.PUT(
           "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/top-players",
           {
             ...tournamentPath(leagueId, tournamentId),

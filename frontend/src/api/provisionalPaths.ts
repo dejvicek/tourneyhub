@@ -18,7 +18,6 @@ type Uuid = string;
 
 type ErrorResponse = components["schemas"]["ErrorResponse"];
 type TournamentSummary = components["schemas"]["TournamentSummary"];
-type TournamentSetupRead = components["schemas"]["TournamentSetupRead"];
 type TournamentRead = components["schemas"]["TournamentRead"];
 
 /** Never in the backend: the seeded account the login shows in demo mode. */
@@ -102,13 +101,6 @@ export interface ProvisionalPaths {
   };
 }
 
-/** The routes of setup the backend does not serve yet: the Monster DYP top players (FR-041). */
-export interface SetupPaths {
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/top-players": {
-    put: Put<Tournament, { player_ids: Uuid[] }, TournamentSetupRead>;
-  };
-}
-
 /**
  * The generated paths plus the provisional ones. A path in both keeps its
  * generated methods and gains the provisional ones; a method in both would
@@ -134,7 +126,7 @@ type DefinedMethods<T> = {
 }[keyof T];
 
 /** "path method" for each method that both the contract and the generated schema define. */
-type Contract = ProvisionalPaths & SetupPaths;
+type Contract = ProvisionalPaths;
 type Duplicates = {
   [P in keyof Contract & keyof GeneratedPaths]: `${P} ${DefinedMethods<
     Contract[P]
@@ -151,7 +143,4 @@ type Duplicates = {
 type NoDuplicates<T extends never> = T;
 export type ContractDuplicates = NoDuplicates<Duplicates>;
 
-export type ProvisionalApiPaths = MergePaths<
-  GeneratedPaths,
-  ProvisionalPaths & SetupPaths
->;
+export type ProvisionalApiPaths = MergePaths<GeneratedPaths, ProvisionalPaths>;
