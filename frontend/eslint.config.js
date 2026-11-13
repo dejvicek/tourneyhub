@@ -70,19 +70,25 @@ const apiClient = {
 };
 // The demo (src/demo) loads only in demo mode, through main.tsx's dynamic
 // import; app code imports nothing from it, so no MSW code reaches a
-// production bundle. src/api/provisional.ts and the tests are the exceptions
-// until the demo goes (MVP-ROADMAP D2, D5).
+// production bundle (MVP-ROADMAP D5 deletes it).
 const demoInternals = {
   regex: "^(@/|(\\.\\./)+)demo(/|$)",
   message:
     "Only main.tsx starts the demo; app code imports nothing from src/demo (the rules are in @/lib/rules, provisional types in @/api/provisionalTypes).",
 };
-// src/api/provisional.ts types provisionalApi with the demo's contract, and
-// only that, until D3 and D4 generate those routes.
-const demoBesidesContract = {
-  regex: "^(@/|(\\.\\./)+)demo/(?!contract$)",
+// src/test holds the tests' helpers and the fake API (src/test/fake); app
+// code never imports it, so no test code reaches a production bundle.
+const testInternals = {
+  regex: "^(@/|(\\.\\./)+)test(/|$)",
   message:
-    "src/api/provisional.ts imports only the demo's contract (@/demo/contract).",
+    "App code imports nothing from src/test; the fake API and the test helpers are for tests and src/demo/browser.ts.",
+};
+// The tests own the fake API (src/test/fake); the demo only boots it in the
+// browser, so nothing in src/test or a test imports from src/demo.
+const demoFromTests = {
+  regex: "^(@/|(\\.\\./)+)demo(/|$)",
+  message:
+    "Tests and src/test import nothing from src/demo; the demo imports the fake API from src/test/fake, not the other way round.",
 };
 // Imports flow one way: shared code → features → the app (guide §11).
 const appFromShared = {
@@ -358,7 +364,11 @@ export default defineConfig([
             "Sort names with an Intl.Collator in i18n.resolvedLanguage; compare ISO dates as plain strings.",
         },
       ],
-      "no-restricted-imports": restrictImports(apiClient, demoInternals),
+      "no-restricted-imports": restrictImports(
+        apiClient,
+        demoInternals,
+        testInternals,
+      ),
     },
   },
   {
@@ -368,6 +378,7 @@ export default defineConfig([
         apiClient,
         appFromShared,
         demoInternals,
+        testInternals,
       ),
     },
   },
@@ -384,6 +395,7 @@ export default defineConfig([
             apiClient,
             appFromShared,
             demoInternals,
+            testInternals,
           ],
         },
       ],
@@ -396,6 +408,7 @@ export default defineConfig([
         apiClient,
         appFromFeature,
         demoInternals,
+        testInternals,
       ),
     },
   },
@@ -403,23 +416,21 @@ export default defineConfig([
     files: ["src/api/**/*.ts"],
     rules: {
       "no-restricted-globals": "off",
-      "no-restricted-imports": restrictImports(appFromShared, demoInternals),
-    },
-  },
-  {
-    // Typed by the demo's contract until D3 and D4 generate its routes.
-    files: ["src/api/provisional.ts"],
-    rules: {
       "no-restricted-imports": restrictImports(
         appFromShared,
-        demoBesidesContract,
+        demoInternals,
+        testInternals,
       ),
     },
   },
   {
     files: ["src/features/*/api.ts"],
     rules: {
-      "no-restricted-imports": restrictImports(appFromFeature, demoInternals),
+      "no-restricted-imports": restrictImports(
+        appFromFeature,
+        demoInternals,
+        testInternals,
+      ),
       "no-restricted-syntax": [
         "error",
         ...appSyntax,
@@ -430,18 +441,20 @@ export default defineConfig([
     },
   },
   {
-    // Tests run against the demo's fake API (src/test/server.ts).
+    // Tests run against the fake API (src/test/server.ts, src/test/fake).
     files: ["src/test/**/*.{ts,tsx}", "src/**/*.test.{ts,tsx}"],
-    rules: { "no-restricted-imports": restrictImports(apiClient) },
+    rules: {
+      "no-restricted-imports": restrictImports(apiClient, demoFromTests),
+    },
   },
   {
-    // The fake API (and what the demo boots from it); its tests call it
-    // through the API clients.
-    files: [
-      "src/demo/**/*.ts",
-      "src/test/fake/**/*.ts",
-      "src/test/setupTestHelpers.ts",
-    ],
+    // The fake API, its tests and its helper call the API through the clients.
+    files: ["src/test/fake/**/*.ts", "src/test/setupTestHelpers.ts"],
+    rules: { "no-restricted-imports": restrictImports(demoFromTests) },
+  },
+  {
+    // The demo boots the fake API in the browser; it may import src/test/fake.
+    files: ["src/demo/**/*.ts"],
     rules: { "no-restricted-imports": restrictImports() },
   },
   {
@@ -475,7 +488,8 @@ export default defineConfig([
     },
   },
   {
-    // The demo's fake engines are leaving with demo mode; no `as` rule there.
+    // The fake engines are stand-ins that leave with the fake API; no `as`
+    // rule there. The same goes for what is left in src/demo.
     files: [
       "src/demo/**/*.ts",
       "src/test/fake/**/*.ts",
