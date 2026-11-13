@@ -752,6 +752,19 @@ export function setTopPlayers(
   if (stale) {
     return stale;
   }
+  // FR-041: at most one top player per match of round 1.
+  const maximum = Math.floor(draft.playerIds.length / 4);
+  if (playerIds.length > maximum) {
+    return fail(422, "too_many_top_players", { max: maximum });
+  }
+  // ADR-008: only a change of the set of marks makes a start stale.
+  const before = new Set(draft.topPlayerIds);
+  if (
+    before.size !== new Set(playerIds).size ||
+    playerIds.some((id) => !before.has(id))
+  ) {
+    draft.drawCounter += 1;
+  }
   draft.topPlayerIds = [...playerIds];
   for (const entry of t.entries) {
     entry.is_top_player = entry.player_ids.every((id) =>

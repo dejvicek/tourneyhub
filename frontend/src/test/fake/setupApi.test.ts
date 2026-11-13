@@ -651,6 +651,84 @@ describe("the fake API for tournament setup", () => {
     expect((await setupOf(doubles)).draw_counter).toBe(paired.draw_counter);
   });
 
+  describe("top players (FR-041)", () => {
+    const monster = () =>
+      createDraft({ type: "monster_dyp", group_phase: "monster_dyp" });
+    const mark = (id: string, player_ids: string[]) =>
+      api.PUT(
+        "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/top-players",
+        { ...at(id), body: { player_ids } },
+      );
+    const playersOf = async (id: string, count: number) =>
+      (await pickPlayers(id, count)).ranking
+        .slice(0, count)
+        .map((r) => r.player_id);
+
+    it("fr041 fake too many top players", async () => {
+      const id = await monster();
+      const players = await playersOf(id, 9);
+
+      const refused = await failure(dataOf(mark(id, players.slice(0, 3))));
+
+      expect([refused.status, refused.code, refused.detail]).toEqual([
+        422,
+        "too_many_top_players",
+        { max: 2 },
+      ]);
+    });
+
+    it("fr041 fake marks bump the draw counter once", async () => {
+      const id = await monster();
+      const [a, b] = await playersOf(id, 8);
+      const start = (await setupOf(id)).draw_counter;
+
+      await dataOf(mark(id, [a ?? "", b ?? ""]));
+      const first = (await setupOf(id)).draw_counter;
+      await dataOf(mark(id, [b ?? "", a ?? ""]));
+      const same = (await setupOf(id)).draw_counter;
+      await dataOf(mark(id, []));
+      const cleared = (await setupOf(id)).draw_counter;
+
+      expect([first, same, cleared]).toEqual([start + 1, start + 1, start + 2]);
+    });
+
+    it("adr008 fake changed marks make the start stale", async () => {
+      const id = await monster();
+      const [a, b] = await playersOf(id, 8);
+      await dataOf(mark(id, [a ?? ""]));
+      const preview = await setupOf(id);
+
+      await dataOf(mark(id, [b ?? ""]));
+      const stale = await failure(
+        dataOf(
+          api.POST(
+            "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/start",
+            { ...at(id), body: startBody(preview) },
+          ),
+        ),
+      );
+
+      expect([stale.status, stale.code]).toEqual([409, "draw_counter_changed"]);
+    });
+
+    it("fr041 fake unpicked player", async () => {
+      const id = await monster();
+      const picked = await playersOf(id, 8);
+      const outsider = (await setupOf(id)).ranking.find(
+        (r) => !picked.includes(r.player_id),
+      );
+
+      const refused = await failure(
+        dataOf(mark(id, [outsider?.player_id ?? ""])),
+      );
+
+      expect([refused.status, refused.code]).toEqual([
+        409,
+        "player_not_picked",
+      ]);
+    });
+  });
+
   it("deletes a tournament, and a repeated delete is a 404", async () => {
     const id = await createDraft();
     const remove = () =>
