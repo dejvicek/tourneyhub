@@ -40,7 +40,7 @@ from tourneyhub.services.tournaments.shared import (
     _played,
     _require_open_season,
     _ScheduleRows,
-    knockout_bracket,
+    knockout_phase,
 )
 from tourneyhub.services.tournaments.start import (
     _reset_to_setup,
@@ -74,10 +74,10 @@ def _require_no_knockout(tournament: Tournament) -> None:
     422 `group_phase_locked` with the knockout's `phase_id`; deleting the
     knockout unlocks it (BR-087).
     """
-    knockout = knockout_bracket(tournament)
+    knockout = knockout_phase(tournament)
     if knockout is not None:
         raise RuleViolationError(
-            ErrorCode.GROUP_PHASE_LOCKED, phase_id=str(knockout.phase.id)
+            ErrorCode.GROUP_PHASE_LOCKED, phase_id=str(knockout.id)
         )
 
 

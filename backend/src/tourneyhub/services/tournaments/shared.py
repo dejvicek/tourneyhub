@@ -32,6 +32,8 @@ from tourneyhub.engine.knockout import (
 from tourneyhub.engine.leagues import SeasonState
 from tourneyhub.engine.tournaments import (
     EntryStage,
+    MatchKind,
+    MonsterKnockoutMode,
     Outcome,
     PhaseFormat,
     PhaseKind,
@@ -174,10 +176,30 @@ def knockout_phase(tournament: Tournament) -> TournamentPhase | None:
     )
 
 
+def final_round_no(phase: TournamentPhase) -> int:
+    """The number of the knockout round that holds the final, drawn or not (BR-120).
+
+    Round 1 has a match for every two bracket slots, byes included (BR-041),
+    so the bracket's size is twice its standard matches; this holds for a
+    fixed bracket and for a Lord have mercy knockout, whose final is drawn
+    last (D4).
+    """
+    first = next(round_ for round_ in phase.rounds if round_.round_no == 1)
+    standard = sum(match.kind is MatchKind.STANDARD for match in first.matches)
+    return (2 * standard).bit_length() - 1
+
+
 def knockout_bracket(tournament: Tournament) -> KnockoutBracket | None:
-    """The knockout's bracket with its sides derived on read (D4); None without one."""
+    """The fixed-pair bracket with its sides derived on read (D4).
+
+    None without a knockout, and for a Lord have mercy knockout, whose pairs
+    change every round (BR-084): `remix.remix_knockout` reads that one.
+    """
     phase = knockout_phase(tournament)
-    if phase is None:
+    if (
+        phase is None
+        or phase.monster_knockout_mode is MonsterKnockoutMode.LORD_HAVE_MERCY
+    ):
         return None
     keys = {
         match.id: match_key(
@@ -214,10 +236,7 @@ def knockout_bracket(tournament: Tournament) -> KnockoutBracket | None:
         keys=keys,
         rows=rows,
         outcomes=outcomes,
-        # A Lord have mercy knockout stores its later rounds only once drawn.
-        played={
-            rows[m.key].id: m for m in play_bracket(bracket, outcomes) if m.key in rows
-        },
+        played={rows[m.key].id: m for m in play_bracket(bracket, outcomes)},
     )
 
 

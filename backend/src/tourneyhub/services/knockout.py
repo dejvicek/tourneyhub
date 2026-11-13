@@ -83,6 +83,8 @@ from tourneyhub.services.tournaments.shared import (
     _match_slots,
     _played,
     _require_open_season,
+    final_round_no,
+    knockout_phase,
 )
 from tourneyhub.services.tournaments.start import _bracket_rounds
 
@@ -465,7 +467,7 @@ def _start_problem(
             code=ErrorCode.TOURNAMENT_NOT_IN_PROGRESS,
             detail={"state": tournament.state},
         )
-    if knockout_bracket(tournament) is not None:
+    if knockout_phase(tournament) is not None:
         current = _current_phase(tournament)
         return KnockoutProblem(
             code=ErrorCode.CURRENT_PHASE_CHANGED,
@@ -629,7 +631,7 @@ def draw_knockout_again(
         raise ConflictError(
             ErrorCode.TOURNAMENT_NOT_IN_PROGRESS, state=tournament.state
         )
-    if knockout_bracket(tournament) is not None:
+    if knockout_phase(tournament) is not None:
         current = _current_phase(tournament)
         raise ConflictError(
             ErrorCode.CURRENT_PHASE_CHANGED,
@@ -751,7 +753,8 @@ def set_final_format(
     """Give the final a format of its own, or None to play the knockout's (FR-054).
 
     The final is the standard match of the bracket's last round (D4, BR-120);
-    the third-place match keeps the knockout's format. The change is allowed
+    the third-place match keeps the knockout's format. A Lord have mercy
+    final is drawn last, and the format waits for it. The change is allowed
     while the final has no result (BR-096): one with a result, which every
     finished tournament's final has, is 409 `match_has_result` (detail
     `match_id`), as a field placement is: the screen hides the control then, so
@@ -772,16 +775,25 @@ def set_final_format(
         raise ConflictError(
             ErrorCode.TOURNAMENT_NOT_IN_PROGRESS, state=tournament.state
         )
-    knockout = knockout_bracket(tournament)
-    if knockout is None:
+    phase = knockout_phase(tournament)
+    if phase is None:
         raise NotFoundError(ErrorCode.KNOCKOUT_NOT_FOUND)
-    last = max(knockout.phase.rounds, key=lambda round_: round_.round_no)
-    final = next(m for m in last.matches if m.kind is MatchKind.STANDARD)
-    if final.outcome is not None:
+    final_no = final_round_no(phase)
+    final = next(
+        (
+            match
+            for round_ in phase.rounds
+            if round_.round_no == final_no
+            for match in round_.matches
+            if match.kind is MatchKind.STANDARD
+        ),
+        None,  # a Lord have mercy final not drawn yet (D4)
+    )
+    if final is not None and final.outcome is not None:
         raise ConflictError(ErrorCode.MATCH_HAS_RESULT, match_id=str(final.id))
     now = clock()
-    knockout.phase.final_match_format = final_match_format
-    knockout.phase.updated_at = now
+    phase.final_match_format = final_match_format
+    phase.updated_at = now
     tournament.updated_at = now
     session.flush()
     return read_tournament(

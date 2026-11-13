@@ -1,5 +1,7 @@
 """Starting the knockout in Lord have mercy: pairs drawn by lot, round 1 stored
-(FR-045, BR-080, BR-084, ADR-008, ADR-010, DATA-MODEL D4).
+(FR-045, BR-080, BR-084, ADR-008, ADR-010, DATA-MODEL D4); a knockout whose
+later rounds are drawn one by one is not a fixed bracket (BR-053, BR-120,
+FR-054).
 """
 
 from collections.abc import Callable
@@ -14,8 +16,11 @@ from sqlalchemy.orm import Session
 from tourneyhub.db.models.entries import Entry
 from tourneyhub.db.models.leagues import League, Player
 from tourneyhub.db.models.matches import Round
-from tourneyhub.db.models.tournaments import TournamentPhase
+from tourneyhub.db.models.tournaments import Tournament, TournamentPhase
+from tourneyhub.engine.ids import PlayerId
 from tourneyhub.engine.tournaments import EntryStage, MonsterKnockoutMode, PhaseKind
+from tourneyhub.services.tournaments.remix import left_player_ids, remix_knockout
+from tourneyhub.services.tournaments.shared import _load_tournament
 
 type Json = dict[str, Any]
 
@@ -156,12 +161,15 @@ def _preview(
     headers: dict[str, str],
     tournament: Json,
     qualifiers: int = 8,
+    *,
+    third_place_match: bool = False,
 ) -> Json:
+    third = str(third_place_match).lower()
     return _get(
         client,
         league_id,
         tournament["id"],
-        f"/knockout/preview?qualifiers={qualifiers}&third_place_match=false"
+        f"/knockout/preview?qualifiers={qualifiers}&third_place_match={third}"
         f"&mode={MODE}",
         headers,
     )
@@ -172,7 +180,14 @@ def _members(shown: Json) -> list[list[str]]:
     return [[m["entry_id"] for m in e["members"]] for e in shown["entries"]]
 
 
-def _start_body(tournament: Json, shown: Json, qualifiers: int = 8) -> Json:
+def _start_body(
+    tournament: Json,
+    shown: Json,
+    qualifiers: int = 8,
+    *,
+    third_place_match: bool = False,
+    final_match_format: str | None = None,
+) -> Json:
     return {
         "expected_current_phase_id": tournament["current_phase_id"],
         "expected_qualifier_ids": [
@@ -180,9 +195,9 @@ def _start_body(tournament: Json, shown: Json, qualifiers: int = 8) -> Json:
         ],
         "expected_draw_counter": shown["draw_counter"],
         "qualifiers": qualifiers,
-        "third_place_match": False,
+        "third_place_match": third_place_match,
         "match_format": "bo1",
-        "final_match_format": None,
+        "final_match_format": final_match_format,
         "mode": MODE,
     }
 
@@ -193,10 +208,20 @@ def _start(
     headers: dict[str, str],
     tournament: Json,
     shown: Json,
+    qualifiers: int = 8,
+    *,
+    third_place_match: bool = False,
+    final_match_format: str | None = None,
 ) -> Json:
     response = client.put(
         _t_url(league_id, tournament["id"], "/knockout"),
-        json=_start_body(tournament, shown),
+        json=_start_body(
+            tournament,
+            shown,
+            qualifiers,
+            third_place_match=third_place_match,
+            final_match_format=final_match_format,
+        ),
         headers=headers,
     )
     assert response.status_code == 200, response.text
@@ -311,3 +336,248 @@ def test_br080_br084_a_disabled_player_does_not_qualify(
     assert len(shown["entries"]) == 3
     assert order[0] not in [m for members in _members(shown) for m in members]
     assert shown["skipped_entry_ids"] == [order[0]]
+
+
+# ---------------------------------------------------------------- not a fixed bracket
+
+
+def _started(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    tournament: Json,
+    qualifiers: int = 8,
+    *,
+    third_place_match: bool = True,
+    final_match_format: str | None = None,
+) -> tuple[Json, Json]:
+    """The preview and the tournament once Lord have mercy has started."""
+    shown = _preview(
+        client,
+        league_id,
+        headers,
+        tournament,
+        qualifiers,
+        third_place_match=third_place_match,
+    )
+    started = _start(
+        client,
+        league_id,
+        headers,
+        tournament,
+        shown,
+        qualifiers,
+        third_place_match=third_place_match,
+        final_match_format=final_match_format,
+    )
+    return shown, started
+
+
+def _knockout(tournament: Json) -> Json:
+    knockout: Json = next(p for p in tournament["phases"] if p["kind"] == "knockout")
+    return knockout
+
+
+def _rounds(tournament: Json, phase: Json) -> list[Json]:
+    return [r for r in tournament["rounds"] if r["phase_id"] == phase["id"]]
+
+
+def _put_result(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    tournament: Json,
+    match: Json,
+    result: Json,
+) -> tuple[int, Json]:
+    response = client.put(
+        _t_url(league_id, tournament["id"], f"/matches/{match['id']}/result"),
+        json=result,
+        headers=headers,
+    )
+    body: Json = response.json()
+    return response.status_code, body
+
+
+def _set_final(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    tournament: Json,
+    final_match_format: str | None,
+) -> tuple[int, Json]:
+    response = client.put(
+        _t_url(league_id, tournament["id"], "/knockout/final-format"),
+        json={"final_match_format": final_match_format},
+        headers=headers,
+    )
+    body: Json = response.json()
+    return response.status_code, body
+
+
+def _bo3_win() -> Json:
+    """Side 1 wins a BO3 two games to none."""
+    game = {"winner": "side_1", "score_1": 10, "score_2": 5}
+    return {"walkover_winner": None, "games": [game, game]}
+
+
+def test_br053_group_phase_stays_locked_during_lord_have_mercy(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    _, started = _started(client, league_id, headers, monster)
+    knockout = _knockout(started)
+    group = next(p for p in started["phases"] if p["kind"] == "group")
+    [group_round] = _rounds(started, group)
+    locked = {"code": "group_phase_locked", "detail": {"phase_id": knockout["id"]}}
+
+    added = client.post(
+        _t_url(league_id, monster["id"], "/rounds"),
+        json={"expected_round_no": 2},
+        headers=headers,
+    )
+    deleted = client.delete(
+        _t_url(league_id, monster["id"], f"/rounds/{group_round['id']}"),
+        headers=headers,
+    )
+    tiebreakers = client.put(
+        _t_url(league_id, monster["id"], "/tiebreakers"),
+        json={"tiebreakers": group["tiebreakers"]},
+        headers=headers,
+    )
+    # The fixture's side 1 won every group match, so this is a new result.
+    result = _put_result(
+        client,
+        league_id,
+        headers,
+        started,
+        group_round["matches"][0],
+        _win("side_2"),
+    )
+
+    assert (added.status_code, added.json()) == (422, locked)
+    assert (deleted.status_code, deleted.json()) == (422, locked)
+    assert (tiebreakers.status_code, tiebreakers.json()) == (422, locked)
+    assert result == (422, locked)
+
+
+def test_fr045_draw_again_once_a_lord_have_mercy_knockout_exists_is_409(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    shown, started = _started(client, league_id, headers, monster)
+    changed = {
+        "code": "current_phase_changed",
+        "detail": {"current_phase_id": started["current_phase_id"]},
+    }
+
+    response = client.post(
+        _t_url(league_id, monster["id"], "/knockout/draw"),
+        json={"expected_draw_counter": shown["draw_counter"]},
+        headers=headers,
+    )
+    preview = _preview(client, league_id, headers, monster, third_place_match=True)
+
+    assert started["current_phase_id"] == _knockout(started)["id"]
+    assert (response.status_code, response.json()) == (409, changed)
+    assert (preview["can_start"], preview["problem"]) == (False, changed)
+
+
+def test_br120_round_one_plays_the_knockouts_format_until_the_final(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    _, started = _started(client, league_id, headers, monster, final_match_format="bo3")
+    knockout = _knockout(started)
+    [round_1] = _rounds(started, knockout)
+
+    results = [
+        _put_result(client, league_id, headers, started, match, _win("side_1"))
+        for match in round_1["matches"]
+    ]
+
+    # Four pairs: round 1 holds the semifinals, the final is round 2's.
+    assert len(round_1["matches"]) == 2
+    assert [status for status, _ in results] == [200, 200]
+    assert knockout["final_match_format"] == "bo3"
+
+
+def test_fr054_the_final_format_can_change_until_the_final_is_drawn(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    _, started = _started(client, league_id, headers, monster)
+    [round_1] = _rounds(started, _knockout(started))
+    first, second = round_1["matches"]
+    entered = _put_result(client, league_id, headers, started, first, _win("side_1"))
+
+    status, body = _set_final(client, league_id, headers, started, "bo3")
+    later = _put_result(client, league_id, headers, started, second, _win("side_1"))
+
+    assert entered[0] == 200
+    assert status == 200, body
+    assert _knockout(body)["final_match_format"] == "bo3"
+    # A semifinal is not the final: it keeps the knockout's format (BR-120).
+    assert later[0] == 200
+
+
+def test_fr054_final_format_applies_to_the_drawn_final(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    _, started = _started(
+        client, league_id, headers, monster, 4, third_place_match=False
+    )
+    [round_1] = _rounds(started, _knockout(started))
+    [final] = round_1["matches"]  # two pairs: round 1 is the final
+
+    status, _ = _set_final(client, league_id, headers, started, "bo3")
+    bo1 = _put_result(client, league_id, headers, started, final, _win("side_1"))
+    bo3 = _put_result(client, league_id, headers, started, final, _bo3_win())
+    after = _set_final(client, league_id, headers, started, None)
+
+    assert status == 200
+    assert bo1[0] == 422
+    assert bo3[0] == 200
+    assert after == (
+        409,
+        {"code": "match_has_result", "detail": {"match_id": final["id"]}},
+    )
+
+
+def test_br084_br155_the_loader_reads_the_stored_rounds_and_who_left(
+    client: TestClient,
+    session: Session,
+    league: League,
+    headers: dict[str, str],
+    monster: Json,
+    disable: Callable[[str], None],
+) -> None:
+    def load() -> Tournament:
+        return _load_tournament(
+            session, league=league, tournament_id=UUID(monster["id"])
+        )
+
+    before = remix_knockout(load())
+    _, started = _started(client, league.id, headers, monster)
+    order = _order(client, league.id, headers, monster)
+    disable(order[0])
+    tournament = load()
+    remix = remix_knockout(tournament)
+
+    assert before is None
+    assert remix is not None
+    assert remix.phase.id == UUID(_knockout(started)["id"])
+    assert (remix.state.size, remix.state.third_place_match) == (4, True)
+    assert remix.state.rounds_drawn == 1
+    assert set(remix.rounds) == {1}
+    [round_1] = _rounds(started, _knockout(started))
+    assert {remix.rows[key].id for key in remix.keys.values()} == {
+        UUID(m["id"]) for m in round_1["matches"]
+    }
+    for match in round_1["matches"]:
+        stored = remix.state.match(remix.keys[UUID(match["id"])])
+        assert (stored.side_1, stored.side_2) == tuple(
+            tuple(sorted(PlayerId(UUID(p)) for p in side["player_ids"]))
+            for side in match["sides"]
+        )
+    assert len(remix.state.players) == 8
+    player_of = {
+        e["id"]: e["player_ids"][0] for e in started["entries"] if e["stage"] == "main"
+    }
+    assert left_player_ids(tournament, remix) == {PlayerId(UUID(player_of[order[0]]))}

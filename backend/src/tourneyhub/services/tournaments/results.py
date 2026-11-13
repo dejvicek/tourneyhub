@@ -32,7 +32,9 @@ from tourneyhub.services.tournaments.shared import (
     _match_players,
     _match_slots,
     _require_open_season,
+    final_round_no,
     knockout_bracket,
+    knockout_phase,
 )
 from tourneyhub.services.tournaments.views import MatchView, _match_view, _setup_of
 
@@ -59,12 +61,13 @@ class MatchResult:
 def _match_format(phase: TournamentPhase, round_: Round, match: Match) -> MatchFormat:
     """The format a match plays: its phase's, or the final's own (BR-120).
 
-    The final is the standard match of the bracket's last round (D4).
+    The final is the standard match of the bracket's last round (D4), which a
+    Lord have mercy knockout draws last: until then no stored round holds it.
     """
     is_final = (
         phase.kind is PhaseKind.KNOCKOUT
         and match.kind is MatchKind.STANDARD
-        and round_.round_no == max(r.round_no for r in phase.rounds)
+        and round_.round_no == final_round_no(phase)
     )
     if is_final and phase.final_match_format is not None:
         return MatchFormat(phase.final_match_format)
@@ -234,19 +237,21 @@ def _require_unlocked(
     `group_phase_locked`. Before that, a Swiss locks every round but the
     newest, `round_locked` with the newest `round_no` (BR-065); deleting the
     newest round unlocks the one before (BR-066), since the newest round is
-    found on every write. A knockout result is locked while a later match it
-    feeds has a result, `result_locked` with those `match_ids` (BR-094).
+    found on every write. A result of a fixed bracket is locked while a later
+    match it feeds has a result, `result_locked` with those `match_ids`
+    (BR-094).
     """
-    knockout = knockout_bracket(tournament)
-    if knockout is None:
+    drawn = knockout_phase(tournament)
+    if drawn is None:
         newest = phase.rounds[-1]
         if phase.format in ROUND_BY_ROUND_FORMATS and round_ is not newest:
             raise RuleViolationError(ErrorCode.ROUND_LOCKED, round_no=newest.round_no)
         return
     if phase.kind is PhaseKind.GROUP:
-        raise RuleViolationError(
-            ErrorCode.GROUP_PHASE_LOCKED, phase_id=str(knockout.phase.id)
-        )
+        raise RuleViolationError(ErrorCode.GROUP_PHASE_LOCKED, phase_id=str(drawn.id))
+    knockout = knockout_bracket(tournament)
+    if knockout is None:
+        return  # Lord have mercy has no fixed bracket; its round lock is BR-146
     later = locked_by(knockout.bracket, knockout.keys[match.id], knockout.outcomes)
     if later:
         raise RuleViolationError(
