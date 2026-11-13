@@ -8,12 +8,7 @@ import {
 
 import { api, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
-import type {
-  DisabledWrite,
-  LateEntryWrite,
-  RoundAddWrite,
-  TiebreakersWrite,
-} from "@/api/provisionalTypes";
+import type { DisabledWrite, LateEntryWrite } from "@/api/provisionalTypes";
 import type { components } from "@/api/schema";
 import { tournamentQueries } from "@/features/tournaments/api";
 import type { MonsterKnockoutMode } from "@/lib/rules";
@@ -22,10 +17,15 @@ type KnockoutWrite = components["schemas"]["KnockoutWrite"];
 
 type FinalFormatWrite = components["schemas"]["FinalFormatWrite"];
 
+type RoundCreate = components["schemas"]["RoundCreate"];
+
+type TiebreakersWrite = components["schemas"]["TiebreakersWrite"];
+
 // Provisional routes of the demo's contract, "finals" section
-// (src/demo/contract.ts), except the places (P8), the season effect (P10a) and
-// the knockout (P10b),
-// which the backend serves. Keys start with the entity (docs/style/frontend-style.md §8.1).
+// (src/demo/contract.ts), except the places (P8), the season effect (P10a),
+// the knockout (P10b) and the Swiss rounds and tie-breakers (P12), which the
+// backend serves. The Swiss standings come from GET …/play (playQueries in
+// features/fields/api.ts). Keys start with the entity (docs/style/frontend-style.md §8.1).
 const tournamentKey = (leagueId: string, tournamentId: string) =>
   ["leagues", leagueId, "tournaments", tournamentId] as const;
 
@@ -69,17 +69,6 @@ export const finalsQueries = {
         dataOf(
           api.GET(
             "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/season-effect",
-            { params: pathOf(leagueId, tournamentId), signal },
-          ),
-        ),
-    }),
-  ranking: (leagueId: string, tournamentId: string) =>
-    queryOptions({
-      queryKey: [...tournamentKey(leagueId, tournamentId), "ranking"],
-      queryFn: ({ signal }) =>
-        dataOf(
-          provisionalApi.GET(
-            "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/ranking",
             { params: pathOf(leagueId, tournamentId), signal },
           ),
         ),
@@ -169,7 +158,10 @@ function settle(queryClient: QueryClient, leagueId: string) {
 const scope = (leagueId: string) => ({ id: `league:${leagueId}` });
 
 export const finalsMutations = {
-  /** ADR-008: carries the round number the organizer expects. */
+  /**
+   * Draws the next round (FR-040, FR-042); ADR-008: carries the round number
+   * the organizer expects, so a repeated or stale request is refused.
+   */
   addRound: (
     queryClient: QueryClient,
     leagueId: string,
@@ -177,16 +169,19 @@ export const finalsMutations = {
   ) =>
     mutationOptions({
       scope: scope(leagueId),
-      mutationFn: (body: RoundAddWrite) =>
+      mutationFn: (body: RoundCreate) =>
         dataOf(
-          provisionalApi.POST(
+          api.POST(
             "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/rounds",
             { params: { path: pathOf(leagueId, tournamentId).path }, body },
           ),
         ),
       onSettled: () => settle(queryClient, leagueId),
     }),
-  /** A round is deleted by its id (ADR-008). */
+  /**
+   * Deletes the newest round by its id (ADR-008, FR-046, BR-066); round 1
+   * takes the tournament back to setup.
+   */
   deleteRound: (
     queryClient: QueryClient,
     leagueId: string,
@@ -196,7 +191,7 @@ export const finalsMutations = {
       scope: scope(leagueId),
       mutationFn: (roundId: string) =>
         dataOf(
-          provisionalApi.DELETE(
+          api.DELETE(
             "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/rounds/{round_id}",
             {
               params: {
@@ -253,6 +248,10 @@ export const finalsMutations = {
         ),
       onSettled: () => settle(queryClient, leagueId),
     }),
+  /**
+   * The enabled tie-breakers in their order (FR-043, BR-072). Answers the
+   * whole tournament; the settle reloads it and the standings of GET …/play.
+   */
   setTiebreakers: (
     queryClient: QueryClient,
     leagueId: string,
@@ -262,7 +261,7 @@ export const finalsMutations = {
       scope: scope(leagueId),
       mutationFn: (body: TiebreakersWrite) =>
         dataOf(
-          provisionalApi.PUT(
+          api.PUT(
             "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/tiebreakers",
             { params: { path: pathOf(leagueId, tournamentId).path }, body },
           ),
@@ -380,7 +379,6 @@ export type BracketData = Omit<OrganizerBracket, "rounds"> & {
 export type BracketSideData = BracketMatchData["sides"][number];
 export type PlacesData = QueryData<ReturnType<typeof finalsQueries.places>>;
 export type PlaceData = PlacesData["rows"][number];
-export type RankingData = QueryData<ReturnType<typeof finalsQueries.ranking>>;
 export type ParticipantData = QueryData<
   ReturnType<typeof finalsQueries.participants>
 >[number];

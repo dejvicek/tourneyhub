@@ -3,7 +3,7 @@ import { http, HttpResponse } from "msw";
 import { generatePath } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { rankingOf } from "@/demo/finalsEngine";
+import { provisionalApi } from "@/api/provisional";
 import { DEMO_SHARE_TOKEN, demoId } from "@/demo/ids";
 import { db } from "@/demo/store";
 import { axeViolations } from "@/features/auth/axeCheck";
@@ -47,6 +47,30 @@ function addSetupTournament(): string {
     state: "setup",
   });
   return id;
+}
+
+/**
+ * The backend's shape (DATA-MODEL §4): the group phase has no `qualifiers`;
+ * the knockout's row, which exists once the knockout is drawn, has them.
+ */
+function qualifiersOnTheKnockout(tournamentId: string, qualifiers: number) {
+  const tournament = db().tournaments.find((t) => t.id === tournamentId);
+  const group = tournament?.phases.find((phase) => phase.kind === "group");
+  if (tournament === undefined || group === undefined) {
+    throw new Error("The seed has this tournament with a group phase");
+  }
+  group.qualifiers = null;
+  tournament.phases.push({
+    ...group,
+    id: demoId(4501, "outside"),
+    position: 2,
+    kind: "knockout",
+    format: "single_elimination",
+    sit_out_points: null,
+    tiebreakers: null,
+    qualifiers,
+    third_place_match: false,
+  });
 }
 
 describe("share-link views", () => {
@@ -135,15 +159,28 @@ describe("share-link views", () => {
     expect(await axeViolations()).toEqual([]);
   });
 
-  it("D02: a Monster DYP shows the organizer's standings, with real points and places", async () => {
+  it("D02: a Monster DYP shows the organizer's standings, with real points, places and tie-breakers (FR-043)", async () => {
     const monster = db().tournaments.find((t) => t.name === "Monster DYP");
     if (monster === undefined) {
       throw new Error("The seed has a Monster DYP");
     }
-    const expected = rankingOf(monster).rows;
+    const { data: expected = [] } = await provisionalApi.GET(
+      "/api/v1/public/{share_token}/tournaments/{tournament_id}/standings",
+      {
+        params: {
+          path: { share_token: DEMO_SHARE_TOKEN, tournament_id: monster.id },
+        },
+      },
+    );
     renderAt(pageOf("Monster DYP"));
 
     const table = await screen.findByRole("table", { name: "Standings" });
+    // The organizer's tie-breakers, in their order (BR-072).
+    expect(
+      within(table)
+        .getAllByRole("columnheader")
+        .map((h) => h.textContent),
+    ).toEqual(["Place", "Player", "Pts", "BH1", "BH2", "Diff"]);
     // Place, player, points and the tie-breakers of each row.
     const rows = within(table)
       .getAllByRole("row")
@@ -153,8 +190,25 @@ describe("share-link views", () => {
     expect(expected[0]?.points).toBeGreaterThan(0);
     expect(rows.at(0)?.[0]).toHaveTextContent("1");
     expect(rows.at(0)?.[2]).toHaveTextContent(String(expected[0]?.points));
+    expect(rows.at(0)?.[3]).toHaveTextContent(String(expected[0]?.bh1));
     // Not everyone shares the first place.
     expect(rows.at(-1)?.[0]).not.toHaveTextContent(/^1$/);
+  });
+
+  it("a Swiss draws the cut line from the knockout's qualifiers when the group phase has none (BR-080)", async () => {
+    const swiss = db().tournaments.find((t) => t.name === "Swiss evening");
+    if (swiss === undefined) {
+      throw new Error("The seed has a Swiss evening");
+    }
+    qualifiersOnTheKnockout(swiss.id, 3);
+    renderAt(pageOf("Swiss evening"));
+
+    const table = await screen.findByRole("table", { name: "Standings" });
+    const rows = within(table).getAllByRole("row");
+    // The line falls under the third row of players, after the header.
+    expect(rows.filter((row) => row.classList.contains("border-b-2"))).toEqual([
+      rows[3],
+    ]);
   });
 
   it("the places list a shared place once, with every entry under it", async () => {
@@ -281,7 +335,7 @@ describe("share-link views outside demo mode", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("do not ask for the knockout or the ranking, which only the demo serves", async () => {
+  it("do not ask for a tournament's knockout or standings on the league page", async () => {
     const asked: string[] = [];
     server.events.on("request:start", ({ request }) => {
       asked.push(new URL(request.url).pathname);
@@ -289,8 +343,10 @@ describe("share-link views outside demo mode", () => {
     renderAt(league);
     await screen.findByRole("article", { name: "Thursday DYP" });
 
-    expect(asked.filter((path) => /\/(bracket|ranking)$/.test(path))).toEqual(
-      [],
-    );
+    expect(
+      asked.filter((path) =>
+        /\/tournaments\/[^/]+\/(bracket|standings)$/.test(path),
+      ),
+    ).toEqual([]);
   });
 });

@@ -255,6 +255,50 @@ describe("result entry (screens 7 and 7b)", () => {
   );
 
   it.each([
+    [
+      "en",
+      "This round is locked because round 3 is drawn. Delete the newer rounds to change it.",
+    ],
+    [
+      "cs",
+      "Toto kolo je zamčené, protože už je vylosované kolo 3. Pokud ho chcete změnit, smažte novější kola.",
+    ],
+  ])(
+    "says an earlier Swiss round is locked until the newer rounds go (BR-065, BR-066, %s)",
+    async (language, text) => {
+      await i18n.changeLanguage(language);
+      server.use(
+        http.put(
+          "/api/v1/leagues/:leagueId/tournaments/:tournamentId/matches/:matchId/result",
+          () =>
+            HttpResponse.json(
+              { code: "round_locked", detail: { round_no: 3 } },
+              { status: 422 },
+            ),
+        ),
+      );
+      const user = userEvent.setup();
+      const { match } = onField(1);
+      renderAt(playPath(paths.scheduleResult, { matchId: match.id }));
+
+      const sheet = await screen.findByRole("dialog");
+      const beads = await within(sheet).findAllByRole("radio", {
+        name: /^10 goals for|^10 gólů/,
+      });
+      await user.click(beads[1] ?? sheet);
+      await user.click(
+        within(sheet).getByRole("button", {
+          name: language === "en" ? "Save result" : /^Uložit výsledek/,
+        }),
+      );
+
+      await waitFor(() => {
+        expect(within(sheet).getByRole("alert")).toHaveTextContent(text);
+      });
+    },
+  );
+
+  it.each([
     ["en", "The pairs in this match changed; the screen has been refreshed."],
     ["cs", "Dvojice v tomto zápase se změnily, obrazovka byla znovu načtena."],
   ])(

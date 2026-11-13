@@ -672,7 +672,14 @@ function swissStandings(
     }
     return 0;
   };
-  const sorted = [...rows.values()].sort(compare);
+  // Entries still level keep their seed order, as in finalsEngine's
+  // rankingOf, which the draws and the knockout use: one order everywhere.
+  const seedOf = new Map(t.entries.map((entry) => [entry.id, entry.seed ?? 0]));
+  const sorted = [...rows.values()].sort(
+    (a, b) =>
+      compare(a, b) ||
+      (seedOf.get(a.entry_id) ?? 0) - (seedOf.get(b.entry_id) ?? 0),
+  );
   const places: number[] = [];
   return sorted.map((row, index) => {
     const above = sorted[index - 1];
@@ -739,6 +746,17 @@ function aheadBy(
     }
   }
   return null;
+}
+
+/**
+ * The group phase's standings as the share link answers them (FR-070): a
+ * round robin's, or a Swiss's or Monster DYP's with BH1 and BH2 (FR-043).
+ */
+export function publicStandings(t: StoredTournament): TournamentStandingRow[] {
+  const group = t.phases.find((phase) => phase.kind === "group");
+  return group?.format === "swiss" || group?.format === "monster_dyp"
+    ? swissStandings(t, group)
+    : tournamentStandings(t);
 }
 
 /** The play screens' read: waiting order, live standings, phase end (FR-060, FR-092). */

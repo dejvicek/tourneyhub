@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ApiError, dataOf } from "@/api/client";
+import { api, ApiError, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
 import { rules } from "@/lib/rules";
 
@@ -113,10 +113,10 @@ describe("the finals in the fake API", () => {
     expect(byPlace(9)).toHaveLength(5);
   });
 
-  it("adds a round only with the number the organizer expects (ADR-008)", async () => {
+  it("adds a round only with the number the organizer expects (ADR-008, FR-040)", async () => {
     const add = (expected: number) =>
       dataOf(
-        provisionalApi.POST(`${root}/rounds`, {
+        api.POST(`${root}/rounds`, {
           params: { path: base(SWISS) },
           body: { expected_round_no: expected },
         }),
@@ -124,11 +124,22 @@ describe("the finals in the fake API", () => {
 
     const added = await add(4);
     expect(added.round_no).toBe(4);
-    // A repeated request and a stale screen get 409.
-    await expect(add(4)).rejects.toMatchObject({ status: 409 });
-    await expect(add(2)).rejects.toMatchObject({ status: 409 });
+    expect(added.is_sit_out_by_lot).toBe(false);
+    // A repeated request and a stale screen get 409 with the newest round.
+    await expect(add(4)).rejects.toMatchObject({
+      status: 409,
+      code: "round_number_changed",
+      detail: { current_round_no: 4 },
+    });
+    await expect(add(2)).rejects.toMatchObject({
+      status: 409,
+      code: "round_number_changed",
+    });
     // Round 4 has no results yet, so there is no round 5 (FR-040).
-    await expect(add(5)).rejects.toMatchObject({ status: 422 });
+    await expect(add(5)).rejects.toMatchObject({
+      status: 422,
+      code: "round_not_complete",
+    });
   });
 
   it("deletes only the newest round, by its id (BR-066)", async () => {
@@ -138,19 +149,22 @@ describe("the finals in the fake API", () => {
     const [first, , third] = tournament.rounds;
     const remove = (roundId: string) =>
       dataOf(
-        provisionalApi.DELETE(`${root}/rounds/{round_id}`, {
+        api.DELETE(`${root}/rounds/{round_id}`, {
           params: { path: { ...base(SWISS), round_id: roundId } },
         }),
       );
 
     await expect(remove(first?.id ?? "")).rejects.toMatchObject({
       status: 409,
+      code: "round_not_newest",
+      detail: { round_id: third?.id },
     });
     await remove(third?.id ?? "");
     // Deleting it again means it is already gone.
     await expect(remove(third?.id ?? "")).rejects.toBeInstanceOf(ApiError);
     await expect(remove(third?.id ?? "")).rejects.toMatchObject({
       status: 404,
+      code: "round_not_found",
     });
   });
 
@@ -205,13 +219,11 @@ describe("the finals in the fake API", () => {
       }),
     );
     expect(late).toMatchObject({ joined_round: 6, state: "playing" });
-    const ranking = await dataOf(
-      provisionalApi.GET(`${root}/ranking`, {
-        params: { path: base(MONSTER) },
-      }),
+    const play = await dataOf(
+      api.GET(`${root}/play`, { params: { path: base(MONSTER) } }),
     );
     expect(
-      ranking.rows.find((r) => r.entry_id === late.entry_id),
+      play.standings.find((r) => r.entry_id === late.entry_id),
     ).toMatchObject({
       points: 0,
       played: 0,
@@ -243,13 +255,17 @@ describe("the finals in the fake API", () => {
         expect(going).not.toContain(preview.skipped_entry_ids[0]);
         if (mode === "seeded_pairs") {
           // The best partners the (N/2 + 1)th of the qualifiers, and so on (BR-081).
-          const ranking = await dataOf(
-            provisionalApi.GET(`${root}/ranking`, {
-              params: { path: base(MONSTER) },
-            }),
+          const [play, tournament] = await Promise.all([
+            dataOf(
+              api.GET(`${root}/play`, { params: { path: base(MONSTER) } }),
+            ),
+            dataOf(api.GET(root, { params: { path: base(MONSTER) } })),
+          ]);
+          const disabled = new Set(
+            tournament.entries.filter((e) => e.is_disabled).map((e) => e.id),
           );
-          const active = ranking.rows
-            .filter((r) => !r.is_disabled)
+          const active = play.standings
+            .filter((r) => !disabled.has(r.entry_id))
             .map((r) => r.entry_id);
           expect(
             preview.entries.map((e) => e.members.map((m) => m.entry_id)),

@@ -5,11 +5,7 @@
 // DYP standings with BH1 and BH2, naive pairing of the next round, and the
 // knockout formed after Monster DYP rounds. Minimal and deterministic; the
 // open rules of issue #24 are read from rules.ts.
-import type {
-  ParticipantRead,
-  RankingRead,
-  SwissRankingRow,
-} from "@/api/provisionalTypes";
+import type { ParticipantRead } from "@/api/provisionalTypes";
 import {
   MATCH_POINTS,
   type MonsterKnockoutMode,
@@ -470,6 +466,28 @@ export function bracketOf(t: StoredTournament): BracketRead | null {
 }
 
 // ---------------------------------------------------------------- ranking
+
+/** demo only: a row of the order the draws, the places and the knockout use. */
+export interface SwissRankingRow {
+  place: number;
+  entry_id: string;
+  played: number;
+  sat_out: number;
+  points: number;
+  bh1: number;
+  bh2: number;
+  score_difference: number;
+  is_disabled: boolean;
+}
+
+/** demo only: the Swiss and Monster DYP order with its tie-breakers. */
+export interface RankingRead {
+  /** The enabled tie-breakers, in order. */
+  tiebreakers: SwissTiebreaker[];
+  /** How many go through to the knockout, if the setup said. */
+  qualifiers: number | null;
+  rows: SwissRankingRow[];
+}
 
 type Compared = Omit<SwissRankingRow, "place">;
 

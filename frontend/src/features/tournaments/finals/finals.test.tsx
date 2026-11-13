@@ -572,6 +572,30 @@ describe("Finished (screen 10)", () => {
   });
 });
 
+/**
+ * The backend's shape (DATA-MODEL §4): the group phase has no `qualifiers`;
+ * the knockout's row, which exists once the knockout is drawn, has them.
+ */
+function qualifiersOnTheKnockout(tournamentId: string, qualifiers: number) {
+  const tournament = db().tournaments.find((t) => t.id === tournamentId);
+  const group = tournament?.phases.find((phase) => phase.kind === "group");
+  if (tournament === undefined || group === undefined) {
+    throw new Error("The seed has this tournament with a group phase");
+  }
+  group.qualifiers = null;
+  tournament.phases.push({
+    ...group,
+    id: demoId(4501, "outside"),
+    position: 2,
+    kind: "knockout",
+    format: "single_elimination",
+    sit_out_points: null,
+    tiebreakers: null,
+    qualifiers,
+    third_place_match: false,
+  });
+}
+
 describe("Between rounds (screen 11)", () => {
   it("shows the standings with the tie-breakers in their order and the cut line", async () => {
     renderAt(at(paths.betweenRounds, MONSTER));
@@ -592,6 +616,21 @@ describe("Between rounds (screen 11)", () => {
         /These decide, in this order: BH1, BH2, Score difference\./,
       ),
     ).toBeInTheDocument();
+  });
+
+  it("draws the cut line from the knockout's qualifiers when the group phase has none (BR-080)", async () => {
+    qualifiersOnTheKnockout(SWISS, 2);
+    renderAt(at(paths.betweenRounds, SWISS));
+
+    const table = await screen.findByRole("table", {
+      name: "Standings, top 2 go through",
+    });
+    const rows = within(table).getAllByRole("row");
+    // The line falls under the second row of players, after the header.
+    expect(rows[2]).toHaveClass("border-b-2");
+    expect(rows.filter((row) => row.classList.contains("border-b-2"))).toEqual([
+      rows[2],
+    ]);
   });
 
   it("recommends rounds from the active players and offers the next steps", async () => {
@@ -651,6 +690,29 @@ describe("Between rounds (screen 11)", () => {
         ),
       ).toHaveLength(3);
     });
+  });
+
+  it("says the rounds changed when another device added the round first (ADR-008)", async () => {
+    server.use(
+      http.post(
+        "*/api/v1/leagues/:leagueId/tournaments/:tournamentId/rounds",
+        () =>
+          HttpResponse.json(
+            { code: "round_number_changed", detail: { current_round_no: 4 } },
+            { status: 409 },
+          ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderAt(at(paths.betweenRounds, SWISS));
+
+    await user.click(
+      await screen.findByRole("button", { name: "Add round 4" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The rounds changed on another device, so they were reloaded. Check them and try again.",
+    );
   });
 
   it("finishes the tournament after confirming and shows its places", async () => {

@@ -36,6 +36,16 @@ export const finals = {
       "A group result changed who goes through, so the preview was refreshed. Check it and draw again.",
     finalHasResult:
       "The final has a result now, so its format cannot change. Clear the result first.",
+    roundNumberChanged:
+      "The rounds changed on another device, so they were reloaded. Check them and try again.",
+    roundNotComplete:
+      "Every match of this round needs a result before the next round is drawn.",
+    roundNotNewest:
+      "Only the newest round can be deleted. The rounds were reloaded.",
+    notEnoughEntries:
+      "Another round needs at least 2 players or pairs who are not disabled.",
+    groupPhaseLocked:
+      "The knockout is drawn, so the rounds and the tie-breakers are fixed. Delete the knockout first.",
   },
   place: {
     label: "{{place}}{{suffix}}",

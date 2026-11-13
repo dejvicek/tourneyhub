@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { playQueries } from "@/features/fields/api";
 import {
   finalsMutations,
   finalsQueries,
@@ -33,6 +34,7 @@ import { errorText } from "./finals/errorText";
 import { resultPath } from "./finals/links";
 import { localDate, useRoster } from "./finals/names";
 import { Notice } from "./finals/Notice";
+import { qualifiersOf } from "./finals/qualifiers";
 import { RankingTable } from "./finals/RankingTable";
 import { scoreOf } from "./finals/score";
 import { ScreenHeader } from "./finals/ScreenHeader";
@@ -72,7 +74,8 @@ function RoundsContent() {
   const leagueId = useRouteParam("leagueId");
   const tournamentId = useRouteParam("tournamentId");
   const tournament = useQuery(tournamentQueries.detail(leagueId, tournamentId));
-  const ranking = useQuery(finalsQueries.ranking(leagueId, tournamentId));
+  // FR-043: the standings with BH1 and BH2, computed on read (ADR-009).
+  const play = useQuery(playQueries.view(leagueId, tournamentId));
   const participants = useQuery(
     finalsQueries.participants(leagueId, tournamentId),
   );
@@ -88,18 +91,18 @@ function RoundsContent() {
   );
   const [picked, setPicked] = useState<number | undefined>(undefined);
 
-  if (tournament.isError || ranking.isError) {
+  if (tournament.isError || play.isError) {
     return (
       <LoadError
         onRetry={() => {
           void tournament.refetch();
-          void ranking.refetch();
+          void play.refetch();
         }}
       />
     );
   }
   const data = tournament.data;
-  const standings = ranking.data;
+  const standings = play.data;
   if (data === undefined || standings === undefined) {
     return <Loading />;
   }
@@ -116,8 +119,15 @@ function RoundsContent() {
   const current = rounds.find((r) => r.round_no === picked) ?? latest;
   const format = group.match_format;
   const hasKnockout = data.phases.some((phase) => phase.kind === "knockout");
-  const complete = latest?.matches.every((m) => m.outcome !== null) ?? false;
+  // Every match of the group phase has a result (FR-040).
+  const complete = standings.group_done;
   const mainEntries = data.entries.filter((e) => e.stage === "main");
+  const disabled = new Set(
+    mainEntries.filter((e) => e.is_disabled).map((e) => e.id),
+  );
+  // BR-072: the organizer's tie-breakers in their order; none is null.
+  const tiebreakers = group.tiebreakers ?? [];
+  const qualifiers = qualifiersOf(data.phases);
   const active = mainEntries.filter((e) => !e.is_disabled).length;
   const open = latest?.matches.filter((m) => m.outcome === null).length ?? 0;
   const disabledNames = (participants.data ?? [])
@@ -381,9 +391,9 @@ function RoundsContent() {
   );
 
   const standingsHeading =
-    standings.qualifiers === null
+    qualifiers === null
       ? t("finals.rounds.standings")
-      : t("finals.rounds.standingsQualifiers", { count: standings.qualifiers });
+      : t("finals.rounds.standingsQualifiers", { count: qualifiers });
   const standingsSection = (
     <section aria-labelledby="standings-heading" className="space-y-3">
       <h2 id="standings-heading" className="font-display text-display-section">
@@ -391,25 +401,26 @@ function RoundsContent() {
       </h2>
       <RankingTable
         caption={standingsHeading}
-        ranking={standings}
+        rows={standings.standings}
+        tiebreakers={tiebreakers}
+        qualifiers={qualifiers}
+        disabled={disabled}
         participants={participants.data ?? []}
         entryName={(entryId) => roster.entry(entryId)}
       />
       <p className="text-caption text-muted-foreground">
-        {standings.tiebreakers.length === 0
+        {tiebreakers.length === 0
           ? t("finals.tiebreakers.footnoteNone")
           : t("finals.tiebreakers.footnote", {
               order: list.format(
-                standings.tiebreakers.map((key) =>
-                  t(`finals.tiebreakers.names.${key}`),
-                ),
+                tiebreakers.map((key) => t(`finals.tiebreakers.names.${key}`)),
               ),
             })}
       </p>
       <TiebreakerSheet
         leagueId={leagueId}
         tournamentId={tournamentId}
-        ranking={standings}
+        tiebreakers={tiebreakers}
       />
     </section>
   );

@@ -1,14 +1,11 @@
 import { queryOptions } from "@tanstack/react-query";
 
 import { api, dataOf } from "@/api/client";
-import { provisionalApi } from "@/api/provisional";
 
 // The share-link views (FR-070–FR-072): no account, read-only. The backend
 // serves the league, a season's tournaments, a tournament, the season
-// standings, a round robin's standings, the places (P11, P10a) and the
-// knockout (P10b). Only the Swiss and Monster DYP ranking is still the demo's
-// contract (P12); a tournament that has one cannot be started on the backend
-// yet, so the screen that calls it is not reached outside demo mode.
+// standings, the group phase's standings (a round robin's, or a Swiss's
+// with BH1 and BH2, P12), the places (P11, P10a) and the knockout (P10b).
 
 function fetchLeague(shareToken: string, signal?: AbortSignal) {
   return dataOf(
@@ -100,7 +97,7 @@ export const publicQueries = {
         fetchTournament(shareToken, tournamentId, signal),
       refetchInterval: LIVE_MS,
     }),
-  /** A round robin's standings now (FR-060). */
+  /** The group phase's standings now: a round robin's or a Swiss's (FR-060, FR-043). */
   standings: (shareToken: string, tournamentId: string) =>
     queryOptions({
       queryKey: [
@@ -132,25 +129,6 @@ export const publicQueries = {
         dataOf(
           api.GET(
             "/api/v1/public/{share_token}/tournaments/{tournament_id}/bracket",
-            {
-              params: {
-                path: { share_token: shareToken, tournament_id: tournamentId },
-              },
-              signal,
-            },
-          ),
-        ),
-      enabled,
-      refetchInterval: LIVE_MS,
-    }),
-  /** Swiss and Monster DYP standings with their tie-breakers (FR-043). */
-  ranking: (shareToken: string, tournamentId: string, enabled: boolean) =>
-    queryOptions({
-      queryKey: ["public", shareToken, "tournaments", tournamentId, "ranking"],
-      queryFn: ({ signal }) =>
-        dataOf(
-          provisionalApi.GET(
-            "/api/v1/public/{share_token}/tournaments/{tournament_id}/ranking",
             {
               params: {
                 path: { share_token: shareToken, tournament_id: tournamentId },

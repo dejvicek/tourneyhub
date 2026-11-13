@@ -49,6 +49,8 @@ const CODE_TEXTS = {
   match_sides_unknown: "results.unknownSides",
   group_phase_locked: "results.errors.locked",
   result_locked: "results.errors.lockedKnockout",
+  // BR-065: a Swiss locks every round but the newest; deleting it unlocks (BR-066).
+  round_locked: "results.errors.lockedRound",
   match_sides_changed: "results.errors.sidesChanged",
 } as const satisfies Partial<Record<ErrorCode, string>>;
 
@@ -62,7 +64,10 @@ function useResultError(error: ApiError | null): string | null {
     return null;
   }
   if (hasText(error.code)) {
-    return t(CODE_TEXTS[error.code], { game: Number(error.detail.game_no) });
+    return t(CODE_TEXTS[error.code], {
+      game: Number(error.detail.game_no),
+      round: Number(error.detail.round_no),
+    });
   }
   return error.status === 404 || error.status === 409
     ? t("results.errors.changed")
