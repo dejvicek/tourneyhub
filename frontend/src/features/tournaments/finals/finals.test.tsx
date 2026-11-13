@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { provisionalApi } from "@/api/provisional";
 import { finalsMutations, finalsQueries } from "@/features/finals/api";
+import { resultMutations } from "@/features/results/api";
 import { shortName } from "@/features/tournaments/finals/names";
 import { i18n } from "@/i18n";
 import { paths } from "@/lib/paths";
@@ -323,21 +324,18 @@ describe("Knockout in Lord have mercy (screen 9, BR-155)", () => {
   const readRounds = () =>
     new QueryClient().query(finalsQueries.knockoutRounds(TEST_LEAGUE_ID, LHM));
   const enterResult = async (matchId: string, bestOf3 = false) => {
-    const saved = await provisionalApi.PUT(
-      `${root}/matches/{match_id}/result`,
-      {
-        params: { path: { ...ids(LHM), match_id: matchId } },
-        body: {
-          walkover_winner: null,
-          games: Array.from({ length: bestOf3 ? 2 : 1 }, () => ({
-            winner: "side_1" as const,
-            score_1: 10,
-            score_2: 3,
-          })),
-        },
-      },
-    );
-    expect(saved.response.ok).toBe(true);
+    const queryClient = new QueryClient();
+    await new MutationObserver(
+      queryClient,
+      resultMutations.save(TEST_LEAGUE_ID, LHM, matchId),
+    ).mutate({
+      walkover_winner: null,
+      games: Array.from({ length: bestOf3 ? 2 : 1 }, () => ({
+        winner: "side_1" as const,
+        score_1: 10,
+        score_2: 3,
+      })),
+    });
   };
   /** Gives every match of the newest round that lacks a result one. */
   async function finishNewestRound(): Promise<void> {
@@ -474,18 +472,16 @@ describe("Knockout in Lord have mercy (screen 9, BR-155)", () => {
     const user = userEvent.setup();
     renderAt(knockoutPath());
 
-    await user.click(
-      await screen.findByRole("button", { name: "Draw the final" }),
-    );
+    const draw = await screen.findByRole("button", { name: "Draw the final" });
+    const readsBeforeClick = reads;
+    await user.click(draw);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "The rounds changed on another device, so they were reloaded. Check them and try again.",
     );
-    const before = reads;
     await waitFor(() => {
-      expect(reads).toBeGreaterThan(before - 1);
+      expect(reads).toBeGreaterThan(readsBeforeClick);
     });
-    expect(before).toBeGreaterThan(1);
   });
 
   it("names how many results deleting the newest round removes (FR-046)", async () => {

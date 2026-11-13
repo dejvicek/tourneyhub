@@ -136,6 +136,8 @@ export const finals = {
       "The drawn pairs and {{count}} results are removed. The winners of the round before can be changed again.",
     deleteBodyNone:
       "The drawn pairs are removed. The winners of the round before can be changed again.",
+    deleteBodyFirstNone:
+      "The drawn pairs are removed. This deletes the knockout and unlocks the group phase.",
     deleteBodyFirst_one:
       "The drawn pairs and {{count}} result are removed. This deletes the knockout and unlocks the group phase.",
     deleteBodyFirst_other:

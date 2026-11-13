@@ -99,6 +99,22 @@ export function RemixKnockout({
     type: "unit",
   });
 
+  const deleteLabel =
+    newest === undefined
+      ? null
+      : t("finals.remix.deleteRound", { round: inSentence(newest.name) });
+  // BR-087: round 1 takes the knockout with it; a count of 0 reads without a number.
+  const deleteBody =
+    newest === undefined
+      ? null
+      : newest.round_no === 1
+        ? newest.result_count === 0
+          ? t("finals.remix.deleteBodyFirstNone")
+          : t("finals.remix.deleteBodyFirst", { count: newest.result_count })
+        : newest.result_count === 0
+          ? t("finals.remix.deleteBodyNone")
+          : t("finals.remix.deleteBody", { count: newest.result_count });
+
   const resultHref = (match: RemixMatch): string | null =>
     match.state === "bye"
       ? null
@@ -190,9 +206,7 @@ export function RemixKnockout({
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button type="button" variant="outline">
-                {t("finals.remix.deleteRound", {
-                  round: inSentence(newest.name),
-                })}
+                {deleteLabel}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -202,17 +216,7 @@ export function RemixKnockout({
                     round: inSentence(newest.name),
                   })}
                 </AlertDialogTitle>
-                <AlertDialogDescription>
-                  {newest.round_no === 1
-                    ? t("finals.remix.deleteBodyFirst", {
-                        count: newest.result_count,
-                      })
-                    : newest.result_count === 0
-                      ? t("finals.remix.deleteBodyNone")
-                      : t("finals.remix.deleteBody", {
-                          count: newest.result_count,
-                        })}
-                </AlertDialogDescription>
+                <AlertDialogDescription>{deleteBody}</AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>
@@ -235,9 +239,7 @@ export function RemixKnockout({
                     });
                   }}
                 >
-                  {t("finals.remix.deleteRound", {
-                    round: inSentence(newest.name),
-                  })}
+                  {deleteLabel}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

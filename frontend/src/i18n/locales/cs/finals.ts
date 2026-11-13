@@ -141,6 +141,8 @@ export const finals: CsMessages<Messages["finals"]> = {
       "Vylosované dvojice a {{count}} výsledků se odstraní. Vítěze předchozího kola půjde znovu změnit.",
     deleteBodyNone:
       "Vylosované dvojice se odstraní. Vítěze předchozího kola půjde znovu změnit.",
+    deleteBodyFirstNone:
+      "Vylosované dvojice se odstraní. Tím se smaže celá vyřazovací část a základní část se odemkne.",
     deleteBodyFirst_one:
       "Vylosované dvojice a {{count}} výsledek se odstraní. Tím se smaže celá vyřazovací část a základní část se odemkne.",
     deleteBodyFirst_few:
