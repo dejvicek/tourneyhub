@@ -291,7 +291,7 @@ def read_knockout_preview(
     Writes nothing. A knockout that cannot start is still 200, with the
     `problem` its start would answer: `tournament_not_in_progress`,
     `current_phase_changed` (the knockout exists), `season_closed`,
-    `format_not_supported` (no group phase, or Lord have mercy),
+    `format_not_supported` (no group phase),
     `knockout_mode_required` (Monster DYP rounds without a `mode`),
     `group_phase_not_done` or `knockout_mode_not_applicable` (a `mode` after a
     round robin or a Swiss). After Monster DYP rounds `qualifiers` counts
@@ -339,15 +339,17 @@ def start_knockout(
     place; entries still level are ordered by lot (BR-074, BR-080, BR-085).
     The byes go to the top seeds (BR-040 to BR-042); the first matches take
     the free fields, and the group phase's results lock (BR-053, BR-065).
+    A Lord have mercy knockout (BR-084) stores only round 1; the later rounds
+    are drawn one at a time.
 
     409: `tournament_not_in_progress` (detail `state`), `current_phase_changed`
     (the knockout already exists, detail `current_phase_id`),
     `draw_counter_changed` (detail `draw_counter`, the current one),
     `qualifiers_changed` (the cut or the seeds are not the previewed ones,
     detail `entry_ids`, the current ones) or `season_closed`. 422:
-    `format_not_supported` (no group phase, or Lord have mercy; detail
-    `format`, and `mode` for Lord have mercy), `knockout_mode_required`
-    (Monster DYP rounds without a `mode`; detail `format`),
+    `format_not_supported` (no group phase; detail `format`),
+    `knockout_mode_required` (Monster DYP rounds without a `mode`; detail
+    `format`),
     `group_phase_not_done` (detail `matches_left`), `qualifiers_odd` (a pair
     mode with an odd number; detail `given`), `qualifiers_out_of_range`
     (detail `minimum`, `maximum`, `given`) or `knockout_mode_not_applicable`

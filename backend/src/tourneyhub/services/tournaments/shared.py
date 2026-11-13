@@ -214,7 +214,10 @@ def knockout_bracket(tournament: Tournament) -> KnockoutBracket | None:
         keys=keys,
         rows=rows,
         outcomes=outcomes,
-        played={rows[m.key].id: m for m in play_bracket(bracket, outcomes)},
+        # A Lord have mercy knockout stores its later rounds only once drawn.
+        played={
+            rows[m.key].id: m for m in play_bracket(bracket, outcomes) if m.key in rows
+        },
     )
 
 

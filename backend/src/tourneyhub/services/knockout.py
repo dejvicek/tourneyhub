@@ -162,10 +162,9 @@ def _require_mode(
     """The mode that forms the knockout's entries (FR-045, BR-081 to BR-084).
 
     After a round robin or a Swiss a mode is 422 `knockout_mode_not_applicable`
-    (detail `format`). After Monster DYP rounds Seeded pairs, Singles and A
-    little mercy go through; no mode is 422 `knockout_mode_required` (detail
-    `format`), and Lord have mercy, whose rounds come later, 422
-    `format_not_supported` (detail `format` and `mode`).
+    (detail `format`). After Monster DYP rounds every mode goes through, Seeded
+    pairs, Singles, A little mercy and Lord have mercy; no mode is 422
+    `knockout_mode_required` (detail `format`).
     """
     if group.format is not PhaseFormat.MONSTER_DYP:
         if mode is not None:
@@ -175,10 +174,6 @@ def _require_mode(
         return None
     if mode is None:
         raise RuleViolationError(ErrorCode.KNOCKOUT_MODE_REQUIRED, format=group.format)
-    if mode is MonsterKnockoutMode.LORD_HAVE_MERCY:
-        raise RuleViolationError(
-            ErrorCode.FORMAT_NOT_SUPPORTED, format=group.format, mode=mode
-        )
     return mode
 
 
@@ -529,9 +524,8 @@ def start_knockout(
     `draw_counter`, the current one), checked right after the phase. A
     tournament not in progress is 409 `tournament_not_in_progress`, a closed
     season 409 `season_closed`. A tournament without a group phase is 422
-    `format_not_supported`, and so is Lord have mercy (detail `format`,
-    `mode`); Monster DYP without a mode is 422 `knockout_mode_required`
-    (detail `format`), a mode after another group phase 422
+    `format_not_supported`; Monster DYP without a mode is 422
+    `knockout_mode_required` (detail `format`), a mode after another group phase 422
     `knockout_mode_not_applicable`, a group-phase match without a result 422
     `group_phase_not_done`, an odd number of qualifiers in a pair mode 422
     `qualifiers_odd` (detail `given`) and a number out of range 422
@@ -545,13 +539,14 @@ def start_knockout(
     through as they are and are seeded by their place; entries still level
     are ordered by the lot `knockout-seeding` (BR-074, BR-085). After Monster
     DYP rounds the best players go through and the mode forms the entries:
-    Seeded pairs (BR-081), Singles (BR-082) or A little mercy (BR-083), whose
-    lot is `<mode>:<draw_counter>` (ADR-010). An entry of one player
+    Seeded pairs (BR-081), Singles (BR-082), A little mercy (BR-083) or Lord
+    have mercy (BR-084), whose lot is `<mode>:<draw_counter>` (ADR-010). An entry of one player
     continues its main entry (`source_entry_id`); a pair has its two players
     as members and no source (DATA-MODEL §4.4), and stays together for the
     whole knockout (BR-086). Every bracket match is created, the byes for the
     top seeds in round 1 (BR-040 to BR-042), with the third-place match in
-    the final's round (BR-044). The phase gets its match format, the league's
+    the final's round (BR-044); Lord have mercy stores only round 1, as its
+    later rounds are drawn when the round before is complete (BR-084, D4). The phase gets its match format, the league's
     default unless the request names one, the final its own or none (BR-120),
     and the mode. The first matches take the free fields (BR-130), and the
     group phase's results are locked from now on (BR-053, BR-065).
@@ -690,7 +685,10 @@ def _write_knockout(
         [EntryId(entry.id) for entry in seeds],
         third_place_match=start.third_place_match,
     )
-    phase.rounds.extend(_bracket_rounds(bracket, members, now))
+    rounds = _bracket_rounds(bracket, members, now)
+    # Lord have mercy draws each later round once the one before is complete (D4).
+    lord_have_mercy = mode is MonsterKnockoutMode.LORD_HAVE_MERCY
+    phase.rounds.extend(rounds[:1] if lord_have_mercy else rounds)
     tournament.updated_at = now
     session.flush()  # the matches exist before a field references one
     _fill_fields(tournament, _match_slots(tournament), now)
