@@ -163,8 +163,9 @@ def _require_mode(
 
     After a round robin or a Swiss a mode is 422 `knockout_mode_not_applicable`
     (detail `format`). After Monster DYP rounds Seeded pairs, Singles and A
-    little mercy go through; no mode and Lord have mercy, whose rounds come
-    later, are 422 `format_not_supported` (detail `format`).
+    little mercy go through; no mode is 422 `knockout_mode_required` (detail
+    `format`), and Lord have mercy, whose rounds come later, 422
+    `format_not_supported` (detail `format` and `mode`).
     """
     if group.format is not PhaseFormat.MONSTER_DYP:
         if mode is not None:
@@ -172,8 +173,12 @@ def _require_mode(
                 ErrorCode.KNOCKOUT_MODE_NOT_APPLICABLE, format=group.format
             )
         return None
-    if mode is None or mode is MonsterKnockoutMode.LORD_HAVE_MERCY:
-        raise RuleViolationError(ErrorCode.FORMAT_NOT_SUPPORTED, format=group.format)
+    if mode is None:
+        raise RuleViolationError(ErrorCode.KNOCKOUT_MODE_REQUIRED, format=group.format)
+    if mode is MonsterKnockoutMode.LORD_HAVE_MERCY:
+        raise RuleViolationError(
+            ErrorCode.FORMAT_NOT_SUPPORTED, format=group.format, mode=mode
+        )
     return mode
 
 
@@ -524,10 +529,12 @@ def start_knockout(
     `draw_counter`, the current one), checked right after the phase. A
     tournament not in progress is 409 `tournament_not_in_progress`, a closed
     season 409 `season_closed`. A tournament without a group phase is 422
-    `format_not_supported`, and so is Monster DYP without a mode or with Lord
-    have mercy; a mode after another group phase is 422
+    `format_not_supported`, and so is Lord have mercy (detail `format`,
+    `mode`); Monster DYP without a mode is 422 `knockout_mode_required`
+    (detail `format`), a mode after another group phase 422
     `knockout_mode_not_applicable`, a group-phase match without a result 422
-    `group_phase_not_done`, and a number of qualifiers out of range 422
+    `group_phase_not_done`, an odd number of qualifiers in a pair mode 422
+    `qualifiers_odd` (detail `given`) and a number out of range 422
     `qualifiers_out_of_range` (detail `minimum`, `maximum`, `given`; BR-080).
     The request also carries the qualifying entries in seed order that the
     preview showed; a group result that changed the cut or the seeds since is

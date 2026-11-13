@@ -5,6 +5,7 @@ from tourneyhub.engine.errors import (
     GameScoreMismatchError,
     NotEnoughEntriesError,
     NotEnoughPlayersError,
+    OddQualifierCountError,
     PlayerOnAnotherFieldError,
     QualifierCountError,
     ResultDoesNotFitFormatError,
@@ -50,6 +51,8 @@ def to_app_error(error: EngineError) -> RuleViolationError:  # noqa: PLR0911  (o
                 maximum=maximum,
                 given=given,
             )
+        case OddQualifierCountError(given=given):
+            return RuleViolationError(ErrorCode.QUALIFIERS_ODD, given=given)
         case PlayerOnAnotherFieldError(player_ids=player_ids, field_ids=field_ids):
             return RuleViolationError(
                 ErrorCode.PLAYER_ON_ANOTHER_FIELD,

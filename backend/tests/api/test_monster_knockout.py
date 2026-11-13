@@ -212,11 +212,23 @@ MONSTER_DYP: Json = {
     "field_count": 2,
 }
 
+SWISS: Json = {**ROUND_ROBIN, "group_phase": "swiss", "round_robin_legs": None}
+
 MODES = [
     pytest.param("seeded_pairs", 8, id="BR-081"),
     pytest.param("singles", 4, id="BR-082"),
     pytest.param("a_little_mercy", 8, id="BR-083"),
 ]
+
+
+@pytest.fixture
+def disable(session: Session) -> Callable[[str], None]:
+    def disable(entry_id: str) -> None:
+        """Disable an entry; its route comes with P14 (FR-044)."""
+        session.get_one(Entry, UUID(entry_id)).is_disabled = True
+        session.flush()
+
+    return disable
 
 
 def win(side: str, score: tuple[int, int] = (10, 5)) -> Json:
@@ -629,3 +641,227 @@ def test_monster_knockout_reads_without_errors(
     ]
 
     assert [r.status_code for r in reads] == [200] * len(reads), [r.text for r in reads]
+
+
+def _knockout_put(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    tournament: Json,
+    **values: object,
+) -> tuple[int, Json]:
+    """Start the knockout with a body that is right except for `values`."""
+    shown = _get(
+        client,
+        league_id,
+        tournament["id"],
+        "/knockout/preview?qualifiers=8&third_place_match=false",
+        headers,
+    )
+    response = client.put(
+        _t_url(league_id, tournament["id"], "/knockout"),
+        json={
+            "expected_current_phase_id": tournament["current_phase_id"],
+            "expected_qualifier_ids": [],
+            "expected_draw_counter": shown["draw_counter"],
+            "qualifiers": 8,
+            "third_place_match": False,
+            "match_format": "bo1",
+            "final_match_format": None,
+            "mode": "seeded_pairs",
+            **values,
+        },
+        headers=headers,
+    )
+    body: Json = response.json()
+    return response.status_code, body
+
+
+def test_fr045_a_monster_dyp_knockout_needs_a_mode(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    status, body = _knockout_put(client, league_id, headers, monster, mode=None)
+    shown = _get(
+        client,
+        league_id,
+        monster["id"],
+        "/knockout/preview?qualifiers=8&third_place_match=false",
+        headers,
+    )
+
+    refusal = {"code": "knockout_mode_required", "detail": {"format": "monster_dyp"}}
+    assert (status, body) == (422, refusal)
+    assert (shown["can_start"], shown["problem"], shown["entries"]) == (
+        False,
+        refusal,
+        [],
+    )
+
+
+def test_br084_lord_have_mercy_is_refused_until_its_rounds_exist(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    status, body = _knockout_put(
+        client, league_id, headers, monster, mode="lord_have_mercy"
+    )
+    shown = _monster_preview(
+        client, league_id, headers, monster, mode="lord_have_mercy", qualifiers=8
+    )
+
+    refusal = {
+        "code": "format_not_supported",
+        "detail": {"format": "monster_dyp", "mode": "lord_have_mercy"},
+    }
+    assert (status, body) == (422, refusal)
+    # The preview is a 200 (_get asserts it) that shows the engine's pairs.
+    assert (shown["can_start"], shown["problem"]) == (False, refusal)
+    assert len(shown["entries"]) == 4
+
+
+@pytest.mark.parametrize("mode", ["seeded_pairs", "a_little_mercy"])
+def test_br080_pair_modes_need_an_even_number_of_qualifiers(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    monster: Json,
+    mode: str,
+) -> None:
+    status, body = _knockout_put(
+        client, league_id, headers, monster, mode=mode, qualifiers=7
+    )
+    shown = _monster_preview(
+        client, league_id, headers, monster, mode=mode, qualifiers=7
+    )
+
+    assert (status, body) == (
+        422,
+        {"code": "qualifiers_odd", "detail": {"given": 7}},
+    )
+    assert shown["qualifiers"] == 6
+
+
+def test_br080_pair_modes_need_twice_the_minimum(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    status, body = _knockout_put(
+        client,
+        league_id,
+        headers,
+        monster,
+        qualifiers=6,
+        third_place_match=True,
+    )
+
+    assert (status, body) == (
+        422,
+        {
+            "code": "qualifiers_out_of_range",
+            "detail": {"minimum": 8, "maximum": 8, "given": 6},
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    ("third_place_match", "asked", "shown"),
+    [
+        pytest.param(False, 7, 6, id="odd-rounds-down"),
+        pytest.param(False, 2, 4, id="below-the-minimum"),
+        pytest.param(True, 2, 8, id="below-the-minimum-with-third-place"),
+        pytest.param(False, 9, 8, id="above-the-maximum"),
+    ],
+)
+def test_br080_the_preview_clamps_a_pair_count(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    monster: Json,
+    third_place_match: bool,
+    asked: int,
+    shown: int,
+) -> None:
+    preview = _get(
+        client,
+        league_id,
+        monster["id"],
+        f"/knockout/preview?qualifiers={asked}"
+        f"&third_place_match={str(third_place_match).lower()}&mode=seeded_pairs",
+        headers,
+    )
+
+    assert preview["qualifiers"] == shown
+    assert preview["max_qualifiers"] == 8
+    assert len(preview["entries"]) == shown // 2
+
+
+def test_br080_a_disabled_player_does_not_qualify_and_the_next_moves_up(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    monster: Json,
+    disable: Callable[[str], None],
+) -> None:
+    order = _order(client, league_id, headers, monster)
+    disable(order[0])
+
+    singles = _monster_preview(
+        client, league_id, headers, monster, mode="singles", qualifiers=4
+    )
+    pairs = _monster_preview(
+        client, league_id, headers, monster, mode="seeded_pairs", qualifiers=8
+    )
+
+    assert [members[0] for members in _members(singles)] == order[1:5]
+    assert singles["skipped_entry_ids"] == [order[0]]
+    # Seven players left: a pair mode takes six, and max_qualifiers is even.
+    assert (pairs["max_qualifiers"], pairs["qualifiers"]) == (6, 6)
+    assert order[0] not in [member for members in _members(pairs) for member in members]
+
+
+def test_fr045_a_mode_after_a_swiss_is_still_422(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    players: list[str],
+) -> None:
+    created = client.post(
+        _url(league_id, "/tournaments"),
+        json={"id": str(uuid7()), **SWISS},
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    tournament_id = created.json()["tournament_id"]
+    picked = client.put(
+        _t_url(league_id, tournament_id, "/setup/players"),
+        json={"player_ids": players[:4]},
+        headers=headers,
+    )
+    assert picked.status_code == 200, picked.text
+    started = client.post(
+        _t_url(league_id, tournament_id, "/start"),
+        json={
+            "expected_draw_counter": picked.json()["draw_counter"],
+            "expected_seed_order": [
+                e["id"]
+                for e in sorted(picked.json()["entries"], key=lambda e: e["seed"])
+            ],
+        },
+        headers=headers,
+    )
+    assert started.status_code == 200, started.text
+    for match in started.json()["rounds"][0]["matches"]:
+        result = client.put(
+            _t_url(league_id, tournament_id, f"/matches/{match['id']}/result"),
+            json=win("side_1"),
+            headers=headers,
+        )
+        assert result.status_code == 200, result.text
+    tournament = _get(client, league_id, tournament_id, "", headers)
+
+    status, body = _knockout_put(
+        client, league_id, headers, tournament, mode="seeded_pairs", qualifiers=4
+    )
+
+    assert (status, body) == (
+        422,
+        {"code": "knockout_mode_not_applicable", "detail": {"format": "swiss"}},
+    )

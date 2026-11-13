@@ -64,7 +64,8 @@ class ErrorCode(StrEnum):
     # Start and back to setup
     TOURNAMENT_NOT_IN_PROGRESS = "tournament_not_in_progress"
     TOURNAMENT_HAS_RESULTS = "tournament_has_results"  # FR-036
-    FORMAT_NOT_SUPPORTED = "format_not_supported"  # Monster DYP knockout, not yet
+    # No group phase to follow, or Lord have mercy, whose rounds come later (BR-084)
+    FORMAT_NOT_SUPPORTED = "format_not_supported"
     PLAYERS_WITHOUT_PARTNER = "players_without_partner"  # Doubles (BR-030)
     # FR-032: 64 entries today, 16 after the #48 follow-up (issue to open after
     # approval).
@@ -82,11 +83,13 @@ class ErrorCode(StrEnum):
     RESULT_LOCKED = "result_locked"  # a later knockout match has a result (BR-094)
     CURRENT_PHASE_CHANGED = "current_phase_changed"  # the knockout was drawn (FR-045)
     QUALIFIERS_OUT_OF_RANGE = "qualifiers_out_of_range"  # BR-080
+    QUALIFIERS_ODD = "qualifiers_odd"  # a pair mode needs an even number (BR-080)
     QUALIFIERS_CHANGED = "qualifiers_changed"  # the cut is not the one previewed
     PHASE_NOT_FOUND = "phase_not_found"
     PHASE_NOT_DELETABLE = "phase_not_deletable"  # only a knockout after a group phase
     KNOCKOUT_NOT_FOUND = "knockout_not_found"  # the tournament has no knockout
     KNOCKOUT_MODE_NOT_APPLICABLE = "knockout_mode_not_applicable"  # Monster DYP only
+    KNOCKOUT_MODE_REQUIRED = "knockout_mode_required"  # Monster DYP needs one
     # Swiss rounds (FR-040, FR-046)
     ROUND_NOT_FOUND = "round_not_found"
     ROUND_NUMBER_CHANGED = "round_number_changed"  # the expected new number is stale

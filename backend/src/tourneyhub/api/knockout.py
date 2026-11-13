@@ -275,9 +275,12 @@ def read_knockout_preview(
     Writes nothing. A knockout that cannot start is still 200, with the
     `problem` its start would answer: `tournament_not_in_progress`,
     `current_phase_changed` (the knockout exists), `season_closed`,
-    `format_not_supported` (Monster DYP, no group phase),
+    `format_not_supported` (no group phase, or Lord have mercy),
+    `knockout_mode_required` (Monster DYP rounds without a `mode`),
     `group_phase_not_done` or `knockout_mode_not_applicable` (a `mode` after a
-    round robin or a Swiss).
+    round robin or a Swiss). After Monster DYP rounds `qualifiers` counts
+    players and a pair mode shows an even count of at least twice the fewest
+    entries (BR-080).
     """
     preview = knockout_service.preview_knockout(
         session,
@@ -326,10 +329,13 @@ def start_knockout(
     `draw_counter_changed` (detail `draw_counter`, the current one),
     `qualifiers_changed` (the cut or the seeds are not the previewed ones,
     detail `entry_ids`, the current ones) or `season_closed`. 422:
-    `format_not_supported` (Monster DYP, or no group phase; detail
-    `format`), `group_phase_not_done` (detail `matches_left`),
-    `qualifiers_out_of_range` (detail `minimum`, `maximum`, `given`) or
-    `knockout_mode_not_applicable` (detail `format`).
+    `format_not_supported` (no group phase, or Lord have mercy; detail
+    `format`, and `mode` for Lord have mercy), `knockout_mode_required`
+    (Monster DYP rounds without a `mode`; detail `format`),
+    `group_phase_not_done` (detail `matches_left`), `qualifiers_odd` (a pair
+    mode with an odd number; detail `given`), `qualifiers_out_of_range`
+    (detail `minimum`, `maximum`, `given`) or `knockout_mode_not_applicable`
+    (detail `format`).
     """
     tournament = knockout_service.start_knockout(
         session,

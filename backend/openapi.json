@@ -546,11 +546,13 @@
           "result_locked",
           "current_phase_changed",
           "qualifiers_out_of_range",
+          "qualifiers_odd",
           "qualifiers_changed",
           "phase_not_found",
           "phase_not_deletable",
           "knockout_not_found",
           "knockout_mode_not_applicable",
+          "knockout_mode_required",
           "round_not_found",
           "round_number_changed",
           "round_not_complete",
@@ -7276,7 +7278,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout": {
       "put": {
-        "description": "Draw the knockout after the round robin or the Swiss and start it (FR-045).\n\nThe best entries of the standings go through as they are, seeded by their\nplace; entries still level are ordered by lot (BR-074, BR-080, BR-085).\nThe byes go to the top seeds (BR-040 to BR-042); the first matches take\nthe free fields, and the group phase's results lock (BR-053, BR-065).\n\n409: `tournament_not_in_progress` (detail `state`), `current_phase_changed`\n(the knockout already exists, detail `current_phase_id`),\n`draw_counter_changed` (detail `draw_counter`, the current one),\n`qualifiers_changed` (the cut or the seeds are not the previewed ones,\ndetail `entry_ids`, the current ones) or `season_closed`. 422:\n`format_not_supported` (Monster DYP, or no group phase; detail\n`format`), `group_phase_not_done` (detail `matches_left`),\n`qualifiers_out_of_range` (detail `minimum`, `maximum`, `given`) or\n`knockout_mode_not_applicable` (detail `format`).",
+        "description": "Draw the knockout after the round robin or the Swiss and start it (FR-045).\n\nThe best entries of the standings go through as they are, seeded by their\nplace; entries still level are ordered by lot (BR-074, BR-080, BR-085).\nThe byes go to the top seeds (BR-040 to BR-042); the first matches take\nthe free fields, and the group phase's results lock (BR-053, BR-065).\n\n409: `tournament_not_in_progress` (detail `state`), `current_phase_changed`\n(the knockout already exists, detail `current_phase_id`),\n`draw_counter_changed` (detail `draw_counter`, the current one),\n`qualifiers_changed` (the cut or the seeds are not the previewed ones,\ndetail `entry_ids`, the current ones) or `season_closed`. 422:\n`format_not_supported` (no group phase, or Lord have mercy; detail\n`format`, and `mode` for Lord have mercy), `knockout_mode_required`\n(Monster DYP rounds without a `mode`; detail `format`),\n`group_phase_not_done` (detail `matches_left`), `qualifiers_odd` (a pair\nmode with an odd number; detail `given`), `qualifiers_out_of_range`\n(detail `minimum`, `maximum`, `given`) or `knockout_mode_not_applicable`\n(detail `format`).",
         "operationId": "start_knockout",
         "parameters": [
           {
@@ -7474,7 +7476,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout/preview": {
       "get": {
-        "description": "Return the cut, the seeds and the byes the knockout would get (FR-045).\n\nWrites nothing. A knockout that cannot start is still 200, with the\n`problem` its start would answer: `tournament_not_in_progress`,\n`current_phase_changed` (the knockout exists), `season_closed`,\n`format_not_supported` (Monster DYP, no group phase),\n`group_phase_not_done` or `knockout_mode_not_applicable` (a `mode` after a\nround robin or a Swiss).",
+        "description": "Return the cut, the seeds and the byes the knockout would get (FR-045).\n\nWrites nothing. A knockout that cannot start is still 200, with the\n`problem` its start would answer: `tournament_not_in_progress`,\n`current_phase_changed` (the knockout exists), `season_closed`,\n`format_not_supported` (no group phase, or Lord have mercy),\n`knockout_mode_required` (Monster DYP rounds without a `mode`),\n`group_phase_not_done` or `knockout_mode_not_applicable` (a `mode` after a\nround robin or a Swiss). After Monster DYP rounds `qualifiers` counts\nplayers and a pair mode shows an even count of at least twice the fewest\nentries (BR-080).",
         "operationId": "read_knockout_preview",
         "parameters": [
           {
