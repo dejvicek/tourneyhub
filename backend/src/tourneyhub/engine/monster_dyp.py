@@ -860,7 +860,11 @@ class _Grouping:
         )
 
     def swap(self, *, rng_seed: bytes, purpose: str) -> bool:
-        """Swap players while that reduces repeats; return whether a lot chose."""
+        """Swap players while that improves the draw (ADR-011).
+
+        Returns:
+            Whether a lot chose between equally good swaps.
+        """
 
         def lot(swap: Pair) -> tuple[bytes, ...]:
             return tuple(
