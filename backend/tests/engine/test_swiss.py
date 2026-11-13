@@ -545,6 +545,8 @@ def test_br058_br067_a_missed_round_counts_as_a_sit_out() -> None:
 def test_br058_the_round_before_comes_before_the_fewest_sit_outs() -> None:
     # 1 to 4 sat out twice each, 5 once, in round 9: 5 has the fewest
     # sit-outs and the lowest place, but sat out the round before, so it plays.
+    # Of 1 to 4, only 1 sitting out forces a repeat (2, 3, 4 and 5 have all
+    # met), so the lowest of 2 to 4 sits out.
     turns = (1, 2, 3, 4, 1, 2, 3, 4, 5)
     rounds = []
     for number, out in enumerate(turns, start=1):
@@ -553,8 +555,8 @@ def test_br058_the_round_before_comes_before_the_fewest_sit_outs() -> None:
 
     draw = draw_next_swiss_round(table(1, 2, 3, 4, 5), rounds)
 
-    assert draw.sitting_out is not None
-    assert draw.sitting_out != eid(5)
+    assert draw.sitting_out == eid(4)
+    assert not draw.is_sit_out_by_lot
 
 
 def test_br058_the_lot_decides_the_sit_out_between_entries_sharing_a_place() -> None:
