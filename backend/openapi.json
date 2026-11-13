@@ -1055,7 +1055,7 @@
       },
       "KnockoutWrite": {
         "additionalProperties": false,
-        "description": "Draw the knockout and start it (FR-045, BR-080, BR-120).\n\n`expected_current_phase_id` is the phase the screen saw as current, the\ngroup phase (ADR-008). `expected_draw_counter` is the preview's\n`draw_counter`: a stale one is 409 `draw_counter_changed`.\n`expected_qualifier_ids` are the group-phase\nentries the preview showed going through, in seed order (`entries` of the\npreview, by their members' `entry_id`): a group result that changed the cut\nor the seeds since is 409 `qualifiers_changed`. `match_format` null takes\nthe league's default; `final_match_format` null lets the final play\n`match_format` (BR-120).\nBO2 is never a knockout's (BR-121). `mode` is how the teams are formed\nafter Monster DYP rounds (BR-081 to BR-084) and null after any other\ngroup phase; a mode after a round robin or a Swiss is 422\n`knockout_mode_not_applicable`.",
+        "description": "Draw the knockout and start it (FR-045, BR-080, BR-120).\n\n`expected_current_phase_id` is the phase the screen saw as current, the\ngroup phase (ADR-008). `expected_draw_counter` is the preview's\n`draw_counter`: a stale one is 409 `draw_counter_changed`.\n`expected_qualifier_ids` are the group-phase entries the preview showed\ngoing through, in seed order (`entries` of the preview, by their members'\n`entry_id`). After Monster DYP rounds it lists every member of each pair,\nin seed order, and `qualifiers` counts players. A group result that changed\nthe cut or the seeds since is 409 `qualifiers_changed`. `match_format` null takes\nthe league's default; `final_match_format` null lets the final play\n`match_format` (BR-120).\nBO2 is never a knockout's (BR-121). `mode` is how the teams are formed\nafter Monster DYP rounds (BR-081 to BR-084) and null after any other\ngroup phase; a mode after a round robin or a Swiss is 422\n`knockout_mode_not_applicable`.",
         "properties": {
           "expected_current_phase_id": {
             "format": "uuid",
@@ -7830,7 +7830,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/phases/{phase_id}": {
       "delete": {
-        "description": "Delete the knockout that follows the group phase, with its results (FR-046).\n\nThe group phase unlocks, all of a round robin's results or a Swiss's\nnewest round, and the organizer chooses again what comes next (BR-087,\nBR-065: a Swiss can then also add a round); a finished tournament is back in progress. The\nphase is named by its id: a repeat is 404 `phase_not_found` (ADR-008).\n409 `season_closed`. 422 `phase_not_deletable` for a group phase or a\nknockout without a group phase (detail `kind`).",
+        "description": "Delete the knockout that follows the group phase, with its results (FR-046).\n\nThe group phase unlocks, all of a round robin's results or the newest\nround of a Swiss or Monster DYP, and the organizer chooses again what\ncomes next (BR-087, BR-065: a Swiss can then also add a round); a\nfinished tournament is back in progress. The phase is named by its id: a repeat is 404 `phase_not_found` (ADR-008).\n409 `season_closed`. 422 `phase_not_deletable` for a group phase or a\nknockout without a group phase (detail `kind`).",
         "operationId": "delete_knockout",
         "parameters": [
           {

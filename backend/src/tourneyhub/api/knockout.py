@@ -107,10 +107,11 @@ class KnockoutWrite(RequestModel):
     `expected_current_phase_id` is the phase the screen saw as current, the
     group phase (ADR-008). `expected_draw_counter` is the preview's
     `draw_counter`: a stale one is 409 `draw_counter_changed`.
-    `expected_qualifier_ids` are the group-phase
-    entries the preview showed going through, in seed order (`entries` of the
-    preview, by their members' `entry_id`): a group result that changed the cut
-    or the seeds since is 409 `qualifiers_changed`. `match_format` null takes
+    `expected_qualifier_ids` are the group-phase entries the preview showed
+    going through, in seed order (`entries` of the preview, by their members'
+    `entry_id`). After Monster DYP rounds it lists every member of each pair,
+    in seed order, and `qualifiers` counts players. A group result that changed
+    the cut or the seeds since is 409 `qualifiers_changed`. `match_format` null takes
     the league's default; `final_match_format` null lets the final play
     `match_format` (BR-120).
     BO2 is never a knockout's (BR-121). `mode` is how the teams are formed
@@ -442,10 +443,10 @@ def delete_knockout(
 ) -> None:
     """Delete the knockout that follows the group phase, with its results (FR-046).
 
-    The group phase unlocks, all of a round robin's results or a Swiss's
-    newest round, and the organizer chooses again what comes next (BR-087,
-    BR-065: a Swiss can then also add a round); a finished tournament is back in progress. The
-    phase is named by its id: a repeat is 404 `phase_not_found` (ADR-008).
+    The group phase unlocks, all of a round robin's results or the newest
+    round of a Swiss or Monster DYP, and the organizer chooses again what
+    comes next (BR-087, BR-065: a Swiss can then also add a round); a
+    finished tournament is back in progress. The phase is named by its id: a repeat is 404 `phase_not_found` (ADR-008).
     409 `season_closed`. 422 `phase_not_deletable` for a group phase or a
     knockout without a group phase (detail `kind`).
     """
