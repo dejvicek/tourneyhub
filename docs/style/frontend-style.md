@@ -55,7 +55,7 @@ Choices in the configuration that are not obvious:
 - `noUnusedLocals` and `noUnusedParameters` are off. `@typescript-eslint/no-unused-vars` reports unused names alone, as typescript-eslint recommends [T7].
 - `generate:api` passes no `--enum` [T8]: ADR-008's error codes come out as string-literal unions, which `erasableSyntaxOnly` allows and a `switch` can check.
 - ESLint has no `eslint-plugin-react`, and uses `eslint-plugin-jsx-a11y-x` instead of `eslint-plugin-jsx-a11y`. The upstream plugins' releases do not accept ESLint 10 [E10]; every plugin here does (§13).
-- `jsx-a11y-x/control-has-associated-label` is on, though neither of the plugin's configs enables it. `settings["jsx-a11y-x"].components` maps each copied component that renders a native control (today `Button`).
+- `jsx-a11y-x/control-has-associated-label` is on, though neither of the plugin's configs enables it. `settings["jsx-a11y-x"].components` maps each copied component that renders a native control: `Button`, `Input`, `Textarea` and `Label`.
 - typescript-eslint's strict preset is not semver-stable [E2]: reports that an upgrade adds are fixed in the upgrade's pull request.
 - react-refresh skips `src/components/ui/`, whose files export their variants next to the component (`buttonVariants`).
 - better-tailwindcss reads the theme from `src/index.css`. Its `enforce-consistent-class-order` and `enforce-consistent-line-wrapping` stay off, because Prettier owns both.
@@ -174,7 +174,7 @@ Checked by tools: ESLint better-tailwindcss `no-unknown-classes`, `no-conflictin
 - To update a component, review upstream with `pnpm exec shadcn add <name> --diff` and port the changes by hand; never `--overwrite` an edited file [W18].
 - Never run `shadcn apply` or `shadcn migrate base-color`; both rewrite the theme [W19].
 - Classes are merged with `cn`, with one import path, `@/lib/utils` [W15]. `src/lib/utils.ts`, the path `components.json` names as its `utils` alias, builds it with `createCn` from the `cn` package and registers the theme's text styles (`text-display-*`, `text-score-*`, `text-body-*`, `text-button-*`, `text-caption`, `text-micro`) as font sizes; unconfigured, `cn` takes `text-caption` for a colour and drops `text-muted-foreground` beside it. ESLint `no-restricted-imports` allows the `cn` package only in that file, so after `shadcn add` the generated `import { cn } from "cn"` becomes `@/lib/utils`. A new text style in `index.css` is added to its list.
-- Icons come only from `lucide-react`, the `iconLibrary` of `components.json`. The package is not installed until an icon uses it; the pull request that renders the first icon adds it.
+- Icons are our own SVG components, drawn after the Figma icon set (24 px, 2 px stroke). They live in the `icons.tsx` files: `src/components/ui/icons.tsx` for the copied components, and one beside the screens that use them (`src/features/tournaments/setup/`, `src/features/tournaments/play/`). `lucide-react` is not installed, and an icon adds no dependency. `components.json` still names `lucide` as its `iconLibrary`, so after `shadcn add` a generated `lucide-react` import becomes an icon from `src/components/ui/icons.tsx`.
 
 ## 6. Accessibility
 
@@ -348,11 +348,6 @@ Checked by tools: ESLint `no-restricted-imports` (imports flow one way: `api`, `
 - `@/` is the one import alias, for `src/`: `paths` without `baseUrl` in `tsconfig.app.json` [T3], `resolve.alias` in `vite.config.ts`.
 - No barrel files (an `index.ts` that only re-exports): import each module directly [S2].
 - Only `VITE_` environment variables reach the browser, and none holds a secret. The first one adds `src/vite-env.d.ts` with a typed `ImportMetaEnv` [S3].
-
-Still to come with the first screens that need them:
-- The 44 px Button size on the result-entry screen (§6).
-- The Czech plural type for `cs` (§7).
-- The `middleware` that guards organizer routes, with the login (§9).
 
 Demo mode (`pnpm dev:demo`, `src/demo/README.md`) runs every screen against an MSW worker. MSW is a dev dependency; `main.tsx` loads the demo behind a `MODE !== "production"` check that the bundler removes, ESLint lets app code import only `@/demo/rules` and `@/demo/contract`, and Vite's MSW plugin, which serves the worker script, is on only in demo mode. CI fails the frontend job if any text file in `dist` matches `msw|setupWorker|mockServiceWorker`. Provisional API types live in `src/demo/contract.ts` until the backend's routes are generated into `schema.d.ts`; screens call those routes through `provisionalApi` (`src/api/provisional.ts`). Texts are split per area into `src/i18n/locales/{en,cs}/<area>.ts`, merged into the one namespace. The build puts each `src/features/<area>/` into one chunk.
 
