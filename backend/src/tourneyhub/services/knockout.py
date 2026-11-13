@@ -1,10 +1,12 @@
 """The knockout after a group phase: preview, start, final format, delete, bracket.
 
-FR-045, FR-046, FR-054, BR-040 to BR-044, BR-080, BR-085 to BR-087, BR-094, BR-120.
-Every write locks the league row, then the tournament row (ADR-008). Starting
-creates the knockout's entries, which continue the qualifying group-phase
-entries (`source_entry_id`, BR-085), and every bracket match at once, with
-the first round's sides stored; later sides are derived on read (D4). Results
+FR-045, FR-046, FR-054, BR-040 to BR-044, BR-080 to BR-083, BR-085 to BR-087,
+BR-094, BR-120. Every write locks the league row, then the tournament row
+(ADR-008). Starting creates the knockout's entries and every bracket match at
+once, with the first round's sides stored; later sides are derived on read
+(D4). An entry continues a qualifying group-phase entry (`source_entry_id`,
+BR-085, BR-082), or is a pair of two qualifying players formed after Monster
+DYP rounds, without a source (BR-081, BR-083, DATA-MODEL §4.4). Results
 go through `tournaments.set_match_result`, which knows the knockout's lock and
 finishes the tournament with its last result (BR-094, FR-037).
 """
@@ -36,7 +38,9 @@ from tourneyhub.engine.knockout import (
     minimum_qualifiers,
     round_name,
 )
+from tourneyhub.engine.monster_dyp import select_monster_knockout
 from tourneyhub.engine.tournaments import (
+    EntryKind,
     EntryStage,
     KnockoutMatchFormat,
     MatchFormat,
@@ -68,12 +72,14 @@ from tourneyhub.services.tournaments import (
     tie_groups,
 )
 from tourneyhub.services.tournaments.fields import _fill_fields
+from tourneyhub.services.tournaments.play import _player_of, monster_standings_of
 from tourneyhub.services.tournaments.results import _match_format
 from tourneyhub.services.tournaments.shared import (
     _current_phase,
     _group_phase,
     _load_tournament,
     _lock_tournament,
+    _main_entries,
     _match_slots,
     _played,
     _require_open_season,
@@ -135,25 +141,40 @@ class KnockoutPreview:
     is_cut_by_lot: bool
 
 
-def _played_group(tournament: Tournament) -> TournamentPhase:
-    """The round robin or Swiss a knockout follows; Monster DYP comes later.
+_KNOCKOUT_GROUP_FORMATS = PLAYED_GROUP_FORMATS | {PhaseFormat.MONSTER_DYP}
 
-    Without a group phase, or after a Monster DYP, it is 422
-    `format_not_supported` (detail `format`).
+
+def _knockout_group(tournament: Tournament) -> TournamentPhase:
+    """The round robin, Swiss or Monster DYP rounds a knockout follows (FR-045).
+
+    Without a group phase it is 422 `format_not_supported` (detail `format`).
     """
     group = _group_phase(tournament)
-    if group is None or group.format not in PLAYED_GROUP_FORMATS:
+    if group is None or group.format not in _KNOCKOUT_GROUP_FORMATS:
         format_ = tournament.phases[0].format if group is None else group.format
         raise RuleViolationError(ErrorCode.FORMAT_NOT_SUPPORTED, format=format_)
     return group
 
 
-def _require_no_mode(group: TournamentPhase, mode: MonsterKnockoutMode | None) -> None:
-    """Refuse a Monster DYP mode for another group phase (FR-045): 422."""
-    if mode is not None:
-        raise RuleViolationError(
-            ErrorCode.KNOCKOUT_MODE_NOT_APPLICABLE, format=group.format
-        )
+def _require_mode(
+    group: TournamentPhase, mode: MonsterKnockoutMode | None
+) -> MonsterKnockoutMode | None:
+    """The mode that forms the knockout's entries (FR-045, BR-081 to BR-084).
+
+    After a round robin or a Swiss a mode is 422 `knockout_mode_not_applicable`
+    (detail `format`). After Monster DYP rounds Seeded pairs, Singles and A
+    little mercy go through; no mode and Lord have mercy, whose rounds come
+    later, are 422 `format_not_supported` (detail `format`).
+    """
+    if group.format is not PhaseFormat.MONSTER_DYP:
+        if mode is not None:
+            raise RuleViolationError(
+                ErrorCode.KNOCKOUT_MODE_NOT_APPLICABLE, format=group.format
+            )
+        return None
+    if mode is None or mode is MonsterKnockoutMode.LORD_HAVE_MERCY:
+        raise RuleViolationError(ErrorCode.FORMAT_NOT_SUPPORTED, format=group.format)
+    return mode
 
 
 def _require_group_done(group: TournamentPhase) -> None:
@@ -189,6 +210,128 @@ def _cut(
         raise to_app_error(err) from err
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _DrawnEntry:
+    """A knockout entry the draw forms, by seed (BR-081 to BR-083, BR-085).
+
+    `sources` are the group-phase entries behind it, the better-placed first:
+    one after a round robin, a Swiss or in the Singles mode, the main entries
+    of a pair's two players otherwise. `decided_by_lot` says a lot drew the
+    partner or the seed, placed a source among those level with it, or took
+    it through the cut (BR-074, ADR-009).
+    """
+
+    seed: int
+    sources: tuple[UUID, ...]
+    decided_by_lot: bool
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _Draw:
+    """The knockout's entries, seed 1 first, the same for every group phase.
+
+    `skipped` are the main entries of disabled players placed above the last
+    qualifier, whom the next ones replaced (BR-080). `is_cut_by_lot` says the
+    cut fell inside a shared place (BR-074).
+    """
+
+    entries: tuple[_DrawnEntry, ...]
+    skipped: tuple[UUID, ...]
+    is_cut_by_lot: bool
+
+    @property
+    def qualifier_ids(self) -> tuple[UUID, ...]:
+        """Every source in seed order, as the start expects them (ADR-008)."""
+        return tuple(source for entry in self.entries for source in entry.sources)
+
+
+def _draw(
+    tournament: Tournament,
+    group: TournamentPhase,
+    *,
+    qualifiers: int,
+    third_place_match: bool,
+    mode: MonsterKnockoutMode | None,
+) -> _Draw:
+    """The one draw the preview shows and the start writes (FR-045, BR-080).
+
+    A round robin's or a Swiss's best entries go through as they are
+    (BR-085); after Monster DYP rounds the mode forms the entries from the
+    best players (BR-081 to BR-083), and `qualifiers` counts players. Out of
+    range is 422 (BR-080).
+    """
+    if group.format is not PhaseFormat.MONSTER_DYP:
+        cut = _cut(
+            tournament,
+            group_standings(tournament, group),
+            qualifiers=qualifiers,
+            third_place_match=third_place_match,
+        )
+        return _Draw(
+            entries=tuple(
+                _DrawnEntry(
+                    seed=seed,
+                    sources=(entry_id,),
+                    decided_by_lot=entry_id in cut.decided_by_lot,
+                )
+                for seed, entry_id in enumerate(cut.seeds, start=1)
+            ),
+            skipped=tuple(cut.skipped),
+            is_cut_by_lot=cut.is_cut_by_lot,
+        )
+    if mode is None:
+        msg = "a knockout after Monster DYP rounds needs a mode"
+        raise ValueError(msg)
+    return _monster_cut(
+        tournament,
+        group,
+        qualifiers=qualifiers,
+        third_place_match=third_place_match,
+        mode=mode,
+    )
+
+
+def _monster_cut(
+    tournament: Tournament,
+    group: TournamentPhase,
+    *,
+    qualifiers: int,
+    third_place_match: bool,
+    mode: MonsterKnockoutMode,
+) -> _Draw:
+    """The engine's entries after Monster DYP rounds (BR-080 to BR-083).
+
+    The engine names players; each is named here by their main entry. The
+    lot is `<mode>:<draw_counter>` over the tournament's seed (ADR-010).
+    """
+    main = _main_entries(tournament)
+    entry_of = {_player_of(entry): entry.id for entry in main}
+    try:
+        knockout = select_monster_knockout(
+            monster_standings_of(tournament, group),
+            qualifiers=qualifiers,
+            mode=mode,
+            rng_seed=tournament.rng_seed,
+            draw_counter=tournament.draw_counter,
+            third_place_match=third_place_match,
+            disabled=[_player_of(entry) for entry in main if entry.is_disabled],
+        )
+    except EngineError as err:
+        raise to_app_error(err) from err
+    return _Draw(
+        entries=tuple(
+            _DrawnEntry(
+                seed=entry.seed,
+                sources=tuple(entry_of[player] for player in entry.player_ids),
+                decided_by_lot=entry.is_drawn_by_lot,
+            )
+            for entry in knockout.entries
+        ),
+        skipped=tuple(entry_of[player] for player in knockout.skipped),
+        is_cut_by_lot=knockout.is_cut_by_lot,
+    )
+
+
 def preview_knockout(
     session: Session,
     *,
@@ -201,57 +344,55 @@ def preview_knockout(
 ) -> KnockoutPreview:
     """Return the cut, the seeds and the byes the start would draw (FR-045, BR-080).
 
-    Read without a lock. The cut and the bracket are the start's own, so a
-    preview that can start is what the start writes while the results stay.
-    The number asked for is kept within what a knockout can take, so the
-    screen can always show one; a refusal of the start comes back as the
-    `problem`, not as an error.
+    Read without a lock. The draw and the bracket are the start's own, so a
+    preview that can start is what the start writes while the results and
+    the draw counter stay. The number asked for is kept within what a
+    knockout can take, so the screen can always show one; a refusal of the
+    start comes back as the `problem`, not as an error. After Monster DYP
+    rounds `qualifiers` counts players, and a pair mode keeps it even and at
+    least twice the fewest entries (BR-080); without a mode there are no
+    entries.
     """
     league = get_league(session, league_id=league_id, user_id=user_id)
     tournament = _load_tournament(session, league=league, tournament_id=tournament_id)
     problem = _start_problem(league, tournament, mode=mode)
     group = _group_phase(tournament)
-    if group is None or group.format not in PLAYED_GROUP_FORMATS:
-        return KnockoutPreview(
-            problem=problem,
-            draw_counter=tournament.draw_counter,
-            max_qualifiers=0,
-            qualifiers=qualifiers,
-            entries=(),
-            first_round=(),
-            bracket_size=None,
-            locks_round_no=None,
-            skipped_entry_ids=(),
-            is_cut_by_lot=False,
+    is_monster = group is not None and group.format is PhaseFormat.MONSTER_DYP
+    if (
+        group is None
+        or group.format not in _KNOCKOUT_GROUP_FORMATS
+        or (is_monster and mode is None)
+    ):
+        return _empty_preview(
+            tournament, problem, max_qualifiers=0, qualifiers=qualifiers, locks=None
         )
-    standings = group_standings(tournament, group)
+    team_size = 2 if is_monster and mode is not MonsterKnockoutMode.SINGLES else 1
     eligible = sum(
         not entry.is_disabled
         for entry in tournament.entries
         if entry.stage is EntryStage.MAIN
     )
-    minimum = minimum_qualifiers(third_place_match=third_place_match)
+    eligible -= eligible % team_size  # a pair mode takes an even number (BR-080)
+    minimum = team_size * minimum_qualifiers(third_place_match=third_place_match)
     shown = max(minimum, min(qualifiers, eligible))
+    shown -= shown % team_size
     locks = group.rounds[-1].round_no if group.rounds else None
     if eligible < minimum:
-        return KnockoutPreview(
-            problem=problem,
-            draw_counter=tournament.draw_counter,
-            max_qualifiers=eligible,
-            qualifiers=shown,
-            entries=(),
-            first_round=(),
-            bracket_size=None,
-            locks_round_no=locks,
-            skipped_entry_ids=(),
-            is_cut_by_lot=False,
+        return _empty_preview(
+            tournament, problem, max_qualifiers=eligible, qualifiers=shown, locks=locks
         )
-    cut = _cut(
-        tournament, standings, qualifiers=shown, third_place_match=third_place_match
+    draw = _draw(
+        tournament,
+        group,
+        qualifiers=shown,
+        third_place_match=third_place_match,
+        mode=mode,
     )
-    place = {row.entry_id: row.place for row in standings}
-    bracket = draw_bracket(cut.seeds, third_place_match=third_place_match)
-    seed_of = {entry_id: seed for seed, entry_id in enumerate(cut.seeds, start=1)}
+    place = {row.entry_id: row.place for row in group_standings(tournament, group)}
+    # No knockout entry exists yet: each drawn entry is keyed by its first source.
+    keys = [EntryId(entry.sources[0]) for entry in draw.entries]
+    bracket = draw_bracket(keys, third_place_match=third_place_match)
+    seed_of = {key: entry.seed for key, entry in zip(keys, draw.entries, strict=True)}
     return KnockoutPreview(
         problem=problem,
         draw_counter=tournament.draw_counter,
@@ -259,17 +400,43 @@ def preview_knockout(
         qualifiers=shown,
         entries=tuple(
             PreviewEntry(
-                seed=seed,
-                members=(PreviewMember(entry_id=entry_id, place=place[entry_id]),),
-                decided_by_lot=entry_id in cut.decided_by_lot,
+                seed=entry.seed,
+                members=tuple(
+                    PreviewMember(entry_id=source, place=place[EntryId(source)])
+                    for source in entry.sources
+                ),
+                decided_by_lot=entry.decided_by_lot,
             )
-            for seed, entry_id in enumerate(cut.seeds, start=1)
+            for entry in draw.entries
         ),
         first_round=tuple(_seed_pair(match, seed_of) for match in bracket.first_round),
         bracket_size=bracket.size,
         locks_round_no=locks,
-        skipped_entry_ids=cut.skipped,
-        is_cut_by_lot=cut.is_cut_by_lot,
+        skipped_entry_ids=draw.skipped,
+        is_cut_by_lot=draw.is_cut_by_lot,
+    )
+
+
+def _empty_preview(
+    tournament: Tournament,
+    problem: KnockoutProblem | None,
+    *,
+    max_qualifiers: int,
+    qualifiers: int,
+    locks: int | None,
+) -> KnockoutPreview:
+    """A preview without entries: no knockout can be drawn now (FR-045)."""
+    return KnockoutPreview(
+        problem=problem,
+        draw_counter=tournament.draw_counter,
+        max_qualifiers=max_qualifiers,
+        qualifiers=qualifiers,
+        entries=(),
+        first_round=(),
+        bracket_size=None,
+        locks_round_no=locks,
+        skipped_entry_ids=(),
+        is_cut_by_lot=False,
     )
 
 
@@ -305,8 +472,8 @@ def _start_problem(
             detail={"current_phase_id": None if current is None else str(current.id)},
         )
     try:
-        group = _played_group(tournament)
-        _require_no_mode(group, mode)
+        group = _knockout_group(tournament)
+        _require_mode(group, mode)
         _require_group_done(group)
     except RuleViolationError as err:
         return KnockoutProblem(code=err.code, detail=err.detail)
@@ -322,11 +489,11 @@ class KnockoutStart:
 
     `match_format` None takes the league's default; `final_match_format`
     None lets the final play `match_format` (BR-120). `expected_qualifier_ids`
-    are the group-phase entries the preview showed going through, in seed
-    order (the cut and the seeding, which fix the bracket).
-    `expected_draw_counter` is the tournament's counter the preview showed.
-    `mode` is for a knockout after Monster DYP rounds (BR-081 to BR-084),
-    which comes later.
+    are the group-phase entries the preview showed going through, every
+    member of every entry in seed order (the cut, the pairs and the seeding,
+    which fix the bracket). `expected_draw_counter` is the tournament's
+    counter the preview showed. `mode` forms the entries after Monster DYP
+    rounds (BR-081 to BR-084), where `qualifiers` counts players.
     """
 
     expected_current_phase_id: UUID
@@ -348,7 +515,7 @@ def start_knockout(
     start: KnockoutStart,
     clock: Clock,
 ) -> TournamentView:
-    """Draw the knockout after a round robin or a Swiss and start it (FR-045).
+    """Draw the knockout after a group phase and start it (FR-045).
 
     The request carries the phase the screen saw as the current one, the
     group phase: once the knockout exists it is 409 `current_phase_changed`
@@ -356,24 +523,31 @@ def start_knockout(
     `expected_draw_counter` is 409 `draw_counter_changed` (detail
     `draw_counter`, the current one), checked right after the phase. A
     tournament not in progress is 409 `tournament_not_in_progress`, a closed
-    season 409 `season_closed`. A Monster DYP or a tournament without a
-    group phase is 422 `format_not_supported`, a group-phase match
-    without a result 422 `group_phase_not_done`, and a number of qualifiers
-    out of range 422 `qualifiers_out_of_range` (detail `minimum`, `maximum`,
-    `given`; BR-080). The request also carries the qualifying entries in seed
-    order that the preview showed; a group result that changed the cut or the
-    seeds since is 409 `qualifiers_changed` (detail `entry_ids`, the current
-    ones), so the organizer sees the new draw before it is written (ADR-008).
+    season 409 `season_closed`. A tournament without a group phase is 422
+    `format_not_supported`, and so is Monster DYP without a mode or with Lord
+    have mercy; a mode after another group phase is 422
+    `knockout_mode_not_applicable`, a group-phase match without a result 422
+    `group_phase_not_done`, and a number of qualifiers out of range 422
+    `qualifiers_out_of_range` (detail `minimum`, `maximum`, `given`; BR-080).
+    The request also carries the qualifying entries in seed order that the
+    preview showed; a group result that changed the cut or the seeds since is
+    409 `qualifiers_changed` (detail `entry_ids`, the current ones), so the
+    organizer sees the new draw before it is written (ADR-008).
 
-    The best entries of the standings go through as they are and are seeded
-    by their place; entries still level are ordered by the lot
-    `knockout-seeding` (BR-074, BR-085). Each becomes a knockout entry that
-    continues it (`source_entry_id`). Every bracket match is created, the
-    byes for the top seeds in round 1 (BR-040 to BR-042), with the third-place
-    match in the final's round (BR-044). The phase gets its match format,
-    the league's default unless the request names one, and the final its own
-    or none (BR-120). The first matches take the free fields (BR-130), and
-    the group phase's results are locked from now on (BR-053, BR-065).
+    After a round robin or a Swiss the best entries of the standings go
+    through as they are and are seeded by their place; entries still level
+    are ordered by the lot `knockout-seeding` (BR-074, BR-085). After Monster
+    DYP rounds the best players go through and the mode forms the entries:
+    Seeded pairs (BR-081), Singles (BR-082) or A little mercy (BR-083), whose
+    lot is `<mode>:<draw_counter>` (ADR-010). An entry of one player
+    continues its main entry (`source_entry_id`); a pair has its two players
+    as members and no source (DATA-MODEL §4.4), and stays together for the
+    whole knockout (BR-086). Every bracket match is created, the byes for the
+    top seeds in round 1 (BR-040 to BR-042), with the third-place match in
+    the final's round (BR-044). The phase gets its match format, the league's
+    default unless the request names one, the final its own or none (BR-120),
+    and the mode. The first matches take the free fields (BR-130), and the
+    group phase's results are locked from now on (BR-053, BR-065).
     """
     league, tournament = _lock_tournament(
         session,
@@ -397,20 +571,40 @@ def start_knockout(
         raise ConflictError(
             ErrorCode.DRAW_COUNTER_CHANGED, draw_counter=tournament.draw_counter
         )
-    group = _played_group(tournament)
-    _require_no_mode(group, start.mode)
+    group = _knockout_group(tournament)
+    mode = _require_mode(group, start.mode)
     _require_group_done(group)
-    cut = _cut(
+    draw = _draw(
         tournament,
-        group_standings(tournament, group),
+        group,
         qualifiers=start.qualifiers,
         third_place_match=start.third_place_match,
+        mode=mode,
     )
-    if tuple(cut.seeds) != start.expected_qualifier_ids:
+    if draw.qualifier_ids != start.expected_qualifier_ids:
         raise ConflictError(
-            ErrorCode.QUALIFIERS_CHANGED, entry_ids=[str(i) for i in cut.seeds]
+            ErrorCode.QUALIFIERS_CHANGED,
+            entry_ids=[str(i) for i in draw.qualifier_ids],
         )
-    now = clock()
+    _write_knockout(
+        session, league, tournament, start=start, draw=draw, mode=mode, now=clock()
+    )
+    return read_tournament(
+        session, league_id=league_id, tournament_id=tournament.id, user_id=user_id
+    )
+
+
+def _write_knockout(
+    session: Session,
+    league: League,
+    tournament: Tournament,
+    *,
+    start: KnockoutStart,
+    draw: _Draw,
+    mode: MonsterKnockoutMode | None,
+    now: datetime,
+) -> None:
+    """Store the knockout phase, its entries and every bracket match (D4)."""
     phase = TournamentPhase(
         id=uuid7(),
         position=2,
@@ -421,7 +615,7 @@ def start_knockout(
         tiebreakers=None,
         qualifiers=start.qualifiers,
         third_place_match=start.third_place_match,
-        monster_knockout_mode=None,
+        monster_knockout_mode=mode,
         match_format=MatchFormat(
             start.match_format or league.default_match_format.value
         ),
@@ -430,7 +624,7 @@ def start_knockout(
         rounds=[],
     )
     tournament.phases.append(phase)
-    seeds = _knockout_entries(tournament, cut.seeds, now)
+    seeds = _knockout_entries(tournament, draw, now=now)
     session.flush()  # the entries and the phase exist before the matches name them
     members = {entry.id: entry.members for entry in seeds}
     bracket = draw_bracket(
@@ -442,26 +636,29 @@ def start_knockout(
     session.flush()  # the matches exist before a field references one
     _fill_fields(tournament, _match_slots(tournament), now)
     session.flush()
-    return read_tournament(
-        session, league_id=league_id, tournament_id=tournament.id, user_id=user_id
-    )
 
 
 def _knockout_entries(
-    tournament: Tournament, seeds: Sequence[EntryId], now: datetime
+    tournament: Tournament, draw: _Draw, *, now: datetime
 ) -> list[Entry]:
-    """One knockout entry per qualifier, continuing it, seed 1 first (BR-085, D4)."""
+    """One knockout entry per drawn entry, seed 1 first (BR-081 to BR-085, D4).
+
+    An entry of one source continues it (`source_entry_id`) with its kind
+    and members; a pair after Monster DYP rounds has its two players as
+    members and no source (DATA-MODEL §4.4).
+    """
     by_id = {entry.id: entry for entry in tournament.entries}
     created: list[Entry] = []
-    for seed, source_id in enumerate(seeds, start=1):
-        source = by_id[source_id]
+    for drawn in draw.entries:
+        sources = [by_id[source_id] for source_id in drawn.sources]
+        single = sources[0] if len(sources) == 1 else None
         entry_id = uuid7()
         entry = Entry(
             id=entry_id,
             stage=EntryStage.KNOCKOUT,
-            kind=source.kind,
-            seed=seed,
-            source_entry_id=source.id,
+            kind=EntryKind.PAIR if single is None else single.kind,
+            seed=drawn.seed,
+            source_entry_id=None if single is None else single.id,
             is_top_player=False,
             is_disabled=False,
             created_at=now,
@@ -473,6 +670,7 @@ def _knockout_entries(
                     stage=EntryStage.KNOCKOUT,
                     created_at=now,
                 )
+                for source in sources
                 for member in source.members
             ],
         )

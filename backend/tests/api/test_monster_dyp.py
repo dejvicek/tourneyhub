@@ -1300,36 +1300,3 @@ def test_group_phase_not_done_is_422(
         422,
         {"code": "group_phase_not_done", "detail": {"matches_left": 1}},
     )
-
-
-def test_knockout_after_monster_dyp_still_refused(
-    client: TestClient, league: League, headers: dict[str, str], players: list[str]
-) -> None:
-    """Guards the `PLAYED_GROUP_FORMATS` boundary until the knockout comes (PR 3)."""
-    tid = _monster(client, league, headers, players[:8])
-    tournament = _started(client, league, tid, headers)
-    _play_round(client, league, tid, _round(tournament), headers)
-
-    preview = client.get(
-        _t_url(league, tid, "/knockout/preview?qualifiers=4&third_place_match=false"),
-        headers=headers,
-    )
-    started = client.put(
-        _t_url(league, tid, "/knockout"),
-        json={
-            "expected_current_phase_id": tournament["current_phase_id"],
-            "expected_draw_counter": preview.json()["draw_counter"],
-            "expected_qualifier_ids": [],
-            "qualifiers": 4,
-            "third_place_match": False,
-            "match_format": None,
-            "final_match_format": None,
-            "mode": None,
-        },
-        headers=headers,
-    )
-
-    assert started.status_code == 422
-    assert started.json()["code"] == "format_not_supported"
-    assert preview.status_code == 200
-    assert preview.json()["problem"]["code"] == "format_not_supported"
