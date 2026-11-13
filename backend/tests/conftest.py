@@ -202,6 +202,19 @@ _TOURNAMENT_INVARIANTS = {
         JOIN tournament_phases ph ON ph.id = r.phase_id
         WHERE (ph.kind = 'group' OR r.round_no = 1)
             AND (SELECT count(*) FROM match_sides s WHERE s.match_id = m.id) <> 2
+        UNION ALL
+        SELECT m.id FROM matches m
+        JOIN rounds r ON r.id = m.round_id
+        JOIN tournament_phases ph ON ph.id = r.phase_id
+        WHERE ph.monster_knockout_mode = 'lord_have_mercy' AND r.round_no > 1
+            AND (
+                SELECT count(*) FROM match_sides s
+                WHERE s.match_id = m.id AND s.entry_id IS NULL AND NOT s.is_bye
+                    AND (
+                        SELECT count(*) FROM match_side_players sp
+                        WHERE sp.match_id = s.match_id AND sp.side = s.side
+                    ) = 2
+            ) <> 2
     """,
     "a group round without one participation row per main entry (D5)": """
         SELECT r.id FROM rounds r

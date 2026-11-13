@@ -18,6 +18,7 @@ from tourneyhub.db.models.leagues import League
 from tourneyhub.db.models.matches import Match, MatchSide, MatchSidePlayer, Round
 from tourneyhub.db.models.tournaments import Tournament
 from tourneyhub.engine.knockout import RoundName, round_name
+from tourneyhub.engine.monster_dyp import Team
 from tourneyhub.engine.remix import RemixMatch, allows_result, draw_next_round
 from tourneyhub.engine.tournaments import (
     KnockoutMatchFormat,
@@ -327,6 +328,14 @@ def _loaded(tournament: Tournament) -> RemixKnockout:
     return remix
 
 
+def _pair(pair: Team | None) -> Team:
+    """The players of a side; a later round never has a bye (BR-141)."""
+    if pair is None:
+        msg = "a drawn match of a later round has a side without players"
+        raise ValueError(msg)
+    return pair
+
+
 def _stored_round(round_no: int, drawn: tuple[RemixMatch, ...], now: datetime) -> Round:
     """A drawn round as rows: a match per pair of pairs, no participation (D5)."""
     return Round(
@@ -356,8 +365,10 @@ def _stored_round(round_no: int, drawn: tuple[RemixMatch, ...], now: datetime) -
                             for player in pair
                         ],
                     )
-                    for number, pair in ((1, match.side_1), (2, match.side_2))
-                    if pair is not None  # a later round has no bye (BR-141)
+                    for number, pair in (
+                        (1, _pair(match.side_1)),
+                        (2, _pair(match.side_2)),
+                    )
                 ],
                 games=[],
             )
