@@ -1,4 +1,4 @@
-// Demo handlers: accounts, login and the session (FR-001–FR-004, ADR-006).
+// Fake handlers: accounts, login and the session (FR-001–FR-004, ADR-006).
 // The backend serves these routes; the handlers follow its schema
 // (src/api/schema.d.ts) and P2b's rules. The browser's refresh cookie is
 // stood in for by outsideDb().signedInUserId; the tokens are placeholders.
@@ -7,7 +7,6 @@ import { http, HttpResponse } from "msw";
 import { newId } from "@/lib/newId";
 
 import type { UserRead } from "../contract";
-import { DEMO_EMAIL } from "../ids";
 import {
   nameProblem,
   outsideError,
@@ -15,15 +14,10 @@ import {
   validationFailed,
 } from "../outsideErrors";
 import { route } from "../route";
-import {
-  DEMO_PASSWORD,
-  DEMO_SIGNUP_CODE,
-  type StoredAccount,
-  type Throttle,
-} from "../seedOutside";
+import type { StoredAccount, Throttle } from "../seedOutside";
 import { outsideDb } from "../store";
 
-const DEMO_ACCESS_TOKEN = "demo-access-token";
+const TEST_ACCESS_TOKEN = "demo-access-token";
 /** P2b's MIN_PASSWORD_LENGTH (ADR-006; FR-002 says 12, a PRD question). */
 const MIN_PASSWORD_LENGTH = 15;
 const EMAIL = /^[^@\s]+@[^@\s.]+(\.[^@\s.]+)+$/;
@@ -117,13 +111,6 @@ export const authHandlers = [
     return me;
   }),
 
-  // Demo only: what the login screen shows in demo mode.
-  route("get", "/api/v1/demo/account", () => ({
-    email: DEMO_EMAIL,
-    password: DEMO_PASSWORD,
-    signup_code: outsideDb().signupCode ?? DEMO_SIGNUP_CODE,
-  })),
-
   route("post", "/api/v1/auth/login", ({ body }) => {
     const state = outsideDb();
     const wait = throttled(state.loginThrottle);
@@ -137,13 +124,13 @@ export const authHandlers = [
       return notAuthenticated();
     }
     state.signedInUserId = account.user.id;
-    return { access_token: DEMO_ACCESS_TOKEN };
+    return { access_token: TEST_ACCESS_TOKEN };
   }),
 
   // Refresh and logout send no body, which route() would parse.
   http.post("/api/v1/auth/refresh", () =>
     signedInAccount()
-      ? HttpResponse.json({ access_token: DEMO_ACCESS_TOKEN })
+      ? HttpResponse.json({ access_token: TEST_ACCESS_TOKEN })
       : notAuthenticated(),
   ),
 
@@ -199,7 +186,7 @@ export const authHandlers = [
         createdAt: new Date().toISOString(),
       });
       state.signedInUserId = user.id;
-      return { access_token: DEMO_ACCESS_TOKEN };
+      return { access_token: TEST_ACCESS_TOKEN };
     },
     201,
   ),

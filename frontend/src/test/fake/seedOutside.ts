@@ -1,5 +1,5 @@
 // The outside area's part of the demo (auth, leagues, players, public), ids
-// demoId(4000)–demoId(4999). It adds another organizer's league, which the
+// testId(4000)–testId(4999). It adds another organizer's league, which the
 // demo organizer never sees (FR-007), and holds the demo's accounts and
 // sessions. The credentials are fake seed values; the login screen shows
 // them in demo mode only, read through GET /api/v1/demo/account, so they
@@ -7,17 +7,17 @@
 import { DEFAULT_PLACEMENT_POINTS } from "@/lib/rules";
 
 import type { UserRead } from "./contract";
-import { DEMO_USER_ID, demoId } from "./ids";
+import { TEST_USER_ID, testId } from "./ids";
 import type { SeedPart } from "./seed";
 
 /** The demo organizer's password: 15 characters or more, as P2b requires. */
-export const DEMO_PASSWORD = "thursday-foosball-demo";
+export const TEST_PASSWORD = "thursday-foosball-demo";
 /** The instance's sign-up code in the demo (FR-001). */
-export const DEMO_SIGNUP_CODE = "FOOSBALL-2026";
+export const TEST_SIGNUP_CODE = "FOOSBALL-2026";
 
 /** A second organizer, so that ownership shows (FR-007). */
-export const OTHER_ORGANIZER_ID = demoId(4000, "outside");
-const OTHER_LEAGUE_ID = demoId(4001, "outside");
+export const OTHER_ORGANIZER_ID = testId(4000, "outside");
+const OTHER_LEAGUE_ID = testId(4001, "outside");
 
 export const seedOutside: SeedPart = {
   area: "outside",
@@ -90,7 +90,7 @@ export function createOutsideState(organizer: UserRead): OutsideState {
       {
         // The seed's own user, so that PATCH /me and the shells agree.
         user: organizer,
-        password: DEMO_PASSWORD,
+        password: TEST_PASSWORD,
         createdAt: "2026-08-20T17:30:00Z",
       },
       {
@@ -107,7 +107,7 @@ export function createOutsideState(organizer: UserRead): OutsideState {
       },
       {
         user: {
-          id: demoId(4003, "outside"),
+          id: testId(4003, "outside"),
           email: "eva.novakova@demo.tourneyhub.test",
           display_name: "Eva Nováková",
           language: "cs",
@@ -120,7 +120,7 @@ export function createOutsideState(organizer: UserRead): OutsideState {
       },
       {
         user: {
-          id: demoId(4004, "outside"),
+          id: testId(4004, "outside"),
           email: "tomas.cerny@demo.tourneyhub.test",
           display_name: "Tomáš Černý",
           language: "en",
@@ -131,8 +131,8 @@ export function createOutsideState(organizer: UserRead): OutsideState {
         createdAt: "2026-10-02T16:20:00Z",
       },
     ],
-    signedInUserId: DEMO_USER_ID,
-    signupCode: DEMO_SIGNUP_CODE,
+    signedInUserId: TEST_USER_ID,
+    signupCode: TEST_SIGNUP_CODE,
     signupCodeUpdatedAt: "2026-08-20T17:30:00Z",
     loginThrottle: { failures: [], blockedUntil: 0 },
     signupThrottle: { failures: [], blockedUntil: 0 },

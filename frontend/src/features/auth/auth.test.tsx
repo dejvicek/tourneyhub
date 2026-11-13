@@ -5,17 +5,17 @@ import { generatePath } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { setAccessToken } from "@/api/token";
-import { DEMO_EMAIL, DEMO_LEAGUE_ID } from "@/demo/ids";
-import { DEMO_PASSWORD, DEMO_SIGNUP_CODE } from "@/demo/seedOutside";
-import { outsideDb } from "@/demo/store";
 import { i18n } from "@/i18n";
 import { paths } from "@/lib/paths";
+import { TEST_EMAIL, TEST_LEAGUE_ID } from "@/test/fake/ids";
+import { TEST_PASSWORD, TEST_SIGNUP_CODE } from "@/test/fake/seedOutside";
+import { outsideDb } from "@/test/fake/store";
 import { renderAt } from "@/test/renderApp";
 import { server } from "@/test/server";
 
 import { axeViolations } from "./axeCheck";
 
-const players = generatePath(paths.players, { leagueId: DEMO_LEAGUE_ID });
+const players = generatePath(paths.players, { leagueId: TEST_LEAGUE_ID });
 
 async function logIn(
   user: ReturnType<typeof userEvent.setup>,
@@ -46,7 +46,7 @@ describe("auth screens", () => {
       `?${new URLSearchParams({ next: players }).toString()}`,
     );
 
-    await logIn(user, DEMO_EMAIL, DEMO_PASSWORD);
+    await logIn(user, TEST_EMAIL, TEST_PASSWORD);
 
     expect(
       await screen.findByRole("heading", { level: 1, name: "Players" }),
@@ -59,7 +59,7 @@ describe("auth screens", () => {
     const user = userEvent.setup();
     renderAt(paths.login);
 
-    await logIn(user, DEMO_EMAIL, "not-the-password");
+    await logIn(user, TEST_EMAIL, "not-the-password");
 
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent(
@@ -84,7 +84,7 @@ describe("auth screens", () => {
     const user = userEvent.setup();
     renderAt(paths.login);
 
-    await logIn(user, DEMO_EMAIL, "guess");
+    await logIn(user, TEST_EMAIL, "guess");
 
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent(
@@ -124,7 +124,7 @@ describe("auth screens", () => {
 
     await user.type(
       await screen.findByLabelText("Sign-up code"),
-      DEMO_SIGNUP_CODE,
+      TEST_SIGNUP_CODE,
     );
     await user.type(screen.getByLabelText("Email"), "new@example.test");
     await user.type(screen.getByLabelText("Your name"), "Nová Organizátorka");
@@ -150,7 +150,7 @@ describe("auth screens", () => {
 
     await user.type(
       await screen.findByLabelText("Sign-up code"),
-      DEMO_SIGNUP_CODE,
+      TEST_SIGNUP_CODE,
     );
     await user.type(screen.getByLabelText("Email"), "new@example.test");
     await user.type(screen.getByLabelText("Your name"), "Nová");
@@ -185,9 +185,9 @@ describe("auth screens", () => {
     });
 
     await user.clear(current);
-    await user.type(current, DEMO_PASSWORD);
+    await user.type(current, TEST_PASSWORD);
     await user.clear(next);
-    await user.type(next, DEMO_PASSWORD);
+    await user.type(next, TEST_PASSWORD);
     await user.click(submit);
     await waitFor(() => {
       expect(next).toHaveAccessibleDescription(

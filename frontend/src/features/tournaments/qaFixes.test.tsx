@@ -6,25 +6,25 @@ import { generatePath } from "react-router";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { setAccessToken } from "@/api/token";
-import { DEMO_LEAGUE_ID, demoId } from "@/demo/ids";
-import { createSeed } from "@/demo/seed";
+import { i18n } from "@/i18n";
+import { paths } from "@/lib/paths";
+import { TEST_LEAGUE_ID, testId } from "@/test/fake/ids";
+import { createSeed } from "@/test/fake/seed";
+import { stubViewport } from "@/test/media";
+import { renderAt } from "@/test/renderApp";
+import { server } from "@/test/server";
 import {
   createDraft,
   pickPlayers,
   startTournament,
-} from "@/demo/setupTestHelpers";
-import { i18n } from "@/i18n";
-import { paths } from "@/lib/paths";
-import { stubViewport } from "@/test/media";
-import { renderAt } from "@/test/renderApp";
-import { server } from "@/test/server";
+} from "@/test/setupTestHelpers";
 
 const seed = createSeed();
 const idOf = (name: string) =>
   seed.tournaments.find((t) => t.name === name)?.id ?? "";
 const at = (path: string, name: string, extra: Record<string, string> = {}) =>
   generatePath(path, {
-    leagueId: DEMO_LEAGUE_ID,
+    leagueId: TEST_LEAGUE_ID,
     tournamentId: idOf(name),
     ...extra,
   });
@@ -99,7 +99,7 @@ describe("D29: the schedule names the pair that sits out", () => {
     await startTournament(id);
     renderAt(
       generatePath(paths.schedule, {
-        leagueId: DEMO_LEAGUE_ID,
+        leagueId: TEST_LEAGUE_ID,
         tournamentId: id,
       }),
     );
@@ -177,7 +177,7 @@ describe("D19: closing the result sheet", () => {
 describe("D26: switches", () => {
   it("toggles the third-place switch from its label", async () => {
     const user = userEvent.setup();
-    renderAt(generatePath(paths.newTournament, { leagueId: DEMO_LEAGUE_ID }));
+    renderAt(generatePath(paths.newTournament, { leagueId: TEST_LEAGUE_ID }));
 
     await user.click(await screen.findByRole("radio", { name: "None" }));
     const label = await screen.findByText("Third-place match");
@@ -194,12 +194,12 @@ describe("D28: setup says why Next is off", () => {
   it("explains uneven halves", async () => {
     const user = userEvent.setup();
     const { createDraft, pickPlayers } =
-      await import("@/demo/setupTestHelpers");
+      await import("@/test/setupTestHelpers");
     const id = await createDraft({});
     await pickPlayers(id, 12);
     renderAt(
       generatePath(paths.setupDraw, {
-        leagueId: DEMO_LEAGUE_ID,
+        leagueId: TEST_LEAGUE_ID,
         tournamentId: id,
       }),
     );
@@ -246,7 +246,7 @@ describe("D31, D32: no needless requests", () => {
   it("D32: a deleted tournament isn't fetched again", async () => {
     const user = userEvent.setup();
     const id = idOf("October Singles");
-    renderAt(generatePath(paths.tournaments, { leagueId: DEMO_LEAGUE_ID }));
+    renderAt(generatePath(paths.tournaments, { leagueId: TEST_LEAGUE_ID }));
     await user.click(
       await screen.findByRole("button", {
         name: "Actions for October Singles",
@@ -279,7 +279,7 @@ describe("D31, D32: no needless requests", () => {
 });
 
 describe("unknown ids", () => {
-  it("D07: demoId stays outside the seed", () => {
-    expect(seed.tournaments.some((t) => t.id === demoId(9999))).toBe(false);
+  it("D07: testId stays outside the seed", () => {
+    expect(seed.tournaments.some((t) => t.id === testId(9999))).toBe(false);
   });
 });

@@ -1,4 +1,4 @@
-// Demo handlers: the running group phase and its end (FR-040, FR-060,
+// Fake handlers: the running group phase and its end (FR-040, FR-060,
 // FR-092): the play screens' read and finishing after the round robin.
 import { groupDone, groupMatchesLeft, playRead } from "../playEngine";
 import { apiError, route } from "../route";

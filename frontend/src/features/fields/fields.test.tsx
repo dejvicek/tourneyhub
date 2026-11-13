@@ -3,8 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { provisionalApi } from "@/api/provisional";
-import { DEMO_LEAGUE_ID } from "@/demo/ids";
 import { i18n } from "@/i18n";
+import { TEST_LEAGUE_ID } from "@/test/fake/ids";
 import { onField, paths, playPath, runningDyp } from "@/test/play";
 import { renderAt } from "@/test/renderApp";
 
@@ -96,7 +96,7 @@ describe("fields (screens 6b–6d)", () => {
     t.fields.push({ id: "field-3", number: 3, match_id: null });
     const { data: play } = await provisionalApi.GET(
       "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/play",
-      { params: { path: { league_id: DEMO_LEAGUE_ID, tournament_id: t.id } } },
+      { params: { path: { league_id: TEST_LEAGUE_ID, tournament_id: t.id } } },
     );
     const blocked = play?.waiting.find((w) => w.busy.length > 0);
     renderAt(playPath(paths.moveMatch, { matchId: blocked?.match_id ?? "" }));
@@ -112,7 +112,7 @@ describe("fields (screens 6b–6d)", () => {
     const response = await provisionalApi.PUT(
       "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/fields/placements",
       {
-        params: { path: { league_id: DEMO_LEAGUE_ID, tournament_id: t.id } },
+        params: { path: { league_id: TEST_LEAGUE_ID, tournament_id: t.id } },
         body: {
           placements: [
             {
@@ -133,7 +133,7 @@ describe("fields (screens 6b–6d)", () => {
     const t = runningDyp();
     const [one, two] = t.fields;
     const path = {
-      league_id: DEMO_LEAGUE_ID,
+      league_id: TEST_LEAGUE_ID,
       tournament_id: t.id,
     };
     const url =

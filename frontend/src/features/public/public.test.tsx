@@ -4,21 +4,21 @@ import { generatePath } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { provisionalApi } from "@/api/provisional";
-import { DEMO_SHARE_TOKEN, demoId } from "@/demo/ids";
-import { db } from "@/demo/store";
 import { axeViolations } from "@/features/auth/axeCheck";
 import { i18n } from "@/i18n";
 import { paths } from "@/lib/paths";
+import { TEST_SHARE_TOKEN, testId } from "@/test/fake/ids";
+import { db } from "@/test/fake/store";
 import { stubViewport } from "@/test/media";
 import { renderAt } from "@/test/renderApp";
 import { server } from "@/test/server";
 
 const league = generatePath(paths.publicLeague, {
-  shareToken: DEMO_SHARE_TOKEN,
+  shareToken: TEST_SHARE_TOKEN,
 });
 const running = generatePath(paths.publicTournament, {
-  shareToken: DEMO_SHARE_TOKEN,
-  tournamentId: demoId(400, "foundation"),
+  shareToken: TEST_SHARE_TOKEN,
+  tournamentId: testId(400, "foundation"),
 });
 
 /** The seeded tournament called `name`, as its share-link page. */
@@ -28,7 +28,7 @@ function pageOf(name: string): string {
     throw new Error(`The seed has no ${name}`);
   }
   return generatePath(paths.publicTournament, {
-    shareToken: DEMO_SHARE_TOKEN,
+    shareToken: TEST_SHARE_TOKEN,
     tournamentId: found.id,
   });
 }
@@ -39,7 +39,7 @@ function addSetupTournament(): string {
   if (first === undefined) {
     throw new Error("The seed has tournaments");
   }
-  const id = demoId(4500, "outside");
+  const id = testId(4500, "outside");
   db().tournaments.push({
     ...first,
     id,
@@ -62,7 +62,7 @@ function qualifiersOnTheKnockout(tournamentId: string, qualifiers: number) {
   group.qualifiers = null;
   tournament.phases.push({
     ...group,
-    id: demoId(4501, "outside"),
+    id: testId(4501, "outside"),
     position: 2,
     kind: "knockout",
     format: "single_elimination",
@@ -108,7 +108,7 @@ describe("share-link views", () => {
     const id = addSetupTournament();
     renderAt(
       generatePath(paths.publicTournament, {
-        shareToken: DEMO_SHARE_TOKEN,
+        shareToken: TEST_SHARE_TOKEN,
         tournamentId: id,
       }),
     );
@@ -168,7 +168,7 @@ describe("share-link views", () => {
       "/api/v1/public/{share_token}/tournaments/{tournament_id}/standings",
       {
         params: {
-          path: { share_token: DEMO_SHARE_TOKEN, tournament_id: monster.id },
+          path: { share_token: TEST_SHARE_TOKEN, tournament_id: monster.id },
         },
       },
     );

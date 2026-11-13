@@ -3,17 +3,17 @@ import userEvent from "@testing-library/user-event";
 import { generatePath } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { syncBracket } from "@/demo/finalsEngine";
-import { DEMO_LEAGUE_ID } from "@/demo/ids";
-import { activeSeason, db } from "@/demo/store";
 import { axeViolations } from "@/features/auth/axeCheck";
 import { i18n } from "@/i18n";
 import { newId } from "@/lib/newId";
 import { paths } from "@/lib/paths";
+import { syncBracket } from "@/test/fake/finalsEngine";
+import { TEST_LEAGUE_ID } from "@/test/fake/ids";
+import { activeSeason, db } from "@/test/fake/store";
 import { renderAt } from "@/test/renderApp";
 
 const settings = generatePath(paths.leagueSettings, {
-  leagueId: DEMO_LEAGUE_ID,
+  leagueId: TEST_LEAGUE_ID,
 });
 
 /**
@@ -43,7 +43,7 @@ describe("leagues", () => {
     });
     expect(card).toHaveAttribute(
       "href",
-      generatePath(paths.tournaments, { leagueId: DEMO_LEAGUE_ID }),
+      generatePath(paths.tournaments, { leagueId: TEST_LEAGUE_ID }),
     );
     expect(await within(card).findByText("Season 1")).toBeInTheDocument();
   });
@@ -101,7 +101,7 @@ describe("leagues", () => {
     expect(third).toHaveAccessibleDescription(
       "Place 3 is worth more than the place above it.",
     );
-    expect(activeSeason(DEMO_LEAGUE_ID)?.placement_points).toEqual([
+    expect(activeSeason(TEST_LEAGUE_ID)?.placement_points).toEqual([
       10, 8, 6, 4, 2,
     ]);
   });
@@ -116,7 +116,7 @@ describe("leagues", () => {
     await user.click(screen.getByRole("button", { name: "Save points" }));
 
     await waitFor(() => {
-      expect(activeSeason(DEMO_LEAGUE_ID)?.placement_points).toEqual([
+      expect(activeSeason(TEST_LEAGUE_ID)?.placement_points).toEqual([
         10, 8, 6, 4, 2, 0,
       ]);
     });
@@ -138,7 +138,7 @@ describe("leagues", () => {
 
     await waitFor(() => {
       expect(
-        db().leagues.find((row) => row.id === DEMO_LEAGUE_ID),
+        db().leagues.find((row) => row.id === TEST_LEAGUE_ID),
       ).toMatchObject({
         name: "Thursday Kicker",
         draws_allowed: true,
@@ -171,7 +171,7 @@ describe("leagues", () => {
     });
 
     // Another device starts Season 2 while this screen still shows Season 1.
-    const first = activeSeason(DEMO_LEAGUE_ID);
+    const first = activeSeason(TEST_LEAGUE_ID);
     if (first === undefined) {
       throw new Error("The seed has an active season");
     }
@@ -247,7 +247,7 @@ describe("leagues", () => {
       await screen.findByText("You have no leagues yet."),
     ).toBeInTheDocument();
     expect(
-      db().seasons.filter((season) => season.league_id === DEMO_LEAGUE_ID),
+      db().seasons.filter((season) => season.league_id === TEST_LEAGUE_ID),
     ).toHaveLength(0);
   });
 
@@ -275,7 +275,7 @@ describe("leagues", () => {
 
     expect(fields).toHaveAccessibleDescription(/Use 32 or fewer\./);
     expect(
-      db().leagues.find((row) => row.id === DEMO_LEAGUE_ID)
+      db().leagues.find((row) => row.id === TEST_LEAGUE_ID)
         ?.default_field_count,
     ).toBe(2);
 
@@ -292,7 +292,7 @@ describe("leagues", () => {
   });
 
   it("D34: the points table stops at 256 places", async () => {
-    const season = activeSeason(DEMO_LEAGUE_ID);
+    const season = activeSeason(TEST_LEAGUE_ID);
     if (season === undefined) {
       throw new Error("The league has an active season");
     }

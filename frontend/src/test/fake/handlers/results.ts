@@ -1,4 +1,4 @@
-// Demo handlers: results (FR-050–FR-053, FR-094, BR-053, BR-090–BR-095,
+// Fake handlers: results (FR-050–FR-053, FR-094, BR-053, BR-090–BR-095,
 // BR-120–BR-124). A result is written whole, every game or the walkover;
 // the empty result clears it (ADR-008). Typed from the generated schema and
 // answered with the backend's codes (P8, P10b).

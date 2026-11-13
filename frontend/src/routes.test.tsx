@@ -2,11 +2,11 @@ import { screen, waitFor } from "@testing-library/react";
 import { generatePath } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { DEMO_LEAGUE_ID, DEMO_SHARE_TOKEN, demoId } from "@/demo/ids";
-import { createSeed } from "@/demo/seed";
-import { outsideDb } from "@/demo/store";
 import { i18n } from "@/i18n";
 import { paths } from "@/lib/paths";
+import { TEST_LEAGUE_ID, TEST_SHARE_TOKEN, testId } from "@/test/fake/ids";
+import { createSeed } from "@/test/fake/seed";
+import { outsideDb } from "@/test/fake/store";
 import { renderAt } from "@/test/renderApp";
 
 const seed = createSeed();
@@ -28,10 +28,10 @@ const runningMatch = running.rounds.at(-1)?.matches.at(-1)?.id ?? "";
 const autumnFinal = autumn.rounds.at(-1)?.matches[0]?.id ?? "";
 
 const params = {
-  leagueId: DEMO_LEAGUE_ID,
+  leagueId: TEST_LEAGUE_ID,
   tournamentId: running.id,
   matchId: runningMatch,
-  shareToken: DEMO_SHARE_TOKEN,
+  shareToken: TEST_SHARE_TOKEN,
 };
 
 type Screen = [
@@ -237,7 +237,7 @@ describe("the route table", () => {
 
   it("shows a not-found page for an unknown tournament (D21)", async () => {
     renderAt(
-      generatePath(paths.schedule, { ...params, tournamentId: demoId(9999) }),
+      generatePath(paths.schedule, { ...params, tournamentId: testId(9999) }),
     );
     expect(
       await screen.findByRole("heading", { level: 1, name: "Page not found" }),
@@ -245,7 +245,7 @@ describe("the route table", () => {
   });
 
   it("shows a not-found page for an unknown league (D07)", async () => {
-    renderAt(generatePath(paths.tournaments, { leagueId: demoId(9998) }));
+    renderAt(generatePath(paths.tournaments, { leagueId: testId(9998) }));
     expect(
       await screen.findByRole("heading", { level: 1, name: "Page not found" }),
     ).toBeInTheDocument();

@@ -4,8 +4,8 @@ import axe from "axe-core";
 import { api, dataOf } from "@/api/client";
 import type { components } from "@/api/schema";
 
-import { DEMO_LEAGUE_ID, DEMO_SEASON_ID } from "./ids";
-import { newId } from "./setupEngine";
+import { TEST_LEAGUE_ID, TEST_SEASON_ID } from "./fake/ids";
+import { newId } from "./fake/setupEngine";
 
 type TournamentCreate = components["schemas"]["TournamentCreate"];
 
@@ -22,7 +22,7 @@ export const dypFormat: Omit<TournamentCreate, "id"> = {
   field_count: 2,
 };
 
-const league = { league_id: DEMO_LEAGUE_ID };
+const league = { league_id: TEST_LEAGUE_ID };
 const at = (tournamentId: string) => ({
   params: { path: { ...league, tournament_id: tournamentId } },
 });
@@ -189,7 +189,7 @@ export async function startTournament(tournamentId: string) {
 export function tournamentsOfSeason() {
   return dataOf(
     api.GET("/api/v1/leagues/{league_id}/seasons/{season_id}/tournaments", {
-      params: { path: { ...league, season_id: DEMO_SEASON_ID } },
+      params: { path: { ...league, season_id: TEST_SEASON_ID } },
     }),
   );
 }

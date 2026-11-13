@@ -3,19 +3,19 @@ import userEvent from "@testing-library/user-event";
 import { generatePath } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { DEMO_LEAGUE_ID } from "@/demo/ids";
+import { i18n } from "@/i18n";
+import { paths } from "@/lib/paths";
+import { TEST_LEAGUE_ID } from "@/test/fake/ids";
+import { stubViewport } from "@/test/media";
+import { renderAt } from "@/test/renderApp";
 import {
   axeViolations,
   createDraft,
   pickPlayers,
   setupOf,
-} from "@/demo/setupTestHelpers";
-import { i18n } from "@/i18n";
-import { paths } from "@/lib/paths";
-import { stubViewport } from "@/test/media";
-import { renderAt } from "@/test/renderApp";
+} from "@/test/setupTestHelpers";
 
-const leagueId = DEMO_LEAGUE_ID;
+const leagueId = TEST_LEAGUE_ID;
 const playersPage = (tournamentId: string) =>
   generatePath(paths.setupPlayers, { leagueId, tournamentId });
 

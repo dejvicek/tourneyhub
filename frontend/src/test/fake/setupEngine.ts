@@ -8,7 +8,7 @@
 //
 // What setup stores beyond StoredTournament (the draw counter, the picked
 // players, the halves, the doubles pairs) lives in a draft per tournament,
-// keyed on the store's current state so that resetDemoStore() drops it too.
+// keyed on the store's current state so that resetFakeStore() drops it too.
 import type { components } from "@/api/schema";
 import { rules } from "@/lib/rules";
 import { DEFAULT_SIT_OUT_POINTS } from "@/lib/sitOutPoints";
@@ -20,7 +20,7 @@ import {
   roundRobinRounds,
   waitingMatches,
 } from "./engine";
-import type { DemoState, StoredLeague, StoredTournament } from "./seed";
+import type { FakeState, StoredLeague, StoredTournament } from "./seed";
 import { activeSeason, db, seasonStandingsOf } from "./store";
 
 type Schemas = components["schemas"];
@@ -61,7 +61,7 @@ interface SetupDraft {
   topPlayerIds: string[];
 }
 
-const drafts = new WeakMap<DemoState, Map<string, SetupDraft>>();
+const drafts = new WeakMap<FakeState, Map<string, SetupDraft>>();
 
 /** The stored format; the settings the phases do not use are null (FR-031). */
 function formatOf(t: StoredTournament): FormatRead {

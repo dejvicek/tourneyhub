@@ -4,12 +4,12 @@ import { api, ApiError, dataOf } from "@/api/client";
 import type { components } from "@/api/schema";
 import { onField, playEverything, runningDyp } from "@/test/play";
 
-import { DEMO_LEAGUE_ID } from "./ids";
+import { TEST_LEAGUE_ID } from "./ids";
 
 type ResultWrite = components["schemas"]["ResultWrite"];
 
 const tournamentPath = () => ({
-  league_id: DEMO_LEAGUE_ID,
+  league_id: TEST_LEAGUE_ID,
   tournament_id: runningDyp().id,
 });
 

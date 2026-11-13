@@ -1,4 +1,4 @@
-// Demo handlers: tournaments, their setup and progress (FR-030–FR-048).
+// Fake handlers: tournaments, their setup and progress (FR-030–FR-048).
 import { apiError, route } from "../route";
 import {
   applyFormat,
@@ -56,7 +56,7 @@ export const tournamentHandlers = [
   ),
 
   // ---------------------------------------------------------- setup
-  // Screens 1-5: create, format, players, draws, start (src/demo/setupEngine.ts).
+  // Screens 1-5: create, format, players, draws, start (src/test/fake/setupEngine.ts).
 
   route(
     "post",

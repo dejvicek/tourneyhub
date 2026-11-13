@@ -1,4 +1,4 @@
-// Demo handlers: season standings (FR-022, FR-061). The seasons themselves
+// Fake handlers: season standings (FR-022, FR-061). The seasons themselves
 // come with the league (handlers/leagues.ts).
 import { seasonStandings } from "../engine";
 import { apiError, route } from "../route";

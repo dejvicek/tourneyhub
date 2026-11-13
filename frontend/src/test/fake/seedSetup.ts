@@ -2,7 +2,7 @@
 // still in setup, with 14 players picked and seven pairs drawn, so that
 // screens 3–5 open on data and "Generate and start" can be tried from the
 // tournament list.
-import { demoId } from "./ids";
+import { testId } from "./ids";
 import type { SeedPart } from "./seed";
 
 /** The date `days` after a YYYY-MM-DD date. */
@@ -24,7 +24,7 @@ export const seedSetup: SeedPart = {
     });
     t.phase(kit.roundRobinPhase);
     // The first 14 players of the roster: the top seven with the bottom seven.
-    const players = Array.from({ length: 14 }, (_, i) => demoId(100 + i));
+    const players = Array.from({ length: 14 }, (_, i) => testId(100 + i));
     for (let i = 0; i < 7; i++) {
       t.entry([players[i] ?? "", players[13 - i] ?? ""], i + 1);
     }

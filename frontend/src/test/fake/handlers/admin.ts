@@ -1,4 +1,4 @@
-// Demo handlers: the instance admin's screens (FR-005, FR-006, ADR-007). The
+// Fake handlers: the instance admin's screens (FR-005, FR-006, ADR-007). The
 // backend serves these routes; the handlers follow its schema
 // (src/api/schema.d.ts) and P4's rules: every route is for an admin only,
 // a code has 12 to 256 characters, a reset revokes the logins and requires a

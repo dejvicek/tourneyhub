@@ -92,12 +92,12 @@ describe("the running round robin (screen 6)", () => {
   });
 });
 
-type DemoMatch = ReturnType<
+type FakeMatch = ReturnType<
   typeof runningDyp
 >["rounds"][number]["matches"][number];
 
 /** Clears every result, so a test sets only the ones it needs. */
-function clearResults(): DemoMatch[][] {
+function clearResults(): FakeMatch[][] {
   const t = runningDyp();
   for (const match of t.rounds.flatMap((r) => r.matches)) {
     match.outcome = null;
@@ -110,7 +110,7 @@ function clearResults(): DemoMatch[][] {
 }
 
 /** Enters a result: the games' scores, side 1 first; the winner of most games wins. */
-function enter(match: DemoMatch, ...scores: [number, number][]): void {
+function enter(match: FakeMatch, ...scores: [number, number][]): void {
   match.games = scores.map(([score_1, score_2], index) => ({
     game_no: index + 1,
     winner: score_1 > score_2 ? "side_1" : "side_2",

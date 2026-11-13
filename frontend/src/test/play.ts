@@ -2,9 +2,9 @@
 // demo's seed.
 import { generatePath } from "react-router";
 
-import { DEMO_LEAGUE_ID } from "@/demo/ids";
-import { db } from "@/demo/store";
 import { paths } from "@/lib/paths";
+import { TEST_LEAGUE_ID } from "@/test/fake/ids";
+import { db } from "@/test/fake/store";
 
 export function runningDyp() {
   const t = db().tournaments.find((row) => row.name === "Thursday DYP");
@@ -19,7 +19,7 @@ export function playPath(
   extra: Record<string, string> = {},
 ): string {
   return generatePath(path, {
-    leagueId: DEMO_LEAGUE_ID,
+    leagueId: TEST_LEAGUE_ID,
     tournamentId: runningDyp().id,
     ...extra,
   });

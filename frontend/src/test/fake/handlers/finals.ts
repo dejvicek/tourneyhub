@@ -1,4 +1,4 @@
-// Demo handlers: the finals of a tournament (FR-037, FR-040–FR-048): the
+// Fake handlers: the finals of a tournament (FR-037, FR-040–FR-048): the
 // knockout bracket and places, rounds of a Swiss or Monster DYP, late and
 // disabled players, tie-breakers, finishing, and starting or deleting the
 // knockout. The logic is finalsEngine.ts (`// demo only, the engine decides`).
@@ -30,7 +30,7 @@ import {
   setNote,
   syncBracket,
 } from "../finalsEngine";
-import { demoId } from "../ids";
+import { testId } from "../ids";
 import { apiError, route } from "../route";
 import type { StoredTournament } from "../seed";
 import { db, findTournament, placesRead, tournamentRead } from "../store";
@@ -58,7 +58,7 @@ function idFactory(): () => string {
   let n = highestIdNumber(db().tournaments);
   return () => {
     n += 1;
-    return demoId(n);
+    return testId(n);
   };
 }
 
