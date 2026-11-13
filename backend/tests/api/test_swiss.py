@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from tourneyhub.db.models.entries import Entry
 from tourneyhub.db.models.leagues import League, Player, Season
 from tourneyhub.db.models.matches import RoundParticipation
+from tourneyhub.db.models.tournaments import TournamentPhase
 from tourneyhub.engine.leagues import SeasonState
 
 type Json = dict[str, Any]
@@ -516,6 +517,32 @@ def test_fr043_the_tiebreakers_can_be_set_in_setup(
     assert status == 200, body
     assert body["state"] == "setup"
     assert body["phases"][0]["tiebreakers"] == ["score_difference", "bh2"]
+
+
+def test_adr008_the_same_tiebreakers_again_change_nothing(
+    swiss: Callable[..., Json],
+    set_tiebreakers: Callable[[str, list[str]], tuple[int, Json]],
+    session: Session,
+) -> None:
+    tournament = swiss(4)
+    phase = session.get_one(TournamentPhase, UUID(tournament["phases"][0]["id"]))
+
+    status, body = set_tiebreakers(tournament["id"], ["bh1", "bh2", "score_difference"])
+
+    session.refresh(phase)
+    assert status == 200, body
+    assert body["phases"] == tournament["phases"]
+    assert phase.updated_at is None
+
+
+def test_fr060_a_monster_dyp_has_no_standings_yet(
+    setup: Callable[..., Json], read: Callable[..., Json]
+) -> None:
+    ready = setup(4, type="monster_dyp", group_phase="monster_dyp")
+
+    play = read(ready["tournament_id"], "/play")
+
+    assert play == {"waiting": [], "standings": [], "group_done": False}
 
 
 @pytest.mark.parametrize(
