@@ -8,6 +8,8 @@ export default defineConfig({
   testDir: ".",
   // Relative to this file; by default it would be next to package.json.
   outputDir: "test-results",
+  // One sign-up code for every spec's organizer (globalSetup.ts).
+  globalSetup: "./globalSetup.ts",
   forbidOnly: Boolean(process.env.CI),
   reporter: process.env.CI ? [["list"], ["github"]] : "list",
   use: {
