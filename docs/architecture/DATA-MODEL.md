@@ -490,7 +490,7 @@ Loading every id through the locked league and tournament also stops an organize
 - a Monster DYP without a `monster_dyp` group phase, another type with one, and DYP halves in a tournament of another type;
 - side players that differ from the members of the side's entry;
 - bye sides with players;
-- group rounds without exactly one `round_participation` row per `main` entry, and a row that says `played` while the entry has no side in the round's matches, or another status while it has one;
+- group rounds without exactly one `round_participation` row per `main` entry, and a row that says `played` while the entry has no side in the round's matches (a Monster DYP team has no entry: its side counts for the entries of its players), or another status while it has one;
 - a group-phase match or a first-round bracket match without two stored sides (with the services of issue #63, also a match of a later round of a Lord have mercy knockout without two stored sides of two players each, and a side that is neither a bye nor tied to an entry in any other knockout match);
 - an entry on a side of two matches of one round (BR-051);
 - games on a match without a result or on a walkover, a result that is not a walkover and has no games, game numbers with a gap, and games that do not fit the format (the phase's, or the final's own) or the outcome: a BO1 game whose winner is not the outcome, a BO2 with a drawn game or an outcome its two games do not make, a BO3 or BO5 with a drawn game, with a winner short of 2 or 3 games, or whose last game the winner did not win (§4.5);
