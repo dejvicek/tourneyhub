@@ -125,7 +125,7 @@ export const finals = {
   },
   remix: {
     winnerFixed: "Winner fixed",
-    left: "Left",
+    left: "No longer playing",
     drawnAfter: "Drawn after the {{previous}}",
     drawnLater: "Drawn later",
   },

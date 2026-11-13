@@ -45,6 +45,49 @@ function Dot({ filled }: { filled: boolean }) {
   );
 }
 
+/** The players of a side. A pair reads as on every screen (finals.common.names.team), each name with its own "left" badge. */
+function Players({ side, ctx }: { side: RemixSide; ctx: RemixContext }) {
+  const { t } = useTranslation();
+  const one = (id: string) => (
+    <>
+      {ctx.playerName(id)}
+      {side.left_player_ids.includes(id) && (
+        <span className="ml-1 rounded-sm border border-current px-1 text-caption font-normal">
+          {t("finals.remix.left")}
+        </span>
+      )}
+    </>
+  );
+  const [first, second] = side.player_ids;
+  if (
+    first === undefined ||
+    second === undefined ||
+    side.player_ids.length !== 2
+  ) {
+    return side.player_ids.map((id, index) => (
+      <span key={id}>
+        {index > 0 && ", "}
+        {one(id)}
+      </span>
+    ));
+  }
+  // The team pattern decides the separator; the names go in as nodes.
+  const parts = t("finals.common.names.team", {
+    first: "@@1@@",
+    second: "@@2@@",
+    interpolation: { escapeValue: false },
+  }).split(/(@@1@@|@@2@@)/);
+  return parts.map((part, index) =>
+    part === "@@1@@" ? (
+      <span key={index}>{one(first)}</span>
+    ) : part === "@@2@@" ? (
+      <span key={index}>{one(second)}</span>
+    ) : (
+      part
+    ),
+  );
+}
+
 function SideRow({
   side,
   ctx,
@@ -67,21 +110,11 @@ function SideRow({
           side.player_ids.length === 0 && "text-muted-foreground",
         )}
       >
-        {side.is_bye
-          ? t("finals.knockout.bye")
-          : side.player_ids.length === 0
-            ? t("finals.knockout.tbd")
-            : side.player_ids.map((id, index) => (
-                <span key={id}>
-                  {index > 0 && " / "}
-                  {ctx.playerName(id)}
-                  {side.left_player_ids.includes(id) && (
-                    <span className="ml-1 rounded-sm border border-current px-1 text-caption font-normal">
-                      {t("finals.remix.left")}
-                    </span>
-                  )}
-                </span>
-              ))}
+        {side.player_ids.length === 0 ? (
+          t("finals.knockout.tbd")
+        ) : (
+          <Players side={side} ctx={ctx} />
+        )}
         {won && (
           <span className="sr-only"> ({t("finals.knockout.winner")})</span>
         )}
@@ -97,8 +130,7 @@ const BOX_STATE = {
   played: "border-border-surface bg-card text-card-foreground",
   ready: "border-team-a bg-card text-card-foreground",
   on_field: "border-team-a bg-card text-card-foreground",
-  bye: "border-dashed border-input bg-transparent text-muted-foreground",
-} as const satisfies Record<RemixMatch["state"], string>;
+} as const satisfies Record<Exclude<RemixMatch["state"], "bye">, string>;
 
 /** One match of a round: both sides, the score, its state and a way in. */
 export function RemixMatchCard({
@@ -116,14 +148,22 @@ export function RemixMatchCard({
   const played = match.state === "played";
   const winner =
     match.outcome === "side_1" ? 0 : match.outcome === "side_2" ? 1 : null;
+  if (match.state === "bye") {
+    const kept = match.sides[match.sides[0].is_bye ? 1 : 0];
+    return (
+      <p className="rounded-lg border border-dashed border-input px-3 py-2 text-body-sm text-muted-foreground">
+        {t("finals.knockout.byeFor", {
+          name: kept.player_ids.map(ctx.playerName).join(", "),
+        })}
+      </p>
+    );
+  }
   const status =
     match.state === "played"
       ? t("finals.knockout.played")
-      : match.state === "bye"
-        ? t("finals.knockout.bye")
-        : match.state === "on_field"
-          ? t("finals.knockout.onField", { field: match.field_number })
-          : t("finals.knockout.ready");
+      : match.state === "on_field"
+        ? t("finals.knockout.onField", { field: match.field_number })
+        : t("finals.knockout.ready");
   return (
     <article
       aria-label={title}

@@ -124,7 +124,7 @@ export const finals: CsMessages<Messages["finals"]> = {
   },
   remix: {
     winnerFixed: "Vítěz je pevný",
-    left: "Odešel",
+    left: "Už nehraje",
     drawnAfter: "Losuje se po: {{previous}}",
     drawnLater: "Losuje se později",
   },

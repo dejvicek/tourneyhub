@@ -81,7 +81,10 @@ function RoundColumns({ knockout, ctx }: Props) {
     (_, offset) => {
       const drawn = knockout.rounds.length + offset;
       const named = (done: number) =>
-        nextRoundName({ ...knockout, rounds: Array.from({ length: done }) });
+        nextRoundName({
+          ...knockout,
+          rounds: Array.from<unknown>({ length: done }),
+        });
       const name = named(drawn);
       const previous = drawn === 0 ? null : named(drawn - 1);
       return { drawn, name, previous };
