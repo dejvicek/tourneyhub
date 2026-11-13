@@ -38,6 +38,7 @@ def test_main_prints_a_schema_with_function_names_as_operation_ids(
         "delete_tournament",
         "draw_again",
         "draw_knockout_again",
+        "draw_knockout_round",
         "start_knockout",
         "finish_tournament",
         "list_leagues",

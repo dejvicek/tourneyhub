@@ -3074,6 +3074,278 @@
         "title": "RankingRow",
         "type": "object"
       },
+      "RemixKnockoutRead": {
+        "description": "A Lord have mercy knockout round by round, computed on read (D4, BR-155).\n\n`size` is twice the round-1 matches and `round_count` the rounds the\nknockout will have; `rounds` holds those drawn so far. `can_draw_next` says\nthe next round can be drawn (BR-140). `left_player_ids` are all the players\nwho have left but stay in (FR-049). The final plays `final_match_format`,\nor `match_format` when it is null (BR-120).",
+        "properties": {
+          "can_draw_next": {
+            "title": "Can Draw Next",
+            "type": "boolean"
+          },
+          "final_match_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KnockoutMatchFormat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "left_player_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Left Player Ids",
+            "type": "array"
+          },
+          "match_format": {
+            "$ref": "#/components/schemas/MatchFormat"
+          },
+          "phase_id": {
+            "format": "uuid",
+            "title": "Phase Id",
+            "type": "string"
+          },
+          "round_count": {
+            "title": "Round Count",
+            "type": "integer"
+          },
+          "rounds": {
+            "items": {
+              "$ref": "#/components/schemas/RemixRoundRead"
+            },
+            "title": "Rounds",
+            "type": "array"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          },
+          "third_place_match": {
+            "title": "Third Place Match",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "phase_id",
+          "size",
+          "round_count",
+          "third_place_match",
+          "match_format",
+          "final_match_format",
+          "can_draw_next",
+          "left_player_ids",
+          "rounds"
+        ],
+        "title": "RemixKnockoutRead",
+        "type": "object"
+      },
+      "RemixMatchRead": {
+        "description": "A match of a drawn Lord have mercy round (BR-155).\n\n`number` counts the tournament's matches, the group phase's first; a bye\nhas none, and the third-place match comes after the final. `state`: `bye`;\n`played`; `on_field`; `ready`. `score` is side 1's: a BO1 game's goals,\nelse the games won. `winner_locked` says a later round is drawn, so the\nresult can be corrected but not cleared or given to the other pair\n(BR-146).",
+        "properties": {
+          "field_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field Number"
+          },
+          "is_walkover": {
+            "title": "Is Walkover",
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MatchKind"
+          },
+          "match_format": {
+            "$ref": "#/components/schemas/MatchFormat"
+          },
+          "match_id": {
+            "format": "uuid",
+            "title": "Match Id",
+            "type": "string"
+          },
+          "number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Outcome"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "sides": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "$ref": "#/components/schemas/RemixSideRead"
+              },
+              {
+                "$ref": "#/components/schemas/RemixSideRead"
+              }
+            ],
+            "title": "Sides",
+            "type": "array"
+          },
+          "state": {
+            "$ref": "#/components/schemas/RemixMatchState"
+          },
+          "winner_locked": {
+            "title": "Winner Locked",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "match_id",
+          "number",
+          "position",
+          "kind",
+          "state",
+          "sides",
+          "outcome",
+          "is_walkover",
+          "score",
+          "match_format",
+          "field_number",
+          "winner_locked"
+        ],
+        "title": "RemixMatchRead",
+        "type": "object"
+      },
+      "RemixMatchState": {
+        "enum": [
+          "bye",
+          "played",
+          "on_field",
+          "ready"
+        ],
+        "type": "string"
+      },
+      "RemixRoundRead": {
+        "description": "A drawn round; `result_count` counts the matches with a result in it.",
+        "properties": {
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/RemixMatchRead"
+            },
+            "title": "Matches",
+            "type": "array"
+          },
+          "name": {
+            "$ref": "#/components/schemas/RoundName"
+          },
+          "result_count": {
+            "title": "Result Count",
+            "type": "integer"
+          },
+          "round_id": {
+            "format": "uuid",
+            "title": "Round Id",
+            "type": "string"
+          },
+          "round_no": {
+            "title": "Round No",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "round_id",
+          "round_no",
+          "name",
+          "result_count",
+          "matches"
+        ],
+        "title": "RemixRoundRead",
+        "type": "object"
+      },
+      "RemixSideRead": {
+        "description": "A side of a Lord have mercy match: a pair of players, or a bye (BR-041).\n\n`entry_id` is the round-1 pair entry; a later round's pair has none (D4).\n`player_ids` is empty for a bye. `left_player_ids` are the pair's players\nwho have left but stay in the draw (BR-147, BR-149).",
+        "properties": {
+          "entry_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Id"
+          },
+          "is_bye": {
+            "title": "Is Bye",
+            "type": "boolean"
+          },
+          "left_player_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Left Player Ids",
+            "type": "array"
+          },
+          "player_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Player Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "player_ids",
+          "entry_id",
+          "is_bye",
+          "left_player_ids"
+        ],
+        "title": "RemixSideRead",
+        "type": "object"
+      },
       "ResultWrite": {
         "additionalProperties": false,
         "description": "A whole result, the target state (ADR-008): every game played, or a walkover.\n\nA walkover names its winner and has no games (FR-052, BR-124). No walkover\nand no games is the empty result, which clears the match's result (FR-053).\n\n`expected_sides` are the entries the screen saw on side 1 and side 2. The\nsides of a knockout match after the first round are derived from the\nwinners (DATA-MODEL D4), so \"side 1 wins\" must name the entry it meant:\nit is required there, and optional for a match whose sides are stored.",
@@ -7714,6 +7986,105 @@
           }
         ],
         "summary": "Read Knockout Preview",
+        "tags": [
+          "knockout"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout/rounds": {
+      "post": {
+        "description": "Draw the next round of a Lord have mercy knockout (BR-140 to BR-144, BR-156).\n\nThe round before must be complete (BR-140). The players who went through\nare paired by lot; the final's round is drawn the same way (BR-141,\nBR-142) with the third-place match among the semifinal losers (BR-144).\nThe lots hold no draw counter, so the same players always give the same\npairs (BR-156, ADR-010). Disabled players still in are drawn like everyone\nelse (BR-149). The new matches take the free fields, the third-place match\nafter the final (BR-130), and the winners of the round before are locked\n(BR-146). Returns the knockout round by round.\n\n404 `knockout_not_found` without a knockout. 409: `round_number_changed`\n(`expected_round_no` is not the rounds drawn plus one; detail\n`current_round_no`, the newest round's), `tournament_not_in_progress`\n(detail `state`) or `season_closed`. 422: `format_not_supported` (a\nfixed-pair knockout; detail `format`, `mode`) or `round_not_complete` (a\nmatch of the newest round has no result; detail `matches_left`).",
+        "operationId": "draw_knockout_round",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoundCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemixKnockoutRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Draw Knockout Round",
         "tags": [
           "knockout"
         ]

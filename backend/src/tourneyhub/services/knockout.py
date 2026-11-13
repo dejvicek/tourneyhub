@@ -839,7 +839,17 @@ def delete_knockout(
         raise NotFoundError(ErrorCode.PHASE_NOT_FOUND)
     if phase.kind is not PhaseKind.KNOCKOUT or _group_phase(tournament) is None:
         raise RuleViolationError(ErrorCode.PHASE_NOT_DELETABLE, kind=phase.kind)
-    now = clock()
+    _remove_knockout(session, tournament, phase, clock())
+
+
+def _remove_knockout(
+    session: Session, tournament: Tournament, phase: TournamentPhase, now: datetime
+) -> None:
+    """Delete the knockout phase with its matches and entries, and free its fields.
+
+    The fields take the next matches that can be played (BR-130), the group
+    phase is unlocked (BR-087) and a finished tournament is back in progress.
+    """
     matches = {match.id for round_ in phase.rounds for match in round_.matches}
     for field in tournament.fields:
         if field.match_id in matches:

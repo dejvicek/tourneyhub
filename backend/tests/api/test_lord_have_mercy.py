@@ -18,6 +18,8 @@ from tourneyhub.db.models.leagues import League, Player
 from tourneyhub.db.models.matches import Round
 from tourneyhub.db.models.tournaments import Tournament, TournamentPhase
 from tourneyhub.engine.ids import PlayerId
+from tourneyhub.engine.lots import order_by_lot
+from tourneyhub.engine.remix import THIRD_PLACE_PURPOSE, remix_purpose
 from tourneyhub.engine.tournaments import EntryStage, MonsterKnockoutMode, PhaseKind
 from tourneyhub.services.tournaments.remix import left_player_ids, remix_knockout
 from tourneyhub.services.tournaments.shared import _load_tournament
@@ -105,14 +107,10 @@ def _get(
     return result
 
 
-@pytest.fixture
-def monster(
-    client: TestClient,
-    league_id: UUID,
-    headers: dict[str, str],
-    players: list[str],
+def _monster_of(
+    client: TestClient, league_id: UUID, headers: dict[str, str], players: list[str]
 ) -> Json:
-    """Eight players after Monster DYP round 1, side 1 winning every match."""
+    """These players after Monster DYP round 1, side 1 winning every match."""
     created = client.post(
         _url(league_id, "/tournaments"),
         json={"id": str(uuid7()), **MONSTER_DYP},
@@ -145,6 +143,17 @@ def monster(
         )
         assert result.status_code == 200, result.text
     return _get(client, league_id, tournament_id, "", headers)
+
+
+@pytest.fixture
+def monster(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    players: list[str],
+) -> Json:
+    """Eight players after Monster DYP round 1, side 1 winning every match."""
+    return _monster_of(client, league_id, headers, players)
 
 
 def _order(
@@ -581,3 +590,345 @@ def test_br084_br155_the_loader_reads_the_stored_rounds_and_who_left(
         e["id"]: e["player_ids"][0] for e in started["entries"] if e["stage"] == "main"
     }
     assert left_player_ids(tournament, remix) == {PlayerId(UUID(player_of[order[0]]))}
+
+
+# ---------------------------------------------------------------- draw the next round
+
+
+def _draw_round(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    tournament: Json,
+    expected_round_no: int,
+) -> tuple[int, Json]:
+    response = client.post(
+        _t_url(league_id, tournament["id"], "/knockout/rounds"),
+        json={"expected_round_no": expected_round_no},
+        headers=headers,
+    )
+    body: Json = response.json()
+    return response.status_code, body
+
+
+def _is_bye(match: Json) -> bool:
+    return any(side["is_bye"] for side in match["sides"])
+
+
+def _play(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    tournament: Json,
+    matches: list[Json],
+    *,
+    losers: int = 0,
+) -> None:
+    """Give every match without a bye a result, side 1 winning (side 2 for the
+    last `losers` matches). Matches come from the tournament or from a draw."""
+    for index, match in enumerate(matches):
+        if _is_bye(match) or match.get("state") == "bye":
+            continue
+        side = "side_2" if index >= len(matches) - losers else "side_1"
+        status, body = _put_result(
+            client,
+            league_id,
+            headers,
+            tournament,
+            {"id": match.get("id", match.get("match_id"))},
+            _win(side),
+        )
+        assert status == 200, body
+
+
+def _round_one(started: Json) -> list[Json]:
+    [round_1] = _rounds(started, _knockout(started))
+    matches: list[Json] = round_1["matches"]
+    return matches
+
+
+def _players_of(sides: list[Json]) -> set[str]:
+    return {player for side in sides for player in side["player_ids"]}
+
+
+def _winners(matches: list[Json]) -> set[str]:
+    """The players of side 1 of every match without a bye, and of a bye's pair."""
+    return {
+        player
+        for match in matches
+        for side in match["sides"]
+        if not side["is_bye"] and (_is_bye(match) or side is match["sides"][0])
+        for player in side["player_ids"]
+    }
+
+
+def test_br140_br141_round_two_is_drawn_from_the_winners(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    _, started = _started(client, league_id, headers, monster, third_place_match=False)
+    round_1 = _round_one(started)
+    _play(client, league_id, headers, started, round_1)
+
+    status, drawn = _draw_round(client, league_id, headers, started, 2)
+
+    assert status == 201, drawn
+    [round_2] = drawn["rounds"][1:]
+    [final] = round_2["matches"]
+    assert round_2["round_no"] == 2
+    assert _players_of(final["sides"]) == _winners(round_1)
+    for side in final["sides"]:
+        assert side["entry_id"] is None
+        assert len(side["player_ids"]) == 2
+        assert not side["is_bye"]
+    assert (drawn["round_count"], drawn["can_draw_next"]) == (2, False)
+    stored = _get(client, league_id, monster["id"], "", headers)
+    assert [r["round_no"] for r in _rounds(stored, _knockout(stored))] == [1, 2]
+
+
+def test_br141_pairs_with_a_bye_go_through(
+    client: TestClient,
+    league: League,
+    league_id: UUID,
+    headers: dict[str, str],
+    make_player: Callable[..., Player],
+) -> None:
+    twelve = [str(make_player(league=league, name=f"Q{n}").id) for n in range(12)]
+    big = _monster_of(client, league_id, headers, twelve)
+    _, started = _started(client, league_id, headers, big, 12, third_place_match=False)
+    round_1 = _round_one(started)
+    byes = [match for match in round_1 if _is_bye(match)]
+    _play(client, league_id, headers, started, round_1)
+
+    status, drawn = _draw_round(client, league_id, headers, started, 2)
+
+    # Six pairs fill a bracket of eight: two byes, two played matches.
+    assert len(round_1) == 4
+    assert len(byes) == 2
+    assert status == 201, drawn
+    round_2 = drawn["rounds"][1]
+    assert len(round_2["matches"]) == 2
+    players = _players_of([s for m in round_2["matches"] for s in m["sides"]])
+    assert len(players) == 8
+    assert _winners(round_1) == players
+
+
+def test_br142_br144_br156_final_and_third_place_drawn_together(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    _, started = _started(client, league_id, headers, monster)
+    round_1 = _round_one(started)
+    _play(client, league_id, headers, started, round_1)
+
+    status, drawn = _draw_round(client, league_id, headers, started, 2)
+
+    assert status == 201, drawn
+    final, third = drawn["rounds"][1]["matches"]
+    assert (final["kind"], third["kind"]) == ("standard", "third_place")
+    assert drawn["rounds"][1]["name"] == "final"
+    assert _players_of(final["sides"]) == _winners(round_1)
+    losers = {p for m in round_1 for s in m["sides"] for p in s["player_ids"]}
+    assert _players_of(third["sides"]) == losers - _winners(round_1)
+    assert third["number"] == final["number"] + 1
+
+
+def test_br156_third_place_pairs_do_not_depend_on_the_final(
+    client: TestClient,
+    session: Session,
+    league_id: UUID,
+    headers: dict[str, str],
+    monster: Json,
+) -> None:
+    _, started = _started(client, league_id, headers, monster)
+    round_1 = _round_one(started)
+    _play(client, league_id, headers, started, round_1)
+    seed = session.get_one(Tournament, UUID(monster["id"])).rng_seed
+    winners = _winners(round_1)
+    losers = {p for m in round_1 for s in m["sides"] for p in s["player_ids"]} - winners
+
+    _, drawn = _draw_round(client, league_id, headers, started, 2)
+
+    def pairs(players: set[str], purpose: str) -> list[set[str]]:
+        ordered = order_by_lot(
+            sorted(UUID(p) for p in players), rng_seed=seed, purpose=purpose
+        )
+        return [
+            {str(a), str(b)} for a, b in zip(ordered[::2], ordered[1::2], strict=True)
+        ]
+
+    def stored(match: Json) -> list[set[str]]:
+        return [set(side["player_ids"]) for side in match["sides"]]
+
+    final, third = drawn["rounds"][1]["matches"]
+    # Each match is drawn from its own players with its own lot (ADR-010).
+    assert stored(third) == pairs(losers, THIRD_PLACE_PURPOSE)
+    assert stored(final) == pairs(winners, remix_purpose(2))
+
+
+def test_adr008_stale_expected_round_no_is_409(
+    client: TestClient,
+    session: Session,
+    league_id: UUID,
+    headers: dict[str, str],
+    monster: Json,
+) -> None:
+    _, started = _started(client, league_id, headers, monster)
+    _play(client, league_id, headers, started, _round_one(started))
+    first = _draw_round(client, league_id, headers, started, 2)
+
+    again = _draw_round(client, league_id, headers, started, 2)
+
+    assert first[0] == 201
+    assert again == (
+        409,
+        {"code": "round_number_changed", "detail": {"current_round_no": 2}},
+    )
+    phase = _knockout(started)
+    rounds = session.scalars(
+        select(Round).where(Round.phase_id == UUID(phase["id"]), Round.round_no == 2)
+    ).all()
+    assert len(rounds) == 1
+
+
+def test_br140_round_not_complete_is_422(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    _, started = _started(client, league_id, headers, monster)
+    first, _ = _round_one(started)
+    _put_result(client, league_id, headers, started, first, _win("side_1"))
+
+    result = _draw_round(client, league_id, headers, started, 2)
+
+    assert result == (
+        422,
+        {"code": "round_not_complete", "detail": {"matches_left": 1}},
+    )
+
+
+def test_br140_draw_in_a_fixed_pair_knockout_is_422(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    shown = _get(
+        client,
+        league_id,
+        monster["id"],
+        "/knockout/preview?qualifiers=8&third_place_match=false&mode=seeded_pairs",
+        headers,
+    )
+    body = _start_body(monster, shown)
+    body["mode"] = "seeded_pairs"
+    started = client.put(
+        _t_url(league_id, monster["id"], "/knockout"), json=body, headers=headers
+    )
+    assert started.status_code == 200, started.text
+
+    result = _draw_round(client, league_id, headers, monster, 2)
+
+    assert result == (
+        422,
+        {
+            "code": "format_not_supported",
+            "detail": {"format": "single_elimination", "mode": "seeded_pairs"},
+        },
+    )
+
+
+def test_br140_draw_without_a_knockout_is_404(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    result = _draw_round(client, league_id, headers, monster, 2)
+
+    assert result == (404, {"code": "knockout_not_found", "detail": {}})
+
+
+def test_br130_a_drawn_round_takes_free_fields_third_place_after_final(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    _, started = _started(client, league_id, headers, monster)
+    _play(client, league_id, headers, started, _round_one(started))
+    fields = _get(client, league_id, monster["id"], "", headers)["fields"]
+    removed = client.delete(
+        _t_url(league_id, monster["id"], f"/fields/{fields[-1]['id']}"),
+        headers=headers,
+    )
+    assert removed.status_code == 204, removed.text
+
+    status, drawn = _draw_round(client, league_id, headers, started, 2)
+
+    assert status == 201, drawn
+    final, third = drawn["rounds"][1]["matches"]
+    # One field is left: the final takes it, the third-place match waits.
+    assert (final["state"], final["field_number"]) == ("on_field", 1)
+    assert (third["state"], third["field_number"]) == ("ready", None)
+    done = _put_result(
+        client, league_id, headers, started, {"id": final["match_id"]}, _win("side_1")
+    )
+    assert done[0] == 200, done[1]
+    after = _get(client, league_id, monster["id"], "", headers)
+    assert [f["match_id"] for f in after["fields"]] == [third["match_id"]]
+
+
+def test_br147_br149_a_disabled_player_still_in_stays_in_the_draw(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    monster: Json,
+    disable: Callable[[str], None],
+) -> None:
+    _, started = _started(client, league_id, headers, monster)
+    round_1 = _round_one(started)
+    player_of = {
+        e["player_ids"][0]: e["id"] for e in started["entries"] if e["stage"] == "main"
+    }
+    winner = next(iter(round_1[0]["sides"][0]["player_ids"]))
+    disable(player_of[winner])
+    _play(client, league_id, headers, started, round_1)
+
+    status, drawn = _draw_round(client, league_id, headers, started, 2)
+
+    assert status == 201, drawn
+    final, _ = drawn["rounds"][1]["matches"]
+    assert winner in _players_of(final["sides"])
+    assert drawn["left_player_ids"] == [winner]
+    # The walkover against that player's pair is the organizer's to record.
+    against = "side_2" if winner in final["sides"][0]["player_ids"] else "side_1"
+    walkover = _put_result(
+        client,
+        league_id,
+        headers,
+        started,
+        {"id": final["match_id"]},
+        {"walkover_winner": against, "games": []},
+    )
+    assert walkover[0] == 200, walkover[1]
+
+
+def test_fr054_br120_a_final_drawn_in_round_two_plays_the_final_format(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    _, started = _started(client, league_id, headers, monster, final_match_format="bo3")
+    _play(client, league_id, headers, started, _round_one(started))
+
+    status, drawn = _draw_round(client, league_id, headers, started, 2)
+
+    assert status == 201, drawn
+    final, third = drawn["rounds"][1]["matches"]
+    assert (final["match_format"], third["match_format"]) == ("bo3", "bo1")
+    assert drawn["rounds"][0]["matches"][0]["match_format"] == "bo1"
+    # The format can change until the final has a result (BR-096).
+    before = _set_final(client, league_id, headers, started, None)
+    assert before[0] == 200, before[1]
+    again = _set_final(client, league_id, headers, started, "bo3")
+    assert again[0] == 200, again[1]
+    bo1 = _put_result(
+        client, league_id, headers, started, {"id": final["match_id"]}, _win("side_1")
+    )
+    bo3 = _put_result(
+        client, league_id, headers, started, {"id": final["match_id"]}, _bo3_win()
+    )
+    after = _set_final(client, league_id, headers, started, None)
+    assert bo1[0] == 422
+    assert bo3[0] == 200
+    assert after == (
+        409,
+        {"code": "match_has_result", "detail": {"match_id": final["match_id"]}},
+    )
