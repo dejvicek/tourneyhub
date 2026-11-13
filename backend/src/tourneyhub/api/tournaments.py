@@ -332,7 +332,7 @@ def set_top_players(
     """Mark the Monster DYP top players, the target state (FR-041, BR-061).
 
     At most one per match of round 1: 422 `too_many_top_players` with `max`;
-    422 `player_not_picked` for a player who is not in the tournament. Other
+    409 `player_not_picked` for a player who is not in the tournament. Other
     types: 409 `tournament_type_changed`.
     """
     setup = tournament_service.set_top_players(

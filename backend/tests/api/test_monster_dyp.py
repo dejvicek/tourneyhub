@@ -149,7 +149,7 @@ def test_fr041_top_players_must_be_tournament_players(
         client, league, tid, "/setup/top-players", {"player_ids": [outsider]}, headers
     )
 
-    assert status == 422
+    assert status == 409
     assert body["code"] == "player_not_picked"
 
 
