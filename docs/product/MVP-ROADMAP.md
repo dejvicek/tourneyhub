@@ -32,7 +32,7 @@ The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. 
 - [ ] D3 Move the routes the backend already covers or can cover with little work:
   - [ ] Finishing a tournament on the finals screen calls `POST …/finish` instead of `PUT …/state`.
   - [ ] `GET …/players/{player_id}/tournaments` (BR-002, FR-012), together with Q25.
-  - [ ] `PUT …/setup/top-players` (FR-041), together with Q11.
+  - [x] `PUT …/setup/top-players` (FR-041), together with Q11.
 - [ ] D4 Routes that come with P12–P14 (section 4). Until they exist, the screens that need them are hidden:
   - [x] P12, P13: the screens move from the provisional `…/ranking` to `GET …/play` and the public `…/standings`; `PUT …/tiebreakers`, `POST …/rounds` and `DELETE …/rounds/{round_id}` exist in the backend, and the screens still have to switch to them. ([#97](https://github.com/dejvicek/tourneyhub/pull/97))
   - [ ] P14: `GET …/participants`, `POST …/entries`, `PUT …/entries/{entry_id}/disabled`.
@@ -61,7 +61,7 @@ The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. 
     - [ ] Step 2: replacements.
     - [ ] Order of re-mixed pairs sharing a place ([#94](https://github.com/dejvicek/tourneyhub/issues/94), waiting for an answer).
     - [ ] Check the bracket size of round 1 in `remix_state` ([#96](https://github.com/dejvicek/tourneyhub/issues/96)).
-  - [ ] Screen 13 and marking top players on the real API.
+  - [x] Screen 13 and marking top players on the real API.
   - [x] Which draw to use when every grouping repeats a partner ([#79](https://github.com/dejvicek/tourneyhub/issues/79), [#83](https://github.com/dejvicek/tourneyhub/pull/83)).
 - [ ] **P14 Late players and disabling** (FR-044, FR-047, FR-048; BR-045, BR-054, BR-064, BR-067)
   - [ ] Disable and enable a participant (written as a target state, ADR-008).
