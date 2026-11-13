@@ -137,6 +137,11 @@ def set_match_result(
     third-place match's, finishes the tournament in the same transaction
     (FR-037). In a Swiss, every round but the newest is locked (BR-065):
     422 `round_locked` with the newest `round_no`.
+
+    A Lord have mercy knockout stores the sides of every round, so it needs
+    no derivation or expectation. Once its next round is drawn, a result
+    keeps its winner (BR-146): it can be corrected, but clearing or flipping
+    it is 422 `round_locked`.
     """
     league, tournament = _lock_tournament(
         session,

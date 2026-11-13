@@ -572,7 +572,9 @@ class ResultWrite(RequestModel):
     `expected_sides` are the entries the screen saw on side 1 and side 2. The
     sides of a knockout match after the first round are derived from the
     winners (DATA-MODEL D4), so "side 1 wins" must name the entry it meant:
-    it is required there, and optional for a match whose sides are stored.
+    it is required there, and optional for a match whose sides are stored,
+    as in every round of a Lord have mercy knockout. That knockout can answer
+    422 `round_locked` (BR-146) once the next round is drawn.
     """
 
     walkover_winner: Literal[Outcome.SIDE_1, Outcome.SIDE_2] | None
