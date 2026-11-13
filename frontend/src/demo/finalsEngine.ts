@@ -619,6 +619,7 @@ function groupOrder(
     return roundRobinStandings(
       t.entries.filter((entry) => entry.stage === "main").map((e) => e.id),
       roundsOf(t, group),
+      group.match_format,
     ).map(({ entry_id, place }) => ({ entry_id, place }));
   }
   return rankingOf(t).rows.map(({ entry_id, place }) => ({ entry_id, place }));

@@ -6,6 +6,7 @@
 // for the rules still open; none of this is the real behaviour.
 import type {
   FieldRead,
+  MatchFormat,
   MatchRead,
   Outcome,
   PlaceRow,
@@ -134,6 +135,34 @@ function scoreDifference(match: MatchRead, side: 0 | 1): number {
   return difference;
 }
 
+/** BR-101: the games a walkover counts for its winner, those needed to win. */
+const WALKOVER_GAMES: Record<MatchFormat, number> = {
+  bo1: 1,
+  bo2: 2,
+  bo3: 2,
+  bo5: 3,
+};
+
+/** demo only, the engine decides: games won minus lost by one side (BR-101). */
+export function gameDifference(
+  match: MatchRead,
+  side: 0 | 1,
+  matchFormat: MatchFormat,
+): number {
+  const mine: Outcome = side === 0 ? "side_1" : "side_2";
+  if (match.is_walkover) {
+    const games = WALKOVER_GAMES[matchFormat];
+    return match.outcome === mine ? games : -games;
+  }
+  let difference = 0;
+  for (const game of match.games) {
+    if (game.winner !== "draw") {
+      difference += game.winner === mine ? 1 : -1;
+    }
+  }
+  return difference;
+}
+
 /**
  * demo only, the engine decides: round-robin standings (BR-070, BR-101), with
  * the tie-breakers of rules.roundRobinTiebreakers. A sit-out is counted but
@@ -142,6 +171,7 @@ function scoreDifference(match: MatchRead, side: 0 | 1): number {
 export function roundRobinStandings(
   entryIds: readonly string[],
   rounds: readonly RoundRead[],
+  matchFormat: MatchFormat = "bo1",
 ): TournamentStandingRow[] {
   const rows = new Map<string, Omit<TournamentStandingRow, "place">>(
     entryIds.map((entry_id) => [
@@ -154,6 +184,7 @@ export function roundRobinStandings(
         lost: 0,
         sat_out: 0,
         points: 0,
+        game_difference: 0,
         score_difference: 0,
       },
     ]),
@@ -181,6 +212,11 @@ export function roundRobinStandings(
         }
         const mine: Outcome = index === 0 ? "side_1" : "side_2";
         row.played += 1;
+        row.game_difference += gameDifference(
+          match,
+          index === 0 ? 0 : 1,
+          matchFormat,
+        );
         row.score_difference += scoreDifference(match, index === 0 ? 0 : 1);
         if (match.outcome === "draw") {
           row.drawn += 1;
@@ -231,6 +267,9 @@ export function roundRobinStandings(
           }
           break;
         case "game_difference":
+          if (a.game_difference !== b.game_difference) {
+            return b.game_difference - a.game_difference;
+          }
           break;
       }
     }
