@@ -1,5 +1,5 @@
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from itertools import combinations
 from time import perf_counter
 from uuid import UUID
@@ -1187,3 +1187,38 @@ def test_br058_benchmark_the_repeat_key_below_dirac_takes_under_a_second() -> No
 
     assert drawn.sitting_out is not None
     assert elapsed < 1.0
+
+
+@pytest.mark.benchmark
+def test_adr011_benchmark_256_entries_over_20_rounds_records_the_slowest_round(
+    record_property: Callable[[str, object], None],
+) -> None:
+    # ADR-011 "Timing": the 1 second target per round applies to the window-16
+    # step, and a benchmark records it without failing the build on time.
+    entries = ids(*range(1, 257))
+    rounds = [play(draw_first_swiss_round(entries), 1)]
+    durations: list[float] = []
+    for round_no in range(2, 21):
+        start = perf_counter()
+        lines = swiss_standings(
+            entries,
+            rounds,
+            tiebreakers=DEFAULT_TIEBREAKERS,
+            sit_out_points=0,
+            rng_seed=SEED,
+        )
+        drawn = draw_next_swiss_round(lines, rounds)
+        durations.append(perf_counter() - start)
+        rounds.append(play(drawn, round_no))
+
+    slowest, total = max(durations), sum(durations)
+    record_property("slowest_round_seconds", slowest)
+    record_property("total_seconds", total)
+    print(  # noqa: T201 - the benchmark reports its time, shown by pytest -s
+        f"256 entries, 20 rounds: slowest round {slowest:.3f} s, total {total:.3f} s"
+    )
+
+    assert len(rounds) == 20
+    for round_ in rounds:
+        playing = [e for m in round_.matches for e in (m.side_1, m.side_2)]
+        assert sorted(playing + list(round_.sat_out)) == sorted(entries)
