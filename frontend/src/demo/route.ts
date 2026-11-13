@@ -4,16 +4,23 @@
 // contract declares, or a Response made by apiError().
 import { http, HttpResponse, type JsonBodyType } from "msw";
 
-import type { DemoPaths, ErrorResponse } from "./contract";
+import type { ProvisionalApiPaths } from "@/api/provisionalPaths";
+
+import type { ErrorResponse } from "./contract";
 
 type Method = "get" | "post" | "put" | "patch" | "delete";
 
 type PathsWith<M extends Method> = {
-  [P in keyof DemoPaths]: DemoPaths[P] extends Record<M, unknown> ? P : never;
-}[keyof DemoPaths];
+  [P in keyof ProvisionalApiPaths]: ProvisionalApiPaths[P] extends Record<
+    M,
+    unknown
+  >
+    ? P
+    : never;
+}[keyof ProvisionalApiPaths];
 
-type Operation<P extends keyof DemoPaths, M extends Method> =
-  DemoPaths[P] extends Record<M, infer O> ? O : never;
+type Operation<P extends keyof ProvisionalApiPaths, M extends Method> =
+  ProvisionalApiPaths[P] extends Record<M, infer O> ? O : never;
 
 type PathParams<O> = O extends { parameters: { path: infer X } }
   ? X
