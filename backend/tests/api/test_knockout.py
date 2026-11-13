@@ -19,7 +19,7 @@ from tourneyhub.app import create_app
 from tourneyhub.db.models.accounts import User
 from tourneyhub.db.models.entries import Entry
 from tourneyhub.db.models.leagues import League, Player, Season
-from tourneyhub.db.models.tournaments import TournamentPhase
+from tourneyhub.db.models.tournaments import Tournament, TournamentPhase
 from tourneyhub.engine.accounts import Language
 from tourneyhub.engine.leagues import SeasonState
 from tourneyhub.engine.results import Game
@@ -250,6 +250,7 @@ def start_knockout(
         ).json()
         body = {
             "expected_current_phase_id": tournament["current_phase_id"],
+            "expected_draw_counter": shown["draw_counter"],
             "expected_qualifier_ids": [
                 e["members"][0]["entry_id"] for e in shown["entries"]
             ],
@@ -1363,6 +1364,7 @@ def test_api1_another_organizers_knockout_is_not_found(
         None: None,
         "start": {
             "expected_current_phase_id": drawn["current_phase_id"],
+            "expected_draw_counter": 0,
             "expected_qualifier_ids": [],
             "qualifiers": 2,
             "third_place_match": False,
@@ -1560,6 +1562,7 @@ def _commit_knockout(
             user_id=owner.id,
             start=knockout_service.KnockoutStart(
                 expected_current_phase_id=started.phases[0].id,
+                expected_draw_counter=seeded.draw_counter,
                 expected_qualifier_ids=_previewed(
                     setup, ids, qualifiers=player_count, third_place=third_place
                 ),
@@ -1653,6 +1656,15 @@ def _bracket(
     }
 
 
+def _draw_counter(engine: Engine, ids: tuple[UUID, UUID, UUID]) -> int:
+    """The stored draw counter, which the knockout start must name (ADR-008)."""
+    with Session(engine) as check:
+        return (
+            check.scalar(select(Tournament.draw_counter).where(Tournament.id == ids[2]))
+            or 0
+        )
+
+
 def _back_to_the_group_phase(
     engine: Engine, now: datetime, ids: tuple[UUID, UUID, UUID]
 ) -> tuple[UUID, UUID, tuple[UUID, ...]]:
@@ -1720,8 +1732,10 @@ def test_br053_a_result_racing_the_knockout_start(
     group_id, match_id, previewed = _back_to_the_group_phase(
         committing_engine, now, ids
     )
+    draw_counter = _draw_counter(committing_engine, ids)
     start = knockout_service.KnockoutStart(
         expected_current_phase_id=group_id,
+        expected_draw_counter=draw_counter,
         expected_qualifier_ids=previewed,
         qualifiers=2,
         third_place_match=False,
@@ -1743,6 +1757,7 @@ def test_br053_a_result_racing_the_knockout_start(
             _t_url(league_id, str(tournament_id), "/knockout"),
             json={
                 "expected_current_phase_id": str(group_id),
+                "expected_draw_counter": draw_counter,
                 "expected_qualifier_ids": [str(i) for i in previewed],
                 "qualifiers": 2,
                 "third_place_match": False,
@@ -1799,8 +1814,10 @@ def test_fr045_two_starts_at_once_draw_one_knockout(
     ids = _commit_knockout(committing_engine, now, player_count=4, third_place=False)
     owner_id, league_id, tournament_id = ids
     group_id, _, previewed = _back_to_the_group_phase(committing_engine, now, ids)
+    draw_counter = _draw_counter(committing_engine, ids)
     start = knockout_service.KnockoutStart(
         expected_current_phase_id=group_id,
+        expected_draw_counter=draw_counter,
         expected_qualifier_ids=previewed,
         qualifiers=2,
         third_place_match=False,
@@ -1814,6 +1831,7 @@ def test_fr045_two_starts_at_once_draw_one_knockout(
             _t_url(league_id, str(tournament_id), "/knockout"),
             json={
                 "expected_current_phase_id": str(group_id),
+                "expected_draw_counter": draw_counter,
                 "expected_qualifier_ids": [str(i) for i in previewed],
                 "qualifiers": 2,
                 "third_place_match": False,

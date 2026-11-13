@@ -120,9 +120,11 @@ class KnockoutPreview:
     needs and `max_qualifiers`, the entries that can go through. With a
     `problem` the start would be refused, and there are no entries when no
     knockout is possible. `first_round` pairs seeds, None for a bye (BR-041).
+    `draw_counter` is the tournament's, which the start must name (ADR-008).
     """
 
     problem: KnockoutProblem | None
+    draw_counter: int
     max_qualifiers: int
     qualifiers: int
     entries: tuple[PreviewEntry, ...]
@@ -212,6 +214,7 @@ def preview_knockout(
     if group is None or group.format not in PLAYED_GROUP_FORMATS:
         return KnockoutPreview(
             problem=problem,
+            draw_counter=tournament.draw_counter,
             max_qualifiers=0,
             qualifiers=qualifiers,
             entries=(),
@@ -233,6 +236,7 @@ def preview_knockout(
     if eligible < minimum:
         return KnockoutPreview(
             problem=problem,
+            draw_counter=tournament.draw_counter,
             max_qualifiers=eligible,
             qualifiers=shown,
             entries=(),
@@ -250,6 +254,7 @@ def preview_knockout(
     seed_of = {entry_id: seed for seed, entry_id in enumerate(cut.seeds, start=1)}
     return KnockoutPreview(
         problem=problem,
+        draw_counter=tournament.draw_counter,
         max_qualifiers=eligible,
         qualifiers=shown,
         entries=tuple(
@@ -318,11 +323,14 @@ class KnockoutStart:
     `match_format` None takes the league's default; `final_match_format`
     None lets the final play `match_format` (BR-120). `expected_qualifier_ids`
     are the group-phase entries the preview showed going through, in seed
-    order (the cut and the seeding, which fix the bracket). `mode` is for a
-    knockout after Monster DYP rounds (BR-081 to BR-084), which comes later.
+    order (the cut and the seeding, which fix the bracket).
+    `expected_draw_counter` is the tournament's counter the preview showed.
+    `mode` is for a knockout after Monster DYP rounds (BR-081 to BR-084),
+    which comes later.
     """
 
     expected_current_phase_id: UUID
+    expected_draw_counter: int
     expected_qualifier_ids: tuple[UUID, ...]
     qualifiers: int
     third_place_match: bool
@@ -344,7 +352,9 @@ def start_knockout(
 
     The request carries the phase the screen saw as the current one, the
     group phase: once the knockout exists it is 409 `current_phase_changed`
-    (detail `current_phase_id`), so a repeat draws nothing (ADR-008). A
+    (detail `current_phase_id`), so a repeat draws nothing (ADR-008). A stale
+    `expected_draw_counter` is 409 `draw_counter_changed` (detail
+    `draw_counter`, the current one), checked right after the phase. A
     tournament not in progress is 409 `tournament_not_in_progress`, a closed
     season 409 `season_closed`. A Monster DYP or a tournament without a
     group phase is 422 `format_not_supported`, a group-phase match
@@ -382,6 +392,10 @@ def start_knockout(
         raise ConflictError(
             ErrorCode.CURRENT_PHASE_CHANGED,
             current_phase_id=None if current is None else str(current.id),
+        )
+    if tournament.draw_counter != start.expected_draw_counter:
+        raise ConflictError(
+            ErrorCode.DRAW_COUNTER_CHANGED, draw_counter=tournament.draw_counter
         )
     group = _played_group(tournament)
     _require_no_mode(group, start.mode)

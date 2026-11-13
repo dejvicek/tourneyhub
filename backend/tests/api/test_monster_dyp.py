@@ -1318,6 +1318,7 @@ def test_knockout_after_monster_dyp_still_refused(
         _t_url(league, tid, "/knockout"),
         json={
             "expected_current_phase_id": tournament["current_phase_id"],
+            "expected_draw_counter": preview.json()["draw_counter"],
             "expected_qualifier_ids": [],
             "qualifiers": 4,
             "third_place_match": False,

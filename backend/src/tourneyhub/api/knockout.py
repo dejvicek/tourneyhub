@@ -14,7 +14,7 @@ from pydantic import Field, JsonValue
 
 from tourneyhub.api.deps import ClockDep, CurrentUserDep, SessionDep
 from tourneyhub.api.public_headers import PUBLIC_PREFIX
-from tourneyhub.api.schemas import ErrorResponse, RequestModel, ResponseModel
+from tourneyhub.api.schemas import INT_MAX, ErrorResponse, RequestModel, ResponseModel
 from tourneyhub.api.tournament_models import TournamentRead
 from tourneyhub.engine.knockout import MAX_KNOCKOUT_ENTRIES, RoundName
 from tourneyhub.engine.tournaments import (
@@ -84,11 +84,13 @@ class KnockoutPreviewRead(ResponseModel):
     the seeds of each first-round match, null for a bye (BR-041), top of the
     bracket first. `locks_round_no` is the last group round, whose results
     the draw locks (BR-053). `is_cut_by_lot` says the cut fell inside a
-    shared place, so the lot chose who goes through (BR-074).
+    shared place, so the lot chose who goes through (BR-074). `draw_counter` is
+    the tournament's; the start names it as `expected_draw_counter` (ADR-008).
     """
 
     can_start: bool
     problem: KnockoutProblemRead | None
+    draw_counter: int
     max_qualifiers: int
     qualifiers: int
     entries: list[KnockoutPreviewEntryRead]
@@ -103,7 +105,9 @@ class KnockoutWrite(RequestModel):
     """Draw the knockout and start it (FR-045, BR-080, BR-120).
 
     `expected_current_phase_id` is the phase the screen saw as current, the
-    group phase (ADR-008). `expected_qualifier_ids` are the group-phase
+    group phase (ADR-008). `expected_draw_counter` is the preview's
+    `draw_counter`: a stale one is 409 `draw_counter_changed`.
+    `expected_qualifier_ids` are the group-phase
     entries the preview showed going through, in seed order (`entries` of the
     preview, by their members' `entry_id`): a group result that changed the cut
     or the seeds since is 409 `qualifiers_changed`. `match_format` null takes
@@ -116,8 +120,9 @@ class KnockoutWrite(RequestModel):
     """
 
     expected_current_phase_id: UUID
+    expected_draw_counter: Annotated[int, Field(ge=0, le=INT_MAX)]
     expected_qualifier_ids: Annotated[
-        list[UUID], Field(max_length=MAX_KNOCKOUT_ENTRIES)
+        list[UUID], Field(max_length=2 * MAX_KNOCKOUT_ENTRIES)
     ]
     qualifiers: Qualifiers
     third_place_match: bool
@@ -287,6 +292,7 @@ def read_knockout_preview(
         {
             "can_start": preview.problem is None,
             "problem": preview.problem,
+            "draw_counter": preview.draw_counter,
             "max_qualifiers": preview.max_qualifiers,
             "qualifiers": preview.qualifiers,
             "entries": preview.entries,
@@ -317,6 +323,7 @@ def start_knockout(
 
     409: `tournament_not_in_progress` (detail `state`), `current_phase_changed`
     (the knockout already exists, detail `current_phase_id`),
+    `draw_counter_changed` (detail `draw_counter`, the current one),
     `qualifiers_changed` (the cut or the seeds are not the previewed ones,
     detail `entry_ids`, the current ones) or `season_closed`. 422:
     `format_not_supported` (Monster DYP, or no group phase; detail
@@ -331,6 +338,7 @@ def start_knockout(
         user_id=user.id,
         start=KnockoutStart(
             expected_current_phase_id=body.expected_current_phase_id,
+            expected_draw_counter=body.expected_draw_counter,
             expected_qualifier_ids=tuple(body.expected_qualifier_ids),
             qualifiers=body.qualifiers,
             third_place_match=body.third_place_match,

@@ -317,6 +317,7 @@ def start_knockout(
             _t_url(league_id, tournament["id"], "/knockout"),
             json={
                 "expected_current_phase_id": tournament["current_phase_id"],
+                "expected_draw_counter": shown["draw_counter"],
                 "expected_qualifier_ids": [
                     e["members"][0]["entry_id"] for e in shown["entries"]
                 ],
