@@ -61,6 +61,8 @@ export const roundRobin = {
     entry: "Pair or player",
     gameDifference: "Game difference",
     difference: "Score difference",
+    gamesLabel: "games",
+    scoreLabel: "score",
     points: "Points",
     placeValue: "{{place}}",
     form: "Form: {{results}}",

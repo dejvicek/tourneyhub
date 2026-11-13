@@ -159,10 +159,23 @@ export function StandingsTable({
                 {showGames && (
                   <td className="border-t py-3 pr-2 text-right text-body-sm">
                     {signed.format(row.game_difference)}
+                    {/* The head is for screen readers; on screen the two
+                        signed numbers need a word each (BR-101, FR-082). */}
+                    <span
+                      aria-hidden="true"
+                      className="block text-caption text-muted-foreground"
+                    >
+                      {t("roundRobin.standings.gamesLabel")}
+                    </span>
                   </td>
                 )}
                 <td className="border-t py-3 pr-2 text-right text-body-sm text-muted-foreground">
                   {signed.format(row.score_difference)}
+                  {showGames && (
+                    <span aria-hidden="true" className="block text-caption">
+                      {t("roundRobin.standings.scoreLabel")}
+                    </span>
+                  )}
                 </td>
                 <td className="w-10 border-t py-3 text-right font-display text-score-l">
                   {row.points}

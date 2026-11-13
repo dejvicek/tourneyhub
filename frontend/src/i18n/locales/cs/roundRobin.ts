@@ -74,6 +74,8 @@ export const roundRobin: CsMessages<Messages["roundRobin"]> = {
     entry: "Dvojice nebo hráč",
     gameDifference: "Rozdíl her",
     difference: "Rozdíl skóre",
+    gamesLabel: "hry",
+    scoreLabel: "skóre",
     points: "Body",
     placeValue: "{{place}}.",
     form: "Forma: {{results}}",
