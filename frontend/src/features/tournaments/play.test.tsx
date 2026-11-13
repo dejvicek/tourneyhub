@@ -92,6 +92,91 @@ describe("the running round robin (screen 6)", () => {
   });
 });
 
+type DemoMatch = ReturnType<
+  typeof runningDyp
+>["rounds"][number]["matches"][number];
+
+/** Clears every result, so a test sets only the ones it needs. */
+function clearResults(): DemoMatch[][] {
+  const t = runningDyp();
+  for (const match of t.rounds.flatMap((r) => r.matches)) {
+    match.outcome = null;
+    match.games = [];
+    match.is_walkover = false;
+    match.result_entered_at = null;
+  }
+  t.fields = t.fields.map((f) => ({ ...f, match_id: null }));
+  return t.rounds.map((r) => r.matches);
+}
+
+/** Enters a result: the games' scores, side 1 first; the winner of most games wins. */
+function enter(match: DemoMatch, ...scores: [number, number][]): void {
+  match.games = scores.map(([score_1, score_2], index) => ({
+    game_no: index + 1,
+    winner: score_1 > score_2 ? "side_1" : "side_2",
+    score_1,
+    score_2,
+  }));
+  const won = scores.filter(([a, b]) => a > b).length;
+  match.outcome = won * 2 > scores.length ? "side_1" : "side_2";
+  match.result_entered_at = "2026-11-10T20:00:00Z";
+}
+
+function at<T>(items: readonly T[] | undefined, index: number): T {
+  const item = items?.[index];
+  if (item === undefined) {
+    throw new Error(`No item ${String(index)}`);
+  }
+  return item;
+}
+
+describe("the standings notes (BR-101)", () => {
+  beforeEach(async () => {
+    await i18n.changeLanguage("en");
+  });
+
+  it("says when game difference ranks entries level on points", async () => {
+    for (const phase of runningDyp().phases) {
+      phase.match_format = "bo3";
+    }
+    const rounds = clearResults();
+    // Two winners that did not meet: 2:0 is ahead of 2:1.
+    enter(at(at(rounds, 0), 0), [10, 5], [10, 5]);
+    enter(at(at(rounds, 0), 1), [10, 5], [5, 10], [10, 5]);
+    renderAt(playPath(paths.tournamentStandings));
+
+    expect(
+      (await screen.findAllByText(/ahead of .+ on game difference\./)).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("shows both results when two entries met twice (#75 Q35)", async () => {
+    const rounds = clearResults();
+    const first = at(at(rounds, 0), 0);
+    const [a, b] = first.sides;
+    const second = at(at(rounds, 1), 0);
+    const third = at(at(rounds, 2), 0);
+    const fourth = at(at(rounds, 3), 0);
+    const others = at(at(rounds, 0), 1).sides;
+    // A beats B in rounds 1 and 2; B beats two others, so both have 4 points
+    // and their own matches decide.
+    enter(first, [10, 8]);
+    second.sides = [{ ...b }, { ...a }];
+    enter(second, [5, 10]);
+    third.sides = [{ ...b }, { ...others[0] }];
+    enter(third, [10, 0]);
+    fourth.sides = [{ ...b }, { ...others[1] }];
+    enter(fourth, [10, 0]);
+    renderAt(playPath(paths.tournamentStandings));
+
+    expect(
+      await screen.findByText(
+        /ahead of .+ on head-to-head: 10:8 in round 1, 10:5 in round 2\./,
+      ),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("group phase done (screen 8)", () => {
   beforeEach(async () => {
     await i18n.changeLanguage("en");
