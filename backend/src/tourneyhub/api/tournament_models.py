@@ -216,6 +216,16 @@ class HalvesWrite(RequestModel):
     ]
 
 
+class TopPlayersWrite(RequestModel):
+    """The players the organizer marks as Monster DYP top players (FR-041, BR-061).
+
+    The target state: a player not listed is not marked. At most one per match
+    of round 1 (422 `too_many_top_players`).
+    """
+
+    player_ids: PlayerIds
+
+
 class SeedingWrite(RequestModel):
     """Seed by league ranking or by random shuffle (FR-034, BR-021, BR-022)."""
 

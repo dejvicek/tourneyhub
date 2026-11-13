@@ -24,6 +24,7 @@ from tourneyhub.services.tournaments.fields import (
     place_matches,
     remove_field,
 )
+from tourneyhub.services.tournaments.monster_dyp import set_top_players
 from tourneyhub.services.tournaments.places import (
     PlacesView,
     finished_season_points,
@@ -111,6 +112,7 @@ __all__ = [
     "set_seed_order",
     "set_seeding_method",
     "set_tiebreakers",
+    "set_top_players",
     "set_tournament_format",
     "set_tournament_players",
     "start_tournament",

@@ -53,6 +53,7 @@ class ErrorCode(StrEnum):
     # Setup
     PLAYER_REMOVED = "player_removed"  # a removed player cannot be picked (BR-002)
     PLAYER_NOT_PICKED = "player_not_picked"
+    TOO_MANY_TOP_PLAYERS = "too_many_top_players"  # FR-041, BR-061
     DRAW_COUNTER_CHANGED = "draw_counter_changed"
     SEEDING_METHOD_CHANGED = "seeding_method_changed"
     SEED_ORDER_CHANGED = "seed_order_changed"

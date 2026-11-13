@@ -524,6 +524,7 @@
           "draws_not_allowed",
           "player_removed",
           "player_not_picked",
+          "too_many_top_players",
           "draw_counter_changed",
           "seeding_method_changed",
           "seed_order_changed",
@@ -3792,6 +3793,20 @@
           "tiebreakers"
         ],
         "title": "TiebreakersWrite",
+        "type": "object"
+      },
+      "TopPlayersWrite": {
+        "additionalProperties": false,
+        "description": "The players the organizer marks as Monster DYP top players (FR-041, BR-061).\n\nThe target state: a player not listed is not marked. At most one per match\nof round 1 (422 `too_many_top_players`).",
+        "properties": {
+          "player_ids": {
+            "$ref": "#/components/schemas/PlayerIds"
+          }
+        },
+        "required": [
+          "player_ids"
+        ],
+        "title": "TopPlayersWrite",
         "type": "object"
       },
       "TournamentCreate": {
@@ -8940,6 +8955,105 @@
           }
         ],
         "summary": "Set Seeding Method",
+        "tags": [
+          "tournaments"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/top-players": {
+      "put": {
+        "description": "Mark the Monster DYP top players, the target state (FR-041, BR-061).\n\nAt most one per match of round 1: 422 `too_many_top_players` with `max`;\n422 `player_not_picked` for a player who is not in the tournament. Other\ntypes: 409 `tournament_type_changed`.",
+        "operationId": "set_top_players",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TopPlayersWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TournamentSetupRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Top Players",
         "tags": [
           "tournaments"
         ]

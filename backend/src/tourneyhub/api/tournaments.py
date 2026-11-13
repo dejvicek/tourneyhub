@@ -29,6 +29,7 @@ from tourneyhub.api.tournament_models import (
     StartWrite,
     SwissRoundRead,
     TiebreakersWrite,
+    TopPlayersWrite,
     TournamentCreate,
     TournamentFormatWrite,
     TournamentRead,
@@ -316,6 +317,30 @@ def set_dyp_halves(
         method=body.method,
         halves={half.player_id: half.half for half in body.halves},
         clock=clock,
+    )
+    return TournamentSetupRead.model_validate(setup)
+
+
+@router.put("/tournaments/{tournament_id}/setup/top-players", responses=_WRITE_ERRORS)
+def set_top_players(
+    league_id: UUID,
+    tournament_id: UUID,
+    body: TopPlayersWrite,
+    session: SessionDep,
+    user: CurrentUserDep,
+) -> TournamentSetupRead:
+    """Mark the Monster DYP top players, the target state (FR-041, BR-061).
+
+    At most one per match of round 1: 422 `too_many_top_players` with `max`;
+    422 `player_not_picked` for a player who is not in the tournament. Other
+    types: 409 `tournament_type_changed`.
+    """
+    setup = tournament_service.set_top_players(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user.id,
+        player_ids=body.player_ids,
     )
     return TournamentSetupRead.model_validate(setup)
 
