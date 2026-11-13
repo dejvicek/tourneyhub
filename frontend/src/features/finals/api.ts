@@ -8,16 +8,17 @@ import {
 
 import { api, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
-import type { components } from "@/api/schema";
 import type {
   DisabledWrite,
-  KnockoutWrite,
   LateEntryWrite,
   RoundAddWrite,
   TiebreakersWrite,
-} from "@/demo/contract";
+} from "@/api/provisionalTypes";
+import type { components } from "@/api/schema";
 import { tournamentQueries } from "@/features/tournaments/api";
 import type { MonsterKnockoutMode } from "@/lib/rules";
+
+type KnockoutWrite = components["schemas"]["KnockoutWrite"];
 
 type FinalFormatWrite = components["schemas"]["FinalFormatWrite"];
 

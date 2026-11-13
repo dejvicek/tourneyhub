@@ -8,8 +8,15 @@
 // Names follow the API's conventions (ADR-008, DATA-MODEL.md): /api/v1,
 // snake_case, UUIDs, enumerations as string literals. Routes are grouped by
 // area, like the handlers in src/demo/handlers/.
+import type {
+  DisabledWrite,
+  LateEntryWrite,
+  ParticipantRead,
+  RankingRead,
+  RoundAddWrite,
+  TiebreakersWrite,
+} from "@/api/provisionalTypes";
 import type { components, paths as GeneratedPaths } from "@/api/schema";
-import type { SwissTiebreaker } from "@/lib/rules";
 
 type Uuid = string;
 
@@ -233,57 +240,6 @@ export type KnockoutPreview = components["schemas"]["KnockoutPreviewRead"];
 export type PlaceReason = components["schemas"]["PlaceReasonRead"];
 export type PlaceDetail = components["schemas"]["PlaceRead"];
 export type PlacesRead = components["schemas"]["PlacesRead"];
-
-export interface SwissRankingRow {
-  place: number;
-  entry_id: Uuid;
-  played: number;
-  sat_out: number;
-  points: number;
-  bh1: number;
-  bh2: number;
-  score_difference: number;
-  is_disabled: boolean;
-}
-
-/** Swiss and Monster DYP standings with the tie-breakers (FR-043, BR-072, BR-073). */
-export interface RankingRead {
-  /** The enabled tie-breakers, in order. */
-  tiebreakers: SwissTiebreaker[];
-  /** How many go through to the knockout, if the setup said. */
-  qualifiers: number | null;
-  rows: SwissRankingRow[];
-}
-
-export interface ParticipantRead {
-  entry_id: Uuid;
-  state: "playing" | "sat_out" | "disabled";
-  /** The round a late player joined in; null for everyone from round 1. */
-  joined_round: number | null;
-  /** The round a disabled player was disabled in. */
-  disabled_since_round: number | null;
-  /** The newest round the entry sat out, if it sat out the latest round. */
-  sat_out_round: number | null;
-}
-
-export interface RoundAddWrite {
-  /** The number the organizer expects the new round to get (ADR-008). */
-  expected_round_no: number;
-}
-
-export interface DisabledWrite {
-  disabled: boolean;
-}
-
-export interface LateEntryWrite {
-  player_id: Uuid;
-  /** The round the player is expected to start in. */
-  from_round_no: number;
-}
-
-export interface TiebreakersWrite {
-  tiebreakers: SwissTiebreaker[];
-}
 
 export interface FinishStateWrite {
   state: "finished";

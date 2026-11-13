@@ -4,7 +4,7 @@ import type {
   ParticipantRead,
   RankingRead,
   SwissRankingRow,
-} from "@/demo/contract";
+} from "@/api/provisionalTypes";
 import { cn } from "@/lib/utils";
 
 interface RankingTableProps {
