@@ -67,7 +67,7 @@ REST under `/api/v1`; share-link views are anonymous under `/api/v1/public/{shar
 
 ### Frontend (`frontend/src/`)
 
-Imports flow one way (ESLint-enforced): `api`, `i18n`, `components`, `hooks`, `lib` → `features/<area>/` → `pages`, `routes.tsx`, `App.tsx`, `main.tsx`. All HTTP goes through the openapi-fetch client in `src/api/client.ts`; types come only from the generated schema. UI text in English and Czech (`src/i18n/locales/{en,cs}/`). Demo mode (`pnpm dev:demo`, `src/demo/`) runs every screen against MSW; routes the backend lacks go through `provisionalApi`.
+Imports flow one way (ESLint-enforced): `api`, `i18n`, `components`, `hooks`, `lib` → `features/<area>/` → `pages`, `routes.tsx`, `App.tsx`, `main.tsx`. All HTTP goes through the openapi-fetch client in `src/api/client.ts`; types come only from the generated schema. UI text in English and Czech (`src/i18n/locales/{en,cs}/`). Demo mode (`pnpm dev:demo`, `src/demo/`) runs every screen against the fake API in `src/test/fake/` (MSW), which the Vitest suite also uses; routes the backend lacks go through `provisionalApi`.
 
 ## Commands
 
