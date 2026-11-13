@@ -3459,6 +3459,54 @@ def delete_round(
     session.flush()
 
 
+def set_tiebreakers(
+    session: Session,
+    *,
+    league_id: UUID,
+    tournament_id: UUID,
+    user_id: UUID,
+    tiebreakers: Sequence[Tiebreaker],
+    clock: Clock,
+) -> TournamentView:
+    """Set which tie-breakers a Swiss or Monster DYP uses, in order (FR-043, BR-072).
+
+    The target state: the enabled tie-breakers, first one first; an empty
+    list orders entries level on points by lot alone (BR-074). A repeat
+    changes nothing (ADR-008). Allowed in setup and while the tournament runs,
+    since the standings are computed on read (ADR-009). A finished tournament
+    is 409 `tournament_not_in_progress`, a closed season 409 `season_closed`.
+    A group phase that is not a Swiss or a Monster DYP, or none, is 422
+    `format_not_supported`; once the knockout is drawn the group standing is
+    fixed, 422 `group_phase_locked` (BR-053).
+    """
+    league, tournament = _lock_tournament(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user_id,
+        rounds=True,
+    )
+    _require_open_season(league, tournament)
+    if tournament.state is TournamentState.FINISHED:
+        raise ConflictError(
+            ErrorCode.TOURNAMENT_NOT_IN_PROGRESS, state=tournament.state
+        )
+    group = _group_phase(tournament)
+    if group is None or group.format not in ROUND_BY_ROUND_FORMATS:
+        format_ = tournament.phases[0].format if group is None else group.format
+        raise RuleViolationError(ErrorCode.FORMAT_NOT_SUPPORTED, format=format_)
+    _require_no_knockout(tournament)
+    if group.tiebreakers != list(tiebreakers):
+        now = clock()
+        group.tiebreakers = list(tiebreakers)
+        group.updated_at = now
+        tournament.updated_at = now
+        session.flush()
+    return read_tournament(
+        session, league_id=league_id, tournament_id=tournament.id, user_id=user_id
+    )
+
+
 # ---------------------------------------------------------------- finishing
 
 
