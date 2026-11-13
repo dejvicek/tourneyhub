@@ -22,7 +22,7 @@ class PlacingEntry:
             tell which group-phase entries went on to the knockout, since a
             knockout entry has an id of its own (DATA-MODEL §4.4).
         seed: The entry's setup seed, 1 for the best, or None without one.
-            Entries sharing a place are listed by seed, seedless ones last.
+            Entries sharing a place are listed by seed, seedless ones last (BR-104).
     """
 
     entry_id: EntryId
@@ -171,7 +171,7 @@ def place_entries(
 
 
 def _order(entry: PlacingEntry) -> tuple[bool, int, int]:
-    """Order entries sharing a place: by seed, seedless last, then by id."""
+    """Order entries sharing a place: by seed, seedless last, then by id (BR-104)."""
     seed = entry.seed
     return (seed is None, 0 if seed is None else seed, entry.entry_id.int)
 
