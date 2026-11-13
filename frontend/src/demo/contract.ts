@@ -231,7 +231,6 @@ export type KnockoutPreview = components["schemas"]["KnockoutPreviewRead"];
 // the number the organizer expects (ADR-008); the standings come from the
 // play read and the share link's standings.
 export type SwissRoundRead = components["schemas"]["SwissRoundRead"];
-export type SwissMatchRead = components["schemas"]["SwissMatchRead"];
 
 // The places (P8 for a round robin without a knockout): generated.
 export type PlaceReason = components["schemas"]["PlaceReasonRead"];
