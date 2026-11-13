@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from tourneyhub.db.models.matches import Match, MatchSide, MatchSidePlayer, Round
 from tourneyhub.db.models.tournaments import Tournament
 from tourneyhub.engine.knockout import RoundName, round_name
-from tourneyhub.engine.remix import RemixMatch, draw_next_round
+from tourneyhub.engine.remix import RemixMatch, allows_result, draw_next_round
 from tourneyhub.engine.tournaments import (
     KnockoutMatchFormat,
     MatchFormat,
@@ -304,7 +304,8 @@ def _remix_view(tournament: Tournament, remix: RemixKnockout) -> RemixKnockoutVi
             score=_score(row),
             match_format=_match_format(remix.phase, round_, row),
             field_number=field_number,
-            winner_locked=not match.has_bye and match.key.round_no < state.rounds_drawn,
+            winner_locked=not match.has_bye
+            and not allows_result(state, match.key, None),
         )
 
     return RemixKnockoutView(

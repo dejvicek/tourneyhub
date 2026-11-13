@@ -11,6 +11,7 @@ from tourneyhub.db.models.matches import Match, MatchGame, Round
 from tourneyhub.db.models.tournaments import Tournament, TournamentPhase
 from tourneyhub.engine.errors import EngineError
 from tourneyhub.engine.knockout import is_complete, locked_by
+from tourneyhub.engine.remix import allows_result
 from tourneyhub.engine.results import Game, match_outcome
 from tourneyhub.engine.tournaments import (
     MatchFormat,
@@ -24,6 +25,7 @@ from tourneyhub.errors import ConflictError, ErrorCode, RuleViolationError
 from tourneyhub.services.engine_errors import to_app_error
 from tourneyhub.services.tournaments.fields import _fill_fields
 from tourneyhub.services.tournaments.places import _ranking
+from tourneyhub.services.tournaments.remix import remix_knockout
 from tourneyhub.services.tournaments.shared import (
     ROUND_BY_ROUND_FORMATS,
     Clock,
@@ -171,14 +173,14 @@ def set_match_result(
     now = clock()
     if result.is_empty:
         if match.outcome is not None:
-            _require_unlocked(tournament, phase, round_, match)
+            _require_unlocked(tournament, phase, round_, match, None)
         _clear_result(tournament, match, now)
     else:
         outcome = _outcome_of(
             result, league=league, phase=phase, round_=round_, match=match
         )
         if not _same_result(match, result, outcome):
-            _require_unlocked(tournament, phase, round_, match)
+            _require_unlocked(tournament, phase, round_, match, outcome)
             _write_result(session, tournament, match, result, outcome, now)
             _finish_with_knockout(tournament, now)
     session.flush()
@@ -229,9 +231,13 @@ def _require_expected_sides(
 
 
 def _require_unlocked(
-    tournament: Tournament, phase: TournamentPhase, round_: Round, match: Match
+    tournament: Tournament,
+    phase: TournamentPhase,
+    round_: Round,
+    match: Match,
+    outcome: Outcome | None,
 ) -> None:
-    """Refuse a change to a locked result (BR-053, BR-065, BR-094): 422.
+    """Refuse a change to a locked result (BR-053, BR-065, BR-094, BR-146): 422.
 
     Once the knockout is drawn, every group-phase result is locked,
     `group_phase_locked`. Before that, a Swiss locks every round but the
@@ -239,7 +245,10 @@ def _require_unlocked(
     newest round unlocks the one before (BR-066), since the newest round is
     found on every write. A result of a fixed bracket is locked while a later
     match it feeds has a result, `result_locked` with those `match_ids`
-    (BR-094).
+    (BR-094). In a Lord have mercy knockout, drawing a round locks the winners
+    of the round before: `outcome` (None when the result is cleared) must be
+    the stored winner, else `round_locked` with the newest knockout
+    `round_no` (BR-146).
     """
     drawn = knockout_phase(tournament)
     if drawn is None:
@@ -249,9 +258,16 @@ def _require_unlocked(
         return
     if phase.kind is PhaseKind.GROUP:
         raise RuleViolationError(ErrorCode.GROUP_PHASE_LOCKED, phase_id=str(drawn.id))
+    remix = remix_knockout(tournament)
+    if remix is not None:
+        if not allows_result(remix.state, remix.keys[match.id], outcome):
+            raise RuleViolationError(
+                ErrorCode.ROUND_LOCKED, round_no=remix.state.rounds_drawn
+            )
+        return
     knockout = knockout_bracket(tournament)
     if knockout is None:
-        return  # Lord have mercy has no fixed bracket; its round lock is BR-146
+        return
     later = locked_by(knockout.bracket, knockout.keys[match.id], knockout.outcomes)
     if later:
         raise RuleViolationError(

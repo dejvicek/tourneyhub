@@ -932,3 +932,86 @@ def test_fr054_br120_a_final_drawn_in_round_two_plays_the_final_format(
         409,
         {"code": "match_has_result", "detail": {"match_id": final["match_id"]}},
     )
+
+
+# ---------------------------------------------------------------- the round lock
+
+
+_CLEAR: Json = {"walkover_winner": None, "games": []}
+
+
+def _two_rounds(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> tuple[Json, list[Json], Json]:
+    """The tournament, its round 1 (side 1 winning) and round 2 drawn after it."""
+    _, started = _started(client, league_id, headers, monster)
+    round_1 = _round_one(started)
+    _play(client, league_id, headers, started, round_1)
+    status, drawn = _draw_round(client, league_id, headers, started, 2)
+    assert status == 201, drawn
+    return started, round_1, drawn
+
+
+def test_br146_a_locked_round_takes_a_correction_with_the_same_winner(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    started, round_1, _ = _two_rounds(client, league_id, headers, monster)
+
+    status, body = _put_result(
+        client, league_id, headers, started, round_1[0], _win("side_1", (10, 2))
+    )
+
+    assert status == 200, body
+    assert (body["games"][0]["score_1"], body["games"][0]["score_2"]) == (10, 2)
+    assert body["outcome"] == "side_1"
+
+
+def test_br146_a_locked_round_cannot_be_cleared(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    started, round_1, _ = _two_rounds(client, league_id, headers, monster)
+
+    result = _put_result(client, league_id, headers, started, round_1[0], _CLEAR)
+
+    assert result == (422, {"code": "round_locked", "detail": {"round_no": 2}})
+
+
+def test_br146_a_locked_round_cannot_change_its_winner(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    started, round_1, drawn = _two_rounds(client, league_id, headers, monster)
+    walkover = {"walkover_winner": "side_2", "games": []}
+
+    other = _put_result(client, league_id, headers, started, round_1[0], _win("side_2"))
+    forfeited = _put_result(client, league_id, headers, started, round_1[0], walkover)
+
+    expected = (422, {"code": "round_locked", "detail": {"round_no": 2}})
+    assert other == expected
+    assert forfeited == expected
+    # The view says the same as the lock: round 1 is locked, round 2 is not.
+    assert [m["winner_locked"] for m in drawn["rounds"][0]["matches"]] == [True] * 2
+    assert [m["winner_locked"] for m in drawn["rounds"][1]["matches"]] == [False] * 2
+
+
+def test_br146_the_final_and_third_place_are_one_round(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    started, round_1, drawn = _two_rounds(client, league_id, headers, monster)
+    final, third = drawn["rounds"][1]["matches"]
+    in_final, in_third = {"id": final["match_id"]}, {"id": third["match_id"]}
+
+    played = [
+        _put_result(client, league_id, headers, started, in_final, _win("side_1")),
+        _put_result(client, league_id, headers, started, in_third, _win("side_1")),
+    ]
+    # Both matches are the newest round: neither locks the other.
+    changed = _put_result(client, league_id, headers, started, in_final, _win("side_2"))
+    cleared = _put_result(client, league_id, headers, started, in_third, _CLEAR)
+    still_locked = _put_result(
+        client, league_id, headers, started, round_1[0], _win("side_2")
+    )
+
+    assert [status for status, _ in played] == [200, 200]
+    assert changed[0] == 200, changed[1]
+    assert cleared[0] == 200, cleared[1]
+    assert still_locked[0] == 422
