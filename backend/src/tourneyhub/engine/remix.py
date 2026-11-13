@@ -17,7 +17,12 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from tourneyhub.engine.ids import EntryId, PlayerId, ensure_distinct
-from tourneyhub.engine.knockout import MatchKey, minimum_qualifiers, seed_slots
+from tourneyhub.engine.knockout import (
+    MatchKey,
+    bracket_size,
+    minimum_qualifiers,
+    seed_slots,
+)
 from tourneyhub.engine.lots import order_by_lot
 from tourneyhub.engine.monster_dyp import Team
 from tourneyhub.engine.places import PlacingEntry
@@ -316,6 +321,9 @@ def remix_state(
     )
     if pairs < minimum_qualifiers(third_place_match=third_place_match):
         msg = f"{pairs} pairs are too few for this knockout"
+        raise ValueError(msg)
+    if size != bracket_size(pairs):
+        msg = f"{pairs} pairs need a bracket of {bracket_size(pairs)}, not {size}"
         raise ValueError(msg)
     round_count = size.bit_length() - 1
     if (
@@ -645,7 +653,9 @@ def _order(entry: PlacingEntry) -> tuple[bool, int, int]:
 def _pair_blocks(state: RemixState) -> list[list[Team]]:
     """The knockout's pairs by their last match, sharing a place, best first (BR-102).
 
-    Each block lists its pairs by the position of their last match.
+    Each block lists its pairs by the position of their last match. Pairs
+    sharing a place are listed in lot order (#94 option A); this is the one
+    place to change.
     """
     # The final, then the third-place match: each has a winner and a loser.
     blocks = [
@@ -656,10 +666,10 @@ def _pair_blocks(state: RemixState) -> list[list[Team]]:
     ]
     # With a third-place match, the semifinal losers are placed by it.
     earlier = state.rounds[: -2 if state.third_place_match else -1]
-    for round_ in reversed(earlier):
-        losers = [match.loser for match in round_ if match.loser is not None]
-        if losers:
-            blocks.append(losers)
+    blocks.extend(
+        [match.loser for match in round_ if match.loser is not None]
+        for round_ in reversed(earlier)
+    )
     return blocks
 
 
