@@ -1183,6 +1183,7 @@ export function previewOf(args: {
   return {
     can_start: true,
     problem: null,
+    draw_counter: args.draw,
     is_cut_by_lot: false,
     max_qualifiers: t.entries.filter(
       (e) => e.stage === "main" && !e.is_disabled,
