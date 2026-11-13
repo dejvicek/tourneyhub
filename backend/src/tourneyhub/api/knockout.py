@@ -15,7 +15,7 @@ from pydantic import Field, JsonValue
 from tourneyhub.api.deps import ClockDep, CurrentUserDep, SessionDep
 from tourneyhub.api.public_headers import PUBLIC_PREFIX
 from tourneyhub.api.schemas import ErrorResponse, RequestModel, ResponseModel
-from tourneyhub.api.tournaments import TournamentRead
+from tourneyhub.api.tournament_models import TournamentRead
 from tourneyhub.engine.knockout import MAX_KNOCKOUT_ENTRIES, RoundName
 from tourneyhub.engine.tournaments import (
     KnockoutMatchFormat,

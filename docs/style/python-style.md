@@ -92,7 +92,7 @@ Layers, enforced by import-linter: `api` and `cli` → `services` → `db` → `
 - **`services`** are module-level functions in `services/<area>.py`, named verb first (`create_league`, `generate_round`). A service takes `session: Session` first, then keyword-only arguments: plain values, never request models, and `now: datetime` when it needs the time. It takes the locks and checks the expected state (§7), calls the engine and raises `AppError`s. It returns ORM rows or engine values with everything the response will read already loaded; a `lazy="raise"` error in a router is a bug in the service. Services never import FastAPI, never commit and never build response models. import-linter keeps `fastapi`, `starlette` and `http` out of `services`, `db`, `cli`, `errors` and `settings`, and `tests/test_architecture.py` checks that services, models and the engine never commit, roll back or begin a transaction.
 - **`api`** turns requests into service calls and service results into response models. Routers and dependencies run no queries of their own; `CurrentUserDep`, for example, calls a service. import-linter keeps `tourneyhub.db` out of `api`, except the `User` model that `api/deps.py` needs as the type of `CurrentUserDep` and `AdminDep` (§2). It cannot keep out SQLAlchemy, which `api` needs for `Session` and `IntegrityError`, so a query that does not use the models, such as one through `text()`, is left to review.
 - **`db/models/`** has one module per DATA-MODEL §4 area (`accounts`, `leagues`, `tournaments`, `entries`, `matches`); `db/models/__init__.py` imports them all, so Alembic sees the whole schema.
-- One module per area in `api/` and `services/`: `api/leagues.py` calls `services/leagues.py`.
+- One module per area in `api/` and `services/`: `api/leagues.py` calls `services/leagues.py`. An area whose module grows past about 1000 lines is split by use case. In `services/` it becomes a package (`services/tournaments/`) whose `__init__.py` only re-exports the names that callers use. In `api/` the models move to a module of their own (`api/tournament_models.py`) and the routes stay in one router. Inside such a package a `_name` is internal to the package, not to one module. No tool counts the lines; review does.
 
 ## 4. Python
 
@@ -335,7 +335,7 @@ class Settings(BaseSettings):
     cookie_secure: bool = True
 ```
 
-- `RequestModel`, `ResponseModel`, `ErrorResponse` and the shared `type` aliases live in `api/schemas.py`; the models of one area live in its router module. A model that a dependency reads, such as `LoginRequest`, also lives in `api/schemas.py`: the router module imports `api/deps.py`, so `api/deps.py` cannot import from it.
+- `RequestModel`, `ResponseModel`, `ErrorResponse` and the shared `type` aliases live in `api/schemas.py`; the models of one area live in its router module, or in a module of their own beside it once the area is split (§3). A model that a dependency reads, such as `LoginRequest`, also lives in `api/schemas.py`: the router module imports `api/deps.py`, so `api/deps.py` cannot import from it.
 - A setting without a safe default has no default. Constraints that would otherwise fail later fail at startup instead, like the length of `jwt_secret`. pydantic-settings does not report a misspelled variable, so a default would hide the mistake.
 - Rules between settings are `model_validator`s on `Settings`: `cookie_secure=False` is refused unless `env == "development"` (ADR-004).
 - Secrets are `SecretStr`, read with `.get_secret_value()` only where they are used.
