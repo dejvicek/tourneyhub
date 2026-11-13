@@ -428,4 +428,71 @@ describe("share-link views outside demo mode", () => {
       ),
     ).toEqual([]);
   });
+
+  describe("Lord have mercy knockout (BR-155, FR-070)", () => {
+    it("shows a Lord have mercy knockout round by round, read-only (BR-155, FR-070)", async () => {
+      const asked: string[] = [];
+      server.events.on("request:start", ({ request }) => {
+        asked.push(new URL(request.url).pathname);
+      });
+      renderAt(pageOf("Lord have mercy night"));
+
+      expect(
+        await screen.findByRole("heading", { name: "Knockout" }),
+      ).toBeInTheDocument();
+      const rounds = await screen.findByRole("radiogroup", {
+        name: "Rounds of the knockout",
+      });
+      expect(
+        within(rounds).getByRole("radio", { name: "Semifinals" }),
+      ).toBeChecked();
+      expect(screen.getByText("Semifinal 1")).toBeInTheDocument();
+      expect(screen.getByText("Semifinal 2")).toBeInTheDocument();
+      // No way to enter or change a result.
+      expect(
+        screen.queryByRole("link", { name: /(Enter|Change) result/ }),
+      ).toBeNull();
+      expect(screen.queryByRole("button", { name: /result|Draw/ })).toBeNull();
+      expect(
+        screen.queryByRole("region", { name: "Bracket" }),
+      ).not.toBeInTheDocument();
+      expect(asked.some((path) => path.endsWith("/knockout/rounds"))).toBe(
+        true,
+      );
+    });
+
+    it("marks players who left (FR-049)", async () => {
+      const tournament = db().tournaments.find(
+        (t) => t.name === "Lord have mercy night",
+      );
+      const leaver = tournament?.entries.find(
+        (entry) => entry.stage === "main" && entry.player_ids.length === 1,
+      );
+      if (leaver === undefined) {
+        throw new Error("The seed has main entries");
+      }
+      leaver.is_disabled = true;
+      renderAt(pageOf("Lord have mercy night"));
+
+      await screen.findByRole("radiogroup", { name: "Rounds of the knockout" });
+      expect(screen.getAllByText("No longer playing")).toHaveLength(1);
+    });
+
+    it("never asks for the bracket (review focus 1)", async () => {
+      server.use(
+        http.get("*/api/v1/public/:token/tournaments/:id/bracket", () =>
+          HttpResponse.json({ code: "internal_error" }, { status: 500 }),
+        ),
+      );
+      const asked: string[] = [];
+      server.events.on("request:start", ({ request }) => {
+        asked.push(new URL(request.url).pathname);
+      });
+      renderAt(pageOf("Lord have mercy night"));
+
+      await screen.findByRole("radiogroup", { name: "Rounds of the knockout" });
+      expect(asked.filter((path) => path.endsWith("/bracket"))).toEqual([]);
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+  });
 });
