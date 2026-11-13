@@ -527,10 +527,10 @@ def start_knockout(
     tournament not in progress is 409 `tournament_not_in_progress`, a closed
     season 409 `season_closed`. A tournament without a group phase is 422
     `format_not_supported`; Monster DYP without a mode is 422
-    `knockout_mode_required` (detail `format`), a mode after another group phase 422
-    `knockout_mode_not_applicable`, a group-phase match without a result 422
-    `group_phase_not_done`, an odd number of qualifiers in a pair mode 422
-    `qualifiers_odd` (detail `given`) and a number out of range 422
+    `knockout_mode_required` (detail `format`), a mode after another group
+    phase 422 `knockout_mode_not_applicable`, a group-phase match without a
+    result 422 `group_phase_not_done`, an odd number of qualifiers in a pair
+    mode 422 `qualifiers_odd` (detail `given`) and a number out of range 422
     `qualifiers_out_of_range` (detail `minimum`, `maximum`, `given`; BR-080).
     The request also carries the qualifying entries in seed order that the
     preview showed; a group result that changed the cut or the seeds since is
@@ -542,13 +542,14 @@ def start_knockout(
     are ordered by the lot `knockout-seeding` (BR-074, BR-085). After Monster
     DYP rounds the best players go through and the mode forms the entries:
     Seeded pairs (BR-081), Singles (BR-082), A little mercy (BR-083) or Lord
-    have mercy (BR-084), whose lot is `<mode>:<draw_counter>` (ADR-010). An entry of one player
-    continues its main entry (`source_entry_id`); a pair has its two players
-    as members and no source (DATA-MODEL §4.4), and stays together for the
-    whole knockout (BR-086). Every bracket match is created, the byes for the
-    top seeds in round 1 (BR-040 to BR-042), with the third-place match in
-    the final's round (BR-044); Lord have mercy stores only round 1, as its
-    later rounds are drawn when the round before is complete (BR-084, D4). The phase gets its match format, the league's
+    have mercy (BR-084), whose lot is `<mode>:<draw_counter>` (ADR-010). An
+    entry of one player continues its main entry (`source_entry_id`); a pair
+    has its two players as members and no source (DATA-MODEL §4.4), and stays
+    together for the whole knockout (BR-086). Every bracket match is created,
+    the byes for the top seeds in round 1 (BR-040 to BR-042), with the
+    third-place match in the final's round (BR-044); Lord have mercy stores
+    only round 1, as its later rounds are drawn when the round before is
+    complete (BR-084, D4). The phase gets its match format, the league's
     default unless the request names one, the final its own or none (BR-120),
     and the mode. The first matches take the free fields (BR-130), and the
     group phase's results are locked from now on (BR-053, BR-065).

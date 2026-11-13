@@ -64,7 +64,7 @@ class ErrorCode(StrEnum):
     # Start and back to setup
     TOURNAMENT_NOT_IN_PROGRESS = "tournament_not_in_progress"
     TOURNAMENT_HAS_RESULTS = "tournament_has_results"  # FR-036
-    # No group phase to follow, or the other kind of knockout for a bracket or rounds read
+    # No group phase to follow, or the other kind of knockout for a bracket or rounds read or write
     FORMAT_NOT_SUPPORTED = "format_not_supported"
     PLAYERS_WITHOUT_PARTNER = "players_without_partner"  # Doubles (BR-030)
     # FR-032: 64 entries today, 16 after the #48 follow-up (issue to open after

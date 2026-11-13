@@ -292,7 +292,8 @@ def remix_state(
             number of matches; a player twice in one round; a round drawn
             before the round before is complete, or not from the players who
             went through; a third-place match outside the final's round,
-            against the flag, missing, or not between the semifinal losers.
+            against the flag, missing, or not between the semifinal losers;
+            a round 1 larger than its pairs need (#96).
     """
     matches = tuple(matches)
     repeated = [
