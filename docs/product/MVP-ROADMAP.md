@@ -28,7 +28,7 @@ The MVP is split into 16 packages, P1 to P16. The critical path is P1 → P5 →
 The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. The team now works against the real backend, so the demo goes. Today app code and tests still depend on it, and the screens call 12 routes the backend lacks through `provisionalApi`.
 
 - [x] D1 Move out of `src/demo` what the app uses: `rules.ts` (with the Lord have mercy filter, so the option stays hidden on the knockout start screen), the types from `contract.ts`, and the helpers of the finals screens (`StartKnockoutPage`, `names.ts`, `score.ts`, `RankingTable`, `TiebreakerSheet`). Done when only `src/api/provisional.ts` and `main.tsx` import from the demo outside `src/demo` and the tests. ([#91](https://github.com/dejvicek/tourneyhub/pull/91))
-- [ ] D2 Tests without the demo: Vitest gets its own MSW handlers and test data instead of the demo store and seed. Done when nothing in `src/test/` imports from `@/demo/`.
+- [x] D2 Tests without the demo: Vitest gets its own MSW handlers and test data instead of the demo store and seed. Done when nothing in `src/test/` imports from `@/demo/`.
 - [ ] D3 Move the routes the backend already covers or can cover with little work:
   - [ ] Finishing a tournament on the finals screen calls `POST …/finish` instead of `PUT …/state`.
   - [ ] `GET …/players/{player_id}/tournaments` (BR-002, FR-012), together with Q25.
