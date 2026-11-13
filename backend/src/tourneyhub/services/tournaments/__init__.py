@@ -10,7 +10,7 @@ states (ADR-008); the standings and places are computed on read (ADR-009).
 """
 
 import secrets
-from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date, datetime
 from enum import StrEnum
@@ -18,7 +18,7 @@ from typing import Literal, assert_never
 from uuid import UUID, uuid7
 
 from pydantic import JsonValue
-from sqlalchemy import Select, insert, select
+from sqlalchemy import insert, select
 from sqlalchemy.orm import Session, selectinload
 
 from tourneyhub.db.models.entries import Entry, EntryMember, PlayerHalf
@@ -60,16 +60,11 @@ from tourneyhub.engine.knockout import (
     MAX_KNOCKOUT_ENTRIES,
     Bracket,
     BracketMatch,
-    FirstRoundMatch,
-    MatchKey,
     RoundName,
-    bracket_of,
     draw_bracket,
     is_complete,
     knockout_results,
     locked_by,
-    match_key,
-    play_bracket,
     round_name,
 )
 from tourneyhub.engine.leagues import SeasonState
@@ -135,18 +130,31 @@ from tourneyhub.errors import (
 )
 from tourneyhub.services.engine_errors import to_app_error
 from tourneyhub.services.leagues import active_season, get_league, lock_league
+from tourneyhub.services.tournaments.shared import (
+    _ROUNDS,
+    _ROUNDS_IN_FULL,
+    PLAYED_GROUP_FORMATS,
+    ROUND_BY_ROUND_FORMATS,
+    Clock,
+    KnockoutBracket,
+    _current_phase,
+    _field_slots,
+    _find_match,
+    _group_phase,
+    _is_done,
+    _load_tournament,
+    _lock_setup,
+    _lock_tournament,
+    _main_entries,
+    _match_players,
+    _match_slots,
+    _played,
+    _require_open_season,
+    _tournament_query,
+    knockout_bracket,
+)
 
-MATCH_SIDES = 2
-"""A match has two sides, side 1 and side 2 (DATA-MODEL §4.5)."""
-
-PLAYED_GROUP_FORMATS = frozenset({PhaseFormat.ROUND_ROBIN, PhaseFormat.SWISS})
-"""The group formats whose rounds the backend plays; Monster DYP comes later."""
-
-ROUND_BY_ROUND_FORMATS = frozenset({PhaseFormat.SWISS, PhaseFormat.MONSTER_DYP})
-"""Group formats drawn one round at a time, with tie-breakers of their own (FR-040,
-FR-043)."""
-
-type Clock = Callable[[], datetime]
+__all__ = ["PLAYED_GROUP_FORMATS", "Clock", "KnockoutBracket", "knockout_bracket"]
 
 
 class DrawTarget(StrEnum):
@@ -294,82 +302,6 @@ class TournamentSummary:
     winner_player_ids: tuple[UUID, ...] | None
 
 
-# ---------------------------------------------------------------- loading
-
-
-_ROUNDS = selectinload(Tournament.phases).selectinload(TournamentPhase.rounds)
-"""The rounds with what the list counts: matches, their results and byes."""
-
-_ROUNDS_IN_FULL = _ROUNDS.options(
-    selectinload(Round.participation),
-    selectinload(Round.matches).options(
-        selectinload(Match.games),
-        selectinload(Match.sides).selectinload(MatchSide.players),
-    ),
-)
-"""The rounds with everything the whole tournament shows."""
-
-
-def _tournament_query(
-    league: League, tournament_id: UUID, *, rounds: bool = False
-) -> Select[Tournament]:
-    """A tournament of the league with what setup reads, and the rounds (ADR-008)."""
-    query = (
-        select(Tournament)
-        .join(Season, Tournament.season_id == Season.id)
-        .where(Tournament.id == tournament_id, Season.league_id == league.id)
-        .options(
-            selectinload(Tournament.phases),
-            selectinload(Tournament.fields),
-            selectinload(Tournament.players),
-            selectinload(Tournament.halves),
-            selectinload(Tournament.entries).selectinload(Entry.members),
-        )
-        .execution_options(populate_existing=True)
-    )
-    return query.options(_ROUNDS_IN_FULL) if rounds else query
-
-
-def _lock_tournament(
-    session: Session,
-    *,
-    league_id: UUID,
-    tournament_id: UUID,
-    user_id: UUID,
-    rounds: bool = False,
-) -> tuple[League, Tournament]:
-    """Lock the league, then one of its tournaments (ADR-008).
-
-    Another organizer's league is 404 `league_not_found`; a tournament of
-    another league, or an unknown one, is 404 `tournament_not_found`.
-    """
-    league = lock_league(session, league_id=league_id, user_id=user_id)
-    tournament = session.scalars(
-        _tournament_query(league, tournament_id, rounds=rounds).with_for_update(
-            of=Tournament
-        )
-    ).one_or_none()
-    if tournament is None:
-        raise NotFoundError(ErrorCode.TOURNAMENT_NOT_FOUND)
-    return league, tournament
-
-
-def _lock_setup(
-    session: Session, *, league_id: UUID, tournament_id: UUID, user_id: UUID
-) -> tuple[League, Tournament]:
-    """Lock a tournament that must still be in setup.
-
-    A started tournament is 409 `tournament_not_in_setup`: the screen that sent
-    the request is stale, and the reload shows the tournament running (ADR-008).
-    """
-    league, tournament = _lock_tournament(
-        session, league_id=league_id, tournament_id=tournament_id, user_id=user_id
-    )
-    if tournament.state is not TournamentState.SETUP:
-        raise ConflictError(ErrorCode.TOURNAMENT_NOT_IN_SETUP, state=tournament.state)
-    return league, tournament
-
-
 def _standings_by_player(
     session: Session, season: Season
 ) -> dict[PlayerId, SeasonStandingRow]:
@@ -426,9 +358,6 @@ def _ranking(
             )
         )
     return rank_league(records, rng_seed=tournament.rng_seed)
-
-
-# ---------------------------------------------------------------- reading
 
 
 def _format_of(tournament: Tournament) -> TournamentFormat:
@@ -604,29 +533,6 @@ def _summary_of(tournament: Tournament) -> TournamentSummary:
     )
 
 
-def _current_phase(tournament: Tournament) -> TournamentPhase | None:
-    """The phase being played: the last one that has rounds."""
-    return next((phase for phase in reversed(tournament.phases) if phase.rounds), None)
-
-
-def _played(round_: Round) -> list[Match]:
-    """A round's matches, without a bye, which is not a match (BR-041)."""
-    return [
-        match
-        for match in round_.matches
-        if not any(side.is_bye for side in match.sides)
-    ]
-
-
-def _is_done(phase: TournamentPhase) -> bool:
-    """Every match of the phase's rounds so far has a result."""
-    return all(
-        match.outcome is not None
-        for round_ in phase.rounds
-        for match in _played(round_)
-    )
-
-
 def _progress_of(tournament: Tournament) -> TournamentProgress | None:
     """How far a running tournament is; None in setup and once finished."""
     if tournament.state is not TournamentState.IN_PROGRESS:
@@ -654,9 +560,6 @@ def _progress_of(tournament: Tournament) -> TournamentProgress | None:
             if phase.kind is PhaseKind.KNOCKOUT
         ),
     )
-
-
-# ---------------------------------------------------------------- format
 
 
 def _resolve_format(request: FormatRequest, league: League) -> TournamentFormat:
@@ -892,9 +795,6 @@ def set_tournament_format(
         tournament.updated_at = now
     session.flush()
     return _setup_of(tournament, ranking)
-
-
-# ---------------------------------------------------------------- entries
 
 
 def _discard_entries(session: Session, tournament: Tournament) -> None:
@@ -1411,9 +1311,6 @@ def _pair_the_rest(
     _seed(tournament, ranking)
 
 
-# ---------------------------------------------------------------- delete
-
-
 def delete_tournament(
     session: Session, *, league_id: UUID, tournament_id: UUID, user_id: UUID
 ) -> None:
@@ -1430,9 +1327,6 @@ def delete_tournament(
         raise ConflictError(ErrorCode.SEASON_CLOSED)
     session.delete(tournament)
     session.flush()
-
-
-# ---------------------------------------------------------------- the whole tournament
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -1623,158 +1517,6 @@ def _match_view(
     )
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
-class KnockoutBracket:
-    """A knockout phase with every match's sides derived (DATA-MODEL D4).
-
-    Only the first round's sides are stored; `played` holds each match as the
-    engine derives it from them and the stored winners, so a changed winner
-    shows in the later matches on the next read (BR-094).
-    """
-
-    phase: TournamentPhase
-    bracket: Bracket
-    keys: Mapping[UUID, MatchKey]
-    rows: Mapping[MatchKey, Match]
-    outcomes: Mapping[MatchKey, Outcome]
-    played: Mapping[UUID, BracketMatch]
-
-
-def knockout_phase(tournament: Tournament) -> TournamentPhase | None:
-    """The tournament's knockout, once it has its matches."""
-    return next(
-        (p for p in tournament.phases if p.kind is PhaseKind.KNOCKOUT and p.rounds),
-        None,
-    )
-
-
-def knockout_bracket(tournament: Tournament) -> KnockoutBracket | None:
-    """The knockout's bracket with its sides derived on read (D4); None without one."""
-    phase = knockout_phase(tournament)
-    if phase is None:
-        return None
-    keys = {
-        match.id: match_key(
-            round_no=round_.round_no, kind=match.kind, position=match.position
-        )
-        for round_ in phase.rounds
-        for match in round_.matches
-    }
-    rows = {
-        keys[match.id]: match for round_ in phase.rounds for match in round_.matches
-    }
-
-    def stored(match: Match, number: int) -> EntryId | None:
-        side = next(side for side in match.sides if side.side == number)
-        return None if side.entry_id is None else EntryId(side.entry_id)
-
-    bracket = bracket_of(
-        (
-            FirstRoundMatch(
-                position=match.position,
-                side_1=stored(match, 1),
-                side_2=stored(match, 2),
-            )
-            for match in phase.rounds[0].matches
-        ),
-        third_place_match=bool(phase.third_place_match),
-    )
-    outcomes = {
-        key: row.outcome for key, row in rows.items() if row.outcome is not None
-    }
-    return KnockoutBracket(
-        phase=phase,
-        bracket=bracket,
-        keys=keys,
-        rows=rows,
-        outcomes=outcomes,
-        played={rows[m.key].id: m for m in play_bracket(bracket, outcomes)},
-    )
-
-
-def _match_players(tournament: Tournament) -> dict[UUID, frozenset[PlayerId] | None]:
-    """Every match's players, or None while a side is not known yet (D4).
-
-    Stored sides list their players (D2). A knockout match after the first
-    round has no stored sides: its players are those of the entries the
-    engine derives, and a side that waits for an earlier match is unknown.
-    """
-    knockout = knockout_bracket(tournament)
-    derived = {} if knockout is None else knockout.played
-    members = {
-        entry.id: frozenset(PlayerId(member.player_id) for member in entry.members)
-        for entry in tournament.entries
-    }
-    players: dict[UUID, frozenset[PlayerId] | None] = {}
-    for phase in tournament.phases:
-        for round_ in phase.rounds:
-            for match in round_.matches:
-                bracket_match = derived.get(match.id)
-                if match.sides or bracket_match is None:
-                    players[match.id] = _known_players(match)
-                    continue
-                sides = (bracket_match.side_1, bracket_match.side_2)
-                players[match.id] = (
-                    frozenset().union(
-                        *(members[side.entry_id] for side in sides if side.entry_id)
-                    )
-                    if all(side.is_known for side in sides)
-                    else None
-                )
-    return players
-
-
-def _known_players(match: Match) -> frozenset[PlayerId] | None:
-    """Every player of both stored sides, or None while a side is not known yet.
-
-    A side is unknown when it is not stored, or is not a bye and has neither an
-    entry nor players: a knockout side that waits for an earlier match.
-    """
-    if len(match.sides) < MATCH_SIDES or any(
-        not side.is_bye and side.entry_id is None and not side.players
-        for side in match.sides
-    ):
-        return None
-    return frozenset(
-        PlayerId(row.player_id) for side in match.sides for row in side.players
-    )
-
-
-def _match_slots(tournament: Tournament) -> list[MatchSlot]:
-    """Every stored match as the field queue sees it (BR-130).
-
-    A knockout match takes a field once the engine derives both its sides (D4).
-    """
-    players = _match_players(tournament)
-    return [
-        MatchSlot(
-            match_id=MatchId(match.id),
-            phase_position=phase.position,
-            round_no=round_.round_no,
-            kind=match.kind,
-            position=match.position,
-            player_ids=players[match.id],
-            has_bye=any(side.is_bye for side in match.sides),
-            has_result=match.outcome is not None,
-            requeued_at=match.requeued_at,
-        )
-        for phase in tournament.phases
-        for round_ in phase.rounds
-        for match in round_.matches
-    ]
-
-
-def _field_slots(tournament: Tournament) -> list[FieldSlot]:
-    return [
-        FieldSlot(
-            field_id=FieldId(field.id),
-            number=field.number,
-            match_id=None if field.match_id is None else MatchId(field.match_id),
-        )
-        for field in tournament.fields
-    ]
-
-
 def _view_of(tournament: Tournament, ranking: Sequence[RankedPlayer]) -> TournamentView:
     entries = _setup_of(tournament, ranking).entries
     members = {entry.id: entry.player_ids for entry in entries}
@@ -1848,9 +1590,6 @@ def view_tournament(
     return _view_of(tournament, _ranking(session, league=league, tournament=tournament))
 
 
-# ---------------------------------------------------------------- start
-
-
 def _check_ready(tournament: Tournament, phase: TournamentPhase) -> None:
     """Refuse a start whose setup is not complete (FR-032, FR-033, BR-030 to BR-032).
 
@@ -1897,10 +1636,6 @@ def _check_ready(tournament: Tournament, phase: TournamentPhase) -> None:
         raise RuleViolationError(
             ErrorCode.TOO_MANY_ENTRIES_FOR_ROUND_ROBIN, limit=MAX_ROUND_ROBIN_ENTRIES
         )
-
-
-def _main_entries(tournament: Tournament) -> list[Entry]:
-    return [entry for entry in tournament.entries if entry.stage is EntryStage.MAIN]
 
 
 def _round_robin_of(
@@ -2470,9 +2205,6 @@ def _reset_to_setup(session: Session, tournament: Tournament, now: datetime) -> 
     session.flush()
 
 
-# ---------------------------------------------------------------- results
-
-
 @dataclass(frozen=True, slots=True, kw_only=True)
 class MatchResult:
     """A whole result as the organizer sends it (ADR-008, FR-050 to FR-053).
@@ -2490,25 +2222,6 @@ class MatchResult:
     @property
     def is_empty(self) -> bool:
         return self.walkover_winner is None and not self.games
-
-
-def _require_open_season(league: League, tournament: Tournament) -> None:
-    """Refuse a change in a closed season (BR-011): 409 `season_closed`."""
-    season = next(s for s in league.seasons if s.id == tournament.season_id)
-    if season.state is SeasonState.CLOSED:
-        raise ConflictError(ErrorCode.SEASON_CLOSED)
-
-
-def _find_match(
-    tournament: Tournament, match_id: UUID
-) -> tuple[TournamentPhase, Round, Match]:
-    """A match of the tournament with its phase and round, else 404 (ADR-008)."""
-    for phase in tournament.phases:
-        for round_ in phase.rounds:
-            for match in round_.matches:
-                if match.id == match_id:
-                    return phase, round_, match
-    raise NotFoundError(ErrorCode.MATCH_NOT_FOUND)
 
 
 def _match_format(phase: TournamentPhase, round_: Round, match: Match) -> MatchFormat:
@@ -2768,9 +2481,6 @@ def _write_result(
     _fill_fields(tournament, _match_slots(tournament), now)
 
 
-# ---------------------------------------------------------------- play
-
-
 @dataclass(frozen=True, slots=True, kw_only=True)
 class BusyField:
     """A field that holds players of a waiting match (BR-131)."""
@@ -2828,10 +2538,6 @@ class PlayView:
     waiting: tuple[WaitingMatch, ...]
     standings: tuple[GroupStandingRow, ...]
     group_done: bool
-
-
-def _group_phase(tournament: Tournament) -> TournamentPhase | None:
-    return next((p for p in tournament.phases if p.kind is PhaseKind.GROUP), None)
 
 
 def _played_match(match: Match) -> PlayedMatch:
@@ -3040,26 +2746,6 @@ def tie_groups(rows: Iterable[GroupStandingRow]) -> tuple[tuple[EntryId, ...], .
     return tuple(tuple(groups[place]) for place in sorted(groups))
 
 
-def _load_tournament(
-    session: Session,
-    *,
-    league: League,
-    tournament_id: UUID,
-    past_setup: bool = False,
-) -> Tournament:
-    """A tournament of the league with its rounds, read without a lock.
-
-    With `past_setup`, one in setup is not found (FR-070).
-    """
-    query = _tournament_query(league, tournament_id, rounds=True)
-    if past_setup:
-        query = query.where(Tournament.state != TournamentState.SETUP)
-    tournament = session.scalars(query).one_or_none()
-    if tournament is None:
-        raise NotFoundError(ErrorCode.TOURNAMENT_NOT_FOUND)
-    return tournament
-
-
 def read_play(
     session: Session, *, league_id: UUID, tournament_id: UUID, user_id: UUID
 ) -> PlayView:
@@ -3104,9 +2790,6 @@ def read_play(
         standings=() if group is None else group_standings(tournament, group),
         group_done=group is not None and bool(group.rounds) and _is_done(group),
     )
-
-
-# ---------------------------------------------------------------- fields
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -3342,9 +3025,6 @@ def place_matches(
     return read_tournament(
         session, league_id=league_id, tournament_id=tournament.id, user_id=user_id
     )
-
-
-# ---------------------------------------------------------------- Swiss rounds
 
 
 def _require_swiss(tournament: Tournament) -> TournamentPhase:
@@ -3590,9 +3270,6 @@ def set_tiebreakers(
     return read_tournament(
         session, league_id=league_id, tournament_id=tournament.id, user_id=user_id
     )
-
-
-# ---------------------------------------------------------------- finishing
 
 
 def _require_group_only(tournament: Tournament) -> TournamentPhase:

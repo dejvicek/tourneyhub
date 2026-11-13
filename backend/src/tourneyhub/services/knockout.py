@@ -63,19 +63,21 @@ from tourneyhub.services.tournaments import (
     KnockoutBracket,
     TournamentView,
     _bracket_rounds,
-    _current_phase,
     _fill_fields,
-    _group_phase,
-    _load_tournament,
-    _lock_tournament,
     _match_format,
-    _match_slots,
-    _played,
-    _require_open_season,
     group_standings,
     knockout_bracket,
     read_tournament,
     tie_groups,
+)
+from tourneyhub.services.tournaments.shared import (
+    _current_phase,
+    _group_phase,
+    _load_tournament,
+    _lock_tournament,
+    _match_slots,
+    _played,
+    _require_open_season,
 )
 
 # ---------------------------------------------------------------- the cut
