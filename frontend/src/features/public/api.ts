@@ -140,6 +140,35 @@ export const publicQueries = {
       enabled,
       refetchInterval: LIVE_MS,
     }),
+  /** The Lord have mercy knockout, round by round (BR-140). */
+  knockoutRounds: (
+    shareToken: string,
+    tournamentId: string,
+    enabled: boolean,
+  ) =>
+    queryOptions({
+      queryKey: [
+        "public",
+        shareToken,
+        "tournaments",
+        tournamentId,
+        "knockout-rounds",
+      ],
+      queryFn: ({ signal }) =>
+        dataOf(
+          api.GET(
+            "/api/v1/public/{share_token}/tournaments/{tournament_id}/knockout/rounds",
+            {
+              params: {
+                path: { share_token: shareToken, tournament_id: tournamentId },
+              },
+              signal,
+            },
+          ),
+        ),
+      enabled,
+      refetchInterval: LIVE_MS,
+    }),
   /** The places decided so far, with the reason for each. */
   places: (shareToken: string, tournamentId: string, enabled: boolean) =>
     queryOptions({

@@ -85,6 +85,18 @@ export const finalsQueries = {
           ),
         ),
     }),
+  /** The Lord have mercy knockout, round by round (BR-140); 422 for any other. */
+  knockoutRounds: (leagueId: string, tournamentId: string) =>
+    queryOptions({
+      queryKey: [...tournamentKey(leagueId, tournamentId), "knockout-rounds"],
+      queryFn: ({ signal }) =>
+        dataOf(
+          api.GET(
+            "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout/rounds",
+            { params: pathOf(leagueId, tournamentId), signal },
+          ),
+        ),
+    }),
   /** Waits until the request is known. */
   preview: (
     leagueId: string,
@@ -338,6 +350,48 @@ export const finalsMutations = {
         ),
       onSettled: () => settle(queryClient, leagueId),
     }),
+  /** Draws the next Lord have mercy round (BR-140); carries the round number it expects (ADR-008). */
+  drawKnockoutRound: (
+    queryClient: QueryClient,
+    leagueId: string,
+    tournamentId: string,
+  ) =>
+    mutationOptions({
+      scope: scope(leagueId),
+      mutationFn: (body: RoundCreate) =>
+        dataOf(
+          api.POST(
+            "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout/rounds",
+            { params: pathOf(leagueId, tournamentId), body },
+          ),
+        ),
+      onSettled: () => settle(queryClient, leagueId),
+    }),
+  /** Deletes the newest Lord have mercy round by its id; round 1 deletes the knockout (BR-140). */
+  deleteKnockoutRound: (
+    queryClient: QueryClient,
+    leagueId: string,
+    tournamentId: string,
+  ) =>
+    mutationOptions({
+      scope: scope(leagueId),
+      mutationFn: (roundId: string) =>
+        dataOf(
+          api.DELETE(
+            "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout/rounds/{round_id}",
+            {
+              params: {
+                path: {
+                  league_id: leagueId,
+                  tournament_id: tournamentId,
+                  round_id: roundId,
+                },
+              },
+            },
+          ),
+        ),
+      onSettled: () => settle(queryClient, leagueId),
+    }),
   /** The knockout is deleted by its phase id (ADR-008, FR-046). */
   deleteKnockout: (
     queryClient: QueryClient,
@@ -404,3 +458,10 @@ export type PreviewData = QueryData<ReturnType<typeof finalsQueries.preview>>;
 export type TournamentData = QueryData<
   ReturnType<typeof tournamentQueries.detail>
 >;
+
+export type RemixKnockoutData = components["schemas"]["RemixKnockoutRead"];
+export type RemixRoundData = components["schemas"]["RemixRoundRead"];
+export type RemixMatchData = components["schemas"]["RemixMatchRead"];
+export type RemixSideData = components["schemas"]["RemixSideRead"];
+export type PublicRemixKnockoutData =
+  components["schemas"]["PublicRemixKnockoutRead"];
