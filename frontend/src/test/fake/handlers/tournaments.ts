@@ -56,7 +56,7 @@ export const tournamentHandlers = [
   ),
 
   // ---------------------------------------------------------- setup
-  // Screens 1-5: create, format, players, draws, start (src/demo/setupEngine.ts).
+  // Screens 1-5: create, format, players, draws, start (src/test/fake/setupEngine.ts).
 
   route(
     "post",

@@ -3,13 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { generatePath } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { syncBracket } from "@/demo/finalsEngine";
-import { DEMO_LEAGUE_ID } from "@/demo/ids";
-import { activeSeason, db } from "@/demo/store";
 import { axeViolations } from "@/features/auth/axeCheck";
 import { i18n } from "@/i18n";
 import { newId } from "@/lib/newId";
 import { paths } from "@/lib/paths";
+import { syncBracket } from "@/test/fake/finalsEngine";
+import { DEMO_LEAGUE_ID } from "@/test/fake/ids";
+import { activeSeason, db } from "@/test/fake/store";
 import { renderAt } from "@/test/renderApp";
 
 const settings = generatePath(paths.leagueSettings, {

@@ -13,7 +13,7 @@ type Schemas = components["schemas"];
 
 // ---- setup (screens 1-5). The backend serves the setup, "Generate and
 // start", "Back to setup" and the schedule preview; the top players are still
-// a provisional route (the "setup" section of src/demo/contract.ts). Every
+// a provisional route (SetupPaths in src/api/provisionalPaths.ts). Every
 // write sends the target state or the state it expects (ADR-008).
 
 const tournamentPath = (leagueId: string, tournamentId: string) => ({

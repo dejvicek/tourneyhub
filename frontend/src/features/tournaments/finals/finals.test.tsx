@@ -6,10 +6,10 @@ import { generatePath } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { provisionalApi } from "@/api/provisional";
-import { DEMO_LEAGUE_ID, demoId } from "@/demo/ids";
-import { db } from "@/demo/store";
 import { i18n } from "@/i18n";
 import { paths } from "@/lib/paths";
+import { DEMO_LEAGUE_ID, demoId } from "@/test/fake/ids";
+import { db } from "@/test/fake/store";
 import { stubViewport } from "@/test/media";
 import { renderAt } from "@/test/renderApp";
 import { server } from "@/test/server";

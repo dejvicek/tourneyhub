@@ -3,8 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { provisionalApi } from "@/api/provisional";
-import { DEMO_LEAGUE_ID } from "@/demo/ids";
 import { i18n } from "@/i18n";
+import { DEMO_LEAGUE_ID } from "@/test/fake/ids";
 import { onField, paths, playPath, runningDyp } from "@/test/play";
 import { renderAt } from "@/test/renderApp";
 

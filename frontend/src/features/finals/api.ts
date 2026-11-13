@@ -21,8 +21,8 @@ type RoundCreate = components["schemas"]["RoundCreate"];
 
 type TiebreakersWrite = components["schemas"]["TiebreakersWrite"];
 
-// Provisional routes of the demo's contract, "finals" section
-// (src/demo/contract.ts), except the places (P8), the season effect (P10a),
+// Provisional routes, "finals" section of the provisional paths
+// (src/api/provisionalPaths.ts), except the places (P8), the season effect (P10a),
 // the knockout (P10b) and the Swiss rounds and tie-breakers (P12), which the
 // backend serves. The Swiss standings come from GET …/play (playQueries in
 // features/fields/api.ts). Keys start with the entity (docs/style/frontend-style.md §8.1).

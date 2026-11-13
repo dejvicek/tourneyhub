@@ -5,12 +5,12 @@ import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { setAccessToken } from "@/api/token";
-import { DEMO_USER_ID } from "@/demo/ids";
-import { DEMO_SIGNUP_CODE } from "@/demo/seedOutside";
-import { outsideDb } from "@/demo/store";
 import { axeViolations } from "@/features/auth/axeCheck";
 import { i18n } from "@/i18n";
 import { paths } from "@/lib/paths";
+import { DEMO_USER_ID } from "@/test/fake/ids";
+import { DEMO_SIGNUP_CODE } from "@/test/fake/seedOutside";
+import { outsideDb } from "@/test/fake/store";
 import { renderAt } from "@/test/renderApp";
 import { server } from "@/test/server";
 

@@ -3,7 +3,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, configure } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, beforeEach, vi } from "vitest";
 
-import { resetDemoStore } from "@/demo/store";
+import { resetDemoStore } from "@/test/fake/store";
 
 import { stubViewport } from "./media";
 import { server } from "./server";

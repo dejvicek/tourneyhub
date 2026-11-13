@@ -4,8 +4,8 @@ import axe from "axe-core";
 import { api, dataOf } from "@/api/client";
 import type { components } from "@/api/schema";
 
-import { DEMO_LEAGUE_ID, DEMO_SEASON_ID } from "./ids";
-import { newId } from "./setupEngine";
+import { DEMO_LEAGUE_ID, DEMO_SEASON_ID } from "./fake/ids";
+import { newId } from "./fake/setupEngine";
 
 type TournamentCreate = components["schemas"]["TournamentCreate"];
 

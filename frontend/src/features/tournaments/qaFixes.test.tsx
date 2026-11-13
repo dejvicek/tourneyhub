@@ -6,18 +6,18 @@ import { generatePath } from "react-router";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { setAccessToken } from "@/api/token";
-import { DEMO_LEAGUE_ID, demoId } from "@/demo/ids";
-import { createSeed } from "@/demo/seed";
+import { i18n } from "@/i18n";
+import { paths } from "@/lib/paths";
+import { DEMO_LEAGUE_ID, demoId } from "@/test/fake/ids";
+import { createSeed } from "@/test/fake/seed";
+import { stubViewport } from "@/test/media";
+import { renderAt } from "@/test/renderApp";
+import { server } from "@/test/server";
 import {
   createDraft,
   pickPlayers,
   startTournament,
-} from "@/demo/setupTestHelpers";
-import { i18n } from "@/i18n";
-import { paths } from "@/lib/paths";
-import { stubViewport } from "@/test/media";
-import { renderAt } from "@/test/renderApp";
-import { server } from "@/test/server";
+} from "@/test/setupTestHelpers";
 
 const seed = createSeed();
 const idOf = (name: string) =>
@@ -194,7 +194,7 @@ describe("D28: setup says why Next is off", () => {
   it("explains uneven halves", async () => {
     const user = userEvent.setup();
     const { createDraft, pickPlayers } =
-      await import("@/demo/setupTestHelpers");
+      await import("@/test/setupTestHelpers");
     const id = await createDraft({});
     await pickPlayers(id, 12);
     renderAt(

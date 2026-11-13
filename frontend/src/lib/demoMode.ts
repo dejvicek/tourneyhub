@@ -5,8 +5,8 @@ export interface DemoModeEnv {
 }
 
 /**
- * Demo mode runs the app against the fake API in src/demo, an MSW worker in
- * the browser. `pnpm dev:demo` or VITE_DEMO=true turns it on; a production
+ * Demo mode runs the app against the fake API in src/test/fake, an MSW worker
+ * in the browser (src/demo/browser.ts). `pnpm dev:demo` or VITE_DEMO=true turns it on; a production
  * build never has it, whatever the environment says.
  */
 export function isDemoMode(env: DemoModeEnv): boolean {

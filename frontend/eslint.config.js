@@ -435,8 +435,13 @@ export default defineConfig([
     rules: { "no-restricted-imports": restrictImports(apiClient) },
   },
   {
-    // The demo itself; its tests call it through the API clients.
-    files: ["src/demo/**/*.ts"],
+    // The fake API (and what the demo boots from it); its tests call it
+    // through the API clients.
+    files: [
+      "src/demo/**/*.ts",
+      "src/test/fake/**/*.ts",
+      "src/test/setupTestHelpers.ts",
+    ],
     rules: { "no-restricted-imports": restrictImports() },
   },
   {
@@ -471,15 +476,19 @@ export default defineConfig([
   },
   {
     // The demo's fake engines are leaving with demo mode; no `as` rule there.
-    files: ["src/demo/**/*.ts"],
-    ignores: ["src/demo/**/*.test.ts"],
+    files: [
+      "src/demo/**/*.ts",
+      "src/test/fake/**/*.ts",
+      "src/test/setupTestHelpers.ts",
+    ],
+    ignores: ["src/demo/**/*.test.ts", "src/test/fake/**/*.test.ts"],
     rules: {
       "no-restricted-syntax": ["error", ...appSyntax, ...queryClientSyntax],
     },
   },
   {
     // The demo's tests: the tests' list without the `as` rule.
-    files: ["src/demo/**/*.test.ts"],
+    files: ["src/demo/**/*.test.ts", "src/test/fake/**/*.test.ts"],
     rules: {
       "no-restricted-syntax": ["error", ...appSyntax, ...mockApiSyntax],
     },

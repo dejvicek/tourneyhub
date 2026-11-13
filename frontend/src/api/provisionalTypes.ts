@@ -1,6 +1,6 @@
 // Stand-ins for the request and response types of routes the backend does
 // not have yet: the participants, late players and disabling (P14). The
-// demo's contract (src/demo/contract.ts) builds its provisional paths on them,
+// provisional paths (src/api/provisionalPaths.ts) are built on them,
 // and the screens read them from here. Each type goes away once its route is
 // generated into schema.d.ts (D4).
 type Uuid = string;

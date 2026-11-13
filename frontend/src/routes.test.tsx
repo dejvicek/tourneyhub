@@ -2,11 +2,11 @@ import { screen, waitFor } from "@testing-library/react";
 import { generatePath } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { DEMO_LEAGUE_ID, DEMO_SHARE_TOKEN, demoId } from "@/demo/ids";
-import { createSeed } from "@/demo/seed";
-import { outsideDb } from "@/demo/store";
 import { i18n } from "@/i18n";
 import { paths } from "@/lib/paths";
+import { DEMO_LEAGUE_ID, DEMO_SHARE_TOKEN, demoId } from "@/test/fake/ids";
+import { createSeed } from "@/test/fake/seed";
+import { outsideDb } from "@/test/fake/store";
 import { renderAt } from "@/test/renderApp";
 
 const seed = createSeed();

@@ -4,8 +4,8 @@
 import { delay, http } from "msw";
 import { setupWorker } from "msw/browser";
 
-import { demoHandlers } from "./allHandlers";
-import { apiError } from "./route";
+import { demoHandlers } from "@/test/fake/allHandlers";
+import { apiError } from "@/test/fake/route";
 
 export async function startDemo(): Promise<void> {
   const worker = setupWorker(

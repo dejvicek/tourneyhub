@@ -1,7 +1,7 @@
 // Short names for the API types the fake API and its tests use. Most are
 // aliases of generated types (src/api/schema.d.ts); the provisional paths
 // themselves are in src/api/provisionalPaths.ts. Grouped by area, like the
-// handlers in src/demo/handlers/.
+// handlers in src/test/fake/handlers/.
 import type { components } from "@/api/schema";
 
 type Uuid = string;

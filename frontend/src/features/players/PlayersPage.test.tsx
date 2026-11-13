@@ -3,12 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { generatePath } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { DEMO_LEAGUE_ID } from "@/demo/ids";
-import { db } from "@/demo/store";
 import { axeViolations } from "@/features/auth/axeCheck";
 import { i18n } from "@/i18n";
 import { newId } from "@/lib/newId";
 import { paths } from "@/lib/paths";
+import { DEMO_LEAGUE_ID } from "@/test/fake/ids";
+import { db } from "@/test/fake/store";
 import { renderAt } from "@/test/renderApp";
 
 const players = generatePath(paths.players, { leagueId: DEMO_LEAGUE_ID });

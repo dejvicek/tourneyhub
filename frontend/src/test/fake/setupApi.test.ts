@@ -3,8 +3,6 @@ import { describe, expect, it } from "vitest";
 import { api, ApiError, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
 
-import { DEMO_LEAGUE_ID, DEMO_SEASON_ID } from "./ids";
-import { newId } from "./setupEngine";
 import {
   createDraft,
   dypFormat,
@@ -14,7 +12,9 @@ import {
   startBody,
   startTournament,
   tournamentOf,
-} from "./setupTestHelpers";
+} from "../setupTestHelpers";
+import { DEMO_LEAGUE_ID, DEMO_SEASON_ID } from "./ids";
+import { newId } from "./setupEngine";
 
 const league = { league_id: DEMO_LEAGUE_ID };
 const at = (tournament_id: string) => ({

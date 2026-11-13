@@ -5,11 +5,11 @@ import { generatePath } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { setAccessToken } from "@/api/token";
-import { DEMO_EMAIL, DEMO_LEAGUE_ID } from "@/demo/ids";
-import { DEMO_PASSWORD, DEMO_SIGNUP_CODE } from "@/demo/seedOutside";
-import { outsideDb } from "@/demo/store";
 import { i18n } from "@/i18n";
 import { paths } from "@/lib/paths";
+import { DEMO_EMAIL, DEMO_LEAGUE_ID } from "@/test/fake/ids";
+import { DEMO_PASSWORD, DEMO_SIGNUP_CODE } from "@/test/fake/seedOutside";
+import { outsideDb } from "@/test/fake/store";
 import { renderAt } from "@/test/renderApp";
 import { server } from "@/test/server";
 

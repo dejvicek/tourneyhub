@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { PhaseSummary, TournamentState } from "@/demo/contract";
+import type { PhaseSummary, TournamentState } from "@/test/fake/contract";
 
 import {
   tournamentHome,
