@@ -92,7 +92,7 @@ def test_br100_entries_of_a_place_come_out_by_entry_id() -> None:
     assert [place.entry_id.int for place in places] == [1, 2, 3]
 
 
-def test_br100_entries_of_a_place_come_out_by_seed_then_by_entry_id() -> None:
+def test_br104_entries_of_a_place_come_out_by_seed_then_by_entry_id() -> None:
     seeds = {1: 4, 2: 2, 3: 3, 4: 1, 5: None, 6: None}
     entries = [
         PlacingEntry(entry_id=eid(n), player_ids=(PlayerId(eid(n)),), seed=seed)
