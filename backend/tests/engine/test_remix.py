@@ -215,11 +215,22 @@ def test_br141_the_next_round_is_drawn_from_the_winners_in_lot_order() -> None:
 
 def test_br141_br143_the_pairs_are_mixed_again() -> None:
     round_1 = decide(first_round(8), iter(()))
+    state = remix_state(round_1, third_place_match=False)
 
-    drawn = draw_next_round(
-        remix_state(round_1, third_place_match=False), rng_seed=SEED
-    )
+    drawn = draw_next_round(state, rng_seed=SEED)
 
+    lot = order_by_lot(state.going_through, rng_seed=SEED, purpose=remix_purpose(2))
+    pairs = [(lot[i], lot[i + 1]) for i in range(0, len(lot), 2)]
+    expected = [
+        RemixMatch(
+            key=key(2, position),
+            side_1=pairs[2 * position - 2],
+            side_2=pairs[2 * position - 1],
+            outcome=None,
+        )
+        for position in range(1, len(pairs) // 2 + 1)
+    ]
+    assert list(drawn) == expected
     assert teams(drawn) - teams(round_1)
 
 
@@ -261,6 +272,29 @@ def test_br142_br144_the_final_and_the_third_place_match_are_drawn_together() ->
     assert third_place.key == key(2, 1, third=True)
     assert third_place.players == losers
     assert state.semifinal_losers == {pid(n) for n in (3, 4, 5, 6)}
+
+
+def test_br156_the_final_and_the_third_place_match_have_their_own_lots() -> None:
+    matches = play_out(8, third_place_match=True, flips=[True, False] * 10)
+    state = remix_state(
+        [m for m in matches if m.key.round_no <= 2], third_place_match=True
+    )
+
+    final, third_place = draw_next_round(state, rng_seed=SEED)
+
+    finalists = order_by_lot(
+        state.going_through, rng_seed=SEED, purpose=remix_purpose(3)
+    )
+    losers = order_by_lot(
+        state.semifinal_losers, rng_seed=SEED, purpose=THIRD_PLACE_PURPOSE
+    )
+    assert final.key == key(3, 1)
+    assert final.side_1 == (finalists[0], finalists[1])
+    assert final.side_2 == (finalists[2], finalists[3])
+    assert third_place.key == key(3, 1, third=True)
+    assert third_place.side_1 == (losers[0], losers[1])
+    assert third_place.side_2 == (losers[2], losers[3])
+    assert ints(finalists).isdisjoint(ints(losers))
 
 
 def test_br144_a_knockout_of_2_pairs_has_no_semifinal_losers() -> None:
