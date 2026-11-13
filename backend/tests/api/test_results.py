@@ -653,6 +653,7 @@ def test_fr060_the_play_read_ranks_the_round_robin(
         "lost": 0,
         "sat_out": 0,
         "points": 2,
+        "game_difference": 1,
         "score_difference": 10,
         "form": None,
         "ahead_by": "score_difference",
@@ -662,6 +663,32 @@ def test_fr060_the_play_read_ranks_the_round_robin(
     assert rows[0]["form"] == ["won"]
     assert rows[2]["form"] == ["lost"]
     assert play["group_done"] is False
+
+
+def test_br101_a_bo3_walkover_counts_2_0_in_the_game_difference(
+    start: Callable[..., Json],
+    put_result: Callable[..., tuple[int, Json]],
+    read: Callable[[Json, str], Json],
+    players: list[str],
+) -> None:
+    tournament = start(players[:4], group_match_format="bo3")
+    first = tournament["rounds"][0]["matches"]
+    put_result(tournament, first[0]["id"], {"walkover_winner": "side_1", "games": []})
+    put_result(
+        tournament,
+        first[1]["id"],
+        games(game("side_1", 10, 0), game("side_2", 0, 10), game("side_1", 10, 0)),
+    )
+
+    rows = read(tournament, "/play")["standings"]
+
+    walkover_winner = first[0]["sides"][0]["entry_id"]
+    series_winner = first[1]["sides"][0]["entry_id"]
+    assert [(row["entry_id"], row["game_difference"]) for row in rows[:2]] == [
+        (walkover_winner, 2),
+        (series_winner, 1),
+    ]
+    assert rows[0]["ahead_by"] == "game_difference"
 
 
 def test_br071_a_sit_out_is_counted_once_its_round_is_complete_and_earns_no_points(

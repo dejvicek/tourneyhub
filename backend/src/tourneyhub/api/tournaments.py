@@ -595,7 +595,9 @@ class PlayStandingRow(ResponseModel):
     results, oldest first. `ahead_by` names what ranks the entry above the
     next one when both have the same points, and is null when the points
     decide or the place is shared. `bh1` and `bh2` are for Swiss and Monster
-    DYP, null in a round robin.
+    DYP, null in a round robin. `game_difference` ranks in every match format,
+    a walkover counting the games needed to win; the screen shows its column
+    only in BO3 and BO5 (BR-101).
     """
 
     place: int
@@ -606,6 +608,7 @@ class PlayStandingRow(ResponseModel):
     lost: int
     sat_out: int
     points: int
+    game_difference: int
     score_difference: int
     form: list[FormResult]
     ahead_by: RoundRobinTiebreaker | None

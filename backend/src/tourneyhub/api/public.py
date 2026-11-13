@@ -84,7 +84,8 @@ class PublicStandingRow(ResponseModel):
     `place` is shared by entries still level (BR-074), and the next place
     skips (BR-104). `points` come from the matches: a round robin gives no
     points for sitting out (BR-071). The organizer's extras, the form and what ranks one entry above
-    the next, are not part of it.
+    the next, are not part of it. `game_difference` ranks in every match
+    format; the screen shows its column only in BO3 and BO5 (BR-101).
     """
 
     place: int
@@ -95,6 +96,7 @@ class PublicStandingRow(ResponseModel):
     lost: int
     sat_out: int
     points: int
+    game_difference: int
     score_difference: int
 
 
