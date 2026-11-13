@@ -1,7 +1,7 @@
 import * as React from "react";
 
-// The few glyphs the copied components draw. lucide-react is not installed
-// until a screen needs a real icon (docs/style/frontend-style.md §5.3); these are
+// The few glyphs the copied components draw. Icons are our own SVG components,
+// not lucide-react (docs/style/frontend-style.md §5.3); these are
 // 24 px, 2 px stroke like the design's icon set, and hidden from assistive
 // technology because the control around them carries the name.
 
