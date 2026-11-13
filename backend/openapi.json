@@ -1859,7 +1859,7 @@
         "type": "string"
       },
       "PlaceReasonRead": {
-        "description": "Why an entry has its place (\u00a77.13).\n\nAn entry that did not go through to the knockout, or every entry of a\ngroup phase without one, has `group_place`: its place in the standings\nand the phase's format (BR-103). A knockout entry has the final, the\nthird-place match or `lost_in_round` with the `round` it went out in, the\n`score` of that match (the entry's first: a BO1 game's goals, else the\ngames won; null for a walkover or a game without a score) and the\nopponent (BR-102); its `group_place` is that of the entry it continues,\nnull for a pair after Monster DYP rounds, which continues no single entry.",
+        "description": "Why an entry has its place (\u00a77.13).\n\nAn entry that did not go through to the knockout, or every entry of a\ngroup phase without one, has `group_place`: its place in the standings\nand the phase's format (BR-103). A knockout entry has the final, the\nthird-place match or `lost_in_round` with the `round` it went out in, the\n`score` of that match (the entry's first: a BO1 game's goals, else the\ngames won; null for a walkover or a game without a score) and the\nopponent (BR-102); its `group_place` is that of the entry it continues,\nnull for a pair after Monster DYP rounds, which continues no single entry.\n\nAfter a Lord have mercy knockout every row is one player's, by their main\nentry (BR-145): `partner_entry_id` is the main entry of the partner of\nthe player's last knockout match, null for a player who did not qualify\nand everywhere else; `opponent_entry_id` is null; `group_place` is the\nplayer's own.",
         "properties": {
           "group_format": {
             "anyOf": [
@@ -1896,6 +1896,18 @@
               }
             ],
             "title": "Opponent Entry Id"
+          },
+          "partner_entry_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Partner Entry Id"
           },
           "round": {
             "anyOf": [
@@ -1935,7 +1947,8 @@
           "score",
           "opponent_entry_id",
           "group_place",
-          "group_format"
+          "group_format",
+          "partner_entry_id"
         ],
         "title": "PlaceReasonRead",
         "type": "object"
@@ -2736,6 +2749,18 @@
             ],
             "title": "Opponent Entry Id"
           },
+          "partner_entry_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Partner Entry Id"
+          },
           "round": {
             "anyOf": [
               {
@@ -2774,7 +2799,8 @@
           "score",
           "opponent_entry_id",
           "group_place",
-          "group_format"
+          "group_format",
+          "partner_entry_id"
         ],
         "title": "PublicPlaceReasonRead",
         "type": "object"

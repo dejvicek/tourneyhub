@@ -277,13 +277,21 @@ def _require_unlocked(
 
 
 def _finish_with_knockout(tournament: Tournament, now: datetime) -> None:
-    """Finish a tournament whose knockout has every result (FR-037)."""
+    """Finish a tournament whose knockout has every result (FR-037).
+
+    A Lord have mercy knockout is over once its final's round is drawn and
+    played, the third-place match included (BR-142).
+    """
+    if tournament.state is not TournamentState.IN_PROGRESS:
+        return
+    remix = remix_knockout(tournament)
+    if remix is not None:
+        if remix.state.is_complete:
+            tournament.state = TournamentState.FINISHED
+            tournament.updated_at = now
+        return
     knockout = knockout_bracket(tournament)
-    if (
-        knockout is not None
-        and tournament.state is TournamentState.IN_PROGRESS
-        and is_complete(knockout.played.values())
-    ):
+    if knockout is not None and is_complete(knockout.played.values()):
         tournament.state = TournamentState.FINISHED
         tournament.updated_at = now
 

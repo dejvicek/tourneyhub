@@ -833,6 +833,7 @@ def places_read(places: PlacesView) -> PlacesRead:
                     opponent_entry_id=row.opponent_entry_id,
                     group_place=row.group_place,
                     group_format=places.group_format,
+                    partner_entry_id=row.partner_entry_id,
                 ),
             )
             for row in places.rows

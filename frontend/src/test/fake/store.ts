@@ -232,6 +232,7 @@ export function placesRead(t: StoredTournament): PlacesRead {
         round: null,
         score: null,
         opponent_entry_id: null,
+        partner_entry_id: null,
         group_place: row.place,
         group_format: "round_robin" as const,
       },

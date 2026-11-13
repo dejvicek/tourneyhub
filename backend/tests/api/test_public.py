@@ -526,6 +526,7 @@ _PUBLIC_PROPERTIES: dict[str, set[str]] = {
         "group_place",
         "kind",
         "opponent_entry_id",
+        "partner_entry_id",
         "round",
         "score",
     },

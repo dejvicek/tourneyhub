@@ -24,7 +24,6 @@ from tourneyhub.engine.tournaments import (
     EntryStage,
     MonsterKnockoutMode,
     PhaseKind,
-    TournamentState,
 )
 from tourneyhub.services.tournaments.remix import left_player_ids, remix_knockout
 from tourneyhub.services.tournaments.shared import _load_tournament
@@ -1210,16 +1209,19 @@ def test_fr046_deleting_the_whole_knockout_with_later_rounds(
 
 def test_br095_br112_deleting_the_final_round_of_a_finished_tournament(
     client: TestClient,
-    session: Session,
     league_id: UUID,
     headers: dict[str, str],
     monster: Json,
 ) -> None:
     started, _, drawn = _two_rounds(client, league_id, headers, monster)
+    season = monster["season_id"]
     _play(client, league_id, headers, started, drawn["rounds"][1]["matches"])
-    # Finishing comes with the places; the state is what deleting must undo.
-    session.get_one(Tournament, UUID(monster["id"])).state = TournamentState.FINISHED
-    session.flush()
+    finished = _get(client, league_id, monster["id"], "", headers)
+    counted = client.get(
+        _url(league_id, f"/seasons/{season}/standings"), headers=headers
+    )
+    assert finished["state"] == "finished"
+    assert len(counted.json()) == 8
 
     deleted = _delete_round(client, league_id, headers, started, _round_id_of(drawn, 2))
 
@@ -1227,6 +1229,11 @@ def test_br095_br112_deleting_the_final_round_of_a_finished_tournament(
     after = _get(client, league_id, monster["id"], "", headers)
     assert after["state"] == "in_progress"
     assert [r["round_no"] for r in _rounds(after, _knockout(after))] == [1]
+    # The tournament no longer counts in the season (BR-112).
+    uncounted = client.get(
+        _url(league_id, f"/seasons/{season}/standings"), headers=headers
+    )
+    assert uncounted.json() == []
     # The final's round is drawn again from the same winners.
     status, again = _draw_round(client, league_id, headers, started, 2)
     assert status == 201, again
@@ -1261,3 +1268,252 @@ def test_fr046_deleting_a_round_of_a_fixed_pair_knockout_is_422(
             "detail": {"format": "single_elimination", "mode": "seeded_pairs"},
         },
     )
+
+
+# ---------------------------------------------------------------- finish and places
+
+
+def _knockout_played(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    tournament: Json,
+    *,
+    third_place_match: bool = True,
+    qualifiers: int = 8,
+) -> tuple[Json, list[Json], Json]:
+    """Round 1 played (side 1 winning), round 2 drawn, not yet played."""
+    _, started = _started(
+        client,
+        league_id,
+        headers,
+        tournament,
+        qualifiers,
+        third_place_match=third_place_match,
+    )
+    round_1 = _round_one(started)
+    _play(client, league_id, headers, started, round_1)
+    status, drawn = _draw_round(client, league_id, headers, started, 2)
+    assert status == 201, drawn
+    return started, round_1, drawn
+
+
+def _entry_of(started: Json) -> dict[str, str]:
+    """Each player's main entry."""
+    return {
+        e["player_ids"][0]: e["id"] for e in started["entries"] if e["stage"] == "main"
+    }
+
+
+def _places(
+    client: TestClient, league_id: UUID, headers: dict[str, str], tournament: Json
+) -> Json:
+    return _get(client, league_id, tournament["id"], "/places", headers)
+
+
+def _state(
+    client: TestClient, league_id: UUID, headers: dict[str, str], tournament: Json
+) -> str:
+    state: str = _get(client, league_id, tournament["id"], "", headers)["state"]
+    return state
+
+
+def test_fr037_not_finished_after_round_one(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    _, started = _started(client, league_id, headers, monster)
+    _play(client, league_id, headers, started, _round_one(started))
+
+    assert _state(client, league_id, headers, monster) == "in_progress"
+    assert _places(client, league_id, headers, monster) == {
+        "complete": False,
+        "rows": [],
+    }
+    status, drawn = _draw_round(client, league_id, headers, started, 2)
+    assert status == 201, drawn
+    # The final is drawn, but not played.
+    assert _state(client, league_id, headers, monster) == "in_progress"
+
+
+def test_fr037_finishes_with_the_final_and_third_place(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    started, _, drawn = _knockout_played(client, league_id, headers, monster)
+    final, third = drawn["rounds"][1]["matches"]
+
+    _play(client, league_id, headers, started, [final])
+    after_final = _state(client, league_id, headers, monster)
+    _play(client, league_id, headers, started, [third])
+    third_result = {"id": third["match_id"]}
+
+    assert after_final == "in_progress"  # the third-place match is still open
+    assert _state(client, league_id, headers, monster) == "finished"
+    assert _places(client, league_id, headers, monster)["complete"] is True
+    # Clearing the third-place result takes it back (BR-095).
+    cleared = _put_result(client, league_id, headers, started, third_result, _CLEAR)
+    assert cleared[0] == 200, cleared[1]
+    assert _state(client, league_id, headers, monster) == "in_progress"
+
+
+def test_fr037_two_pairs_finish_with_round_one(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    players: list[str],
+) -> None:
+    four = _monster_of(client, league_id, headers, players[:4])
+    _, started = _started(client, league_id, headers, four, 4, third_place_match=False)
+    [final] = _round_one(started)
+    assert _state(client, league_id, headers, four) == "in_progress"
+
+    _play(client, league_id, headers, started, [final])
+
+    assert _state(client, league_id, headers, four) == "finished"
+    rows = _places(client, league_id, headers, four)["rows"]
+    assert [row["place"] for row in rows] == [1, 1, 2, 2]
+    assert {row["reason"]["kind"] for row in rows} == {"won_final", "lost_final"}
+
+
+def test_br145_places_per_player_with_partner(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    started, _, drawn = _knockout_played(client, league_id, headers, monster)
+    final, third = drawn["rounds"][1]["matches"]
+    _play(client, league_id, headers, started, [final, third])
+    entry_of = _entry_of(started)
+
+    rows = _places(client, league_id, headers, monster)["rows"]
+
+    by_entry = {row["entry_id"]: row for row in rows}
+    assert set(by_entry) == set(entry_of.values())
+    assert len(rows) == 8  # one row per player
+    assert [row["place"] for row in rows] == sorted(row["place"] for row in rows)
+    # Side 1 wins each match 10:5: place, points and why, for both of a pair.
+    expected = [
+        (final["sides"][0], 1, 10, "won_final", (10, 5)),
+        (final["sides"][1], 2, 8, "lost_final", (5, 10)),
+        (third["sides"][0], 3, 6, "won_third_place", (10, 5)),
+        (third["sides"][1], 4, 4, "lost_third_place", (5, 10)),
+    ]
+    for side, place, points, kind, score in expected:
+        first, second = side["player_ids"]
+        for player, partner in ((first, second), (second, first)):
+            row = by_entry[entry_of[player]]
+            assert (row["place"], row["points_per_player"]) == (place, points)
+            assert row["reason"]["kind"] == kind
+            assert row["reason"]["round"] == "final"
+            assert row["reason"]["score"] == list(score)
+            assert row["reason"]["opponent_entry_id"] is None
+            assert row["reason"]["partner_entry_id"] == entry_of[partner]
+            assert row["reason"]["group_place"] is not None
+
+
+def test_br145_br111_semifinal_losers_share_3rd_without_third_place(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    started, round_1, drawn = _knockout_played(
+        client, league_id, headers, monster, third_place_match=False
+    )
+    _play(client, league_id, headers, started, drawn["rounds"][1]["matches"])
+    entry_of = _entry_of(started)
+
+    rows = _places(client, league_id, headers, monster)["rows"]
+
+    assert [row["place"] for row in rows] == [1, 1, 2, 2, 3, 3, 3, 3]
+    shared = rows[4:]
+    # (6 + 4) / 2 points each (BR-111), and why: out in the semifinal.
+    assert {row["points_per_player"] for row in shared} == {5}
+    assert {row["reason"]["kind"] for row in shared} == {"lost_in_round"}
+    assert {row["reason"]["round"] for row in shared} == {"semifinal"}
+    losers = {p for match in round_1 for p in match["sides"][1]["player_ids"]}
+    assert {row["entry_id"] for row in shared} == {entry_of[p] for p in losers}
+
+
+def test_br103_best_non_qualifier_is_5th_after_4_pairs(
+    client: TestClient,
+    league: League,
+    league_id: UUID,
+    headers: dict[str, str],
+    make_player: Callable[..., Player],
+) -> None:
+    twelve = [str(make_player(league=league, name=f"Q{n}").id) for n in range(12)]
+    big = _monster_of(client, league_id, headers, twelve)
+    started, round_1, drawn = _knockout_played(
+        client, league_id, headers, big, third_place_match=False
+    )
+    _play(client, league_id, headers, started, drawn["rounds"][1]["matches"])
+    entry_of = _entry_of(started)
+    qualified = {
+        p for match in round_1 for s in match["sides"] for p in s["player_ids"]
+    }
+
+    rows = _places(client, league_id, headers, big)["rows"]
+
+    rest = [row for row in rows if row["reason"]["kind"] == "group_place"]
+    assert len(rows) == 12
+    assert {row["entry_id"] for row in rest} == {
+        entry_of[p] for p in twelve if p not in qualified
+    }
+    # Places count pairs: four knockout pairs fill 1st to 4th (BR-103).
+    assert min(row["place"] for row in rest) == 5
+    # Players level in the group phase share a place (BR-103, BR-104), and the
+    # 5th of the table earns 2 points where it is not shared (BR-110).
+    shared: dict[int, set[int]] = {}
+    for row in rest:
+        shared.setdefault(row["reason"]["group_place"], set()).add(row["place"])
+    assert all(len(places) == 1 for places in shared.values())
+    assert rest[0]["points_per_player"] == (
+        2 if rest[0]["place"] != rest[1]["place"] else 1
+    )
+    for row in rest:
+        assert row["reason"]["partner_entry_id"] is None
+        assert (row["reason"]["round"], row["reason"]["score"]) == (None, None)
+        assert row["reason"]["opponent_entry_id"] is None
+    # They follow in their group-phase order.
+    assert [row["reason"]["group_place"] for row in rest] == sorted(
+        row["reason"]["group_place"] for row in rest
+    )
+
+
+def test_br104_pairs_sharing_a_place_in_lot_order(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    started, round_1, drawn = _knockout_played(
+        client, league_id, headers, monster, third_place_match=False
+    )
+    _play(client, league_id, headers, started, drawn["rounds"][1]["matches"])
+    entry_of = _entry_of(started)
+
+    rows = _places(client, league_id, headers, monster)["rows"]
+
+    # The pairs that share 3rd come in the order of the drawn matches (#94 A),
+    # each pair's two players next to each other.
+    shared = [row["entry_id"] for row in rows if row["place"] == 3]
+    drawn_order = [
+        {entry_of[p] for p in match["sides"][1]["player_ids"]} for match in round_1
+    ]
+    assert [set(shared[0:2]), set(shared[2:4])] == drawn_order
+    assert _places(client, league_id, headers, monster)["rows"] == rows
+
+
+def test_br112_season_standings_count_a_lord_have_mercy_tournament(
+    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
+) -> None:
+    started, _, drawn = _knockout_played(client, league_id, headers, monster)
+    season = f"/seasons/{monster['season_id']}/standings"
+    before = client.get(_url(league_id, season), headers=headers)
+    _play(client, league_id, headers, started, drawn["rounds"][1]["matches"])
+    entry_of = _entry_of(started)
+
+    after = client.get(_url(league_id, season), headers=headers)
+
+    assert before.json() == []
+    rows = after.json()
+    places = _places(client, league_id, headers, monster)["rows"]
+    points = {row["entry_id"]: row["points_per_player"] for row in places}
+    assert {row["player_id"]: row["points"] for row in rows} == {
+        player: points[entry] for player, entry in entry_of.items()
+    }
+    assert sorted(row["points"] for row in rows) == [4, 4, 6, 6, 8, 8, 10, 10]
+    assert {row["tournaments_played"] for row in rows} == {1}
+    assert sorted(row["tournament_wins"] for row in rows) == [0] * 6 + [1, 1]
