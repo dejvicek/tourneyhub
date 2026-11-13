@@ -123,6 +123,12 @@ export const finals = {
       "The bracket and its results are removed. The group phase is unlocked, and you choose again what comes next.",
     deleteConfirm: "Delete the knockout",
   },
+  remix: {
+    winnerFixed: "Winner fixed",
+    left: "Left",
+    drawnAfter: "Drawn after the {{previous}}",
+    drawnLater: "Drawn later",
+  },
   finished: {
     title: "Finished",
     winners: "Winners",

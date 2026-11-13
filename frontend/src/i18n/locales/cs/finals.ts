@@ -122,6 +122,12 @@ export const finals: CsMessages<Messages["finals"]> = {
       "Pavouk i jeho výsledky se odstraní. Základní část se odemkne a znovu si vyberete, co bude dál.",
     deleteConfirm: "Smazat vyřazovací část",
   },
+  remix: {
+    winnerFixed: "Vítěz je pevný",
+    left: "Odešel",
+    drawnAfter: "Losuje se po: {{previous}}",
+    drawnLater: "Losuje se později",
+  },
   finished: {
     title: "Dohráno",
     winners: "Vítězové",
