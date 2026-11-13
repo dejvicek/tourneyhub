@@ -57,6 +57,29 @@ describe("the running round robin (screen 6)", () => {
     expect(within(table).getAllByRole("row")).toHaveLength(7);
   });
 
+  it("hides the game-difference column in BO1 (BR-101)", async () => {
+    stubViewport(1280);
+    renderAt(playPath(paths.schedule));
+
+    const table = await screen.findByRole("table", { name: "Standings" });
+    expect(
+      within(table).queryByRole("columnheader", { name: "Game difference" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the game-difference column in BO3 (BR-101)", async () => {
+    for (const phase of runningDyp().phases) {
+      phase.match_format = "bo3";
+    }
+    stubViewport(1280);
+    renderAt(playPath(paths.schedule));
+
+    const table = await screen.findByRole("table", { name: "Standings" });
+    expect(
+      within(table).getByRole("columnheader", { name: "Game difference" }),
+    ).toBeInTheDocument();
+  });
+
   it("links to the end of the group phase once every match is played (FR-040)", async () => {
     playEverything();
     renderAt(playPath(paths.schedule));

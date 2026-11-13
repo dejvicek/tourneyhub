@@ -17,7 +17,7 @@ interface StandingsNotesProps {
 /**
  * Says which tie-breaker ranks an entry above the next one level on points
  * (BR-101), e.g. "Anna and Petr are ahead of Jana and Tomáš on head-to-head:
- * they won 10:8 in round 5."
+ * they won 10:8 in round 5." Entries that met twice get both results.
  */
 export function StandingsNotes({
   model,
@@ -49,23 +49,49 @@ export function StandingsNotes({
                 side.entry_id === next.entry_id,
             ),
         );
-        const only = between.length === 1 ? between[0] : undefined;
-        const score = only ? scoreOf(only) : null;
-        if (!only || !score) {
-          return [t("roundRobin.notes.headToHead", values)];
-        }
-        const mine = sidesOf(only.match)[0].entry_id === row.entry_id;
-        return [
-          t("roundRobin.notes.headToHeadMatch", {
-            ...values,
-            score: t("roundRobin.score", {
-              a: mine ? score[0] : score[1],
-              b: mine ? score[1] : score[0],
+        // From this row's side, oldest first; null when one has no score.
+        const results = between
+          .sort((x, y) => x.round.round_no - y.round.round_no)
+          .map((info) => {
+            const score = scoreOf(info);
+            if (!score) {
+              return null;
+            }
+            const mine = sidesOf(info.match)[0].entry_id === row.entry_id;
+            return {
+              score: t("roundRobin.score", {
+                a: mine ? score[0] : score[1],
+                b: mine ? score[1] : score[0],
+              }),
+              round: info.round.round_no,
+            };
+          });
+        const [first, second] = results;
+        if (results.length === 1 && first) {
+          return [
+            t("roundRobin.notes.headToHeadMatch", {
+              ...values,
+              score: first.score,
+              round: first.round,
             }),
-            round: only.round.round_no,
-          }),
-        ];
+          ];
+        }
+        // #75 Q35: entries that met twice get both results.
+        if (results.length === 2 && first && second) {
+          return [
+            t("roundRobin.notes.headToHeadMatches", {
+              ...values,
+              first: first.score,
+              firstRound: first.round,
+              second: second.score,
+              secondRound: second.round,
+            }),
+          ];
+        }
+        return [t("roundRobin.notes.headToHead", values)];
       }
+      case "game_difference":
+        return [t("roundRobin.notes.gameDifference", values)];
       case "score_difference":
         return [t("roundRobin.notes.scoreDifference", values)];
     }

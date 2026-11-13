@@ -59,6 +59,7 @@ export const roundRobin = {
     title: "Standings",
     place: "Place",
     entry: "Pair or player",
+    gameDifference: "Game difference",
     difference: "Score difference",
     points: "Points",
     placeValue: "{{place}}",
@@ -87,6 +88,12 @@ export const roundRobin = {
       "{{a}} is ahead of {{b}} on head-to-head: won {{score}} in round {{round}}.",
     headToHeadMatch_other:
       "{{a}} are ahead of {{b}} on head-to-head: they won {{score}} in round {{round}}.",
+    headToHeadMatches_one:
+      "{{a}} is ahead of {{b}} on head-to-head: {{first}} in round {{firstRound}}, {{second}} in round {{secondRound}}.",
+    headToHeadMatches_other:
+      "{{a}} are ahead of {{b}} on head-to-head: {{first}} in round {{firstRound}}, {{second}} in round {{secondRound}}.",
+    gameDifference_one: "{{a}} is ahead of {{b}} on game difference.",
+    gameDifference_other: "{{a}} are ahead of {{b}} on game difference.",
     scoreDifference_one: "{{a}} is ahead of {{b}} on score difference.",
     scoreDifference_other: "{{a}} are ahead of {{b}} on score difference.",
   },

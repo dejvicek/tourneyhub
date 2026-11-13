@@ -60,6 +60,7 @@ export const publicView = {
     played: "Played",
     wins: "Wins",
     tournaments: "Tournaments",
+    gameDifference: "Games",
     difference: "Difference",
     placeValue: "{{place}}.",
   },

@@ -48,7 +48,8 @@ function FormDots({ form }: { form: readonly FormResult[] }) {
 
 /**
  * Live group-phase standings (FR-060, BR-101): place, the pair, form, the
- * record, score difference and points. A shared place repeats its number.
+ * record, game difference in BO3 and BO5, score difference and points. A
+ * shared place repeats its number.
  */
 export function StandingsTable({
   model,
@@ -61,6 +62,11 @@ export function StandingsTable({
     signDisplay: "exceptZero",
   });
   const showSatOut = rows.some((row) => row.sat_out > 0);
+  // BR-101: game difference ranks in every format, but in BO1 and BO2 it
+  // follows from won and lost, so its column only costs width on a phone.
+  const format = model.group?.match_format;
+  const showGames = format === "bo3" || format === "bo5";
+  const columns = showGames ? 5 : 4;
 
   return (
     <table className="w-full border-separate border-spacing-0 text-left">
@@ -69,6 +75,9 @@ export function StandingsTable({
         <tr>
           <th scope="col">{t("roundRobin.standings.place")}</th>
           <th scope="col">{t("roundRobin.standings.entry")}</th>
+          {showGames && (
+            <th scope="col">{t("roundRobin.standings.gameDifference")}</th>
+          )}
           <th scope="col">{t("roundRobin.standings.difference")}</th>
           <th scope="col">{t("roundRobin.standings.points")}</th>
         </tr>
@@ -80,7 +89,7 @@ export function StandingsTable({
             <Fragment key={row.entry_id}>
               {cutAfter === index && (
                 <tr>
-                  <td colSpan={4} className="py-2">
+                  <td colSpan={columns} className="py-2">
                     <span className="flex items-center gap-2 text-caption font-bold text-secondary-foreground">
                       <span className="h-0 flex-1 border-t-2 border-dashed border-primary" />
                       {t("roundRobin.standings.cut", { count: cutAfter })}
@@ -147,6 +156,11 @@ export function StandingsTable({
                     )}
                   </span>
                 </td>
+                {showGames && (
+                  <td className="border-t py-3 pr-2 text-right text-body-sm">
+                    {signed.format(row.game_difference)}
+                  </td>
+                )}
                 <td className="border-t py-3 pr-2 text-right text-body-sm text-muted-foreground">
                   {signed.format(row.score_difference)}
                 </td>

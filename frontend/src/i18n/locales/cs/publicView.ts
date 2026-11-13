@@ -61,6 +61,7 @@ export const publicView: CsMessages<Messages["publicView"]> = {
     played: "Odehráno",
     wins: "Výhry",
     tournaments: "Turnaje",
+    gameDifference: "Hry",
     difference: "Rozdíl",
     placeValue: "{{place}}.",
   },

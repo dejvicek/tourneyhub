@@ -313,6 +313,11 @@ function TableStandings({
   const signed = new Intl.NumberFormat(i18n.resolvedLanguage, {
     signDisplay: "exceptZero",
   });
+  // BR-101: the game-difference column only in BO3 and BO5.
+  const format = tournament.phases.find(
+    (phase) => phase.kind === "group",
+  )?.match_format;
+  const showGames = format === "bo3" || format === "bo5";
   if (standings.data === undefined) {
     return standings.isPending ? (
       <p role="status" className="text-body-md text-muted-foreground">
@@ -339,6 +344,11 @@ function TableStandings({
             <th scope="col" className="px-2 py-2 text-right font-bold">
               {t("publicView.table.played")}
             </th>
+            {showGames && (
+              <th scope="col" className="px-2 py-2 text-right font-bold">
+                {t("publicView.table.gameDifference")}
+              </th>
+            )}
             <th
               scope="col"
               className="hidden px-2 py-2 text-right font-bold sm:table-cell"
@@ -366,6 +376,11 @@ function TableStandings({
                 {names.ofEntry(row.entry_id)}
               </th>
               <td className="px-2 py-2 text-right">{row.played}</td>
+              {showGames && (
+                <td className="px-2 py-2 text-right">
+                  {signed.format(row.game_difference)}
+                </td>
+              )}
               <td className="hidden px-2 py-2 text-right text-muted-foreground sm:table-cell">
                 {signed.format(row.score_difference)}
               </td>
