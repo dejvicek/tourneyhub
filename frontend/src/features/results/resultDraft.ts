@@ -8,7 +8,8 @@ type GameWrite = components["schemas"]["GameWrite"];
 type MatchFormat = components["schemas"]["MatchFormat"];
 type PhaseRead = components["schemas"]["PhaseRead"];
 type ResultWrite = components["schemas"]["ResultWrite"];
-type Side = Exclude<components["schemas"]["Outcome"], "draw">;
+/** One side of a match: the API's outcome without a draw. */
+export type Side = Exclude<components["schemas"]["Outcome"], "draw">;
 
 /** Whether every game needs its score (BR-092), as rules.ts says today. */
 export function scoresRequired(phase: PhaseRead): boolean {

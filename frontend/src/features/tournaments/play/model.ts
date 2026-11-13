@@ -5,6 +5,7 @@ import type { SkipToken } from "@tanstack/react-query";
 
 import type { components } from "@/api/schema";
 import { matchFormat } from "@/features/results/matchFormat";
+import type { Side } from "@/features/results/resultDraft";
 import type { tournamentQueries } from "@/features/tournaments/api";
 
 type EntryRead = components["schemas"]["EntryRead"];
@@ -14,7 +15,6 @@ type MatchSideRead = components["schemas"]["MatchSideRead"];
 type PhaseRead = components["schemas"]["PhaseRead"];
 type PlayerRead = components["schemas"]["PlayerRead"];
 type PlayRead = components["schemas"]["PlayRead"];
-type Side = Exclude<components["schemas"]["Outcome"], "draw">;
 
 /** The tournament as the client returns it (its sides are an array, not a pair). */
 type DetailQueryFn = Exclude<

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { RadioGroup } from "@/components/ui/radio-group";
 import { OptionCard } from "@/features/tournaments/play/OptionCard";
 
-type Side = Exclude<components["schemas"]["Outcome"], "draw">;
+import type { Side } from "./resultDraft";
 
 type ResultWrite = components["schemas"]["ResultWrite"];
 
