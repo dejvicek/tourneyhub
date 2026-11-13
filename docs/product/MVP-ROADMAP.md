@@ -53,7 +53,7 @@ The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. 
   - [ ] Cut line during the Swiss rounds, before the knockout is drawn ([#98](https://github.com/dejvicek/tourneyhub/issues/98), waiting for an answer).
 - [ ] **P13 Monster DYP** (FR-041, FR-045; BR-060 – BR-063, BR-081 – BR-084; ADR-010, ADR-011)
   - [x] Engine: round draws, standings, knockout entries ([#41](https://github.com/dejvicek/tourneyhub/pull/41)).
-  - [ ] Services and API: start, rounds, top players (`entries.is_top_player`).
+  - [x] Services and API: start, rounds, top players (`entries.is_top_player`).
   - [ ] Knockout modes: seeded pairs, singles, A little mercy, Lord have mercy.
   - [ ] Lord have mercy re-mix ([#63](https://github.com/dejvicek/tourneyhub/issues/63)):
     - [x] Step 1, data model and engine: a stored draw per knockout round (DATA-MODEL D4 and D5, ADR-009, ADR-010); the draw of later rounds, the result lock and places per player in the engine ([#93](https://github.com/dejvicek/tourneyhub/pull/93)).
