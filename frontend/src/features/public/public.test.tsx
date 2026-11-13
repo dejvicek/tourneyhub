@@ -195,7 +195,7 @@ describe("share-link views", () => {
     expect(rows.at(-1)?.[0]).not.toHaveTextContent(/^1$/);
   });
 
-  it("FR-043: a Monster DYP's standings render without form and ahead_by", async () => {
+  it("FR-060: a Monster DYP's standings render without form and ahead_by", async () => {
     const monster = db().tournaments.find((t) => t.name === "Monster DYP");
     if (monster === undefined) {
       throw new Error("The seed has a Monster DYP");

@@ -149,7 +149,7 @@ describe("the finals in the fake API", () => {
     });
   });
 
-  it("fr046 fake monster needs four players", async () => {
+  it("FR-032, BR-064: fake Monster DYP needs four players who are not disabled", async () => {
     const entries = await dataOf(
       provisionalApi.GET(`${root}/participants`, {
         params: { path: base(MONSTER) },
@@ -214,7 +214,7 @@ describe("the finals in the fake API", () => {
           body: startBody(await setupOf(id)),
         }),
       );
-      return { id, marks };
+      return { id, marks, picked };
     }
 
     /** Plays round 1, adds round 2 and gives the players of each of its matches. */
@@ -242,7 +242,7 @@ describe("the finals in the fake API", () => {
       );
     }
 
-    it("br061 fake marked players lead different groups", async () => {
+    it("BR-061: fake marked players lead different groups", async () => {
       const { id, marks } = await startMonster(9, [7, 8]);
 
       const groups = await secondRound(id);
@@ -260,14 +260,32 @@ describe("the finals in the fake API", () => {
       expect(new Set(leaders).size).toBe(2);
     });
 
-    it("br061 fake surplus marks at start", async () => {
+    it("BR-061: fake surplus marks at start", async () => {
       // Two marks, but 7 players make one match: only the first marked one leads.
       const { id, marks } = await startMonster(9, [5, 6], 7);
 
       const groups = await secondRound(id);
 
       expect(groups).toHaveLength(1);
-      expect(groups[0]).toContain(marks[0]);
+      // The leader is the first marked player who plays in that round.
+      const firstPlaying = marks.find((mark) => groups.flat().includes(mark));
+      expect(firstPlaying).toBeDefined();
+      expect(groups[0]?.[0]).toBe(firstPlaying);
+    });
+
+    it("BR-061: fake an unmarked top player is the best by league ranking, not by standing", async () => {
+      // One mark: the second group is led by the best-ranked player in the
+      // league among those who play, not by the best in the standings.
+      const { id, marks, picked } = await startMonster(9, [7]);
+
+      const groups = await secondRound(id);
+
+      const playing = groups.flat();
+      const bestInLeague = picked.find(
+        (player) => !marks.includes(player) && playing.includes(player),
+      );
+      expect(bestInLeague).toBeDefined();
+      expect(groups.map((group) => group[0])).toEqual([marks[0], bestInLeague]);
     });
   });
 

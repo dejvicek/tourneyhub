@@ -722,7 +722,7 @@ describe("Between rounds (screen 11)", () => {
   });
 
   // The Swiss fixture stands in for the between-rounds screen that Monster DYP shares.
-  it("says how many players another round needs (FR-046)", async () => {
+  it("says how many players another round needs (FR-032, BR-064)", async () => {
     server.use(
       http.post(
         "*/api/v1/leagues/:leagueId/tournaments/:tournamentId/rounds",
@@ -889,15 +889,11 @@ describe("Monster DYP between rounds on the real response shapes (screen 11)", (
 
     const table = await screen.findByRole("table", { name: /^Standings/ });
     const rows = within(table).getAllByRole("row").slice(1);
-    expect(rows).toHaveLength(9);
     const places = rows.map(
       (row) => within(row).getAllByRole("cell")[0]?.textContent,
     );
     // The four winners share 1st, the sitter (2 points) is 5th, the four losers share 6th.
     expect(places).toEqual(["1", "1", "1", "1", "5", "6", "6", "6", "6"]);
-    expect(
-      rows.map((r) => within(r).getAllByRole("cell")[1]?.textContent),
-    ).toHaveLength(9);
   });
 
   it("FR-040: finishes without a knockout once the round is complete", async () => {

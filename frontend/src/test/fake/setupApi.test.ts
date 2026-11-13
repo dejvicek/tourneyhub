@@ -664,7 +664,7 @@ describe("the fake API for tournament setup", () => {
         .slice(0, count)
         .map((r) => r.player_id);
 
-    it("fr041 fake too many top players", async () => {
+    it("FR-041: fake too many top players", async () => {
       const id = await monster();
       const players = await playersOf(id, 9);
 
@@ -677,7 +677,7 @@ describe("the fake API for tournament setup", () => {
       ]);
     });
 
-    it("fr041 fake marks bump the draw counter once", async () => {
+    it("FR-041: fake marks bump the draw counter once", async () => {
       const id = await monster();
       const [a, b] = await playersOf(id, 8);
       const start = (await setupOf(id)).draw_counter;
@@ -692,7 +692,7 @@ describe("the fake API for tournament setup", () => {
       expect([first, same, cleared]).toEqual([start + 1, start + 1, start + 2]);
     });
 
-    it("adr008 fake changed marks make the start stale", async () => {
+    it("ADR-008: fake changed marks make the start stale", async () => {
       const id = await monster();
       const [a, b] = await playersOf(id, 8);
       await dataOf(mark(id, [a ?? ""]));
@@ -711,16 +711,17 @@ describe("the fake API for tournament setup", () => {
       expect([stale.status, stale.code]).toEqual([409, "draw_counter_changed"]);
     });
 
-    it("fr041 fake unpicked player", async () => {
+    it("FR-041: fake unpicked player", async () => {
       const id = await monster();
       const picked = await playersOf(id, 8);
       const outsider = (await setupOf(id)).ranking.find(
         (r) => !picked.includes(r.player_id),
       );
+      if (!outsider) {
+        throw new Error("the league has a player who is not picked");
+      }
 
-      const refused = await failure(
-        dataOf(mark(id, [outsider?.player_id ?? ""])),
-      );
+      const refused = await failure(dataOf(mark(id, [outsider.player_id])));
 
       expect([refused.status, refused.code]).toEqual([
         409,
