@@ -817,12 +817,13 @@ def test_br080_a_disabled_player_does_not_qualify_and_the_next_moves_up(
     assert order[0] not in [member for members in _members(pairs) for member in members]
 
 
-def test_fr045_a_mode_after_a_swiss_is_still_422(
+def _played_swiss(
     client: TestClient,
     league_id: UUID,
     headers: dict[str, str],
     players: list[str],
-) -> None:
+) -> Json:
+    """Four players after Swiss round 1, every match played."""
     created = client.post(
         _url(league_id, "/tournaments"),
         json={"id": str(uuid7()), **SWISS},
@@ -855,7 +856,17 @@ def test_fr045_a_mode_after_a_swiss_is_still_422(
             headers=headers,
         )
         assert result.status_code == 200, result.text
-    tournament = _get(client, league_id, tournament_id, "", headers)
+    tournament: Json = _get(client, league_id, tournament_id, "", headers)
+    return tournament
+
+
+def test_fr045_a_mode_after_a_swiss_is_still_422(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    players: list[str],
+) -> None:
+    tournament = _played_swiss(client, league_id, headers, players)
 
     status, body = _knockout_put(
         client, league_id, headers, tournament, mode="seeded_pairs", qualifiers=4
@@ -865,3 +876,189 @@ def test_fr045_a_mode_after_a_swiss_is_still_422(
         422,
         {"code": "knockout_mode_not_applicable", "detail": {"format": "swiss"}},
     )
+
+
+# ---------------------------------------------------------------- draw again
+
+
+def _draw_again(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    tournament: Json,
+    expected: int,
+) -> tuple[int, Json]:
+    response = client.post(
+        _t_url(league_id, tournament["id"], "/knockout/draw"),
+        json={"expected_draw_counter": expected},
+        headers=headers,
+    )
+    body: Json = response.json()
+    return response.status_code, body
+
+
+def test_fr045_draw_again_increments_the_counter(
+    client: TestClient,
+    session: Session,
+    league_id: UUID,
+    headers: dict[str, str],
+    monster: Json,
+) -> None:
+    before = _monster_preview(
+        client, league_id, headers, monster, mode="a_little_mercy", qualifiers=8
+    )
+    n = before["draw_counter"]
+
+    status, body = _draw_again(client, league_id, headers, monster, n)
+
+    assert (status, body) == (200, {"draw_counter": n + 1})
+    after = _monster_preview(
+        client, league_id, headers, monster, mode="a_little_mercy", qualifiers=8
+    )
+    assert after["draw_counter"] == n + 1
+    play = _get(client, league_id, monster["id"], "/play", headers)
+    player_of = _player_of(monster)
+    entry_of = {player: entry for entry, player in player_of.items()}
+    stored = session.get_one(Tournament, UUID(monster["id"]))
+    drawn = select_monster_knockout(
+        [
+            MonsterStanding(
+                player_id=PlayerId(UUID(player_of[row["entry_id"]])),
+                position=position,
+                place=row["place"],
+                points=row["points"],
+                bh1=row["bh1"],
+                bh2=row["bh2"],
+                score_difference=row["score_difference"],
+                played=row["played"],
+                won=row["won"],
+                drawn=row["drawn"],
+                lost=row["lost"],
+                sat_out=row["sat_out"],
+                is_decided_by_lot=False,
+            )
+            for position, row in enumerate(play["standings"], start=1)
+        ],
+        qualifiers=8,
+        mode=MonsterKnockoutMode.A_LITTLE_MERCY,
+        rng_seed=stored.rng_seed,
+        draw_counter=n + 1,
+    )
+    assert _members(after) == [
+        [entry_of[str(player)] for player in entry.player_ids]
+        for entry in drawn.entries
+    ]
+    # The top half keeps its places; only the partners are drawn again.
+    assert [pair[0] for pair in _members(after)] == [
+        pair[0] for pair in _members(before)
+    ]
+
+
+def test_adr008_a_stale_draw_again_is_409(
+    client: TestClient,
+    session: Session,
+    league_id: UUID,
+    headers: dict[str, str],
+    monster: Json,
+) -> None:
+    stored = session.get_one(Tournament, UUID(monster["id"]))
+    n = stored.draw_counter
+
+    status, body = _draw_again(client, league_id, headers, monster, n + 1)
+
+    assert (status, body) == (
+        409,
+        {"code": "draw_counter_changed", "detail": {"draw_counter": n}},
+    )
+    session.refresh(stored)
+    assert stored.draw_counter == n
+
+
+def test_adr008_a_start_after_draw_again_with_the_old_preview_is_409(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    monster: Json,
+) -> None:
+    shown = _monster_preview(
+        client, league_id, headers, monster, mode="a_little_mercy", qualifiers=8
+    )
+    status, _ = _draw_again(client, league_id, headers, monster, shown["draw_counter"])
+    assert status == 200
+
+    response = client.put(
+        _t_url(league_id, monster["id"], "/knockout"),
+        json={
+            "expected_current_phase_id": monster["current_phase_id"],
+            "expected_qualifier_ids": [m for ms in _members(shown) for m in ms],
+            "expected_draw_counter": shown["draw_counter"],
+            "qualifiers": 8,
+            "third_place_match": False,
+            "match_format": "bo1",
+            "final_match_format": None,
+            "mode": "a_little_mercy",
+        },
+        headers=headers,
+    )
+
+    assert (response.status_code, response.json()) == (
+        409,
+        {
+            "code": "draw_counter_changed",
+            "detail": {"draw_counter": shown["draw_counter"] + 1},
+        },
+    )
+
+
+def test_fr045_draw_again_once_the_knockout_exists_is_409(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    monster: Json,
+) -> None:
+    shown, started = _start_monster(
+        client, league_id, headers, monster, mode="a_little_mercy", qualifiers=8
+    )
+
+    status, body = _draw_again(
+        client, league_id, headers, monster, shown["draw_counter"]
+    )
+
+    assert status == 409
+    assert body["code"] == "current_phase_changed"
+    assert body["detail"]["current_phase_id"] == started["current_phase_id"]
+
+
+def test_fr045_draw_again_after_a_swiss_is_422(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    players: list[str],
+) -> None:
+    tournament = _played_swiss(client, league_id, headers, players)
+
+    status, body = _draw_again(client, league_id, headers, tournament, 0)
+
+    assert (status, body) == (
+        422,
+        {"code": "knockout_mode_not_applicable", "detail": {"format": "swiss"}},
+    )
+
+
+def test_api1_draw_again_of_another_organizers_tournament_is_404(
+    client: TestClient,
+    league_id: UUID,
+    make_league: Callable[..., League],
+    auth_header: Callable[..., dict[str, str]],
+    monster: Json,
+) -> None:
+    other = make_league()
+
+    response = client.post(
+        _t_url(league_id, monster["id"], "/knockout/draw"),
+        json={"expected_draw_counter": 0},
+        headers=auth_header(other.owner_user_id),
+    )
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "league_not_found"

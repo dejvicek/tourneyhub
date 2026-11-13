@@ -601,6 +601,58 @@ def start_knockout(
     )
 
 
+def draw_knockout_again(
+    session: Session,
+    *,
+    league_id: UUID,
+    tournament_id: UUID,
+    user_id: UUID,
+    expected_draw_counter: int,
+    clock: Clock,
+) -> int:
+    """Draw the knockout's pairs again after Monster DYP rounds; the new counter.
+
+    The lots of the pair modes come from the draw counter, so counting it up
+    gives the next preview a new draw (FR-045, BR-083, ADR-010). The server
+    accepts it in every Monster DYP mode; the screen offers it in the lot modes.
+    A closed season is 409 `season_closed`, a tournament not in progress 409
+    `tournament_not_in_progress`, a knockout that exists 409
+    `current_phase_changed` (detail `current_phase_id`), a group phase that is
+    not Monster DYP 422 `knockout_mode_not_applicable` (detail `format`), and a
+    stale `expected_draw_counter` 409 `draw_counter_changed` (detail
+    `draw_counter`), so a repeat never draws twice (ADR-008).
+    """
+    league, tournament = _lock_tournament(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user_id,
+        rounds=True,
+    )
+    _require_open_season(league, tournament)
+    if tournament.state is not TournamentState.IN_PROGRESS:
+        raise ConflictError(
+            ErrorCode.TOURNAMENT_NOT_IN_PROGRESS, state=tournament.state
+        )
+    if knockout_bracket(tournament) is not None:
+        current = _current_phase(tournament)
+        raise ConflictError(
+            ErrorCode.CURRENT_PHASE_CHANGED,
+            current_phase_id=None if current is None else str(current.id),
+        )
+    group = _group_phase(tournament)
+    if group is None or group.format is not PhaseFormat.MONSTER_DYP:
+        format_ = tournament.phases[0].format if group is None else group.format
+        raise RuleViolationError(ErrorCode.KNOCKOUT_MODE_NOT_APPLICABLE, format=format_)
+    if tournament.draw_counter != expected_draw_counter:
+        raise ConflictError(
+            ErrorCode.DRAW_COUNTER_CHANGED, draw_counter=tournament.draw_counter
+        )
+    tournament.draw_counter += 1
+    tournament.updated_at = clock()
+    return tournament.draw_counter
+
+
 def _write_knockout(
     session: Session,
     league: League,

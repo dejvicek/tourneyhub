@@ -131,6 +131,21 @@ class KnockoutWrite(RequestModel):
     mode: MonsterKnockoutMode | None
 
 
+class KnockoutDrawWrite(RequestModel):
+    """Draw the knockout's pairs again (FR-045, ADR-010).
+
+    `expected_draw_counter` is the preview's `draw_counter`.
+    """
+
+    expected_draw_counter: Annotated[int, Field(ge=0, le=INT_MAX)]
+
+
+class KnockoutDrawRead(ResponseModel):
+    """The draw counter after drawing again; preview again to see the new pairs."""
+
+    draw_counter: int
+
+
 class FinalFormatWrite(RequestModel):
     """The final's own format, or null to play the knockout's (FR-054, BR-120).
 
@@ -355,6 +370,35 @@ def start_knockout(
         clock=clock,
     )
     return TournamentRead.model_validate(tournament)
+
+
+@router.post("/knockout/draw", responses=_WRITE_ERRORS)
+def draw_knockout_again(
+    league_id: UUID,
+    tournament_id: UUID,
+    body: KnockoutDrawWrite,
+    session: SessionDep,
+    user: CurrentUserDep,
+    clock: ClockDep,
+) -> KnockoutDrawRead:
+    """Draw the knockout's pairs again after Monster DYP rounds (FR-045, BR-083).
+
+    Counts the draw counter up; the next preview shows the new lots (ADR-010).
+    Accepted in every Monster DYP mode. A stale `expected_draw_counter` is 409
+    `draw_counter_changed` with the current `draw_counter`. 409 `season_closed`,
+    `tournament_not_in_progress` (detail `state`) or `current_phase_changed`
+    once the knockout exists; 422 `knockout_mode_not_applicable` when the group
+    phase is not Monster DYP.
+    """
+    draw_counter = knockout_service.draw_knockout_again(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user.id,
+        expected_draw_counter=body.expected_draw_counter,
+        clock=clock,
+    )
+    return KnockoutDrawRead(draw_counter=draw_counter)
 
 
 @router.put("/knockout/final-format", responses=_WRITE_ERRORS)

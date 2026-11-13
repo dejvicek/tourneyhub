@@ -833,6 +833,37 @@
         "type": "object"
       },
       "JsonValue": {},
+      "KnockoutDrawRead": {
+        "description": "The draw counter after drawing again; preview again to see the new pairs.",
+        "properties": {
+          "draw_counter": {
+            "title": "Draw Counter",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "draw_counter"
+        ],
+        "title": "KnockoutDrawRead",
+        "type": "object"
+      },
+      "KnockoutDrawWrite": {
+        "additionalProperties": false,
+        "description": "Draw the knockout's pairs again (FR-045, ADR-010).\n\n`expected_draw_counter` is the preview's `draw_counter`.",
+        "properties": {
+          "expected_draw_counter": {
+            "maximum": 2147483647.0,
+            "minimum": 0.0,
+            "title": "Expected Draw Counter",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_draw_counter"
+        ],
+        "title": "KnockoutDrawWrite",
+        "type": "object"
+      },
       "KnockoutMatchFormat": {
         "description": "A match format a knockout and its final can play: never BO2 (BR-121).",
         "enum": [
@@ -7370,6 +7401,105 @@
           }
         ],
         "summary": "Start Knockout",
+        "tags": [
+          "knockout"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout/draw": {
+      "post": {
+        "description": "Draw the knockout's pairs again after Monster DYP rounds (FR-045, BR-083).\n\nCounts the draw counter up; the next preview shows the new lots (ADR-010).\nAccepted in every Monster DYP mode. A stale `expected_draw_counter` is 409\n`draw_counter_changed` with the current `draw_counter`. 409 `season_closed`,\n`tournament_not_in_progress` (detail `state`) or `current_phase_changed`\nonce the knockout exists; 422 `knockout_mode_not_applicable` when the group\nphase is not Monster DYP.",
+        "operationId": "draw_knockout_again",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnockoutDrawWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnockoutDrawRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Draw Knockout Again",
         "tags": [
           "knockout"
         ]
