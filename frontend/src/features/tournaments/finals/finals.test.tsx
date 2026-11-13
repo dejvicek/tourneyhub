@@ -1053,7 +1053,7 @@ describe("Late and disabled players (screen 12)", () => {
 });
 
 describe("Start the knockout (screen 13)", () => {
-  it("offers the three modes from the rules and previews each", async () => {
+  it("offers the four modes, Lord have mercy last (FR-045, BR-084)", async () => {
     const user = userEvent.setup();
     renderAt(at(paths.startKnockout, MONSTER));
 
@@ -1064,16 +1064,17 @@ describe("Start the knockout (screen 13)", () => {
       within(modes)
         .getAllByRole("radio")
         .map((radio) => radio.parentElement?.textContent ?? ""),
-    ).toHaveLength(3);
-    for (const name of ["Seeded pairs", "Singles", "A little mercy"]) {
+    ).toHaveLength(4);
+    for (const name of [
+      "Seeded pairs",
+      "Singles",
+      "A little mercy",
+      "Lord have mercy",
+    ]) {
       expect(
         within(modes).getByRole("radio", { name: new RegExp(`^${name}`) }),
       ).toBeInTheDocument();
     }
-    // Not offered until the re-mix is built (issue #63).
-    expect(
-      within(modes).queryByRole("radio", { name: /^Lord have mercy/ }),
-    ).not.toBeInTheDocument();
     // Seeded pairs: 8 players make 4 pairs and semifinals.
     expect(screen.getAllByText("VS")).toHaveLength(2);
     expect(
@@ -1087,6 +1088,43 @@ describe("Start the knockout (screen 13)", () => {
       ).toBeInTheDocument();
     });
     expect(screen.getAllByText("VS")).toHaveLength(4);
+  });
+
+  it("keeps Draw the knockout disabled and names the problem when can_start is false (BR-080)", async () => {
+    server.use(
+      http.get(
+        "/api/v1/leagues/:leagueId/tournaments/:tournamentId/knockout/preview",
+        () =>
+          HttpResponse.json({
+            can_start: false,
+            problem: { code: "knockout_mode_required", detail: {} },
+            draw_counter: 0,
+            is_cut_by_lot: false,
+            max_qualifiers: 4,
+            qualifiers: 4,
+            entries: [1, 2, 3, 4].map((seed) => ({
+              seed,
+              members: [{ entry_id: `e${String(seed)}`, place: seed }],
+              decided_by_lot: false,
+            })),
+            first_round: [
+              [1, 4],
+              [2, 3],
+            ],
+            bracket_size: 4,
+            locks_round_no: 1,
+            skipped_entry_ids: [],
+          }),
+      ),
+    );
+    renderAt(at(paths.startKnockout, MONSTER));
+
+    expect(
+      await screen.findByText("Pick how the teams are formed."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Draw the knockout" }),
+    ).toBeDisabled();
   });
 
   it("says which disabled player can't go through (BR-080)", async () => {

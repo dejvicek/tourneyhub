@@ -100,13 +100,9 @@ export const rules: Readonly<Rules> = {
   /**
    * FR-045, BR-081–BR-084: the modes offered, in this order. Their names are
    * the `knockoutModes` texts in src/i18n, the same in English and Czech
-   * (FR-080), so a rename changes those texts. Lord have mercy is not offered
-   * until its re-mix is built (issue #63; dejvicek's decision in the review
-   * of #64), so the screen hides it and the fake API refuses it.
+   * (FR-080), so a rename changes those texts. Lord have mercy comes last.
    */
-  monsterKnockoutModes: MONSTER_KNOCKOUT_MODES.filter(
-    (mode) => mode !== "lord_have_mercy",
-  ),
+  monsterKnockoutModes: MONSTER_KNOCKOUT_MODES,
 };
 
 // Settled rules the demo also needs, from PRD.md, kept here so that the

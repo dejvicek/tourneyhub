@@ -493,16 +493,8 @@ describe("the finals in the fake API", () => {
     },
   );
 
-  it("refuses Lord have mercy until its re-mix is built (issue #63)", async () => {
-    await expect(
-      dataOf(
-        provisionalApi.PUT(`${root}/knockout`, {
-          params: { path: base(MONSTER) },
-          body: { ...KNOCKOUT, mode: "lord_have_mercy" },
-        }),
-      ),
-    ).rejects.toMatchObject({ status: 422 });
-  });
+  // Turns green in Task 3 of the P13 PR 5 plan, when the fake draws round 1 only.
+  it.todo("starts a Lord have mercy knockout with round 1 only (BR-140)");
 
   it("deletes the knockout and unlocks the group phase (FR-046, BR-087)", async () => {
     const drawn = await dataOf(
