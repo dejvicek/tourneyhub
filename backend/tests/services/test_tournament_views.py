@@ -16,6 +16,7 @@ from tourneyhub.engine.tournaments import (
 )
 from tourneyhub.services import tournaments as tournament_service
 from tourneyhub.services.tournaments import SideView, _match_format, _match_view
+from tourneyhub.services.tournaments import play as tournament_play
 from tourneyhub.services.tournaments.shared import _match_slots
 
 NOW = datetime(2026, 11, 12, tzinfo=UTC)
@@ -179,10 +180,10 @@ def test_d10_a_field_pointing_at_a_match_the_read_did_not_see_counts_as_free(
         Field(id=uuid7(), number=2, match_id=other.id),
     ]
     monkeypatch.setattr(
-        tournament_service, "get_league", lambda *_, **__: League(id=uuid7())
+        tournament_play, "get_league", lambda *_, **__: League(id=uuid7())
     )
     monkeypatch.setattr(
-        tournament_service, "_load_tournament", lambda *_, **__: tournament
+        tournament_play, "_load_tournament", lambda *_, **__: tournament
     )
 
     play = tournament_service.read_play(
