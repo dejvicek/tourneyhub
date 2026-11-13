@@ -33,6 +33,7 @@ import {
 import { testId } from "../ids";
 import { apiError, route } from "../route";
 import type { StoredTournament } from "../seed";
+import { leagueRanking } from "../setupEngine";
 import { db, findTournament, placesRead, tournamentRead } from "../store";
 
 interface Ids {
@@ -184,7 +185,7 @@ export const finalsHandlers = [
         });
       }
       if (group.format === "monster_dyp") {
-        // BR-063: a round needs four players who are not disabled.
+        // FR-032, BR-064: a round needs four players who are not disabled.
         const given = t.entries.filter(
           (e) => e.stage === "main" && !e.is_disabled,
         ).length;
@@ -192,7 +193,10 @@ export const finalsHandlers = [
           return apiError(422, "not_enough_players", { minimum: 4, given });
         }
       }
-      const drawn = drawNextRound(t);
+      const drawn = drawNextRound(
+        t,
+        new Map(leagueRanking(t.league_id).map((r) => [r.player_id, r.rank])),
+      );
       if (drawn.matches.length === 0) {
         return apiError(422, "not_enough_entries", {});
       }

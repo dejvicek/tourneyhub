@@ -926,7 +926,11 @@ export interface DrawnRound {
  * demo only: the next round of a Swiss (BR-055–BR-058) or Monster DYP
  * (BR-060–BR-063), from the active entries and the current standings.
  */
-export function drawNextRound(t: StoredTournament): DrawnRound {
+export function drawNextRound(
+  t: StoredTournament,
+  /** The league ranking by player id; the seed has none, so it draws by standing. */
+  leagueRank: ReadonlyMap<string, number> = new Map(),
+): DrawnRound {
   const group = groupPhase(t);
   if (!group) {
     return { matches: [], sitting_out: [] };
@@ -991,10 +995,15 @@ export function drawNextRound(t: StoredTournament): DrawnRound {
 
   // Monster DYP.
   const groups = Math.floor(ordered.length / 4);
-  // BR-061: the marked players first, then the league order (the seeds),
-  // at most one per match.
+  // BR-061: the marked players first, then the league ranking (Monster DYP
+  // entries have no seed), at most one per match.
+  // The seed data has no league ranking and orders by the stored seeds.
+  const rankOfEntry = (id: string) =>
+    leagueRank.size === 0
+      ? (seedOf.get(id) ?? 0)
+      : (leagueRank.get(entryById.get(id)?.player_ids[0] ?? "") ?? Infinity);
   const leagueOrder = [...ordered].sort(
-    (a, b) => (seedOf.get(a) ?? 0) - (seedOf.get(b) ?? 0),
+    (a, b) => rankOfEntry(a) - rankOfEntry(b),
   );
   const pickTops = (pool: readonly string[]) => {
     const inPool = leagueOrder.filter((id) => pool.includes(id));
