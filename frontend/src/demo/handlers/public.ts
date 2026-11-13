@@ -2,7 +2,7 @@
 // Read-only; tournaments in setup answer 404, as if they did not exist. An
 // unknown token is 404 share_link_not_found with an empty detail, as the
 // backend answers it; the token is never echoed.
-import { bracketOf, rankingOf, syncBracket } from "../finalsEngine";
+import { bracketOf, syncBracket } from "../finalsEngine";
 import { publicStandings } from "../playEngine";
 import { apiError, route } from "../route";
 import type { StoredTournament } from "../seed";
@@ -105,17 +105,6 @@ export const publicHandlers = [
       }
       syncBracket(t);
       return bracketOf(t) ?? apiError(404, "knockout_not_found", {});
-    },
-  ),
-
-  route(
-    "get",
-    "/api/v1/public/{share_token}/tournaments/{tournament_id}/ranking",
-    ({ params }) => {
-      const t = visibleTournament(params.share_token, params.tournament_id);
-      return t
-        ? rankingOf(t)
-        : apiError(404, "not_found", { tournament_id: params.tournament_id });
     },
   ),
 

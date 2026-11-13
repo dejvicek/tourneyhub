@@ -12,9 +12,6 @@ import type {
   DisabledWrite,
   LateEntryWrite,
   ParticipantRead,
-  RankingRead,
-  RoundAddWrite,
-  TiebreakersWrite,
 } from "@/api/provisionalTypes";
 import type { components, paths as GeneratedPaths } from "@/api/schema";
 
@@ -133,13 +130,7 @@ export interface ProvisionalPaths {
     get: Get<Params<{ league_id: Uuid; player_id: Uuid }>, TournamentSummary[]>;
   };
 
-  // public: the league, a season's tournaments, a tournament, the season
-  // standings, a round robin's standings, the places and the bracket are
-  // generated (P11, P10a, P10b); the Swiss and Monster DYP ranking waits for
-  // P12 (the same read as the organizer's, without an account)
-  "/api/v1/public/{share_token}/tournaments/{tournament_id}/ranking": {
-    get: Get<Params<{ share_token: string; tournament_id: Uuid }>, RankingRead>;
-  };
+  // public: every share-link route is generated (P11, P10a, P10b, P12).
 
   // demo only: the backend never has this route
   "/api/v1/demo/account": { get: Get<NoParams, DemoAccount> };
@@ -171,25 +162,13 @@ type DefinedMethods<T> = {
 
 /** "path method" for each method that both the contract and the generated schema define. */
 type Contract = ProvisionalPaths & SetupPaths;
-/**
- * Swiss routes the backend serves since P12 but whose screens still call the
- * demo version (same path, other response shape for the tie-breakers). The
- * demo wins in MergePaths. Remove them with the screens' switch (step D4).
- */
-type SwitchedLater =
-  | "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/rounds post"
-  | "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/rounds/{round_id} delete"
-  | "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/tiebreakers put";
-type Duplicates = Exclude<
-  {
-    [P in keyof Contract & keyof GeneratedPaths]: `${P} ${DefinedMethods<
-      Contract[P]
-    > &
-      DefinedMethods<GeneratedPaths[P]> &
-      string}`;
-  }[keyof Contract & keyof GeneratedPaths],
-  SwitchedLater
->;
+type Duplicates = {
+  [P in keyof Contract & keyof GeneratedPaths]: `${P} ${DefinedMethods<
+    Contract[P]
+  > &
+    DefinedMethods<GeneratedPaths[P]> &
+    string}`;
+}[keyof Contract & keyof GeneratedPaths];
 
 /**
  * Fails `pnpm typecheck` once the backend serves a route the contract still
@@ -248,6 +227,12 @@ export type BracketRead = components["schemas"]["BracketRead"];
 export type KnockoutWrite = components["schemas"]["KnockoutWrite"];
 export type KnockoutPreview = components["schemas"]["KnockoutPreviewRead"];
 
+// The Swiss rounds and tie-breakers (P12): generated. Adding a round carries
+// the number the organizer expects (ADR-008); the standings come from the
+// play read and the share link's standings.
+export type SwissRoundRead = components["schemas"]["SwissRoundRead"];
+export type SwissMatchRead = components["schemas"]["SwissMatchRead"];
+
 // The places (P8 for a round robin without a knockout): generated.
 export type PlaceReason = components["schemas"]["PlaceReasonRead"];
 export type PlaceDetail = components["schemas"]["PlaceRead"];
@@ -255,14 +240,6 @@ export type PlacesRead = components["schemas"]["PlacesRead"];
 
 export interface FinishStateWrite {
   state: "finished";
-}
-
-interface Delete<P> {
-  parameters: P;
-  requestBody?: never;
-  responses: {
-    204: { headers: Record<string, unknown>; content?: never };
-  } & Errors;
 }
 
 /** The routes of setup the backend does not serve yet; merged into DemoPaths. */
@@ -280,33 +257,16 @@ type TournamentEntry = Params<{
   tournament_id: Uuid;
   entry_id: Uuid;
 }>;
-type TournamentRound = Params<{
-  league_id: Uuid;
-  tournament_id: Uuid;
-  round_id: Uuid;
-}>;
 // Reopening the interface adds the finals routes to the provisional paths.
 export interface ProvisionalPaths {
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/ranking": {
-    get: Get<Tournament, RankingRead>;
-  };
   "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/participants": {
     get: Get<Tournament, ParticipantRead[]>;
-  };
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/rounds": {
-    post: Post<Tournament, RoundAddWrite, RoundRead>;
-  };
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/rounds/{round_id}": {
-    delete: Delete<TournamentRound>;
   };
   "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/entries": {
     post: Post<Tournament, LateEntryWrite, ParticipantRead>;
   };
   "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/entries/{entry_id}/disabled": {
     put: Put<TournamentEntry, DisabledWrite, ParticipantRead>;
-  };
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/tiebreakers": {
-    put: Put<Tournament, TiebreakersWrite, RankingRead>;
   };
   "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/state": {
     put: Put<Tournament, FinishStateWrite, TournamentRead>;

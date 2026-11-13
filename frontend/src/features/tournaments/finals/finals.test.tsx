@@ -653,6 +653,29 @@ describe("Between rounds (screen 11)", () => {
     });
   });
 
+  it("says the rounds changed when another device added the round first (ADR-008)", async () => {
+    server.use(
+      http.post(
+        "*/api/v1/leagues/:leagueId/tournaments/:tournamentId/rounds",
+        () =>
+          HttpResponse.json(
+            { code: "round_number_changed", detail: { current_round_no: 4 } },
+            { status: 409 },
+          ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderAt(at(paths.betweenRounds, SWISS));
+
+    await user.click(
+      await screen.findByRole("button", { name: "Add round 4" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The rounds changed on another device, so they were reloaded. Check them and try again.",
+    );
+  });
+
   it("finishes the tournament after confirming and shows its places", async () => {
     const user = userEvent.setup();
     renderAt(at(paths.betweenRounds, SWISS));

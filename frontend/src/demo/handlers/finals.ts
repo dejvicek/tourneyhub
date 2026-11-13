@@ -7,7 +7,12 @@
 import type { ParticipantRead } from "@/api/provisionalTypes";
 import { MONSTER_KNOCKOUT_MODES, rules } from "@/lib/rules";
 
-import type { MatchRead, TournamentRead } from "../contract";
+import type {
+  MatchRead,
+  RoundRead,
+  SwissRoundRead,
+  TournamentRead,
+} from "../contract";
 import { fillFields, waitingMatches } from "../engine";
 import {
   bracketOf,
@@ -20,7 +25,6 @@ import {
   participantsOf,
   planKnockout,
   previewOf,
-  rankingOf,
   roundFromDraw,
   roundsOf,
   setNote,
@@ -79,6 +83,28 @@ function usesRounds(t: StoredTournament): boolean {
   return format === "swiss" || format === "monster_dyp";
 }
 
+/** The new round as the backend answers it; the demo marks no repeat and no lot. */
+function swissRoundRead(round: RoundRead): SwissRoundRead {
+  return {
+    ...round,
+    matches: round.matches.map((match) => ({
+      ...match,
+      is_repeat: false,
+      is_decided_by_lot: false,
+    })),
+    is_sit_out_by_lot: false,
+  };
+}
+
+/** 422 when the knockout is drawn: the group phase is fixed (BR-087). */
+function groupLocked(t: StoredTournament) {
+  const knockout = knockoutPhase(t);
+  const group = groupPhase(t);
+  return knockout && group
+    ? apiError(422, "group_phase_locked", { phase_id: group.id })
+    : undefined;
+}
+
 function participant(
   t: StoredTournament,
   entryId: string,
@@ -116,18 +142,6 @@ export const finalsHandlers = [
 
   route(
     "get",
-    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/ranking",
-    ({ params }) => {
-      const t = findTournament(params.league_id, params.tournament_id);
-      if (!t) {
-        return notFound(params);
-      }
-      return rankingOf(t);
-    },
-  ),
-
-  route(
-    "get",
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/participants",
     ({ params }) => {
       const t = findTournament(params.league_id, params.tournament_id);
@@ -142,21 +156,37 @@ export const finalsHandlers = [
       const t = findTournament(params.league_id, params.tournament_id);
       const group = t ? groupPhase(t) : undefined;
       if (!t || !group) {
-        return notFound(params);
+        return apiError(404, "tournament_not_found", {});
       }
       const rounds = roundsOf(t, group);
+      // ADR-008: a repeated or stale request names the newest round's number.
       if (body.expected_round_no !== rounds.length + 1) {
-        return stale("round_number", body.expected_round_no, rounds.length + 1);
+        return apiError(409, "round_number_changed", {
+          current_round_no: rounds.length,
+        });
       }
-      if (!usesRounds(t) || knockoutPhase(t) || t.state !== "in_progress") {
-        return refused("rounds_not_allowed");
+      if (t.state !== "in_progress") {
+        return apiError(409, "tournament_not_in_progress", { state: t.state });
+      }
+      // The demo keeps drawing Monster DYP rounds, which the backend cannot yet (P13).
+      if (!usesRounds(t)) {
+        return apiError(422, "format_not_supported", { format: group.format });
+      }
+      const locked = groupLocked(t);
+      if (locked) {
+        return locked;
       }
       if (!roundIsComplete(t)) {
-        return refused("round_incomplete");
+        const latest = rounds.at(-1);
+        return apiError(422, "round_not_complete", {
+          matches_left: (latest?.matches ?? []).filter(
+            (m) => m.outcome === null,
+          ).length,
+        });
       }
       const drawn = drawNextRound(t);
       if (drawn.matches.length === 0) {
-        return refused("too_few_players");
+        return apiError(422, "not_enough_entries", {});
       }
       const round = roundFromDraw({
         ids: idFactory(),
@@ -166,7 +196,7 @@ export const finalsHandlers = [
       });
       t.rounds.push(round);
       refillFields(t);
-      return round;
+      return swissRoundRead(round);
     },
     201,
   ),
@@ -179,14 +209,22 @@ export const finalsHandlers = [
       const group = t ? groupPhase(t) : undefined;
       const round = t?.rounds.find((r) => r.id === params.round_id);
       if (!t || !group || round?.phase_id !== group.id) {
-        return apiError(404, "not_found", { round_id: params.round_id });
+        return apiError(404, "round_not_found", {});
       }
       const rounds = roundsOf(t, group);
-      if (!usesRounds(t) || knockoutPhase(t)) {
-        return refused("rounds_not_allowed");
+      if (t.state !== "in_progress") {
+        return apiError(409, "tournament_not_in_progress", { state: t.state });
       }
-      if (rounds.at(-1)?.id !== round.id) {
-        return stale("newest_round", round.round_no, rounds.length);
+      if (!usesRounds(t)) {
+        return apiError(422, "format_not_supported", { format: group.format });
+      }
+      const locked = groupLocked(t);
+      if (locked) {
+        return locked;
+      }
+      const newest = rounds.at(-1);
+      if (newest !== undefined && newest.id !== round.id) {
+        return apiError(409, "round_not_newest", { round_id: newest.id });
       }
       // BR-066: the newest round goes with its matches and results.
       const gone = new Set(round.matches.map((m) => m.id));
@@ -283,18 +321,29 @@ export const finalsHandlers = [
       const t = findTournament(params.league_id, params.tournament_id);
       const group = t ? groupPhase(t) : undefined;
       if (!t || !group) {
-        return notFound(params);
+        return apiError(404, "tournament_not_found", {});
       }
+      if (t.state === "finished") {
+        return apiError(409, "tournament_not_in_progress", { state: t.state });
+      }
+      if (!usesRounds(t)) {
+        return apiError(422, "format_not_supported", { format: group.format });
+      }
+      const locked = groupLocked(t);
+      if (locked) {
+        return locked;
+      }
+      // FR-043: each tie-breaker at most once.
       const offered: readonly string[] = rules.swissTiebreakers;
       const valid =
-        usesRounds(t) &&
         new Set(body.tiebreakers).size === body.tiebreakers.length &&
         body.tiebreakers.every((tiebreaker) => offered.includes(tiebreaker));
       if (!valid) {
         return refused("tiebreakers");
       }
       group.tiebreakers = [...body.tiebreakers];
-      return rankingOf(t);
+      // The backend answers the whole tournament (P12).
+      return tournamentRead(t);
     },
   ),
 

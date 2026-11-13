@@ -13,10 +13,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
-import {
-  finalsMutations,
-  type RankingData as RankingRead,
-} from "@/features/finals/api";
+import { finalsMutations } from "@/features/finals/api";
 import { rules, type SwissTiebreaker } from "@/lib/rules";
 
 import { errorText } from "./errorText";
@@ -125,7 +122,6 @@ function TiebreakerForm({
       <SheetFooter>
         <Button
           type="button"
-
           disabled={save.isPending}
           onClick={() => {
             save.mutate(
@@ -144,14 +140,15 @@ function TiebreakerForm({
 interface TiebreakerSheetProps {
   leagueId: string;
   tournamentId: string;
-  ranking: RankingRead;
+  /** The group phase's enabled tie-breakers, in order. */
+  tiebreakers: readonly SwissTiebreaker[];
 }
 
 /** FR-043: switch each tie-breaker on or off and put them in order. */
 export function TiebreakerSheet({
   leagueId,
   tournamentId,
-  ranking,
+  tiebreakers,
 }: TiebreakerSheetProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -170,7 +167,7 @@ export function TiebreakerSheet({
         <TiebreakerForm
           leagueId={leagueId}
           tournamentId={tournamentId}
-          active={ranking.tiebreakers}
+          active={tiebreakers}
           onSaved={() => {
             setOpen(false);
           }}

@@ -222,8 +222,9 @@ function Places({
 
 /**
  * The group phase's standings: a round robin's table, or the ranking of a
- * Swiss or Monster DYP with its tie-breakers, as the organizer sees it. A
- * knockout-only tournament has none.
+ * Swiss or Monster DYP with the organizer's tie-breakers in their order
+ * (FR-043, BR-072), as the organizer sees it. A knockout-only tournament has
+ * none.
  */
 function Standings({
   shareToken,
@@ -274,20 +275,29 @@ function RankingStandings({
 }) {
   const { t } = useTranslation();
   const names = useNames(players, tournament);
-  const ranking = useQuery(
-    publicQueries.ranking(shareToken, tournament.id, true),
+  const standings = useQuery(
+    publicQueries.standings(shareToken, tournament.id),
   );
-  if (ranking.data === undefined) {
-    return (
+  const group = tournament.phases.find((phase) => phase.kind === "group");
+  const disabled = new Set(
+    tournament.entries
+      .filter((entry) => entry.is_disabled)
+      .map((entry) => entry.id),
+  );
+  if (standings.data === undefined) {
+    return standings.isPending ? (
       <p role="status" className="text-body-md text-muted-foreground">
         {t("loading")}
       </p>
-    );
+    ) : null;
   }
   return (
     <div className="rounded-lg border border-border-surface bg-card px-4 text-card-foreground">
       <RankingTable
-        ranking={ranking.data}
+        rows={standings.data}
+        tiebreakers={group?.tiebreakers ?? []}
+        qualifiers={group?.qualifiers ?? null}
+        disabled={disabled}
         participants={[]}
         entryName={names.ofEntry}
         caption={t("publicView.tournament.standingsHeading")}

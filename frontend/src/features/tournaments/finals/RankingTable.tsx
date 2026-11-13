@@ -1,24 +1,35 @@
 import { useTranslation } from "react-i18next";
 
-import type {
-  ParticipantRead,
-  RankingRead,
-  SwissRankingRow,
-} from "@/api/provisionalTypes";
+import type { ParticipantRead } from "@/api/provisionalTypes";
+import type { components } from "@/api/schema";
 import { cn } from "@/lib/utils";
 
+type Tiebreaker = components["schemas"]["Tiebreaker"];
+
+/**
+ * One row of the standings: what both the organizer's GET …/play and the
+ * share link's GET …/standings answer.
+ */
+export type RankingRow = Pick<
+  components["schemas"]["PlayStandingRow"],
+  "place" | "entry_id" | "points" | "bh1" | "bh2" | "score_difference"
+>;
+
 interface RankingTableProps {
-  ranking: RankingRead;
+  rows: readonly RankingRow[];
+  /** The enabled tie-breakers, in the organizer's order (FR-043, BR-072). */
+  tiebreakers: readonly Tiebreaker[];
+  /** How many go through to the knockout, if the setup said. */
+  qualifiers: number | null;
+  /** The entries that are disabled (BR-064); they never go through (BR-080). */
+  disabled: ReadonlySet<string>;
   participants: readonly ParticipantRead[];
   entryName: (entryId: string) => string;
   /** The table's accessible name, as its heading says it. */
   caption: string;
 }
 
-function valueOf(
-  row: SwissRankingRow,
-  key: RankingRead["tiebreakers"][number],
-) {
+function valueOf(row: RankingRow, key: Tiebreaker) {
   switch (key) {
     case "bh1":
       return row.bh1;
@@ -31,7 +42,10 @@ function valueOf(
 
 /** Swiss and Monster DYP standings: points and the enabled tie-breakers, in their order (FR-043). */
 export function RankingTable({
-  ranking,
+  rows,
+  tiebreakers,
+  qualifiers,
+  disabled,
   participants,
   entryName,
   caption,
@@ -43,10 +57,10 @@ export function RankingTable({
   // The line falls after the last player who can go through: disabled
   // players don't, so they don't count towards it (BR-080).
   let cutIndex = -1;
-  if (ranking.qualifiers !== null) {
+  if (qualifiers !== null) {
     let enabled = 0;
-    ranking.rows.forEach((row, index) => {
-      if (!row.is_disabled && enabled < (ranking.qualifiers ?? 0)) {
+    rows.forEach((row, index) => {
+      if (!disabled.has(row.entry_id) && enabled < qualifiers) {
         enabled += 1;
         cutIndex = index;
       }
@@ -69,7 +83,7 @@ export function RankingTable({
             <th scope="col" className="w-12 py-2 text-end font-normal">
               {t("finals.rounds.columns.points")}
             </th>
-            {ranking.tiebreakers.map((key) => (
+            {tiebreakers.map((key) => (
               <th
                 key={key}
                 scope="col"
@@ -81,9 +95,10 @@ export function RankingTable({
           </tr>
         </thead>
         <tbody>
-          {ranking.rows.map((row, index) => {
+          {rows.map((row, index) => {
             const info = participants.find((p) => p.entry_id === row.entry_id);
-            const label = row.is_disabled
+            const isDisabled = disabled.has(row.entry_id);
+            const label = isDisabled
               ? t("finals.rounds.disabledLabel")
               : info?.joined_round != null
                 ? t("finals.rounds.joinedLabel", { round: info.joined_round })
@@ -100,9 +115,7 @@ export function RankingTable({
                   {row.place}
                 </td>
                 <td className="py-2.5">
-                  <span
-                    className={cn(row.is_disabled && "text-muted-foreground")}
-                  >
+                  <span className={cn(isDisabled && "text-muted-foreground")}>
                     {entryName(row.entry_id)}
                   </span>
                   {label !== null && (
@@ -112,13 +125,19 @@ export function RankingTable({
                   )}
                 </td>
                 <td className="py-2.5 text-end font-bold">{row.points}</td>
-                {ranking.tiebreakers.map((key) => (
-                  <td key={key} className="py-2.5 text-end">
-                    {key === "score_difference"
-                      ? number.format(valueOf(row, key))
-                      : valueOf(row, key)}
-                  </td>
-                ))}
+                {tiebreakers.map((key) => {
+                  // BH1 and BH2 are null where the format has none.
+                  const value = valueOf(row, key);
+                  return (
+                    <td key={key} className="py-2.5 text-end">
+                      {value === null
+                        ? null
+                        : key === "score_difference"
+                          ? number.format(value)
+                          : value}
+                    </td>
+                  );
+                })}
               </tr>
             );
           })}
