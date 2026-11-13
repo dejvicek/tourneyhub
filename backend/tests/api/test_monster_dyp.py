@@ -130,6 +130,46 @@ def test_fr041_marks_top_players_as_a_target_state(
     assert (status, body["top_player_ids"]) == (200, [])
 
 
+def test_adr008_changed_marks_make_the_start_stale(
+    client: TestClient, league: League, headers: dict[str, str], players: list[str]
+) -> None:
+    tid = _monster(client, league, headers, players[:8])
+    _put(
+        client, league, tid, "/setup/top-players", {"player_ids": [players[0]]}, headers
+    )
+    preview = _get(client, league, tid, "/setup/preview", headers)
+
+    status, _ = _put(
+        client, league, tid, "/setup/top-players", {"player_ids": [players[1]]}, headers
+    )
+    response = client.post(
+        _t_url(league, tid, "/start"),
+        json={
+            "expected_draw_counter": preview["draw_counter"],
+            "expected_seed_order": preview["seed_order"],
+        },
+        headers=headers,
+    )
+
+    assert status == 200
+    assert response.status_code == 409
+    assert response.json()["code"] == "draw_counter_changed"
+
+
+def test_fr041_same_marks_twice_keep_the_draw_counter(
+    client: TestClient, league: League, headers: dict[str, str], players: list[str]
+) -> None:
+    tid = _monster(client, league, headers, players[:8])
+    body = {"player_ids": [players[0], players[1]]}
+    _put(client, league, tid, "/setup/top-players", body, headers)
+    first = _get(client, league, tid, "/setup/preview", headers)["draw_counter"]
+
+    status, _ = _put(client, league, tid, "/setup/top-players", body, headers)
+
+    assert status == 200
+    assert _get(client, league, tid, "/setup/preview", headers)["draw_counter"] == first
+
+
 def test_fr041_at_most_one_top_player_per_round_one_match(
     client: TestClient, league: League, headers: dict[str, str], players: list[str]
 ) -> None:
@@ -689,6 +729,21 @@ def test_fr060_monster_dyp_standings_on_play_and_share_link(
     ]
 
 
+def test_fr060_monster_dyp_in_setup_has_zero_standings(
+    client: TestClient, league: League, headers: dict[str, str], players: list[str]
+) -> None:
+    tid = _monster(client, league, headers, players[:9])
+
+    play = _get(client, league, tid, "/play", headers)
+
+    assert len(play["standings"]) == 9
+    assert all(
+        row[k] == 0
+        for row in play["standings"]
+        for k in ("played", "won", "points", "sat_out", "score_difference")
+    )
+
+
 def test_monster_dyp_round_reads_without_errors(
     client: TestClient, league: League, headers: dict[str, str], twelve: list[str]
 ) -> None:
@@ -1062,6 +1117,7 @@ def test_fr046_delete_the_newest_round(
     two = _next_round(client, league, tid, 2, headers)
     _play_round(client, league, tid, two, headers)
     assert _get(client, league, tid, "/play", headers)["standings"] != after_one
+    teams_of_two = _teams(two)
 
     status, body = _delete_round(client, league, tid, two["id"], headers)
 
@@ -1073,7 +1129,7 @@ def test_fr046_delete_the_newest_round(
     again, missing = _delete_round(client, league, tid, two["id"], headers)
     assert (again, missing["code"]) == (404, "round_not_found")
     # The round can be drawn again: it is the same draw (ADR-010).
-    assert _next_round(client, league, tid, 2, headers)["matches"]
+    assert _teams(_next_round(client, league, tid, 2, headers)) == teams_of_two
 
 
 def test_fr046_only_the_newest_round_can_be_deleted(
@@ -1274,4 +1330,5 @@ def test_knockout_after_monster_dyp_still_refused(
 
     assert started.status_code == 422
     assert started.json()["code"] == "format_not_supported"
-    assert (preview.status_code, preview.json().get("entries", [])) == (200, [])
+    assert preview.status_code == 200
+    assert preview.json()["problem"]["code"] == "format_not_supported"
