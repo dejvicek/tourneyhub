@@ -3,7 +3,7 @@
 // generates, so that openapi-fetch types calls to them. It is a stand-in and
 // may change freely. When the backend adds a route, the generated
 // src/api/schema.d.ts types it: delete it here, and the screen's api.ts
-// switches from provisionalApi to api (src/demo/README.md).
+// switches from provisionalApi to api (src/test/fake/README.md).
 //
 // Names follow the API's conventions (ADR-008, DATA-MODEL.md): /api/v1,
 // snake_case, UUIDs, enumerations as string literals.
@@ -146,7 +146,7 @@ type Duplicates = {
 /**
  * Fails `pnpm typecheck` once the backend serves a route the contract still
  * declares; the error names it as "path method". Delete it here
- * (src/demo/README.md, "Switching an area to the real API").
+ * (src/test/fake/README.md, "Switching an area to the real API").
  */
 type NoDuplicates<T extends never> = T;
 export type ContractDuplicates = NoDuplicates<Duplicates>;

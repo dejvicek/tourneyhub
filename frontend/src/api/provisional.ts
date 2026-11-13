@@ -2,7 +2,7 @@
 // the generated schema plus the provisional paths
 // (src/api/provisionalPaths.ts), so that screens can be built against the
 // fake API now. Once the backend has a route, its calls move to `api` in
-// client.ts and the route leaves the paths (src/demo/README.md).
+// client.ts and the route leaves the paths (src/test/fake/README.md).
 import { createApi } from "./client";
 import type { ProvisionalApiPaths } from "./provisionalPaths";
 

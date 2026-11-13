@@ -1,7 +1,7 @@
 // The demo's fixed ids. Each area of the seed has its own range of numbers,
 // so seed files written in parallel never give two rows the same id.
 
-/** The areas of the seed and their id ranges (src/demo/README.md). */
+/** The areas of the seed and their id ranges (src/test/fake/README.md). */
 export const SEED_AREAS = {
   foundation: [1, 999],
   setup: [1000, 1999],
