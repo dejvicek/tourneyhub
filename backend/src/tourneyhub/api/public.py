@@ -257,8 +257,7 @@ def read_public_places(
 
     Before the tournament finishes, `complete` is false and there are no rows.
     With a knockout, its entries take the top places by BR-102, the others
-    follow in their group-phase order (BR-103); a Monster DYP is 422
-    `format_not_supported` until it is played. A tournament in setup
+    follow in their group-phase order (BR-103). A tournament in setup
     is 404 `tournament_not_found`.
     """
     places = public_service.read_shared_places(

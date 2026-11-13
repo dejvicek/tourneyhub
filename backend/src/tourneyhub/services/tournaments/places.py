@@ -169,7 +169,7 @@ class PlacesView:
 def _require_played_group(tournament: Tournament) -> TournamentPhase:
     """The round robin, Swiss or Monster DYP of a tournament, with or without a knockout.
 
-    A knockout after a Monster DYP is not played yet, so the shared
+    A knockout after a Monster DYP is not served yet, so the shared
     `PLAYED_GROUP_FORMATS` leaves Monster DYP out and it is accepted here.
     """
     group = _group_phase(tournament)

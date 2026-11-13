@@ -807,8 +807,7 @@ def read_places(
     there are no rows. With a knockout, its entries take the top places and
     the others follow in their group-phase order (BR-102, BR-103); without a
     group phase, every entry is placed by the knockout, and its reason has no
-    `group_place` and no `group_format`. A Monster DYP is 422
-    `format_not_supported` until it is played.
+    `group_place` and no `group_format`.
     """
     places = tournament_service.read_places(
         session, league_id=league_id, tournament_id=tournament_id, user_id=user.id

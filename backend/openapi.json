@@ -7778,7 +7778,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/places": {
       "get": {
-        "description": "Return the places and the season points of a finished tournament (\u00a77.13, \u00a77.14).\n\nComputed on read. Before the tournament finishes, `complete` is false and\nthere are no rows. With a knockout, its entries take the top places and\nthe others follow in their group-phase order (BR-102, BR-103); without a\ngroup phase, every entry is placed by the knockout, and its reason has no\n`group_place` and no `group_format`. A Monster DYP is 422\n`format_not_supported` until it is played.",
+        "description": "Return the places and the season points of a finished tournament (\u00a77.13, \u00a77.14).\n\nComputed on read. Before the tournament finishes, `complete` is false and\nthere are no rows. With a knockout, its entries take the top places and\nthe others follow in their group-phase order (BR-102, BR-103); without a\ngroup phase, every entry is placed by the knockout, and its reason has no\n`group_place` and no `group_format`.",
         "operationId": "read_places",
         "parameters": [
           {
@@ -9684,7 +9684,7 @@
     },
     "/api/v1/public/{share_token}/tournaments/{tournament_id}/places": {
       "get": {
-        "description": "Return the places and the season points of a finished tournament (FR-070).\n\nBefore the tournament finishes, `complete` is false and there are no rows.\nWith a knockout, its entries take the top places by BR-102, the others\nfollow in their group-phase order (BR-103); a Monster DYP is 422\n`format_not_supported` until it is played. A tournament in setup\nis 404 `tournament_not_found`.",
+        "description": "Return the places and the season points of a finished tournament (FR-070).\n\nBefore the tournament finishes, `complete` is false and there are no rows.\nWith a knockout, its entries take the top places by BR-102, the others\nfollow in their group-phase order (BR-103). A tournament in setup\nis 404 `tournament_not_found`.",
         "operationId": "read_public_places",
         "parameters": [
           {

@@ -64,7 +64,7 @@ class ErrorCode(StrEnum):
     # Start and back to setup
     TOURNAMENT_NOT_IN_PROGRESS = "tournament_not_in_progress"
     TOURNAMENT_HAS_RESULTS = "tournament_has_results"  # FR-036
-    FORMAT_NOT_SUPPORTED = "format_not_supported"  # Monster DYP, until it is served
+    FORMAT_NOT_SUPPORTED = "format_not_supported"  # a Monster DYP knockout, until it is served
     PLAYERS_WITHOUT_PARTNER = "players_without_partner"  # Doubles (BR-030)
     # FR-032: 64 entries today, 16 after the #48 follow-up (issue to open after
     # approval).
