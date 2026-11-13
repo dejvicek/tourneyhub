@@ -171,6 +171,7 @@ export function tournamentStandings(
   return roundRobinStandings(
     t.entries.filter((entry) => entry.stage === "main").map((e) => e.id),
     t.rounds.filter((round) => round.phase_id === group.id),
+    group.match_format,
   );
 }
 

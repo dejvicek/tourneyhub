@@ -2698,6 +2698,8 @@ def _played_match(match: Match) -> PlayedMatch:
         side_1=EntryId(side_1),
         side_2=EntryId(side_2),
         outcome=match.outcome,
+        games=tuple(game.winner for game in match.games),
+        is_walkover=match.is_walkover,
         scores=tuple(
             (game.score_1, game.score_2)
             for game in match.games
@@ -2726,6 +2728,7 @@ def _standings_of(
             for match in round_.matches
             if match.outcome is not None
         ],
+        match_format=phase.match_format,
         sit_outs=[
             EntryId(row.entry_id)
             for round_ in phase.rounds

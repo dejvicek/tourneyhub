@@ -24,10 +24,7 @@ export type SitOutRule =
 
 /** BR-101 (round robin), FR-043 (Swiss and Monster DYP): tie-breakers. */
 export type RoundRobinTiebreaker =
-  | "head_to_head"
-  | "score_difference"
-  /** Issue #24 proposes a game-difference step for BO3 and BO5. */
-  | "game_difference";
+  "head_to_head" | "game_difference" | "score_difference";
 export type SwissTiebreaker = "bh1" | "bh2" | "score_difference";
 
 /** BR-092: when the score of every game is required. */
@@ -85,11 +82,14 @@ export const rules: Readonly<Rules> = {
 
   /**
    * BR-101: after points, a round robin ranks two level entries by their
-   * matches against each other, then by score difference, and then they share
-   * the place. Issue #24 proposes Kickertool's order: points, encounter,
-   * game and goal difference, and only then the direct comparison.
+   * matches against each other, then by game difference, then by score
+   * difference, and then they share the place.
    */
-  roundRobinTiebreakers: ["head_to_head", "score_difference"],
+  roundRobinTiebreakers: [
+    "head_to_head",
+    "game_difference",
+    "score_difference",
+  ],
 
   /** FR-043: the default tie-breakers of a Swiss or Monster DYP, in order. */
   swissTiebreakers: ["bh1", "bh2", "score_difference"],
