@@ -14,7 +14,6 @@ from sqlalchemy.orm import Session, selectinload
 
 from tourneyhub.db.models.leagues import League, Player, Season
 from tourneyhub.engine.season_standings import SeasonStandingRow
-from tourneyhub.engine.standings import StandingRow
 from tourneyhub.errors import ErrorCode, NotFoundError
 from tourneyhub.services import standings as standings_service
 from tourneyhub.services import tournaments as tournament_service
@@ -116,8 +115,8 @@ def read_shared_season_standings(
 
 def read_shared_standings(
     session: Session, *, share_token: str, tournament_id: UUID
-) -> tuple[StandingRow, ...]:
-    """Return a round robin's standings now, none for other formats (FR-060, FR-070).
+) -> tuple[tournament_service.GroupStandingRow, ...]:
+    """Return the group phase's standings now, a round robin's or a Swiss's (FR-060).
 
     A tournament in setup, of another league or unknown is 404
     `tournament_not_found`, the same answer for all three.
