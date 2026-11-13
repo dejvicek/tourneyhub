@@ -1239,8 +1239,7 @@ def test_br104_players_of_semifinal_losers_are_listed_by_knockout_seed(
     seed = {e["id"]: e["seed"] for e in done["entries"]}
     losers = [r["entry_id"] for r in rows if r["place"] == 3]
     assert len(losers) == 2
-    # Side 1 wins, so the semifinal of seeds 2 and 3 ends before the one of 1 and 4
-    # in bracket order, and the lower seed is still listed first.
+    # Both semifinal losers share 3rd; BR-104 lists the better knockout seed first.
     assert [seed[entry_id] for entry_id in losers] == sorted(
         seed[entry_id] for entry_id in losers
     )
