@@ -69,12 +69,13 @@ const apiClient = {
   message: "Only src/api/ and a feature's api.ts call the API.",
 };
 // The demo (src/demo) loads only in demo mode, through main.tsx's dynamic
-// import; app code may read its rules and provisional contract, nothing
-// else, so no MSW code reaches a production bundle.
+// import; app code imports nothing from it, so no MSW code reaches a
+// production bundle. src/api/provisional.ts and the tests are the exceptions
+// until the demo goes (MVP-ROADMAP D2, D5).
 const demoInternals = {
-  regex: "^(@/|(\\.\\./)+)demo/(?!(rules|contract)$)",
+  regex: "^(@/|(\\.\\./)+)demo(/|$)",
   message:
-    "Only main.tsx starts the demo; app code imports @/demo/rules and @/demo/contract.",
+    "Only main.tsx starts the demo; app code imports nothing from src/demo (the rules are in @/lib/rules, provisional types in @/api/provisionalTypes).",
 };
 // Imports flow one way: shared code → features → the app (guide §11).
 const appFromShared = {
@@ -397,6 +398,11 @@ export default defineConfig([
       "no-restricted-globals": "off",
       "no-restricted-imports": restrictImports(appFromShared, demoInternals),
     },
+  },
+  {
+    // Typed by the demo's contract until its routes are generated (D5).
+    files: ["src/api/provisional.ts"],
+    rules: { "no-restricted-imports": restrictImports(appFromShared) },
   },
   {
     files: ["src/features/*/api.ts"],
