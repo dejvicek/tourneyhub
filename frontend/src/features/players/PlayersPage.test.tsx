@@ -7,11 +7,11 @@ import { axeViolations } from "@/features/auth/axeCheck";
 import { i18n } from "@/i18n";
 import { newId } from "@/lib/newId";
 import { paths } from "@/lib/paths";
-import { DEMO_LEAGUE_ID } from "@/test/fake/ids";
+import { TEST_LEAGUE_ID } from "@/test/fake/ids";
 import { db } from "@/test/fake/store";
 import { renderAt } from "@/test/renderApp";
 
-const players = generatePath(paths.players, { leagueId: DEMO_LEAGUE_ID });
+const players = generatePath(paths.players, { leagueId: TEST_LEAGUE_ID });
 
 function status() {
   return screen.getByRole("status");
@@ -239,12 +239,12 @@ describe("PlayersPage", () => {
 
   it("a league full at 500 players says so at the field", async () => {
     const count = db().players.filter(
-      (p) => p.league_id === DEMO_LEAGUE_ID,
+      (p) => p.league_id === TEST_LEAGUE_ID,
     ).length;
     for (let i = count; i < 500; i++) {
       db().players.push({
         id: newId(),
-        league_id: DEMO_LEAGUE_ID,
+        league_id: TEST_LEAGUE_ID,
         name: `Removed ${String(i)}`,
         removed_at: "2026-10-01T18:00:00Z",
       });

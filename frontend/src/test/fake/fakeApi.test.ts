@@ -5,20 +5,20 @@ import { provisionalApi } from "@/api/provisional";
 import { newId } from "@/lib/newId";
 
 import {
-  DEMO_LEAGUE_ID,
-  DEMO_SEASON_ID,
-  DEMO_SHARE_TOKEN,
-  demoId,
+  TEST_LEAGUE_ID,
+  TEST_SEASON_ID,
+  TEST_SHARE_TOKEN,
+  testId,
 } from "./ids";
 import { db } from "./store";
 
-const league = { league_id: DEMO_LEAGUE_ID };
+const league = { league_id: TEST_LEAGUE_ID };
 
 async function tournamentsOfSeason() {
   return dataOf(
     provisionalApi.GET(
       "/api/v1/leagues/{league_id}/seasons/{season_id}/tournaments",
-      { params: { path: { ...league, season_id: DEMO_SEASON_ID } } },
+      { params: { path: { ...league, season_id: TEST_SEASON_ID } } },
     ),
   );
 }
@@ -35,7 +35,7 @@ async function tournament(id: string) {
 async function publicTournament(id: string) {
   return dataOf(
     api.GET("/api/v1/public/{share_token}/tournaments/{tournament_id}", {
-      params: { path: { share_token: DEMO_SHARE_TOKEN, tournament_id: id } },
+      params: { path: { share_token: TEST_SHARE_TOKEN, tournament_id: id } },
     }),
   );
 }
@@ -45,13 +45,13 @@ async function publicPlaces(id: string) {
     provisionalApi.GET(
       "/api/v1/public/{share_token}/tournaments/{tournament_id}/places",
       {
-        params: { path: { share_token: DEMO_SHARE_TOKEN, tournament_id: id } },
+        params: { path: { share_token: TEST_SHARE_TOKEN, tournament_id: id } },
       },
     ),
   );
 }
 
-describe("the demo's fake API", () => {
+describe("the fake API", () => {
   it("serves one league with 16 players and its active season", async () => {
     const leagues = await dataOf(provisionalApi.GET("/api/v1/leagues"));
     const detail = await dataOf(
@@ -66,10 +66,10 @@ describe("the demo's fake API", () => {
     );
 
     expect(leagues).toEqual([
-      { id: DEMO_LEAGUE_ID, name: "Thursday Foosball" },
+      { id: TEST_LEAGUE_ID, name: "Thursday Foosball" },
     ]);
     expect(detail).toMatchObject({
-      share_token: DEMO_SHARE_TOKEN,
+      share_token: TEST_SHARE_TOKEN,
       default_field_count: 2,
       seasons: [{ number: 1, state: "active", name: null }],
     });
@@ -160,7 +160,7 @@ describe("the demo's fake API", () => {
       provisionalApi.PUT(
         "/api/v1/leagues/{league_id}/seasons/{season_id}/placement-points",
         {
-          params: { path: { ...league, season_id: DEMO_SEASON_ID } },
+          params: { path: { ...league, season_id: TEST_SEASON_ID } },
           body: { placement_points: [10, 5] },
         },
       ),
@@ -244,10 +244,10 @@ describe("the demo's fake API", () => {
   it("serves the share link without tournaments in setup (FR-070)", async () => {
     const shared = await dataOf(
       api.GET("/api/v1/public/{share_token}", {
-        params: { path: { share_token: DEMO_SHARE_TOKEN } },
+        params: { path: { share_token: TEST_SHARE_TOKEN } },
       }),
     );
-    const path = { share_token: DEMO_SHARE_TOKEN, season_id: DEMO_SEASON_ID };
+    const path = { share_token: TEST_SHARE_TOKEN, season_id: TEST_SEASON_ID };
     const tournaments = await dataOf(
       api.GET("/api/v1/public/{share_token}/seasons/{season_id}/tournaments", {
         params: { path },
@@ -261,7 +261,7 @@ describe("the demo's fake API", () => {
     );
 
     expect(shared.name).toBe("Thursday Foosball");
-    expect(shared.seasons.map((season) => season.id)).toContain(DEMO_SEASON_ID);
+    expect(shared.seasons.map((season) => season.id)).toContain(TEST_SEASON_ID);
     expect(shared.players).toHaveLength(16);
     expect(tournaments).not.toHaveLength(0);
     expect(tournaments.every((t) => t.state !== "setup")).toBe(true);
@@ -283,9 +283,9 @@ describe("the demo's fake API", () => {
   });
 
   it("keeps each area's seed ids in its own range", () => {
-    expect(demoId(1000, "setup")).toBe("019a0000-0000-7000-8000-0000000003e8");
-    expect(() => demoId(1000, "foundation")).toThrow(RangeError);
-    expect(() => demoId(2999.5, "play")).toThrow(RangeError);
-    expect(() => demoId(5000, "outside")).toThrow(RangeError);
+    expect(testId(1000, "setup")).toBe("019a0000-0000-7000-8000-0000000003e8");
+    expect(() => testId(1000, "foundation")).toThrow(RangeError);
+    expect(() => testId(2999.5, "play")).toThrow(RangeError);
+    expect(() => testId(5000, "outside")).toThrow(RangeError);
   });
 });

@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { i18n } from "@/i18n";
 import { paths } from "@/lib/paths";
-import { DEMO_LEAGUE_ID } from "@/test/fake/ids";
+import { TEST_LEAGUE_ID } from "@/test/fake/ids";
 import { route } from "@/test/fake/route";
 import { stubViewport } from "@/test/media";
 import { renderAt } from "@/test/renderApp";
@@ -18,7 +18,7 @@ import {
   startTournament,
 } from "@/test/setupTestHelpers";
 
-const leagueId = DEMO_LEAGUE_ID;
+const leagueId = TEST_LEAGUE_ID;
 const list = generatePath(paths.tournaments, { leagueId });
 
 async function startDraft() {

@@ -1,4 +1,4 @@
-// Demo handlers: a league's player list (FR-012, BR-001, BR-002). They follow
+// Fake handlers: a league's player list (FR-012, BR-001, BR-002). They follow
 // the backend's service (backend/src/tourneyhub/services/players.py).
 // BR-002 (no removal of a player picked for an unfinished tournament) follows the backend.
 import type { components } from "@/api/schema";

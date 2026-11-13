@@ -1,4 +1,4 @@
-// Demo handlers: fields (FR-090–FR-094, BR-130–BR-135). The placements come
+// Fake handlers: fields (FR-090–FR-094, BR-130–BR-135). The placements come
 // with the tournament (GET …/tournaments/{tournament_id}); these writes send
 // target states: a placement, a field with the number it expects, a field
 // removed by its id (ADR-008, DATA-MODEL §4.6).

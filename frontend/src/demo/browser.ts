@@ -4,7 +4,7 @@
 import { delay, http } from "msw";
 import { setupWorker } from "msw/browser";
 
-import { demoHandlers } from "@/test/fake/allHandlers";
+import { fakeHandlers } from "@/test/fake/allHandlers";
 import { apiError } from "@/test/fake/route";
 
 export async function startDemo(): Promise<void> {
@@ -14,7 +14,7 @@ export async function startDemo(): Promise<void> {
     http.all("/api/*", async () => {
       await delay();
     }),
-    ...demoHandlers,
+    ...fakeHandlers,
     // An API route without a demo handler answers like the router's 404.
     http.all("/api/*", ({ request }) => {
       console.warn(`Demo: no handler for ${request.method} ${request.url}`);

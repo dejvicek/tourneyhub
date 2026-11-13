@@ -13,10 +13,10 @@ import {
   startTournament,
   tournamentOf,
 } from "../setupTestHelpers";
-import { DEMO_LEAGUE_ID, DEMO_SEASON_ID } from "./ids";
+import { TEST_LEAGUE_ID, TEST_SEASON_ID } from "./ids";
 import { newId } from "./setupEngine";
 
-const league = { league_id: DEMO_LEAGUE_ID };
+const league = { league_id: TEST_LEAGUE_ID };
 const at = (tournament_id: string) => ({
   params: { path: { ...league, tournament_id } },
 });
@@ -53,7 +53,7 @@ describe("the fake API for tournament setup", () => {
     );
     const list = await dataOf(
       api.GET("/api/v1/leagues/{league_id}/seasons/{season_id}/tournaments", {
-        params: { path: { ...league, season_id: DEMO_SEASON_ID } },
+        params: { path: { ...league, season_id: TEST_SEASON_ID } },
       }),
     );
 

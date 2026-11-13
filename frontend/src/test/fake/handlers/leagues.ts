@@ -1,4 +1,4 @@
-// Demo handlers: leagues, their settings and seasons (FR-007, FR-010–FR-013,
+// Fake handlers: leagues, their settings and seasons (FR-007, FR-010–FR-013,
 // FR-020, FR-021, FR-070). The backend serves these routes; the handlers
 // follow its schema (src/api/schema.d.ts) so the demo and the tests still
 // answer them.

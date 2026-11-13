@@ -28,14 +28,14 @@ import {
   waitingMatches,
 } from "./engine";
 import {
-  DEMO_EMAIL,
-  DEMO_LEAGUE_ID,
-  DEMO_SEASON_ID,
-  DEMO_SHARE_TOKEN,
-  DEMO_USER_ID,
-  demoId,
   SEED_AREAS,
   type SeedArea,
+  TEST_EMAIL,
+  TEST_LEAGUE_ID,
+  TEST_SEASON_ID,
+  TEST_SHARE_TOKEN,
+  TEST_USER_ID,
+  testId,
 } from "./ids";
 import { seedParts } from "./seedParts";
 
@@ -56,7 +56,7 @@ export interface StoredTournament extends Omit<
   league_id: string;
 }
 
-export interface DemoState {
+export interface FakeState {
   me: UserRead;
   leagues: StoredLeague[];
   players: StoredPlayer[];
@@ -106,9 +106,9 @@ export class TournamentBuilder {
     this.area = area;
     this.next = base;
     this.tournament = {
-      id: demoId(base, area),
-      league_id: DEMO_LEAGUE_ID,
-      season_id: DEMO_SEASON_ID,
+      id: testId(base, area),
+      league_id: TEST_LEAGUE_ID,
+      season_id: TEST_SEASON_ID,
       goals_per_game: 10,
       phases: [],
       entries: [],
@@ -120,7 +120,7 @@ export class TournamentBuilder {
 
   id(): string {
     this.next += 1;
-    return demoId(this.next, this.area);
+    return testId(this.next, this.area);
   }
 
   phase(fields: Omit<PhaseRead, "id" | "position">): PhaseRead {
@@ -355,11 +355,11 @@ function thursdayDyp(
 }
 
 /** A fresh copy of the demo data; `today` dates the running tournament. */
-export function createSeed(today: Date = new Date()): DemoState {
+export function createSeed(today: Date = new Date()): FakeState {
   const rng = createRng(20261110);
   const players: StoredPlayer[] = PLAYER_NAMES.map((name, i) => ({
-    id: demoId(100 + i, "foundation"),
-    league_id: DEMO_LEAGUE_ID,
+    id: testId(100 + i, "foundation"),
+    league_id: TEST_LEAGUE_ID,
     name,
     removed_at: null,
   }));
@@ -368,10 +368,10 @@ export function createSeed(today: Date = new Date()): DemoState {
     autumnOpenDyp(players, rng),
     thursdayDyp(players, rng, isoDate(today)),
   ];
-  const state: DemoState = {
+  const state: FakeState = {
     me: {
-      id: DEMO_USER_ID,
-      email: DEMO_EMAIL,
+      id: TEST_USER_ID,
+      email: TEST_EMAIL,
       display_name: "Alex Organizer",
       language: "en",
       // The demo account is the instance's admin too (ADR-007), so that the
@@ -381,23 +381,23 @@ export function createSeed(today: Date = new Date()): DemoState {
     },
     leagues: [
       {
-        id: DEMO_LEAGUE_ID,
+        id: TEST_LEAGUE_ID,
         name: "Thursday Foosball",
         draws_allowed: false,
         default_field_count: 2,
         default_match_format: "bo1",
         default_goals_per_game: 10,
-        share_token: DEMO_SHARE_TOKEN,
+        share_token: TEST_SHARE_TOKEN,
         created_at: "2026-09-01T18:00:00Z",
         updated_at: null,
-        owner_id: DEMO_USER_ID,
+        owner_id: TEST_USER_ID,
       },
     ],
     players,
     seasons: [
       {
-        id: DEMO_SEASON_ID,
-        league_id: DEMO_LEAGUE_ID,
+        id: TEST_SEASON_ID,
+        league_id: TEST_LEAGUE_ID,
         number: 1,
         name: null,
         state: "active",
@@ -441,12 +441,12 @@ export interface SeedKit {
  */
 export interface SeedPart {
   area: Exclude<SeedArea, "foundation">;
-  add: (state: DemoState, kit: SeedKit) => void;
+  add: (state: FakeState, kit: SeedKit) => void;
 }
 
 function seedKit(area: SeedArea, today: string): SeedKit {
   return {
-    id: (n) => demoId(n, area),
+    id: (n) => testId(n, area),
     tournament: (base, summary) => new TournamentBuilder(area, base, summary),
     rng: createRng(20261110 + SEED_AREAS[area][0]),
     today,

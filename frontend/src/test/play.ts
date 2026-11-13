@@ -3,7 +3,7 @@
 import { generatePath } from "react-router";
 
 import { paths } from "@/lib/paths";
-import { DEMO_LEAGUE_ID } from "@/test/fake/ids";
+import { TEST_LEAGUE_ID } from "@/test/fake/ids";
 import { db } from "@/test/fake/store";
 
 export function runningDyp() {
@@ -19,7 +19,7 @@ export function playPath(
   extra: Record<string, string> = {},
 ): string {
   return generatePath(path, {
-    leagueId: DEMO_LEAGUE_ID,
+    leagueId: TEST_LEAGUE_ID,
     tournamentId: runningDyp().id,
     ...extra,
   });

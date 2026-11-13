@@ -22,14 +22,14 @@ import {
 import { placesOf, syncBracket } from "./finalsEngine";
 import {
   createSeed,
-  type DemoState,
+  type FakeState,
   type StoredLeague,
   type StoredSeason,
   type StoredTournament,
 } from "./seed";
 import { createOutsideState, type OutsideState } from "./seedOutside";
 
-let state: DemoState = createSeed();
+let state: FakeState = createSeed();
 
 /** A stored row as the API returns it, without the league it belongs to. */
 export function withoutLeague<T extends { league_id: string }>(
@@ -42,12 +42,12 @@ export function withoutLeague<T extends { league_id: string }>(
 }
 
 /** The current data, for handlers to read and change. */
-export function db(): DemoState {
+export function db(): FakeState {
   return state;
 }
 
 /** Back to the seed; tests call it after each test. */
-export function resetDemoStore(): void {
+export function resetFakeStore(): void {
   state = createSeed();
 }
 
@@ -291,11 +291,11 @@ export function publicTournaments(seasonId: string): TournamentSummary[] {
 }
 
 // ---------------------------------------------------------------- outside (auth)
-// Accounts and sessions are no rows of DemoState; they live next to it and
-// start again with it: a new DemoState after resetDemoStore() gets a fresh
+// Accounts and sessions are no rows of FakeState; they live next to it and
+// start again with it: a new FakeState after resetFakeStore() gets a fresh
 // OutsideState.
 
-const outsideByState = new WeakMap<DemoState, OutsideState>();
+const outsideByState = new WeakMap<FakeState, OutsideState>();
 
 export function outsideDb(): OutsideState {
   let outside = outsideByState.get(state);

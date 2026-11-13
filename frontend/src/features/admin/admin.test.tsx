@@ -8,8 +8,8 @@ import { setAccessToken } from "@/api/token";
 import { axeViolations } from "@/features/auth/axeCheck";
 import { i18n } from "@/i18n";
 import { paths } from "@/lib/paths";
-import { DEMO_USER_ID } from "@/test/fake/ids";
-import { DEMO_SIGNUP_CODE } from "@/test/fake/seedOutside";
+import { TEST_USER_ID } from "@/test/fake/ids";
+import { TEST_SIGNUP_CODE } from "@/test/fake/seedOutside";
 import { outsideDb } from "@/test/fake/store";
 import { renderAt } from "@/test/renderApp";
 import { server } from "@/test/server";
@@ -42,7 +42,7 @@ describe("the admin area", () => {
     await openAdmin();
 
     expect(screen.getByTestId("signup-code")).toHaveTextContent(
-      DEMO_SIGNUP_CODE,
+      TEST_SIGNUP_CODE,
     );
     expect(
       row("Eva Nováková").getByText("Must choose a new password"),
@@ -100,7 +100,7 @@ describe("the admin area", () => {
       /Use at least 12 characters\./,
     );
     expect(requests).toBe(0);
-    expect(outsideDb().signupCode).toBe(DEMO_SIGNUP_CODE);
+    expect(outsideDb().signupCode).toBe(TEST_SIGNUP_CODE);
   });
 
   it("FR-005: generates a code", async () => {
@@ -110,7 +110,7 @@ describe("the admin area", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("signup-code")).not.toHaveTextContent(
-        DEMO_SIGNUP_CODE,
+        TEST_SIGNUP_CODE,
       );
     });
     expect(
@@ -596,7 +596,7 @@ describe("the forced new password", () => {
     server.use(
       http.get("/api/v1/leagues", () => {
         const demo = outsideDb().accounts.find(
-          (a) => a.user.id === DEMO_USER_ID,
+          (a) => a.user.id === TEST_USER_ID,
         );
         if (demo) {
           demo.user.must_change_password = true;

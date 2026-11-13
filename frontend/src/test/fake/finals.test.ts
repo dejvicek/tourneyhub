@@ -4,17 +4,17 @@ import { api, ApiError, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
 import { rules } from "@/lib/rules";
 
-import { DEMO_LEAGUE_ID, demoId } from "./ids";
+import { TEST_LEAGUE_ID, testId } from "./ids";
 
 // Ids of the finals seed (seedFinals.ts).
-const DYP_EVENING = demoId(3200);
-const MONSTER = demoId(3300);
-const SWISS = demoId(3450);
-const SPRING_CUP = demoId(3600);
-const GRAND_PRIX = demoId(3700);
+const DYP_EVENING = testId(3200);
+const MONSTER = testId(3300);
+const SWISS = testId(3450);
+const SPRING_CUP = testId(3600);
+const GRAND_PRIX = testId(3700);
 
 const base = (tournamentId: string) => ({
-  league_id: DEMO_LEAGUE_ID,
+  league_id: TEST_LEAGUE_ID,
   tournament_id: tournamentId,
 });
 const root = "/api/v1/leagues/{league_id}/tournaments/{tournament_id}";
@@ -203,7 +203,7 @@ describe("the finals in the fake API", () => {
   it("warns nothing and starts a late player with 0 points from the next round (BR-067)", async () => {
     const players = await dataOf(
       provisionalApi.GET("/api/v1/leagues/{league_id}/players", {
-        params: { path: { league_id: DEMO_LEAGUE_ID } },
+        params: { path: { league_id: TEST_LEAGUE_ID } },
       }),
     );
     const tournament = await dataOf(

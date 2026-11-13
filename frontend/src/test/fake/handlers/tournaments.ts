@@ -1,4 +1,4 @@
-// Demo handlers: tournaments, their setup and progress (FR-030–FR-048).
+// Fake handlers: tournaments, their setup and progress (FR-030–FR-048).
 import { apiError, route } from "../route";
 import {
   applyFormat,

@@ -5,14 +5,14 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { i18n } from "@/i18n";
 import { paths } from "@/lib/paths";
-import { DEMO_LEAGUE_ID } from "@/test/fake/ids";
+import { TEST_LEAGUE_ID } from "@/test/fake/ids";
 import { createSeed } from "@/test/fake/seed";
 import { stubViewport } from "@/test/media";
 import { renderAt } from "@/test/renderApp";
 
 const running = createSeed().tournaments.find((t) => t.state === "in_progress");
 const params = {
-  leagueId: DEMO_LEAGUE_ID,
+  leagueId: TEST_LEAGUE_ID,
   tournamentId: running?.id ?? "",
   matchId: running?.rounds.at(-1)?.matches.at(-1)?.id ?? "",
 };

@@ -8,24 +8,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { provisionalApi } from "@/api/provisional";
 import { i18n } from "@/i18n";
 import { paths } from "@/lib/paths";
-import { DEMO_LEAGUE_ID, demoId } from "@/test/fake/ids";
+import { TEST_LEAGUE_ID, testId } from "@/test/fake/ids";
 import { db } from "@/test/fake/store";
 import { stubViewport } from "@/test/media";
 import { renderAt } from "@/test/renderApp";
 import { server } from "@/test/server";
 
-const DYP_EVENING = demoId(3200);
-const MONSTER = demoId(3300);
-const SWISS = demoId(3450);
-const SPRING_CUP = demoId(3600);
-const GRAND_PRIX = demoId(3700);
-const ROUND_ROBIN_DONE = demoId(3800);
+const DYP_EVENING = testId(3200);
+const MONSTER = testId(3300);
+const SWISS = testId(3450);
+const SPRING_CUP = testId(3600);
+const GRAND_PRIX = testId(3700);
+const ROUND_ROBIN_DONE = testId(3800);
 
 const at = (path: string, tournamentId: string) =>
-  generatePath(path, { leagueId: DEMO_LEAGUE_ID, tournamentId });
+  generatePath(path, { leagueId: TEST_LEAGUE_ID, tournamentId });
 const root = "/api/v1/leagues/{league_id}/tournaments/{tournament_id}";
 const ids = (tournamentId: string) => ({
-  league_id: DEMO_LEAGUE_ID,
+  league_id: TEST_LEAGUE_ID,
   tournament_id: tournamentId,
 });
 
@@ -107,7 +107,7 @@ describe("outside demo mode, where the backend serves the season routes (P10a)",
 
   it("shows the season standings, not a line that they come later", async () => {
     const calls = requested();
-    renderAt(generatePath(paths.seasonStandings, { leagueId: DEMO_LEAGUE_ID }));
+    renderAt(generatePath(paths.seasonStandings, { leagueId: TEST_LEAGUE_ID }));
 
     expect(await screen.findByRole("table")).toBeInTheDocument();
     expect(screen.queryByText(/later version/)).not.toBeInTheDocument();
@@ -356,7 +356,7 @@ describe("Changing a knockout result (FR-053, BR-094)", () => {
     const semifinal = bracket.data?.rounds[0]?.matches[0];
     renderAt(
       generatePath(paths.knockoutResult, {
-        leagueId: DEMO_LEAGUE_ID,
+        leagueId: TEST_LEAGUE_ID,
         tournamentId: DYP_EVENING,
         matchId: semifinal?.match_id ?? "",
       }),
@@ -388,7 +388,7 @@ describe("Changing a knockout result (FR-053, BR-094)", () => {
     const semifinal = bracket.data?.rounds[0]?.matches[0];
     renderAt(
       generatePath(paths.knockoutResult, {
-        leagueId: DEMO_LEAGUE_ID,
+        leagueId: TEST_LEAGUE_ID,
         tournamentId: DYP_EVENING,
         matchId: semifinal?.match_id ?? "",
       }),
@@ -585,7 +585,7 @@ function qualifiersOnTheKnockout(tournamentId: string, qualifiers: number) {
   group.qualifiers = null;
   tournament.phases.push({
     ...group,
-    id: demoId(4501, "outside"),
+    id: testId(4501, "outside"),
     position: 2,
     kind: "knockout",
     format: "single_elimination",
@@ -865,8 +865,8 @@ describe("Late and disabled players (screen 12)", () => {
     // New players have no season points, so only their names order them.
     db().players.push(
       ...czechOrder.toReversed().map((name, i) => ({
-        id: demoId(9100 + i),
-        league_id: DEMO_LEAGUE_ID,
+        id: testId(9100 + i),
+        league_id: TEST_LEAGUE_ID,
         name,
         removed_at: null,
       })),
@@ -1097,7 +1097,7 @@ describe("Start the knockout (screen 13)", () => {
 
 describe("Season standings", () => {
   it("lists the players of the finished tournaments with points, played and wins", async () => {
-    renderAt(generatePath(paths.seasonStandings, { leagueId: DEMO_LEAGUE_ID }));
+    renderAt(generatePath(paths.seasonStandings, { leagueId: TEST_LEAGUE_ID }));
 
     const table = await screen.findByRole("table", {
       name: "Season standings",
@@ -1119,7 +1119,7 @@ describe("Season standings", () => {
 
   it("counts a tournament once it finishes (BR-112)", async () => {
     await playFinal(DYP_EVENING);
-    renderAt(generatePath(paths.seasonStandings, { leagueId: DEMO_LEAGUE_ID }));
+    renderAt(generatePath(paths.seasonStandings, { leagueId: TEST_LEAGUE_ID }));
 
     expect(
       await screen.findByText(/after 3 finished tournaments/),
@@ -1133,7 +1133,7 @@ describe("Season standings", () => {
     for (const player of db().players) {
       player.removed_at = "2026-11-01T10:00:00Z";
     }
-    renderAt(generatePath(paths.seasonStandings, { leagueId: DEMO_LEAGUE_ID }));
+    renderAt(generatePath(paths.seasonStandings, { leagueId: TEST_LEAGUE_ID }));
 
     const table = await screen.findByRole("table", {
       name: "Season standings",
@@ -1148,7 +1148,7 @@ describe("Season standings", () => {
 
   it("is written in Czech with Czech plurals", async () => {
     await i18n.changeLanguage("cs");
-    renderAt(generatePath(paths.seasonStandings, { leagueId: DEMO_LEAGUE_ID }));
+    renderAt(generatePath(paths.seasonStandings, { leagueId: TEST_LEAGUE_ID }));
 
     expect(
       await screen.findByText(/po 2 dohraných turnajích/),
@@ -1156,7 +1156,7 @@ describe("Season standings", () => {
   });
 
   it("has no axe violations", async () => {
-    renderAt(generatePath(paths.seasonStandings, { leagueId: DEMO_LEAGUE_ID }));
+    renderAt(generatePath(paths.seasonStandings, { leagueId: TEST_LEAGUE_ID }));
     await screen.findByRole("table", { name: "Season standings" });
     expect(await violations()).toEqual([]);
   });

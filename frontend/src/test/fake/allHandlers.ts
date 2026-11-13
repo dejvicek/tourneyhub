@@ -11,7 +11,7 @@ import { resultHandlers } from "./handlers/results";
 import { standingsHandlers } from "./handlers/standings";
 import { tournamentHandlers } from "./handlers/tournaments";
 
-export const demoHandlers = [
+export const fakeHandlers = [
   ...authHandlers,
   ...adminHandlers,
   ...leagueHandlers,

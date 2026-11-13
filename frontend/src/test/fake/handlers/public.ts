@@ -1,4 +1,4 @@
-// Demo handlers: the share-link views, without an account (FR-070–FR-072).
+// Fake handlers: the share-link views, without an account (FR-070–FR-072).
 // Read-only; tournaments in setup answer 404, as if they did not exist. An
 // unknown token is 404 share_link_not_found with an empty detail, as the
 // backend answers it; the token is never echoed.
