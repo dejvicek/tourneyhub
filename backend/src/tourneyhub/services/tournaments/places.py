@@ -167,12 +167,15 @@ class PlacesView:
 
 
 def _require_played_group(tournament: Tournament) -> TournamentPhase:
-    """The round robin or Swiss of a tournament, with or without a knockout after it.
+    """The round robin, Swiss or Monster DYP of a tournament, with or without a knockout.
 
-    Monster DYP is not played yet: 422 `format_not_supported` until it is.
+    A knockout after a Monster DYP is not played yet, so the shared
+    `PLAYED_GROUP_FORMATS` leaves Monster DYP out and it is accepted here.
     """
     group = _group_phase(tournament)
-    if group is None or group.format not in PLAYED_GROUP_FORMATS:
+    if group is None or group.format not in PLAYED_GROUP_FORMATS | {
+        PhaseFormat.MONSTER_DYP
+    }:
         last = tournament.phases[-1]
         raise RuleViolationError(ErrorCode.FORMAT_NOT_SUPPORTED, format=last.format)
     return group
@@ -287,8 +290,8 @@ def _placed(tournament: Tournament, placement_points: Sequence[int]) -> _Placed:
     order (BR-103). A knockout without a group phase places every entry by
     BR-102 alone (FR-031). Each player earns the placement points of their
     place, entries sharing a place the average of the places they cover,
-    rounded down (BR-110, BR-111). Monster DYP is 422 `format_not_supported`
-    until it is played.
+    rounded down (BR-110, BR-111). A Monster DYP's places are one player's
+    each, by their main entry (BR-100, BR-103).
     """
     group = _group_phase(tournament)
     knockout = knockout_bracket(tournament)

@@ -773,13 +773,15 @@ def finish_tournament(
     user: CurrentUserDep,
     clock: ClockDep,
 ) -> TournamentRead:
-    """Finish a round robin or a Swiss without a knockout, once the UI has asked (FR-040).
+    """Finish a round robin, Swiss or Monster DYP without a knockout (FR-040).
+
+    The UI asks first.
 
     A tournament that is not in progress is 409 `tournament_not_in_progress`
     (detail `state`), so a repeat changes nothing. A match without a result is
     422 `group_phase_not_done` (detail `matches_left`). A tournament with a
-    knockout, which finishes with its last result (FR-037), or a Monster DYP
-    is 422 `format_not_supported`.
+    knockout, which finishes with its last result (FR-037), is 422
+    `format_not_supported`.
     The standings become the places (`GET …/places`).
     """
     tournament = tournament_service.finish_tournament(

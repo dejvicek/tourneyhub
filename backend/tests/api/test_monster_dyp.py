@@ -727,7 +727,7 @@ def test_monster_dyp_round_reads_without_errors(
         client.get(f"{public}/seasons/{season_id}/tournaments"),
         client.get(f"{public}/tournaments/{tid}"),
         client.get(f"{public}/tournaments/{tid}/standings"),
-        client.get(f"{public}/seasons/{season_id}/standings"),
+        client.get(f"{public}/seasons/{tournament['season_id']}/standings"),
     ]
 
     assert [r.status_code for r in placed] == [200, 200], [r.text for r in placed]
@@ -1158,3 +1158,120 @@ def test_round_not_complete_is_422(
         422,
         {"code": "round_not_complete", "detail": {"matches_left": 1}},
     )
+
+
+def _finish(
+    client: TestClient, league: League, tournament_id: str, headers: dict[str, str]
+) -> tuple[int, Json]:
+    response = client.post(
+        _t_url(league, tournament_id, "/finish"),
+        json={"expected_state": "in_progress"},
+        headers=headers,
+    )
+    result: Json = response.json()
+    return response.status_code, result
+
+
+def test_br103_monster_dyp_without_knockout_places_follow_the_standings(
+    client: TestClient, league: League, headers: dict[str, str], players: list[str]
+) -> None:
+    tid = _monster(client, league, headers, players[:8])
+    tournament = _started(client, league, tid, headers)
+    _play_round(client, league, tid, _round(tournament), headers)
+
+    status, finished = _finish(client, league, tid, headers)
+
+    assert (status, finished["state"]) == (200, "finished"), finished
+    play = _get(client, league, tid, "/play", headers)
+    places = _get(client, league, tid, "/places", headers)
+    assert places["complete"] is True
+    assert {row["entry_id"]: row["place"] for row in places["rows"]} == {
+        row["entry_id"]: row["place"] for row in play["standings"]
+    }
+    assert len(places["rows"]) == 8
+    assert {row["reason"]["group_format"] for row in places["rows"]} == {"monster_dyp"}
+
+
+def test_br111_shared_place_splits_season_points(
+    client: TestClient, league: League, headers: dict[str, str], players: list[str]
+) -> None:
+    tid = _monster(client, league, headers, players[:8])
+    tournament = _started(client, league, tid, headers)
+    for match in _round(tournament)["matches"]:
+        _result(client, league, tid, match["id"], win("side_1"), headers)
+    _finish(client, league, tid, headers)
+
+    places = _get(client, league, tid, "/places", headers)
+
+    # The four winners are level and share 1st, which covers places 1 to 4;
+    # the four losers share 5th, which covers 5 to 8 (BR-104, BR-111).
+    by_place: dict[int, set[int]] = {}
+    for row in places["rows"]:
+        by_place.setdefault(row["place"], set()).add(row["points_per_player"])
+    assert by_place == {1: {(10 + 8 + 6 + 4) // 4}, 5: {(2 + 0 + 0 + 0) // 4}}
+
+
+def test_br112_season_standings_count_a_finished_monster_dyp(
+    client: TestClient,
+    league: League,
+    headers: dict[str, str],
+    players: list[str],
+) -> None:
+    tid = _monster(client, league, headers, players[:8])
+    tournament = _started(client, league, tid, headers)
+    _play_round(client, league, tid, _round(tournament), headers)
+    url = f"/api/v1/leagues/{league.id}/seasons/{tournament['season_id']}/standings"
+    assert client.get(url, headers=headers).json() == []
+
+    _finish(client, league, tid, headers)
+
+    season = client.get(url, headers=headers).json()
+    assert {row["player_id"] for row in season} == set(players[:8])
+    assert sum(row["points"] for row in season) > 0
+
+
+def test_group_phase_not_done_is_422(
+    client: TestClient, league: League, headers: dict[str, str], players: list[str]
+) -> None:
+    tid = _monster(client, league, headers, players[:8])
+    tournament = _started(client, league, tid, headers)
+    first, _ = _round(tournament)["matches"]
+    _result(client, league, tid, first["id"], win("side_1"), headers)
+
+    status, body = _finish(client, league, tid, headers)
+
+    assert (status, body) == (
+        422,
+        {"code": "group_phase_not_done", "detail": {"matches_left": 1}},
+    )
+
+
+def test_knockout_after_monster_dyp_still_refused(
+    client: TestClient, league: League, headers: dict[str, str], players: list[str]
+) -> None:
+    """Guards the `PLAYED_GROUP_FORMATS` boundary until the knockout comes (PR 3)."""
+    tid = _monster(client, league, headers, players[:8])
+    tournament = _started(client, league, tid, headers)
+    _play_round(client, league, tid, _round(tournament), headers)
+
+    preview = client.get(
+        _t_url(league, tid, "/knockout/preview?qualifiers=4&third_place_match=false"),
+        headers=headers,
+    )
+    started = client.put(
+        _t_url(league, tid, "/knockout"),
+        json={
+            "expected_current_phase_id": tournament["current_phase_id"],
+            "expected_qualifier_ids": [],
+            "qualifiers": 4,
+            "third_place_match": False,
+            "match_format": None,
+            "final_match_format": None,
+            "mode": None,
+        },
+        headers=headers,
+    )
+
+    assert started.status_code == 422
+    assert started.json()["code"] == "format_not_supported"
+    assert (preview.status_code, preview.json().get("entries", [])) == (200, [])

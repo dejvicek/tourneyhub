@@ -7066,7 +7066,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/finish": {
       "post": {
-        "description": "Finish a round robin or a Swiss without a knockout, once the UI has asked (FR-040).\n\nA tournament that is not in progress is 409 `tournament_not_in_progress`\n(detail `state`), so a repeat changes nothing. A match without a result is\n422 `group_phase_not_done` (detail `matches_left`). A tournament with a\nknockout, which finishes with its last result (FR-037), or a Monster DYP\nis 422 `format_not_supported`.\nThe standings become the places (`GET \u2026/places`).",
+        "description": "Finish a round robin, Swiss or Monster DYP without a knockout (FR-040).\n\nThe UI asks first.\n\nA tournament that is not in progress is 409 `tournament_not_in_progress`\n(detail `state`), so a repeat changes nothing. A match without a result is\n422 `group_phase_not_done` (detail `matches_left`). A tournament with a\nknockout, which finishes with its last result (FR-037), is 422\n`format_not_supported`.\nThe standings become the places (`GET \u2026/places`).",
         "operationId": "finish_tournament",
         "parameters": [
           {

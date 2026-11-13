@@ -348,14 +348,16 @@ def set_tiebreakers(
 
 
 def _require_group_only(tournament: Tournament) -> TournamentPhase:
-    """The round robin or Swiss of a tournament without a knockout (FR-040).
+    """The round robin, Swiss or Monster DYP of a tournament without a knockout (FR-040).
 
-    A knockout finishes by itself (FR-037), and Monster DYP is not played
-    yet: 422 `format_not_supported` until it is.
+    A knockout finishes by itself (FR-037): 422 `format_not_supported`. A
+    Monster DYP has no knockout yet, so `PLAYED_GROUP_FORMATS`, which the
+    knockout reads, stays as it is and the Monster DYP is accepted here.
     """
     group = _group_phase(tournament)
     last = tournament.phases[-1]
-    if group is not last or group.format not in PLAYED_GROUP_FORMATS:
+    allowed = PLAYED_GROUP_FORMATS | {PhaseFormat.MONSTER_DYP}
+    if group is not last or group.format not in allowed:
         raise RuleViolationError(ErrorCode.FORMAT_NOT_SUPPORTED, format=last.format)
     return group
 
@@ -368,7 +370,9 @@ def finish_tournament(
     user_id: UUID,
     clock: Clock,
 ) -> TournamentView:
-    """Finish a round robin or a Swiss without a knockout; the UI asks first (FR-040).
+    """Finish a round robin, Swiss or Monster DYP without a knockout (FR-040).
+
+    The UI asks first.
 
     The request expects the tournament in progress; in any other state it is
     409 `tournament_not_in_progress`, so a repeat changes nothing (ADR-008). A
