@@ -142,6 +142,10 @@ MATCH_SIDES = 2
 PLAYED_GROUP_FORMATS = frozenset({PhaseFormat.ROUND_ROBIN, PhaseFormat.SWISS})
 """The group formats whose rounds the backend plays; Monster DYP comes later."""
 
+ROUND_BY_ROUND_FORMATS = frozenset({PhaseFormat.SWISS, PhaseFormat.MONSTER_DYP})
+"""Group formats drawn one round at a time, with tie-breakers of their own (FR-040,
+FR-043)."""
+
 type Clock = Callable[[], datetime]
 
 
@@ -2563,7 +2567,8 @@ def set_match_result(
     on the next read; a match on a field whose side is no longer known leaves
     it (BR-130). The result that completes the knockout, the final's or the
     third-place match's, finishes the tournament in the same transaction
-    (FR-037).
+    (FR-037). In a Swiss, every round but the newest is locked (BR-065):
+    422 `result_locked` with the newest `round_no`.
     """
     league, tournament = _lock_tournament(
         session,
@@ -2582,14 +2587,14 @@ def set_match_result(
     now = clock()
     if result.is_empty:
         if match.outcome is not None:
-            _require_unlocked(tournament, phase, match)
+            _require_unlocked(tournament, phase, round_, match)
         _clear_result(tournament, match, now)
     else:
         outcome = _outcome_of(
             result, league=league, phase=phase, round_=round_, match=match
         )
         if not _same_result(match, result, outcome):
-            _require_unlocked(tournament, phase, match)
+            _require_unlocked(tournament, phase, round_, match)
             _write_result(session, tournament, match, result, outcome, now)
             _finish_with_knockout(tournament, now)
     session.flush()
@@ -2640,11 +2645,22 @@ def _require_expected_sides(
 
 
 def _require_unlocked(
-    tournament: Tournament, phase: TournamentPhase, match: Match
+    tournament: Tournament, phase: TournamentPhase, round_: Round, match: Match
 ) -> None:
-    """Refuse a change to a locked result (BR-053, BR-065, BR-094): 422."""
+    """Refuse a change to a locked result (BR-053, BR-065, BR-094): 422.
+
+    Once the knockout is drawn, every group-phase result is locked,
+    `group_phase_locked`. Before that, a Swiss locks every round but the
+    newest, `result_locked` with the newest `round_no` (BR-065); deleting the
+    newest round unlocks the one before (BR-066), since the newest round is
+    found on every write. A knockout result is locked while a later match it
+    feeds has a result, `result_locked` with those `match_ids` (BR-094).
+    """
     knockout = knockout_bracket(tournament)
     if knockout is None:
+        newest = phase.rounds[-1]
+        if phase.format in ROUND_BY_ROUND_FORMATS and round_ is not newest:
+            raise RuleViolationError(ErrorCode.RESULT_LOCKED, round_no=newest.round_no)
         return
     if phase.kind is PhaseKind.GROUP:
         raise RuleViolationError(

@@ -78,7 +78,9 @@ class ErrorCode(StrEnum):
     EXPECTED_SIDES_REQUIRED = "expected_sides_required"  # a derived match needs them
     GROUP_PHASE_NOT_DONE = "group_phase_not_done"  # FR-040
     GROUP_PHASE_LOCKED = "group_phase_locked"  # the knockout is drawn (BR-053)
-    RESULT_LOCKED = "result_locked"  # a later knockout match has a result (BR-094)
+    # A later knockout match has a result (BR-094), or a later Swiss round is
+    # drawn (BR-065)
+    RESULT_LOCKED = "result_locked"
     CURRENT_PHASE_CHANGED = "current_phase_changed"  # the knockout was drawn (FR-045)
     QUALIFIERS_OUT_OF_RANGE = "qualifiers_out_of_range"  # BR-080
     QUALIFIERS_CHANGED = "qualifiers_changed"  # the cut is not the one previewed
