@@ -397,8 +397,38 @@ export const finalsHandlers = [
         t,
         qualifiers: Number(url.searchParams.get("qualifiers") ?? 0),
         mode: known,
-        draw: 0,
+        draw: t.knockout_draw_counter ?? 0,
       });
+    },
+  ),
+
+  // FR-045: draws the pairs again; a stale counter or an existing knockout is 409.
+  route(
+    "post",
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout/draw",
+    ({ params, body }) => {
+      const t = findTournament(params.league_id, params.tournament_id);
+      const group = t ? groupPhase(t) : undefined;
+      if (!t || !group) {
+        return notFound(params);
+      }
+      const existing = bracketOf(t);
+      if (existing) {
+        return apiError(409, "current_phase_changed", {
+          current_phase_id: existing.phase_id,
+        });
+      }
+      if (group.format !== "monster_dyp") {
+        return apiError(422, "knockout_mode_not_applicable", {});
+      }
+      const counter = t.knockout_draw_counter ?? 0;
+      if (body.expected_draw_counter !== counter) {
+        return apiError(409, "draw_counter_changed", {
+          draw_counter: counter,
+        });
+      }
+      t.knockout_draw_counter = counter + 1;
+      return { draw_counter: counter + 1 };
     },
   ),
 
@@ -421,6 +451,12 @@ export const finalsHandlers = [
       if (t.state !== "in_progress" || !roundIsComplete(t)) {
         return refused("round_incomplete");
       }
+      const counter = t.knockout_draw_counter ?? 0;
+      if (body.expected_draw_counter !== counter) {
+        return apiError(409, "draw_counter_changed", {
+          draw_counter: counter,
+        });
+      }
       const monster = group.format === "monster_dyp";
       const mode = monster ? body.mode : null;
       if (
@@ -433,7 +469,7 @@ export const finalsHandlers = [
         t,
         qualifiers: body.qualifiers,
         mode,
-        draw: 0,
+        draw: counter,
       });
       // BR-080: at least 2 entries, or 4 with a third-place match.
       if (plan.entries.length < (body.third_place_match ? 4 : 2)) {
