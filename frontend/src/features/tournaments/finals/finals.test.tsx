@@ -484,6 +484,25 @@ describe("Knockout in Lord have mercy (screen 9, BR-155)", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("draws the next round in Czech with Czech plurals (BR-140)", async () => {
+    await i18n.changeLanguage("cs");
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    renderAt(knockoutPath(), queryClient);
+
+    expect(
+      await screen.findByText("1 zápas ještě nemá výsledek."),
+    ).toBeInTheDocument();
+    await finishNewestRound();
+    await queryClient.invalidateQueries(
+      finalsQueries.knockoutRounds(TEST_LEAGUE_ID, LHM),
+    );
+    expect(
+      await screen.findByRole("button", { name: /^Vylosovat: / }),
+    ).toBeInTheDocument();
+  });
+
   it("shows the 409 round_number_changed text and reloads", async () => {
     await finishNewestRound();
     let reads = 0;
@@ -597,7 +616,7 @@ describe("Knockout in Lord have mercy (screen 9, BR-155)", () => {
     renderAt(knockoutPath());
 
     expect(
-      await screen.findByText(/left and stay in the draw/),
+      await screen.findByText(/no longer play but stay in the draw/),
     ).toBeInTheDocument();
     expect(screen.getAllByText("No longer playing")).toHaveLength(1);
   });

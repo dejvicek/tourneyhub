@@ -132,15 +132,15 @@ export const finals: CsMessages<Messages["finals"]> = {
     deleteRound: "Smazat kolo: {{round}}",
     deleteTitle: "Smazat kolo: {{round}}?",
     deleteBody_one:
-      "Vylosované dvojice a {{count}} výsledek se odstraní. Vítěze předchozího kola půjde znovu změnit.",
+      "Vylosované dvojice a {{count}} výsledek se odstraní. Vítěze předchozího kola bude možné znovu změnit.",
     deleteBody_few:
-      "Vylosované dvojice a {{count}} výsledky se odstraní. Vítěze předchozího kola půjde znovu změnit.",
+      "Vylosované dvojice a {{count}} výsledky se odstraní. Vítěze předchozího kola bude možné znovu změnit.",
     deleteBody_many:
-      "Vylosované dvojice a {{count}} výsledku se odstraní. Vítěze předchozího kola půjde znovu změnit.",
+      "Vylosované dvojice a {{count}} výsledku se odstraní. Vítěze předchozího kola bude možné znovu změnit.",
     deleteBody_other:
-      "Vylosované dvojice a {{count}} výsledků se odstraní. Vítěze předchozího kola půjde znovu změnit.",
+      "Vylosované dvojice a {{count}} výsledků se odstraní. Vítěze předchozího kola bude možné znovu změnit.",
     deleteBodyNone:
-      "Vylosované dvojice se odstraní. Vítěze předchozího kola půjde znovu změnit.",
+      "Vylosované dvojice se odstraní. Vítěze předchozího kola bude možné znovu změnit.",
     deleteBodyFirstNone:
       "Vylosované dvojice se odstraní. Tím se smaže celá vyřazovací část a základní část se odemkne.",
     deleteBodyFirst_one:
@@ -152,7 +152,7 @@ export const finals: CsMessages<Messages["finals"]> = {
     deleteBodyFirst_other:
       "Vylosované dvojice a {{count}} výsledků se odstraní. Tím se smaže celá vyřazovací část a základní část se odemkne.",
     leftNotice: "Už nehrají, ale zůstávají v losování: {{names}}",
-    winnerFixed: "Vítěz je pevný",
+    winnerFixed: "Vítěz je už určený",
     left: "Už nehraje",
     drawnAfter: "Losuje se po: {{previous}}",
     drawnLater: "Losuje se později",
@@ -161,7 +161,7 @@ export const finals: CsMessages<Messages["finals"]> = {
     title: "Dohráno",
     winners: "Vítězové",
     wonFinal: "Finále {{score}}, soupeř: {{opponent}}",
-    wonFinalScore: "Finále {{score}}",
+    wonFinalScore: "Vítězství ve finále {{score}}",
     wonStandings: "První v tabulce",
     earnsEach_one: "Oba dostanou {{count}} bod do sezóny.",
     earnsEach_few: "Oba dostanou {{count}} body do sezóny.",

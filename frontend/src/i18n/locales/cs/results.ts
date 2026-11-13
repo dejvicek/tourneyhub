@@ -121,7 +121,7 @@ export const results: CsMessages<Messages["results"]> = {
     lockedRound:
       "Toto kolo je zamčené, protože už je vylosované kolo {{round}}. Pokud ho chcete změnit, smažte novější kola.",
     lockedWinner:
-      "Vítěz je pevný, protože je vylosované kolo {{round}}. Opravte skóre, nebo smažte nejnovější kolo vyřazovací části a změňte vítěze.",
+      "Vítěz je už určený, protože je vylosované kolo {{round}}. Opravte skóre, nebo smažte nejnovější kolo vyřazovací části a změňte vítěze.",
     sidesChanged:
       "Dvojice v tomto zápase se změnily, obrazovka byla znovu načtena.",
     seasonClosed:
