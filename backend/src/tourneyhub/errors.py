@@ -86,6 +86,9 @@ class ErrorCode(StrEnum):
     PHASE_NOT_DELETABLE = "phase_not_deletable"  # only a knockout after a group phase
     KNOCKOUT_NOT_FOUND = "knockout_not_found"  # the tournament has no knockout
     KNOCKOUT_MODE_NOT_APPLICABLE = "knockout_mode_not_applicable"  # Monster DYP only
+    # Swiss rounds (FR-040, FR-046)
+    ROUND_NUMBER_CHANGED = "round_number_changed"  # the expected new number is stale
+    ROUND_NOT_COMPLETE = "round_not_complete"  # the newest round has a match left
     # Fields (FR-090 to FR-094)
     FIELD_NOT_FOUND = "field_not_found"
     FIELD_NUMBER_CHANGED = "field_number_changed"  # the expected new number is stale

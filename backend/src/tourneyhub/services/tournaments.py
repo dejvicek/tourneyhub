@@ -10,7 +10,7 @@ states (ADR-008); the standings and places are computed on read (ADR-009).
 """
 
 import secrets
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date, datetime
 from enum import StrEnum
@@ -101,6 +101,7 @@ from tourneyhub.engine.swiss import (
     SwissRound,
     SwissStanding,
     draw_first_swiss_round,
+    draw_next_swiss_round,
     swiss_standings,
 )
 from tourneyhub.engine.tournaments import (
@@ -1994,12 +1995,16 @@ def _schedule_rows(
     schedule: Sequence[ScheduledRound],
     members: Mapping[UUID, Sequence[UUID]],
     now: datetime,
+    *,
+    disabled: Collection[UUID] = frozenset(),
 ) -> _ScheduleRows:
     """The rounds of the schedule with their matches, sides and participation.
 
-    Every main entry gets a participation row in every round (D5), and every
-    stored side lists its players (D2). The slots are the matches as the field
-    queue sees them, so no row needs loading to fill the fields.
+    Every main entry in `members` gets a participation row in every round
+    (D5): `sat_out` for the one sitting out, `disabled` for a disabled entry,
+    which is not drawn (BR-064), and `played` for the others. Every stored
+    side lists its players (D2). The slots are the matches as the field queue
+    sees them, so no row needs loading to fill the fields.
     """
     rows = _ScheduleRows(
         rounds=[], matches=[], sides=[], side_players=[], participation=[], slots=[]
@@ -2069,6 +2074,8 @@ def _schedule_rows(
                 "entry_id": entry_id,
                 "status": Participation.SAT_OUT
                 if entry_id == scheduled_round.sitting_out
+                else Participation.DISABLED
+                if entry_id in disabled
                 else Participation.PLAYED,
                 "created_at": now,
             }
@@ -3250,6 +3257,111 @@ def place_matches(
     return read_tournament(
         session, league_id=league_id, tournament_id=tournament.id, user_id=user_id
     )
+
+
+# ---------------------------------------------------------------- Swiss rounds
+
+
+def _require_swiss(tournament: Tournament) -> TournamentPhase:
+    """The Swiss group phase whose rounds are added and deleted (FR-040, FR-046).
+
+    Any other group phase, or none, is 422 `format_not_supported` (detail
+    `format`); Monster DYP rounds come later.
+    """
+    group = _group_phase(tournament)
+    if group is None or group.format is not PhaseFormat.SWISS:
+        format_ = tournament.phases[0].format if group is None else group.format
+        raise RuleViolationError(ErrorCode.FORMAT_NOT_SUPPORTED, format=format_)
+    return group
+
+
+def _require_no_knockout(tournament: Tournament) -> None:
+    """Refuse a change to the group phase once the knockout is drawn (BR-053).
+
+    422 `group_phase_locked` with the knockout's `phase_id`; deleting the
+    knockout unlocks it (BR-087).
+    """
+    knockout = knockout_bracket(tournament)
+    if knockout is not None:
+        raise RuleViolationError(
+            ErrorCode.GROUP_PHASE_LOCKED, phase_id=str(knockout.phase.id)
+        )
+
+
+def add_round(
+    session: Session,
+    *,
+    league_id: UUID,
+    tournament_id: UUID,
+    user_id: UUID,
+    expected_round_no: int,
+    clock: Clock,
+) -> RoundView:
+    """Draw the next round of a Swiss from the standings (FR-040, FR-042).
+
+    The request carries the number the new round expects, the newest round's
+    plus one: any other is 409 `round_number_changed` (detail
+    `current_round_no`, the newest round's), so a repeat draws nothing
+    (ADR-008). A closed season is 409 `season_closed`, a tournament not in
+    progress 409 `tournament_not_in_progress`. A group phase that is not a
+    Swiss is 422 `format_not_supported`; once the knockout is drawn, 422
+    `group_phase_locked`. A match of the newest round without a result is 422
+    `round_not_complete` (detail `matches_left`), and fewer than 2 entries
+    that are not disabled 422 `not_enough_entries`.
+
+    The round is drawn from the standings over every stored round (BR-056 to
+    BR-058, ADR-011), leaving out disabled entries, whose participation is
+    `disabled` (BR-064). The rounds before it are locked from now on
+    (BR-065), and its first matches take the free fields (BR-130).
+    """
+    league, tournament = _lock_tournament(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user_id,
+        rounds=True,
+    )
+    _require_open_season(league, tournament)
+    if tournament.state is not TournamentState.IN_PROGRESS:
+        raise ConflictError(
+            ErrorCode.TOURNAMENT_NOT_IN_PROGRESS, state=tournament.state
+        )
+    group = _require_swiss(tournament)
+    _require_no_knockout(tournament)
+    newest = group.rounds[-1]  # a running Swiss has round 1 (FR-046)
+    if expected_round_no != newest.round_no + 1:
+        raise ConflictError(
+            ErrorCode.ROUND_NUMBER_CHANGED, current_round_no=newest.round_no
+        )
+    left = sum(match.outcome is None for match in _played(newest))
+    if left:
+        raise RuleViolationError(ErrorCode.ROUND_NOT_COMPLETE, matches_left=left)
+    main = _main_entries(tournament)
+    disabled = {EntryId(entry.id) for entry in main if entry.is_disabled}
+    try:
+        draw = draw_next_swiss_round(
+            _swiss_standings_of(tournament, group),
+            _swiss_rounds(group),
+            disabled=sorted(disabled),
+        )
+    except EngineError as err:
+        raise to_app_error(err) from err
+    now = clock()
+    members = {
+        entry.id: sorted(member.player_id for member in entry.members) for entry in main
+    }
+    rows = _schedule_rows(
+        group, [_swiss_round_of(draw)], members, now, disabled=disabled
+    )
+    _insert_schedule(session, rows)  # the matches exist before a field references one
+    tournament.updated_at = now
+    _fill_fields(tournament, [*_match_slots(tournament), *rows.slots], now)
+    session.flush()
+    round_id = rows.rounds[0]["id"]
+    view = read_tournament(
+        session, league_id=league_id, tournament_id=tournament.id, user_id=user_id
+    )
+    return next(round_ for round_ in view.rounds if round_.id == round_id)
 
 
 # ---------------------------------------------------------------- finishing
