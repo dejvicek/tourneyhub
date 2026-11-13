@@ -7,7 +7,6 @@ import { http, HttpResponse } from "msw";
 import { newId } from "@/lib/newId";
 
 import type { UserRead } from "../contract";
-import { TEST_EMAIL } from "../ids";
 import {
   nameProblem,
   outsideError,
@@ -15,12 +14,7 @@ import {
   validationFailed,
 } from "../outsideErrors";
 import { route } from "../route";
-import {
-  type StoredAccount,
-  TEST_PASSWORD,
-  TEST_SIGNUP_CODE,
-  type Throttle,
-} from "../seedOutside";
+import type { StoredAccount, Throttle } from "../seedOutside";
 import { outsideDb } from "../store";
 
 const TEST_ACCESS_TOKEN = "demo-access-token";
@@ -116,13 +110,6 @@ export const authHandlers = [
     me.language = body.language ?? me.language;
     return me;
   }),
-
-  // Demo only: what the login screen shows in demo mode.
-  route("get", "/api/v1/demo/account", () => ({
-    email: TEST_EMAIL,
-    password: TEST_PASSWORD,
-    signup_code: outsideDb().signupCode ?? TEST_SIGNUP_CODE,
-  })),
 
   route("post", "/api/v1/auth/login", ({ body }) => {
     const state = outsideDb();
