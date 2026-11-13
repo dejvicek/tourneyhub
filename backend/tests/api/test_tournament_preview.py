@@ -369,8 +369,10 @@ def test_adr010_the_preview_carries_the_draw_counter_the_start_expects(
 def statements(engine: Engine) -> Iterator[list[str]]:
     seen: list[str] = []
 
-    def record(*args: Any) -> None:  # noqa: ANN401  (SQLAlchemy's event signature)
-        seen.append(args[2])
+    def record(*args: object) -> None:  # SQLAlchemy's event passes the statement third
+        statement = args[2]
+        assert isinstance(statement, str)
+        seen.append(statement)
 
     event.listen(engine, "before_cursor_execute", record)
     yield seen

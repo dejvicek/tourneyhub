@@ -2,7 +2,7 @@
 
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 
 from tourneyhub.engine.ids import EntryId, ensure_distinct
@@ -87,7 +87,7 @@ class StandingRow:
     ahead_by: RoundRobinTiebreaker | None
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class _Tally:
     played: int = 0
     won: int = 0
@@ -170,17 +170,20 @@ def round_robin_standings(
         ):
             row = tally(entry_id)
             result = _result_for(match.outcome, side=side)
-            row.played += 1
-            row.won += result is FormResult.WON
-            row.drawn += result is FormResult.DRAWN
-            row.lost += result is FormResult.LOST
-            row.points += _POINTS[result]
-            row.score_difference += difference
+            tallies[entry_id] = replace(
+                row,
+                played=row.played + 1,
+                won=row.won + (result is FormResult.WON),
+                drawn=row.drawn + (result is FormResult.DRAWN),
+                lost=row.lost + (result is FormResult.LOST),
+                points=row.points + _POINTS[result],
+                score_difference=row.score_difference + difference,
+            )
             forms[entry_id].append(result)
             meeting[entry_id] += _POINTS[result]
     for entry_id in sit_outs:
         row = tally(entry_id)
-        row.sat_out += 1
+        tallies[entry_id] = replace(row, sat_out=row.sat_out + 1)
 
     ranked = _rank(order, tallies, meetings)
     rows: list[StandingRow] = []

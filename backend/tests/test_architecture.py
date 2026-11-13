@@ -219,6 +219,44 @@ def test_the_engine_makes_no_ids() -> None:
     assert not places, _fail("an id generated in the engine", places, "§8")
 
 
+ENGINE_VALUE_ARGUMENTS = ("frozen", "slots", "kw_only")
+
+
+def _dataclass_arguments(decorator: ast.expr) -> set[str] | None:
+    """The arguments set to True in a `dataclass` decorator, or None for another."""
+    match decorator:
+        case ast.Name(id="dataclass") | ast.Attribute(attr="dataclass"):
+            return set()
+        case ast.Call(func=ast.Name(id="dataclass") | ast.Attribute(attr="dataclass")):
+            return {
+                keyword.arg
+                for keyword in decorator.keywords
+                if keyword.arg is not None
+                and isinstance(keyword.value, ast.Constant)
+                and keyword.value.value is True
+            }
+        case _:
+            return None
+
+
+def test_engine_values_are_frozen_slotted_and_keyword_only() -> None:
+    """python-style §4.3: engine values are
+    `@dataclass(frozen=True, slots=True, kw_only=True)`."""
+    places = [
+        f"{_where(module, node)} {node.name}"
+        for module, tree in _modules("engine")
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ClassDef)
+        for decorator in node.decorator_list
+        if (arguments := _dataclass_arguments(decorator)) is not None
+        and not arguments.issuperset(ENGINE_VALUE_ARGUMENTS)
+    ]
+
+    assert not places, _fail(
+        "a dataclass without frozen, slots and kw_only", places, "§4.3"
+    )
+
+
 def test_hypothesis_only_tests_the_engine() -> None:
     """python-style §9: property tests use Hypothesis on the pure engine only."""
     places = [

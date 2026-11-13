@@ -2,8 +2,6 @@ export const standings = {
   season: {
     title: "Season standings",
     lead_one: "{{season}}, after {{count}} finished tournament.",
-    lead_few: "{{season}}, after {{count}} finished tournaments.",
-    lead_many: "{{season}}, after {{count}} finished tournaments.",
     lead_other: "{{season}}, after {{count}} finished tournaments.",
     pick: "Season",
     emptyTitle: "No finished tournaments yet",

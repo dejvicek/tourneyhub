@@ -52,7 +52,7 @@ export const authMutations = {
         );
         setAccessToken(access_token);
       },
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["me"] }),
+      onSettled: () => queryClient.invalidateQueries({ queryKey: ["me"] }),
     }),
   signUp: (queryClient: QueryClient) =>
     mutationOptions({
@@ -70,7 +70,7 @@ export const authMutations = {
         );
         setAccessToken(access_token);
       },
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: ["me"] }),
+      onSettled: () => queryClient.invalidateQueries({ queryKey: ["me"] }),
     }),
   changePassword: () =>
     mutationOptions({
