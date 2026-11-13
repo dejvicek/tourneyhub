@@ -2,15 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { generatePath, Link } from "react-router";
 
+import type { components } from "@/api/schema";
 import { DocumentTitle } from "@/components/DocumentTitle";
 import { PageFallback } from "@/components/PageFallback";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type {
-  SeasonRead,
-  SeasonStandingRow,
-  TournamentSummary,
-} from "@/demo/contract";
 import { EmptyState } from "@/features/leagues/EmptyState";
 import { useSeasonName } from "@/features/leagues/useSeasonName";
 import { useRouteParam } from "@/hooks/useRouteParam";
@@ -19,6 +15,10 @@ import { paths } from "@/lib/paths";
 import { type PublicLeague, type PublicPlayer, publicQueries } from "./api";
 import { LiveFields } from "./LiveFields";
 import { useNames } from "./useNames";
+
+type SeasonRead = components["schemas"]["SeasonRead"];
+type SeasonStandingRow = components["schemas"]["SeasonStandingRead"];
+type TournamentSummary = components["schemas"]["TournamentSummary"];
 
 /**
  * The share link's view of a league (FR-070–FR-072), for players and

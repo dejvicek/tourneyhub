@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
-import type { EntryRead } from "@/demo/contract";
+import type { components } from "@/api/schema";
 import { finalsQueries } from "@/features/finals/api";
+
+type EntryRead = components["schemas"]["EntryRead"];
 
 /** "Anna Nováková" → "Anna N.", the form the design shows in tables and brackets. */
 export function shortName(fullName: string): string {

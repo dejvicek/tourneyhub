@@ -14,12 +14,12 @@ import {
   useSearchParams,
 } from "react-router";
 
+import type { components } from "@/api/schema";
 import { DocumentTitle } from "@/components/DocumentTitle";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
-import type { BracketRoundName, KnockoutWrite } from "@/demo/contract";
 import {
   finalsMutations,
   finalsQueries,
@@ -40,6 +40,9 @@ import { ScreenHeader } from "./finals/ScreenHeader";
 import { LoadError, Loading } from "./finals/StateMessage";
 import { usePlaceLabel } from "./finals/usePlaceLabel";
 import { SegmentedControl } from "./setup/SegmentedControl";
+
+type BracketRoundName = components["schemas"]["RoundName"];
+type KnockoutWrite = components["schemas"]["KnockoutWrite"];
 
 const FIRST_ROUND: Record<number, BracketRoundName> = {
   2: "final",

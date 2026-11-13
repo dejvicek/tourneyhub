@@ -1,6 +1,8 @@
 import { useTranslation } from "react-i18next";
 
-import type { TournamentType } from "@/demo/contract";
+import type { components } from "@/api/schema";
+
+type TournamentType = components["schemas"]["TournamentType"];
 
 /** "6 pairs" or "6 players", by what the tournament's entries are. */
 export function useEntryCount() {

@@ -1,4 +1,7 @@
-import type { MatchFormat, MatchRead } from "@/demo/contract";
+import type { components } from "@/api/schema";
+
+type MatchFormat = components["schemas"]["MatchFormat"];
+type MatchRead = components["schemas"]["MatchRead"];
 
 /** The score a result list shows: a BO1 game's goals, otherwise the games won. */
 export function scoreOf(

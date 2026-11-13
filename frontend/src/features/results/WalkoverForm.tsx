@@ -5,8 +5,9 @@ import type { components } from "@/api/schema";
 import { StickyActions } from "@/components/StickyActions";
 import { Button } from "@/components/ui/button";
 import { RadioGroup } from "@/components/ui/radio-group";
-import type { Side } from "@/demo/contract";
 import { OptionCard } from "@/features/tournaments/play/OptionCard";
+
+type Side = Exclude<components["schemas"]["Outcome"], "draw">;
 
 type ResultWrite = components["schemas"]["ResultWrite"];
 

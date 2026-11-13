@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import type { components } from "@/api/schema";
 import { StickyActions } from "@/components/StickyActions";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import type { Side } from "@/demo/contract";
 import { MATCH_POINTS } from "@/lib/rules";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +20,8 @@ import {
   seriesWrite,
 } from "./resultDraft";
 import { SidePanel } from "./SidePanel";
+
+type Side = Exclude<components["schemas"]["Outcome"], "draw">;
 
 function initialGames(context: ResultFormContext): GameDraft[] {
   const { match, format } = context.info;

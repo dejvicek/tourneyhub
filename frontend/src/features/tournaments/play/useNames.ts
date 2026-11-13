@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 
-import type { MatchSideRead } from "@/demo/contract";
+import type { components } from "@/api/schema";
 
 import {
   entryPlayers,
@@ -9,6 +9,8 @@ import {
   shortName,
   sideNames,
 } from "./model";
+
+type MatchSideRead = components["schemas"]["MatchSideRead"];
 
 const NO_SIDE = { player_ids: [] };
 
