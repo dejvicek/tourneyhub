@@ -36,6 +36,15 @@ export const finals: CsMessages<Messages["finals"]> = {
       "Výsledek ve skupině změnil, kdo postupuje, proto jsme náhled načetli znovu. Zkontrolujte ho a losujte znovu.",
     finalHasResult:
       "Finále už má výsledek, takže jeho formát nejde změnit. Nejdřív výsledek smažte.",
+    roundNumberChanged:
+      "Kola se změnila na jiném zařízení, proto jsme je načetli znovu. Zkontrolujte je a zkuste to ještě jednou.",
+    roundNotComplete:
+      "Než se vylosuje další kolo, musí mít výsledek každý zápas tohoto kola.",
+    roundNotNewest: "Smazat jde jen poslední kolo. Kola jsme načetli znovu.",
+    notEnoughEntries:
+      "Další kolo potřebuje aspoň 2 hráče nebo dvojice, kteří nejsou vyřazeni ze hry.",
+    groupPhaseLocked:
+      "Vyřazovací fáze je vylosovaná, takže kola i rozhodující pravidla jsou pevná. Nejdřív vyřazovací fázi smažte.",
   },
   place: {
     label: "{{place}}{{suffix}}",
