@@ -241,10 +241,7 @@ def _game_difference(match: PlayedMatch, match_format: MatchFormat) -> int:
             raise ValueError(msg)
         games = WALKOVER_GAMES[match_format]
         return games if match.outcome is Outcome.SIDE_1 else -games
-    return sum(match.games.count(side) * sign for side, sign in _GAME_SIGNS)
-
-
-_GAME_SIGNS = ((Outcome.SIDE_1, 1), (Outcome.SIDE_2, -1))
+    return match.games.count(Outcome.SIDE_1) - match.games.count(Outcome.SIDE_2)
 
 
 def _rank(
