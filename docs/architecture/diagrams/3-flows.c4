@@ -519,7 +519,7 @@ views "III. Flows" {
     variant sequence
     title "22. Knockout after a round robin, a Swiss or Monster DYP rounds"
     order 26
-    description "FR-037, FR-045, FR-046, FR-054, BR-040 to BR-044, BR-053, BR-074, BR-080, BR-085, BR-087, BR-094, BR-102, BR-103, BR-120, ADR-008 and DATA-MODEL D4: the preview shows the cut, the seeds and the byes; the start carries the phase the screen saw as current. Knockout entries continue the qualifiers or are pairs of two qualifying players after Monster DYP rounds, every bracket match of a fixed-pair knockout is created, and only the first round stores its sides; later sides are derived from the winners on every read. A Lord have mercy knockout stores round 1 and each later round when it is drawn (BR-140 to BR-146, BR-155). After Monster DYP rounds the organizer picks a mode and in the lot modes (A little mercy, Lord have mercy) the pairs are drawn by lot with the draw counter (ADR-010); the start carries the expected counter. The final's own format can change while the final has no result. A result is locked while a later match it feeds has one; the last result finishes the tournament. Deleting the knockout by its phase id unlocks the round robin, or the newest round of a Swiss or Monster DYP (BR-087)."
+    description "FR-037, FR-045, FR-046, FR-054, BR-040 to BR-044, BR-053, BR-074, BR-080, BR-085, BR-087, BR-094, BR-102, BR-103, BR-120, ADR-008 and DATA-MODEL D4: the preview shows the cut, the seeds and the byes; the start carries the phase the screen saw as current. Knockout entries continue the qualifiers or are pairs of two qualifying players after Monster DYP rounds, every bracket match of a fixed-pair knockout is created, and only the first round stores its sides; later sides are derived from the winners on every read. A Lord have mercy knockout stores round 1 and each later round when it is drawn, with a replacement for each disabled player still in when one is available (BR-140 to BR-149, BR-153 to BR-155). After Monster DYP rounds the organizer picks a mode and in the lot modes (A little mercy, Lord have mercy) the pairs are drawn by lot with the draw counter (ADR-010); the start carries the expected counter. The final's own format can change while the final has no result. A result is locked while a later match it feeds has one; the last result finishes the tournament. Deleting the knockout by its phase id unlocks the round robin, or the newest round of a Swiss or Monster DYP (BR-087)."
     organizer -> tourneyhub.spa.organizerUi "group phase done: Draw the knockout, picks the number, the third-place match and the formats"
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "GET …/knockout/preview"
     tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "standings, the cut with the lot knockout-seeding for a tie, byes for the top seeds"
@@ -552,10 +552,12 @@ views "III. Flows" {
       tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "204"
     }
     opt "Lord have mercy" {
-      tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "POST …/knockout/rounds expecting the round number; GET …/knockout/rounds instead of …/bracket (that answers 422 format_not_supported)"
+      tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "GET …/knockout/rounds instead of …/bracket (that answers 422 format_not_supported): the rounds, the players and next_draw, the replacements the draw would make"
+      tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "POST …/knockout/rounds expecting the round number"
       tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the league, then the tournament: a stale number 409; a match without a result 422 round_not_complete"
-      tourneyhub.api.tournamentsApi -> tourneyhub.db.play "stores the round drawn by lot; the winners of the round before are locked (422 round_locked)"
-      tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "DELETE …/knockout/rounds/{round_id}; only the newest, round 1 deletes the knockout"
+      tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "plans the replacements from the disabled players and the group standing, then draws by lot"
+      tourneyhub.api.tournamentsApi -> tourneyhub.db.play "stores the round with each replacement on their side-player row; the winners of the round before are locked (422 round_locked)"
+      tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "DELETE …/knockout/rounds/{round_id}; only the newest, round 1 deletes the knockout; its replacements are undone"
       tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "201 for the draw, 200 for the read: the knockout round by round; 204 for the delete"
     }
   }
