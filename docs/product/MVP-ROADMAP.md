@@ -38,7 +38,7 @@ The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. 
 - [ ] D4 Routes that come with P12–P14 (section 4). Until they exist, the screens that need them are hidden:
   - [x] P12, P13: the screens move from the provisional `…/ranking` to `GET …/play` and the public `…/standings`; `PUT …/tiebreakers`, `POST …/rounds` and `DELETE …/rounds/{round_id}` exist in the backend, and the screens still have to switch to them. ([#97](https://github.com/dejvicek/tourneyhub/pull/97))
   - [ ] P14:
-    - [x] `GET …/participants` and `PUT …/entries/{entry_id}/disabled`.
+    - [x] `GET …/participants` and `PUT …/entries/{entry_id}/disabled`. ([#113](https://github.com/dejvicek/tourneyhub/pull/113))
     - [ ] `POST …/entries` (late players).
 - [ ] D5 Delete the demo: `src/demo/`, `src/api/provisional.ts` and `src/api/provisionalPaths.ts`, what is left in `src/api/provisionalTypes.ts`, the exports of `src/lib/rules.ts` only the demo read, the `dev:demo` script, the demo settings in `vite.config.ts`, `main.tsx` and CI, and the mentions in `CLAUDE.md` and `docs/style/frontend-style.md`. Done when no demo code is left and lint, typecheck, unit tests, build and e2e pass.
   - [ ] ESLint also stops `./test/…` and `./demo/…` imports from files directly in `src/`, and dynamic `import()` of them.
@@ -69,7 +69,7 @@ The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. 
   - [x] Screen 13 and marking top players on the real API ([#105](https://github.com/dejvicek/tourneyhub/pull/105)).
   - [x] Which draw to use when every grouping repeats a partner ([#79](https://github.com/dejvicek/tourneyhub/issues/79), [#83](https://github.com/dejvicek/tourneyhub/pull/83)).
 - [ ] **P14 Late players and disabling** (FR-044, FR-047, FR-048; BR-045, BR-054, BR-064, BR-067)
-  - [x] Disable and enable a participant (written as a target state, ADR-008).
+  - [x] Disable and enable a participant (written as a target state, ADR-008). ([#113](https://github.com/dejvicek/tourneyhub/pull/113))
   - [ ] Disabling during the group phase of a tournament with a knockout, on screen 12 ([#112](https://github.com/dejvicek/tourneyhub/issues/112), waiting for an answer).
   - [ ] Late entries in Swiss and Monster DYP.
   - [ ] Reschedule a round robin for a late entry, keeping seeds 1 and 2 last (BR-054, BR-051) ([#62](https://github.com/dejvicek/tourneyhub/issues/62)).
