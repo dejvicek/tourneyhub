@@ -90,7 +90,7 @@ export function RemixPlayers({
           variant="ghost"
           aria-expanded={open}
           aria-controls={listId}
-          className="h-auto min-h-11 w-full justify-between px-0 font-display text-display-section whitespace-normal hover:bg-transparent"
+          className="h-auto min-h-11 w-full justify-between px-0 font-display text-display-section whitespace-normal hover:bg-transparent has-[>svg]:px-0"
           onClick={() => {
             setOpen(!open);
           }}
