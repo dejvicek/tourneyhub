@@ -1,10 +1,11 @@
 """The Lord have mercy knockout: draw the next round, and read it round by round.
 
-BR-084, BR-140 to BR-144, BR-155, BR-156, BR-130, FR-049, ADR-010. Its pairs
-change every round, so only the rounds drawn so far are stored, each with its
-sides and their players (D4); round 1 comes from the start (`services.knockout`).
-Every write locks the league row, then the tournament row (ADR-008). A drawn
-round stores no participation (D5) and takes the free fields (BR-130).
+BR-084, BR-140 to BR-149, BR-153 to BR-156, BR-130, FR-049, ADR-010. Its
+pairs change every round, so only the rounds drawn so far are stored, each
+with its sides and their players, a replacement naming the player they came
+in for (D4); round 1 comes from the start (`services.knockout`). Every write
+locks the league row, then the tournament row (ADR-008). A drawn round stores
+no participation (D5) and takes the free fields (BR-130).
 """
 
 from dataclasses import dataclass
@@ -17,9 +18,15 @@ from sqlalchemy.orm import Session
 from tourneyhub.db.models.leagues import League
 from tourneyhub.db.models.matches import Match, MatchSide, MatchSidePlayer, Round
 from tourneyhub.db.models.tournaments import Tournament
+from tourneyhub.engine.ids import PlayerId
 from tourneyhub.engine.knockout import RoundName, round_name
 from tourneyhub.engine.monster_dyp import Team
-from tourneyhub.engine.remix import RemixMatch, allows_result, draw_next_round
+from tourneyhub.engine.remix import (
+    RemixMatch,
+    Replacement,
+    allows_result,
+    draw_next_round,
+)
 from tourneyhub.engine.tournaments import (
     KnockoutMatchFormat,
     MatchFormat,
@@ -40,12 +47,16 @@ from tourneyhub.services.tournaments import Clock
 from tourneyhub.services.tournaments.fields import _fill_fields
 from tourneyhub.services.tournaments.remix import (
     RemixKnockout,
+    disabled_players,
     left_player_ids,
+    next_draw_plan,
     remix_knockout,
+    standing_players,
 )
 from tourneyhub.services.tournaments.shared import (
     _load_tournament,
     _lock_tournament,
+    _main_entries,
     _match_slots,
     _played,
     _require_open_season,
@@ -55,6 +66,7 @@ from tourneyhub.services.tournaments.shared import (
 )
 
 type RemixMatchState = Literal["bye", "played", "on_field", "ready"]
+type RemixPlayerStatus = Literal["still_in", "knocked_out", "replaced"]
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -64,12 +76,15 @@ class RemixSideView:
     `entry_id` is the round-1 pair entry; a later round's pair has none (D4).
     `player_ids` is empty for a bye. `left_player_ids` are the pair's players
     whose main entry is disabled and who stay in the draw (BR-147, BR-149).
+    `replacements` are the pair's players who came in for a player who left,
+    and for whom (BR-148, BR-155).
     """
 
     player_ids: tuple[UUID, ...]
     entry_id: UUID | None
     is_bye: bool
     left_player_ids: tuple[UUID, ...]
+    replacements: tuple[Replacement, ...]
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -109,6 +124,34 @@ class RemixRoundView:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class RemixNextDrawView:
+    """What the next draw would do now (FR-049, BR-148, BR-149).
+
+    `replacements` come in for players who left, the replaced player with the
+    best group-phase standing first; `staying_player_ids` have left but stay in
+    the draw without a replacement, since nobody is available.
+    """
+
+    replacements: tuple[Replacement, ...]
+    staying_player_ids: tuple[UUID, ...]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class RemixPlayerView:
+    """A knockout player, for the organizer's disable switch (FR-044, BR-147).
+
+    `entry_id` is the player's main entry, which the disable route takes.
+    `status`: `still_in`, `knocked_out`, or `replaced` once a replacement came
+    in for them (BR-153).
+    """
+
+    player_id: UUID
+    entry_id: UUID
+    status: RemixPlayerStatus
+    is_disabled: bool
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class RemixKnockoutView:
     """A Lord have mercy knockout round by round, computed on read (D4, BR-155).
 
@@ -116,6 +159,9 @@ class RemixKnockoutView:
     knockout will have, of which only `rounds` are drawn so far.
     `can_draw_next` says the organizer can draw the next round (BR-140), and
     `left_player_ids` are all the players who have left but stay in (FR-049).
+    The organizer's view also has `next_draw`, the replacements the next draw
+    would make, while it can be drawn, and `players`, the knockout's players
+    by group-phase standing; the share link's has neither (None and empty).
     """
 
     phase_id: UUID
@@ -127,6 +173,8 @@ class RemixKnockoutView:
     can_draw_next: bool
     left_player_ids: tuple[UUID, ...]
     rounds: tuple[RemixRoundView, ...]
+    next_draw: RemixNextDrawView | None
+    players: tuple[RemixPlayerView, ...]
 
 
 def draw_knockout_round(
@@ -138,16 +186,19 @@ def draw_knockout_round(
     expected_round_no: int,
     clock: Clock,
 ) -> RemixKnockoutView:
-    """Draw the next round of a Lord have mercy knockout (BR-140 to BR-144, BR-156).
+    """Draw the next round of a Lord have mercy knockout (BR-140 to BR-149, BR-156).
 
     The round before must be complete: every match has a result, byes aside
     (BR-140). The players who went through are paired by lot, the final's
     round with the third-place match among the semifinal losers (BR-141,
     BR-142, BR-144); the lots hold no draw counter, so the same players always
-    give the same pairs (ADR-010, BR-156). Disabled players still in are drawn
-    like everyone else (BR-149). The round takes the free fields, the
-    third-place match after the final (BR-130), and locks the winners of the
-    round before (BR-146).
+    give the same pairs (ADR-010, BR-156). A player whose main entry is
+    disabled now has left: the best-placed player who is knocked out comes in
+    for them, or with nobody available they are drawn like everyone else
+    (BR-147 to BR-149). The plan is the one `GET …/knockout/rounds` shows in
+    `next_draw`, and each replacement is stored on their side-player row. The
+    round takes the free fields, the third-place match after the final
+    (BR-130), and locks the winners of the round before (BR-146).
 
     A closed season is 409 `season_closed`, a tournament not in progress 409
     `tournament_not_in_progress` (detail `state`), no knockout 404
@@ -182,13 +233,18 @@ def draw_knockout_round(
         )
         raise RuleViolationError(ErrorCode.ROUND_NOT_COMPLETE, matches_left=left)
     now = clock()
-    drawn = draw_next_round(state, rng_seed=tournament.rng_seed)
+    drawn = draw_next_round(
+        state,
+        rng_seed=tournament.rng_seed,
+        disabled=disabled_players(tournament),
+        standing=standing_players(tournament),
+    )
     remix.phase.rounds.append(_stored_round(expected_round_no, drawn, now))
     tournament.updated_at = now
     session.flush()  # the matches exist before a field references one
     _fill_fields(tournament, _match_slots(tournament), now)
     session.flush()
-    return _remix_view(tournament, _loaded(tournament))
+    return _remix_view(tournament, _loaded(tournament), organizer=True)
 
 
 def delete_knockout_round(
@@ -214,8 +270,11 @@ def delete_knockout_round(
     The fields let go of the round's matches and take the next ones that can
     be played (BR-130); the round before is unlocked, since the lock follows
     the newest round (BR-146), and drawing again gives the same pairs while
-    the players are the same (BR-156). Deleting round 1 deletes the knockout
-    as `DELETE …/phases/{id}` does (BR-087). `is_disabled` stays as it is.
+    the players are the same (BR-156). The round's replacements go with its
+    side players, so they are undone: a re-enabled player is in the next draw
+    again, and one who is still disabled is replaced again (BR-154). Deleting
+    round 1 deletes the knockout as `DELETE …/phases/{id}` does (BR-087).
+    `is_disabled` stays as it is.
     """
     league, tournament = _lock_tournament(
         session,
@@ -263,7 +322,9 @@ def read_knockout_rounds(
     Read without a lock. See `view_knockout_rounds` for the refusals.
     """
     league = get_league(session, league_id=league_id, user_id=user_id)
-    return view_knockout_rounds(session, league=league, tournament_id=tournament_id)
+    return view_knockout_rounds(
+        session, league=league, tournament_id=tournament_id, organizer=True
+    )
 
 
 def view_knockout_rounds(
@@ -272,6 +333,7 @@ def view_knockout_rounds(
     league: League,
     tournament_id: UUID,
     past_setup: bool = False,
+    organizer: bool = False,
 ) -> RemixKnockoutView:
     """Return one of the league's Lord have mercy knockouts, read without a lock.
 
@@ -279,12 +341,13 @@ def view_knockout_rounds(
     knockout is 422 `format_not_supported` (detail `format`, `mode`), and its
     rounds are read with `…/bracket`. An unknown tournament, one of another
     league and, with `past_setup`, one in setup are 404 `tournament_not_found`
-    (FR-070).
+    (FR-070). With `organizer`, the view also has the next draw's plan and the
+    players (FR-049).
     """
     tournament = _load_tournament(
         session, league=league, tournament_id=tournament_id, past_setup=past_setup
     )
-    return _remix_view(tournament, _require_remix(tournament))
+    return _remix_view(tournament, _require_remix(tournament), organizer=organizer)
 
 
 def read_shared_knockout_rounds(
@@ -337,7 +400,13 @@ def _pair(pair: Team | None) -> Team:
 
 
 def _stored_round(round_no: int, drawn: tuple[RemixMatch, ...], now: datetime) -> Round:
-    """A drawn round as rows: a match per pair of pairs, no participation (D5)."""
+    """A drawn round as rows: a match per pair of pairs, no participation (D5).
+
+    A replacement names the player they came in for on their row (BR-148).
+    """
+    replaced = {
+        r.player_id: r.replaced_player_id for m in drawn for r in m.replacements
+    }
     return Round(
         id=uuid7(),
         round_no=round_no,
@@ -360,7 +429,10 @@ def _stored_round(round_no: int, drawn: tuple[RemixMatch, ...], now: datetime) -
                         created_at=now,
                         players=[
                             MatchSidePlayer(
-                                side=number, player_id=player, created_at=now
+                                side=number,
+                                player_id=player,
+                                replaced_player_id=replaced.get(player),
+                                created_at=now,
                             )
                             for player in pair
                         ],
@@ -378,8 +450,10 @@ def _stored_round(round_no: int, drawn: tuple[RemixMatch, ...], now: datetime) -
     )
 
 
-def _remix_view(tournament: Tournament, remix: RemixKnockout) -> RemixKnockoutView:
-    """The knockout round by round (BR-155)."""
+def _remix_view(
+    tournament: Tournament, remix: RemixKnockout, *, organizer: bool
+) -> RemixKnockoutView:
+    """The knockout round by round (BR-155); the organizer's adds FR-049's parts."""
     state = remix.state
     left = left_player_ids(tournament, remix)
     on_field = {
@@ -398,13 +472,14 @@ def _remix_view(tournament: Tournament, remix: RemixKnockout) -> RemixKnockoutVi
         if not match.has_bye:
             numbers[remix.rows[match.key].id] = earlier + len(numbers) + 1
 
-    def side_view(row: MatchSide) -> RemixSideView:
+    def side_view(row: MatchSide, match: RemixMatch) -> RemixSideView:
         players = tuple(sorted(p.player_id for p in row.players))
         return RemixSideView(
             player_ids=players,
             entry_id=row.entry_id,
             is_bye=row.is_bye,
             left_player_ids=tuple(p for p in players if p in left),
+            replacements=tuple(r for r in match.replacements if r.player_id in players),
         )
 
     def match_view(match: RemixMatch) -> RemixMatchView:
@@ -424,7 +499,7 @@ def _remix_view(tournament: Tournament, remix: RemixKnockout) -> RemixKnockoutVi
             position=row.position,
             kind=row.kind,
             state=match_state,
-            sides=(side_view(side_1), side_view(side_2)),
+            sides=(side_view(side_1, match), side_view(side_2, match)),
             outcome=row.outcome,
             is_walkover=row.is_walkover,
             score=match_score(row),
@@ -434,6 +509,15 @@ def _remix_view(tournament: Tournament, remix: RemixKnockout) -> RemixKnockoutVi
             and not allows_result(state, match.key, None),
         )
 
+    next_draw: RemixNextDrawView | None = None
+    players: tuple[RemixPlayerView, ...] = ()
+    if organizer:
+        plan = next_draw_plan(tournament, remix)
+        if plan is not None:
+            next_draw = RemixNextDrawView(
+                replacements=plan.replacements, staying_player_ids=plan.staying
+            )
+        players = _player_views(tournament, remix)
     return RemixKnockoutView(
         phase_id=remix.phase.id,
         size=state.size,
@@ -453,4 +537,40 @@ def _remix_view(tournament: Tournament, remix: RemixKnockout) -> RemixKnockoutVi
             )
             for round_no, matches in enumerate(state.rounds, start=1)
         ),
+        next_draw=next_draw,
+        players=players,
+    )
+
+
+def _player_views(
+    tournament: Tournament, remix: RemixKnockout
+) -> tuple[RemixPlayerView, ...]:
+    """The knockout's players by group-phase standing (FR-044, BR-147, BR-153)."""
+    state = remix.state
+    entry_of = {
+        PlayerId(member.player_id): entry
+        for entry in _main_entries(tournament)
+        for member in entry.members
+    }
+    order = {
+        player_id: index
+        for index, group in enumerate(standing_players(tournament))
+        for player_id in group
+    }
+
+    def status(player_id: PlayerId) -> RemixPlayerStatus:
+        if player_id in state.replaced:
+            return "replaced"
+        return "still_in" if player_id in state.still_in else "knocked_out"
+
+    return tuple(
+        RemixPlayerView(
+            player_id=player_id,
+            entry_id=entry_of[player_id].id,
+            status=status(player_id),
+            is_disabled=entry_of[player_id].is_disabled,
+        )
+        for player_id in sorted(
+            state.players, key=lambda p: (order.get(p, len(order)), p)
+        )
     )

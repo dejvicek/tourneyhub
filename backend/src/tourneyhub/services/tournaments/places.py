@@ -139,6 +139,7 @@ type PlaceKind = Literal[
     "lost_third_place",
     "lost_in_round",
     "group_place",
+    "replaced",
 ]
 
 
@@ -158,7 +159,10 @@ class PlaceView:
     entry (BR-145): `partner_entry_id` is the main entry of the partner of the
     player's last knockout match, null for a player who did not qualify;
     `opponent_entry_id` is null, since the opponents are two players; and
-    `group_place` is the player's own place in the group phase.
+    `group_place` is the player's own place in the group phase. A player who
+    was replaced has `replaced`, with the `round` of the seat they took: they
+    are placed as if knocked out in it, and `partner_entry_id` is the other
+    player of that pair now (BR-151); `score` is null.
     """
 
     place: int
@@ -382,8 +386,16 @@ def _remix_reason(
     """Why a knockout player has their place: their last match (BR-102, BR-145).
 
     None for a player who did not qualify. A player plays at most one match
-    a round, so the last is the one of the highest round.
+    a round, so the last is the one of the highest round. A player who was
+    replaced is placed by the seat they took instead, as if knocked out in
+    its round, without a score (BR-151).
     """
+    if row.seat_round_no is not None:
+        return (
+            "replaced",
+            round_name(row.seat_round_no, remix.state.round_count),
+            None,
+        )
     played = [
         match
         for match in remix.state.matches
