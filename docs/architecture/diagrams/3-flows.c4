@@ -155,7 +155,7 @@ views "III. Flows" {
     opt "the organizer disables or re-enables an entry (FR-044)" {
       tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "PUT …/entries/{entry_id}/disabled with the target state"
       tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the league and the tournament: not in progress 409, not a Swiss or Monster DYP group phase or a Lord have mercy knockout 422; sets entries.is_disabled, a repeat changes nothing"
-      tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: the participant; the next round leaves a disabled entry out (BR-064)"
+      tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: the participant; the next round leaves a disabled entry out (BR-064), and in a Lord have mercy knockout the next draw replaces a disabled player who is still in (BR-148)"
     }
     opt "the organizer reorders the tie-breakers" {
       tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "PUT …/tiebreakers with the enabled ones in order"
