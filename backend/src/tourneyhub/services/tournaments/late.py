@@ -61,7 +61,8 @@ def add_late_entry(
     missed round as a sit-out for the sit-out order only; the engine reads all
     of this from the stored facts (ADR-009). A Singles Swiss entry gets the
     seed after the highest, a Monster DYP entry none (BR-063). Deleting round
-    1 makes the entry an ordinary picked player again (DATA-MODEL §4.5).
+    1, or going back to setup, makes the entry an ordinary picked player again
+    and seeds every main entry again by the seeding method (DATA-MODEL §4.5).
     """
     league, tournament = _lock_tournament(
         session,

@@ -454,6 +454,147 @@ def test_adr008_deleting_round_1_makes_a_late_player_an_ordinary_picked_player(
     assert players[6] in setup["player_ids"]
 
 
+def test_fr047_br021_br058_deleting_round_1_seeds_a_late_player_by_the_ranking_again(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    create: Callable[..., str],
+    start: Callable[[str], Json],
+    late: Callable[..., tuple[int, Json]],
+    get: Callable[[str, str], Json],
+    players: list[str],
+) -> None:
+    tournament_id = create(6)
+    base = f"/api/v1/leagues/{league_id}/tournaments/{tournament_id}"
+    # Nobody has points yet, so the ranking is the tournament's lot (ADR-010).
+    rank = {r["player_id"]: r["rank"] for r in get(tournament_id, "/setup")["ranking"]}
+    best = min(players, key=rank.__getitem__)  # the late player: ranked #1
+    picked = [p for p in players if p != best][:6]
+    repicked = client.put(
+        f"{base}/setup/players", json={"player_ids": picked}, headers=headers
+    )
+    assert repicked.status_code == 200, repicked.text
+    started = start(tournament_id)
+    status, _ = late(tournament_id, best, 2)
+    assert status == 201
+    assert _entry_of(get(tournament_id, ""), best)["seed"] == 7  # the next seed
+
+    deleted = client.delete(
+        f"{base}/rounds/{_round(started, 1)['id']}", headers=headers
+    )
+    restarted = start(tournament_id)
+
+    assert deleted.status_code == 204
+    entries = _entries(restarted)
+    by_rank = sorted(entries, key=lambda e: rank[e["player_ids"][0]])
+    assert [e["seed"] for e in by_rank] == list(range(1, 8))
+    assert _entry_of(restarted, best)["seed"] == 1
+    [sitting_out] = _round(restarted, 1)["sitting_out"]  # the lowest seed (BR-058)
+    assert sitting_out == by_rank[-1]["id"]
+    assert sitting_out != _entry_of(restarted, best)["id"]
+
+
+def test_fr036_going_back_to_setup_seeds_a_late_player_by_the_ranking_again(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    create: Callable[..., str],
+    start: Callable[[str], Json],
+    late: Callable[..., tuple[int, Json]],
+    get: Callable[[str, str], Json],
+    players: list[str],
+) -> None:
+    tournament_id = create(6)
+    base = f"/api/v1/leagues/{league_id}/tournaments/{tournament_id}"
+    rank = {r["player_id"]: r["rank"] for r in get(tournament_id, "/setup")["ranking"]}
+    best = min(players, key=rank.__getitem__)
+    picked = [p for p in players if p != best][:6]
+    client.put(f"{base}/setup/players", json={"player_ids": picked}, headers=headers)
+    start(tournament_id)
+    late(tournament_id, best, 2)
+
+    back = client.post(
+        f"{base}/back-to-setup",
+        json={"expected_state": "in_progress"},
+        headers=headers,
+    )
+
+    assert back.status_code == 200, back.text
+    setup = get(tournament_id, "/setup")
+    seeds = {e["player_ids"][0]: e["seed"] for e in setup["entries"]}
+    assert seeds[best] == 1
+    assert sorted(seeds.values()) == list(range(1, 8))
+
+
+def test_fr046_deleting_round_1_keeps_the_seeds_of_a_tournament_without_a_late_entry(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    create: Callable[..., str],
+    start: Callable[[str], Json],
+    get: Callable[[str, str], Json],
+) -> None:
+    tournament_id = create(6)
+    base = f"/api/v1/leagues/{league_id}/tournaments/{tournament_id}"
+    entry_ids = [e["id"] for e in get(tournament_id, "/setup")["entries"]]
+    by_hand = list(reversed(entry_ids))  # the organizer reorders the seeds (FR-034)
+    ordered = client.put(
+        f"{base}/setup/seed-order", json={"entry_ids": by_hand}, headers=headers
+    )
+    assert ordered.status_code == 200, ordered.text
+    started = start(tournament_id)
+
+    deleted = client.delete(
+        f"{base}/rounds/{_round(started, 1)['id']}", headers=headers
+    )
+
+    assert deleted.status_code == 204
+    entries = get(tournament_id, "/setup")["entries"]
+    assert [e["id"] for e in sorted(entries, key=lambda e: e["seed"])] == by_hand
+
+
+def test_fr047_deleting_a_later_round_after_a_late_join_leaves_the_player_joining_it(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    create: Callable[..., str],
+    start: Callable[[str], Json],
+    play_round: Callable[[str, int], None],
+    add_round: Callable[[str, int], Json],
+    late: Callable[..., tuple[int, Json]],
+    get: Callable[[str, str], Json],
+    participants: Callable[[str], list[Json]],
+    players: list[str],
+    session: Session,
+) -> None:
+    tournament_id = create(6)
+    start(tournament_id)
+    play_round(tournament_id, 1)
+    round_2 = add_round(tournament_id, 2)
+    status, body = late(tournament_id, players[6], 3)
+    assert status == 201
+    entry_id = body["entry_id"]
+    assert _statuses(session, tournament_id, entry_id) == {
+        1: "not_joined",
+        2: "not_joined",
+    }
+
+    deleted = client.delete(
+        f"/api/v1/leagues/{league_id}/tournaments/{tournament_id}"
+        f"/rounds/{round_2['id']}",
+        headers=headers,
+    )
+
+    assert deleted.status_code == 204
+    session.expire_all()
+    assert _statuses(session, tournament_id, entry_id) == {1: "not_joined"}
+    shown = {p["entry_id"]: p for p in participants(tournament_id)}
+    assert shown[entry_id]["joined_round"] == 2
+    again = add_round(tournament_id, 2)
+    assert players[6] in _in_play(again)
+    assert _entry_of(get(tournament_id, ""), players[6])["id"] == entry_id
+
+
 def test_d5_one_participation_row_per_main_entry_per_group_round(
     create: Callable[..., str],
     start: Callable[[str], Json],

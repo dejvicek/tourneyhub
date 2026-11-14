@@ -254,10 +254,11 @@ def delete_round(
     with it; the round before it is unlocked (BR-066), since the newest round
     is found on every write. Deleting round 1 takes the tournament back to
     setup, as "back to setup" does but with results allowed (FR-036, FR-046):
-    every round goes, the entries, seeds, draws and top-player marks stay, and
-    every disabled flag is cleared. A late entry stays as an ordinary entry of
-    the setup, with its pick, and is seeded again at the next start
-    (DATA-MODEL §4.5, FR-047).
+    every round goes, the entries, draws and top-player marks stay, and every
+    disabled flag is cleared. The seeds stay as they are, except when a late
+    entry joined: then every main entry is seeded again by the seeding method
+    and the league ranking of setup, and the late entry stays as an ordinary
+    entry of the setup, with its pick (DATA-MODEL §4.5, FR-047).
     """
     league, tournament = _lock_tournament(
         session,
@@ -285,7 +286,7 @@ def delete_round(
         raise ConflictError(ErrorCode.ROUND_NOT_NEWEST, round_id=str(newest.id))
     now = clock()
     if round_.round_no == 1:
-        _reset_to_setup(session, tournament, now)
+        _reset_to_setup(session, league, tournament, now)
         return
     matches = {match.id for match in round_.matches}
     for field in tournament.fields:
