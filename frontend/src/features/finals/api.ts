@@ -281,21 +281,6 @@ export const finalsMutations = {
         ),
       onSettled: () => settle(queryClient, leagueId),
     }),
-  finish: (queryClient: QueryClient, leagueId: string, tournamentId: string) =>
-    mutationOptions({
-      scope: scope(leagueId),
-      mutationFn: () =>
-        dataOf(
-          provisionalApi.PUT(
-            "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/state",
-            {
-              params: { path: pathOf(leagueId, tournamentId).path },
-              body: { state: "finished" },
-            },
-          ),
-        ),
-      onSettled: () => settle(queryClient, leagueId),
-    }),
   /** ADR-008: carries the phase the screen saw as current, the group phase. */
   drawKnockout: (
     queryClient: QueryClient,

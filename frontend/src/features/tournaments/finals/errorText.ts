@@ -70,3 +70,13 @@ export function errorText(t: TFunction, error: unknown): string {
   }
   return t("finals.common.failed");
 }
+
+/**
+ * What a failed finish says (FR-040), the same after the round robin and
+ * between the rounds: a 409 means it changed and was reloaded (ADR-008).
+ */
+export function finishErrorText(t: TFunction, error: unknown): string {
+  return error instanceof ApiError && error.status === 409
+    ? t("roundRobin.done.finishChanged")
+    : t("roundRobin.done.finishFailed");
+}

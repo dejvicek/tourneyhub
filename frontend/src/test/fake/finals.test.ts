@@ -519,9 +519,9 @@ describe("the finals in the fake API", () => {
 
   it("finishes a Swiss after confirming, and gives the places by the standings (FR-040)", async () => {
     const finished = await dataOf(
-      provisionalApi.PUT(`${root}/state`, {
+      api.POST(`${root}/finish`, {
         params: { path: base(SWISS) },
-        body: { state: "finished" },
+        body: { expected_state: "in_progress" },
       }),
     );
     expect(finished.state).toBe("finished");

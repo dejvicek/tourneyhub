@@ -414,30 +414,6 @@ export const finalsHandlers = [
   ),
 
   route(
-    "put",
-    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/state",
-    ({ params }) => {
-      const t = findTournament(params.league_id, params.tournament_id);
-      if (!t) {
-        return notFound(params);
-      }
-      if (t.state !== "finished") {
-        // FR-037: a knockout finishes by itself. FR-040: the rest is finished
-        // by the organizer once the current round has its results.
-        if (
-          knockoutPhase(t) ||
-          t.state !== "in_progress" ||
-          !roundIsComplete(t)
-        ) {
-          return refused("cannot_finish");
-        }
-        t.state = "finished";
-      }
-      return tournamentRead(t);
-    },
-  ),
-
-  route(
     "get",
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout/preview",
     ({ params, url }) => {

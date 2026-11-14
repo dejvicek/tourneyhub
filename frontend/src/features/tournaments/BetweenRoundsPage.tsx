@@ -23,6 +23,7 @@ import {
   finalsQueries,
   type TournamentData,
 } from "@/features/finals/api";
+import { resultMutations } from "@/features/results/api";
 import { tournamentQueries } from "@/features/tournaments/api";
 import { useLayout } from "@/hooks/useLayout";
 import { useRouteParam } from "@/hooks/useRouteParam";
@@ -30,7 +31,7 @@ import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 
 type MatchData = TournamentData["rounds"][number]["matches"][number];
-import { errorText } from "./finals/errorText";
+import { errorText, finishErrorText } from "./finals/errorText";
 import { resultPath } from "./finals/links";
 import { localDate, useRoster } from "./finals/names";
 import { Notice } from "./finals/Notice";
@@ -86,9 +87,7 @@ function RoundsContent() {
   const removeRound = useMutation(
     finalsMutations.deleteRound(queryClient, leagueId, tournamentId),
   );
-  const finish = useMutation(
-    finalsMutations.finish(queryClient, leagueId, tournamentId),
-  );
+  const finish = useMutation(resultMutations.finish(leagueId, tournamentId));
   const [picked, setPicked] = useState<number | undefined>(undefined);
 
   if (tournament.isError || play.isError) {
@@ -141,7 +140,7 @@ function RoundsContent() {
     style: "short",
     type: "unit",
   });
-  const mutationError = addRound.error ?? removeRound.error ?? finish.error;
+  const mutationError = addRound.error ?? removeRound.error;
 
   const matchRow = (match: MatchData) => {
     const score = scoreOf(match, format);
@@ -240,6 +239,11 @@ function RoundsContent() {
       {mutationError !== null && (
         <p role="alert" className="text-body-sm">
           {errorText(t, mutationError)}
+        </p>
+      )}
+      {finish.isError && (
+        <p role="alert" className="text-body-sm">
+          {finishErrorText(t, finish.error)}
         </p>
       )}
       {latest !== undefined && !hasKnockout && complete && (

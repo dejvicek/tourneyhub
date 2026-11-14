@@ -17,17 +17,12 @@ import type { components, paths as GeneratedPaths } from "@/api/schema";
 type Uuid = string;
 
 type ErrorResponse = components["schemas"]["ErrorResponse"];
-type TournamentRead = components["schemas"]["TournamentRead"];
 
 /** Never in the backend: the seeded account the login shows in demo mode. */
 export interface DemoAccount {
   email: string;
   password: string;
   signup_code: string;
-}
-
-interface FinishStateWrite {
-  state: "finished";
 }
 
 interface Json<T> {
@@ -89,9 +84,6 @@ export interface ProvisionalPaths {
   };
   "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/entries/{entry_id}/disabled": {
     put: Put<TournamentEntry, DisabledWrite, ParticipantRead>;
-  };
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/state": {
-    put: Put<Tournament, FinishStateWrite, TournamentRead>;
   };
 }
 
