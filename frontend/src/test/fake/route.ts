@@ -1,26 +1,21 @@
-// Typed MSW handlers for the demo's fake API. A handler names its route as
+// Typed MSW handlers for the fake API. A handler names its route as
 // the contract does ("/api/v1/leagues/{league_id}"), gets the path
 // parameters and the body typed from it, and returns the success body the
 // contract declares, or a Response made by apiError().
 import { http, HttpResponse, type JsonBodyType } from "msw";
 
-import type { ProvisionalApiPaths } from "@/api/provisionalPaths";
+import type { paths } from "@/api/schema";
 
 import type { ErrorResponse } from "./contract";
 
 type Method = "get" | "post" | "put" | "patch" | "delete";
 
 type PathsWith<M extends Method> = {
-  [P in keyof ProvisionalApiPaths]: ProvisionalApiPaths[P] extends Record<
-    M,
-    unknown
-  >
-    ? P
-    : never;
-}[keyof ProvisionalApiPaths];
+  [P in keyof paths]: paths[P] extends Record<M, unknown> ? P : never;
+}[keyof paths];
 
-type Operation<P extends keyof ProvisionalApiPaths, M extends Method> =
-  ProvisionalApiPaths[P] extends Record<M, infer O> ? O : never;
+type Operation<P extends keyof paths, M extends Method> =
+  paths[P] extends Record<M, infer O> ? O : never;
 
 type PathParams<O> = O extends { parameters: { path: infer X } }
   ? X
@@ -75,7 +70,7 @@ export function route<M extends Method, P extends PathsWith<M>>(
     const result: unknown = await resolve({
       // MSW parses the parameters the contract names from the same path.
       params: params as PathParams<Operation<P, M>>,
-      // demo only: the fake API trusts its typed caller and validates nothing.
+      // stand-in: the fake API trusts its typed caller and validates nothing.
       body: (text === "" ? undefined : JSON.parse(text)) as RequestBody<
         Operation<P, M>
       >,

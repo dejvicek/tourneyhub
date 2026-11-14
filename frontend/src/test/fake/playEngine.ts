@@ -1,4 +1,4 @@
-// demo only, the engine decides
+// stand-in, the engine decides
 //
 // Stand-ins for the engine and the services behind the play screens
 // (screens 6–8): field placements, the waiting order, result checks and the

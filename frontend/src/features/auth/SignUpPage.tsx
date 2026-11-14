@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type SubmitEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router";
@@ -6,10 +6,9 @@ import { Link, useNavigate } from "react-router";
 import { DocumentTitle } from "@/components/DocumentTitle";
 import { Button } from "@/components/ui/button";
 import { isLanguage } from "@/i18n/language";
-import { isDemoMode } from "@/lib/demoMode";
 import { paths } from "@/lib/paths";
 
-import { authMutations, authQueries } from "./api";
+import { authMutations } from "./api";
 import { errorCodeOf, retryAfterOf } from "./apiErrors";
 import { AuthLayout } from "./AuthLayout";
 import { fieldErrors } from "./fieldErrors";
@@ -117,7 +116,6 @@ export function SignUpPage() {
           required
           maxLength={256}
           error={codeError}
-          hint={isDemoMode(import.meta.env) ? <DemoCodeHint /> : undefined}
         />
         <FormField
           label={t("auth.signUp.email")}
@@ -175,13 +173,4 @@ export function SignUpPage() {
       </p>
     </AuthLayout>
   );
-}
-
-/** Demo mode only: the sign-up code, from the demo's fake API. */
-function DemoCodeHint() {
-  const { t } = useTranslation();
-  const account = useQuery(authQueries.demoAccount());
-  return account.data === undefined
-    ? null
-    : t("auth.signUp.demoCode", { code: account.data.signup_code });
 }

@@ -1,4 +1,4 @@
-// The demo's data: one league with 16 players and its current season, two
+// The fake API's data: one league with 16 players and its current season, two
 // finished tournaments with results, and a DYP tournament running its round
 // robin tonight (PRD §5.1). The same seed gives the same data every time.
 // The screen areas add their own data through seedParts.ts, each in its own
@@ -200,7 +200,7 @@ export class TournamentBuilder {
 /** The value, which the seed's own construction guarantees. */
 function required<T>(value: T | undefined): T {
   if (value === undefined) {
-    throw new Error("The demo seed is inconsistent");
+    throw new Error("The fake seed is inconsistent");
   }
   return value;
 }
@@ -365,7 +365,7 @@ function thursdayDyp(
   return t.tournament;
 }
 
-/** A fresh copy of the demo data; `today` dates the running tournament. */
+/** A fresh copy of the seed data; `today` dates the running tournament. */
 export function createSeed(today: Date = new Date()): FakeState {
   const rng = createRng(20261110);
   const players: StoredPlayer[] = PLAYER_NAMES.map((name, i) => ({
@@ -385,7 +385,7 @@ export function createSeed(today: Date = new Date()): FakeState {
       email: TEST_EMAIL,
       display_name: "Alex Organizer",
       language: "en",
-      // The demo account is the instance's admin too (ADR-007), so that the
+      // The seeded account is the instance's admin too (ADR-007), so that the
       // admin screens open.
       is_admin: true,
       must_change_password: false,
@@ -429,7 +429,7 @@ export function createSeed(today: Date = new Date()): FakeState {
 export interface SeedKit {
   /** An id in the part's own range (ids.ts). */
   id: (n: number) => string;
-  /** A tournament of the demo league's active season; its ids count up from `base`. */
+  /** A tournament of the seeded league's active season; its ids count up from `base`. */
   tournament: (
     base: number,
     summary: Pick<StoredTournament, "name" | "date" | "type" | "state">,

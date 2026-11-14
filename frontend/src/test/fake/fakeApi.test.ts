@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import { api, dataOf } from "@/api/client";
-import { provisionalApi } from "@/api/provisional";
 import { newId } from "@/lib/newId";
 
 import {
@@ -16,10 +15,9 @@ const league = { league_id: TEST_LEAGUE_ID };
 
 async function tournamentsOfSeason() {
   return dataOf(
-    provisionalApi.GET(
-      "/api/v1/leagues/{league_id}/seasons/{season_id}/tournaments",
-      { params: { path: { ...league, season_id: TEST_SEASON_ID } } },
-    ),
+    api.GET("/api/v1/leagues/{league_id}/seasons/{season_id}/tournaments", {
+      params: { path: { ...league, season_id: TEST_SEASON_ID } },
+    }),
   );
 }
 
@@ -42,20 +40,17 @@ async function publicTournament(id: string) {
 
 async function publicPlaces(id: string) {
   return dataOf(
-    provisionalApi.GET(
-      "/api/v1/public/{share_token}/tournaments/{tournament_id}/places",
-      {
-        params: { path: { share_token: TEST_SHARE_TOKEN, tournament_id: id } },
-      },
-    ),
+    api.GET("/api/v1/public/{share_token}/tournaments/{tournament_id}/places", {
+      params: { path: { share_token: TEST_SHARE_TOKEN, tournament_id: id } },
+    }),
   );
 }
 
 describe("the fake API", () => {
   it("serves one league with 16 players and its active season", async () => {
-    const leagues = await dataOf(provisionalApi.GET("/api/v1/leagues"));
+    const leagues = await dataOf(api.GET("/api/v1/leagues"));
     const detail = await dataOf(
-      provisionalApi.GET("/api/v1/leagues/{league_id}", {
+      api.GET("/api/v1/leagues/{league_id}", {
         params: { path: league },
       }),
     );
@@ -139,7 +134,7 @@ describe("the fake API", () => {
       tournament.state = "finished";
     }
     const stale = dataOf(
-      provisionalApi.POST("/api/v1/leagues/{league_id}/seasons", {
+      api.POST("/api/v1/leagues/{league_id}/seasons", {
         params: { path: league },
         body: { expected_current_number: 2 },
       }),
@@ -151,13 +146,13 @@ describe("the fake API", () => {
     });
 
     const second = await dataOf(
-      provisionalApi.POST("/api/v1/leagues/{league_id}/seasons", {
+      api.POST("/api/v1/leagues/{league_id}/seasons", {
         params: { path: league },
         body: { expected_current_number: 1 },
       }),
     );
     const closedTable = dataOf(
-      provisionalApi.PUT(
+      api.PUT(
         "/api/v1/leagues/{league_id}/seasons/{season_id}/placement-points",
         {
           params: { path: { ...league, season_id: TEST_SEASON_ID } },
@@ -221,7 +216,7 @@ describe("the fake API", () => {
     const matchId = field?.match_id ?? "";
 
     const match = await dataOf(
-      provisionalApi.PUT(
+      api.PUT(
         "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/matches/{match_id}/result",
         {
           params: {
@@ -254,10 +249,9 @@ describe("the fake API", () => {
       }),
     );
     const standings = await dataOf(
-      provisionalApi.GET(
-        "/api/v1/public/{share_token}/seasons/{season_id}/standings",
-        { params: { path } },
-      ),
+      api.GET("/api/v1/public/{share_token}/seasons/{season_id}/standings", {
+        params: { path },
+      }),
     );
 
     expect(shared.name).toBe("Thursday Foosball");

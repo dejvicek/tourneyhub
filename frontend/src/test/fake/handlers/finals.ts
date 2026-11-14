@@ -1,7 +1,7 @@
 // Fake handlers: the finals of a tournament (FR-037, FR-040–FR-048): the
 // knockout bracket and places, rounds of a Swiss or Monster DYP, late and
 // disabled players, tie-breakers, finishing, and starting or deleting the
-// knockout. The logic is finalsEngine.ts (`// demo only, the engine decides`).
+// knockout. The logic is finalsEngine.ts (`// stand-in, the engine decides`).
 // A write sends the target state, or the number it expects (ADR-008); an
 // expectation that is stale answers 409, which the screens meet with a reload.
 import type { components } from "@/api/schema";
@@ -88,7 +88,7 @@ function usesRounds(t: StoredTournament): boolean {
   return format === "swiss" || format === "monster_dyp";
 }
 
-/** The new round as the backend answers it; the demo marks no repeat and no lot. */
+/** The new round as the backend answers it; the fake API marks no repeat and no lot. */
 function swissRoundRead(round: RoundRead): SwissRoundRead {
   return {
     ...round,

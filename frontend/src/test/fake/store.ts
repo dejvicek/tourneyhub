@@ -1,4 +1,4 @@
-// The demo's in-memory store. It lives as long as the page: a reload starts
+// The fake API's in-memory store. It lives as long as the page: a reload starts
 // again from the seed. Handlers read and change it through the functions
 // here, which also compute what the backend computes on read (ADR-009).
 import type { components } from "@/api/schema";
@@ -160,7 +160,7 @@ export function tournamentSummary(t: StoredTournament): TournamentSummary {
   };
 }
 
-/** demo only, the engine decides: the group-phase standings. */
+/** stand-in, the engine decides: the group-phase standings. */
 export function tournamentStandings(
   t: StoredTournament,
 ): TournamentStandingRow[] {

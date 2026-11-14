@@ -32,7 +32,4 @@ export const common = {
   },
   close: "Close",
   loading: "Loading…",
-  demo: {
-    notice: "Demo mode: the data is made up and starts over when you reload.",
-  },
 };

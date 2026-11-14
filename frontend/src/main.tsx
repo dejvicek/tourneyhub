@@ -17,18 +17,7 @@ import { createBrowserRouter } from "react-router";
 
 import { ApiError } from "@/api/client";
 import { App } from "@/App";
-import { isDemoMode } from "@/lib/demoMode";
 import { routes } from "@/routes";
-
-// Demo mode serves the API from an MSW worker before the first request. Vite
-// replaces import.meta.env.MODE with "production" in a production build, so
-// the condition is false at build time, the bundler removes the branch and
-// never emits the chunk of the dynamic import: MSW and src/demo stay out of
-// dist. CI checks it (ci.yml, "The build contains no demo"); guide §11.
-if (import.meta.env.MODE !== "production" && isDemoMode(import.meta.env)) {
-  const { startDemo } = await import("@/demo/browser");
-  await startDemo();
-}
 
 const root = document.getElementById("root");
 if (root === null) {

@@ -68,28 +68,30 @@ const apiClient = {
   importNames: ["api", "createApi", "dataOf"],
   message: "Only src/api/ and a feature's api.ts call the API.",
 };
-// The demo (src/demo) loads only in demo mode, through main.tsx's dynamic
-// import; app code imports nothing from it, so no MSW code reaches a
-// production bundle (MVP-ROADMAP D5 deletes it).
-const demoInternals = {
-  regex: "^(@/|(\\.\\./)+)demo(/|$)",
-  message:
-    "Only main.tsx starts the demo; app code imports nothing from src/demo (the rules are in @/lib/rules).",
-};
 // src/test holds the tests' helpers and the fake API (src/test/fake); app
 // code never imports it, so no test code reaches a production bundle.
 const testInternals = {
   regex: "^(@/|(\\.\\./)+)test(/|$)",
   message:
-    "App code imports nothing from src/test; the fake API and the test helpers are for tests and src/demo/browser.ts.",
+    "App code imports nothing from src/test; the fake API and the test helpers are for tests.",
 };
-// The tests own the fake API (src/test/fake); the demo only boots it in the
-// browser, so nothing in src/test or a test imports from src/demo.
-const demoFromTests = {
-  regex: "^(@/|(\\.\\./)+)demo(/|$)",
+// The files directly in src/ (main.tsx, App.tsx, routes.tsx) are the app's
+// entry; testInternals above matches "../test" and "@/test", this matches the
+// "./test" they would write.
+const testFromRoot = {
+  regex: "^\\./test(/|$)",
   message:
-    "Tests and src/test import nothing from src/demo; the demo imports the fake API from src/test/fake, not the other way round.",
+    "App code imports nothing from src/test; the fake API and the test helpers are for tests.",
 };
+// A dynamic import() is not an import declaration, so the import patterns
+// miss it. esquery has no escaped "/" in a regex, hence \x2F.
+const testImportSyntax = [
+  {
+    selector: "ImportExpression[source.value=/^(\\.|@)\\x2Ftest(\\x2F|$)/]",
+    message:
+      "App code imports nothing from src/test; the fake API and the test helpers are for tests.",
+  },
+];
 // Imports flow one way: shared code → features → the app (guide §11).
 const appFromShared = {
   regex: "^(@/|(\\.\\./)+)(App|main|routes|pages|features)(/|$)",
@@ -364,11 +366,7 @@ export default defineConfig([
             "Sort names with an Intl.Collator in i18n.resolvedLanguage; compare ISO dates as plain strings.",
         },
       ],
-      "no-restricted-imports": restrictImports(
-        apiClient,
-        demoInternals,
-        testInternals,
-      ),
+      "no-restricted-imports": restrictImports(apiClient, testInternals),
     },
   },
   {
@@ -377,7 +375,6 @@ export default defineConfig([
       "no-restricted-imports": restrictImports(
         apiClient,
         appFromShared,
-        demoInternals,
         testInternals,
       ),
     },
@@ -394,7 +391,6 @@ export default defineConfig([
             unstableRouterApis,
             apiClient,
             appFromShared,
-            demoInternals,
             testInternals,
           ],
         },
@@ -407,7 +403,6 @@ export default defineConfig([
       "no-restricted-imports": restrictImports(
         apiClient,
         appFromFeature,
-        demoInternals,
         testInternals,
       ),
     },
@@ -416,21 +411,13 @@ export default defineConfig([
     files: ["src/api/**/*.ts"],
     rules: {
       "no-restricted-globals": "off",
-      "no-restricted-imports": restrictImports(
-        appFromShared,
-        demoInternals,
-        testInternals,
-      ),
+      "no-restricted-imports": restrictImports(appFromShared, testInternals),
     },
   },
   {
     files: ["src/features/*/api.ts"],
     rules: {
-      "no-restricted-imports": restrictImports(
-        appFromFeature,
-        demoInternals,
-        testInternals,
-      ),
+      "no-restricted-imports": restrictImports(appFromFeature, testInternals),
       "no-restricted-syntax": [
         "error",
         ...appSyntax,
@@ -444,18 +431,42 @@ export default defineConfig([
     // Tests run against the fake API (src/test/server.ts, src/test/fake).
     files: ["src/test/**/*.{ts,tsx}", "src/**/*.test.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": restrictImports(apiClient, demoFromTests),
+      "no-restricted-imports": restrictImports(apiClient),
     },
+  },
+  {
+    // These tests read what the fake API holds straight through `api`.
+    files: [
+      "src/features/fields/fields.test.tsx",
+      "src/features/public/public.test.tsx",
+      "src/features/tournaments/finals/finals.test.tsx",
+    ],
+    rules: { "no-restricted-imports": restrictImports() },
   },
   {
     // The fake API, its tests and its helper call the API through the clients.
     files: ["src/test/fake/**/*.ts", "src/test/setupTestHelpers.ts"],
-    rules: { "no-restricted-imports": restrictImports(demoFromTests) },
+    rules: { "no-restricted-imports": restrictImports() },
   },
   {
-    // The demo boots the fake API in the browser; it may import src/test/fake.
-    files: ["src/demo/**/*.ts"],
-    rules: { "no-restricted-imports": restrictImports() },
+    // The files directly in src/ may not import src/test, static or dynamic;
+    // their tests may. main.tsx and routes.tsx add the syntax rule below.
+    files: ["src/*.{ts,tsx}"],
+    ignores: ["src/*.test.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": restrictImports(
+        apiClient,
+        testInternals,
+        testFromRoot,
+      ),
+      "no-restricted-syntax": [
+        "error",
+        ...appSyntax,
+        ...assertionSyntax,
+        ...queryClientSyntax,
+        ...testImportSyntax,
+      ],
+    },
   },
   {
     files: ["src/routes.tsx"],
@@ -466,13 +477,19 @@ export default defineConfig([
         ...assertionSyntax,
         ...queryClientSyntax,
         ...routerDataSyntax,
+        ...testImportSyntax,
       ],
     },
   },
   {
     files: ["src/main.tsx"],
     rules: {
-      "no-restricted-syntax": ["error", ...appSyntax, ...assertionSyntax],
+      "no-restricted-syntax": [
+        "error",
+        ...appSyntax,
+        ...assertionSyntax,
+        ...testImportSyntax,
+      ],
     },
   },
   {
@@ -489,20 +506,16 @@ export default defineConfig([
   },
   {
     // The fake engines are stand-ins that leave with the fake API; no `as`
-    // rule there. The same goes for what is left in src/demo.
-    files: [
-      "src/demo/**/*.ts",
-      "src/test/fake/**/*.ts",
-      "src/test/setupTestHelpers.ts",
-    ],
-    ignores: ["src/demo/**/*.test.ts", "src/test/fake/**/*.test.ts"],
+    // rule there.
+    files: ["src/test/fake/**/*.ts", "src/test/setupTestHelpers.ts"],
+    ignores: ["src/test/fake/**/*.test.ts"],
     rules: {
       "no-restricted-syntax": ["error", ...appSyntax, ...queryClientSyntax],
     },
   },
   {
-    // The demo's tests: the tests' list without the `as` rule.
-    files: ["src/demo/**/*.test.ts", "src/test/fake/**/*.test.ts"],
+    // The fake API's tests: the tests' list without the `as` rule.
+    files: ["src/test/fake/**/*.test.ts"],
     rules: {
       "no-restricted-syntax": ["error", ...appSyntax, ...mockApiSyntax],
     },

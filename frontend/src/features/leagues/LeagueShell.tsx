@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import { Link, Outlet, useMatches } from "react-router";
 
 import { ApiError } from "@/api/client";
-import { DemoNotice } from "@/components/DemoNotice";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { LeagueNav } from "@/components/LeagueNav";
 import { NotFoundPage } from "@/components/NotFoundPage";
@@ -84,7 +83,6 @@ export function LeagueShell({ account }: { account?: ReactNode }) {
           </div>
         </header>
         <main className="min-w-0 flex-1 space-y-6 px-8 py-6">
-          <DemoNotice />
           <Outlet />
         </main>
       </div>
@@ -127,7 +125,6 @@ export function LeagueShell({ account }: { account?: ReactNode }) {
             "pb-[calc(var(--spacing-bottom-bar)+env(safe-area-inset-bottom)+1.5rem)]",
         )}
       >
-        <DemoNotice />
         <Outlet />
       </main>
       {bottomBar && <LeagueNav leagueId={leagueId} variant="bottom" />}

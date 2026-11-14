@@ -22,7 +22,7 @@ All documents live in `docs/` (index: `docs/README.md`). Read the relevant one b
 | Document | Holds |
 |---|---|
 | `docs/product/PRD.md` | What the MVP does. Requirement IDs `FR-xxx`, business rules `BR-xxx`, glossary (§3). The user owns it. |
-| `docs/product/MVP-ROADMAP.md` | What is left before the MVP (packages P1–P16, follow-ups, demo removal), as a checklist mirroring issue #84. |
+| `docs/product/MVP-ROADMAP.md` | What is left before the MVP (packages P1–P16, follow-ups), as a checklist mirroring issue #84. |
 | `docs/product/ROADMAP.md` | Post-MVP items (`RM-xx`). Not in scope unless moved into the PRD. |
 | `docs/architecture/ADR.md` | How it is built (ADR-001 – ADR-014). |
 | `docs/architecture/DATA-MODEL.md` | Tables, constraints, what the DB enforces vs. the app (§5). |
@@ -67,7 +67,7 @@ REST under `/api/v1`; share-link views are anonymous under `/api/v1/public/{shar
 
 ### Frontend (`frontend/src/`)
 
-Imports flow one way (ESLint-enforced): `api`, `i18n`, `components`, `hooks`, `lib` → `features/<area>/` → `pages`, `routes.tsx`, `App.tsx`, `main.tsx`. All HTTP goes through the openapi-fetch client in `src/api/client.ts`; types come only from the generated schema. UI text in English and Czech (`src/i18n/locales/{en,cs}/`). Demo mode (`pnpm dev:demo`, `src/demo/`) runs every screen against the fake API in `src/test/fake/` (MSW), which the Vitest suite also uses; routes the backend lacks go through `provisionalApi`.
+Imports flow one way (ESLint-enforced): `api`, `i18n`, `components`, `hooks`, `lib` → `features/<area>/` → `pages`, `routes.tsx`, `App.tsx`, `main.tsx`. All HTTP goes through the openapi-fetch client in `src/api/client.ts`; types come only from the generated schema. UI text in English and Czech (`src/i18n/locales/{en,cs}/`). The Vitest suite answers the API with a fake in `src/test/fake/` (MSW).
 
 ## Commands
 
@@ -112,7 +112,6 @@ On the host with uv instead (needs your own PostgreSQL 17): see `docs/style/pyth
 pnpm install --frozen-lockfile
 pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build
 pnpm exec vitest run src/routes.test.tsx -t "name"   # single test (run pnpm generate:api first if the schema is stale)
-pnpm dev:demo                                        # every screen against the fake API
 ```
 
 Inside Docker: `docker compose exec frontend pnpm lint`.

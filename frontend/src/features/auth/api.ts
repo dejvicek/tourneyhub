@@ -5,11 +5,8 @@ import {
 } from "@tanstack/react-query";
 
 import { api, dataOf } from "@/api/client";
-import { provisionalApi } from "@/api/provisional";
 import { forgetSession, isLoggedOut, setAccessToken } from "@/api/token";
 import type { Language } from "@/i18n/language";
-
-// Every route here is the backend's; only the demo account is the demo's.
 
 /** The refresh and logout routes require it against CSRF (ADR-006). */
 const CSRF = { "X-Requested-With": "tourneyhub" };
@@ -21,14 +18,6 @@ export const authQueries = {
       queryFn: ({ signal }) => dataOf(api.GET("/api/v1/me", { signal })),
       // After a logout there is nobody to ask about (it would only be a 401).
       enabled: !isLoggedOut(),
-    }),
-  /** Demo only: the seeded account the login screen offers. */
-  demoAccount: () =>
-    queryOptions({
-      queryKey: ["demo", "account"],
-      queryFn: ({ signal }) =>
-        dataOf(provisionalApi.GET("/api/v1/demo/account", { signal })),
-      staleTime: Infinity,
     }),
 };
 

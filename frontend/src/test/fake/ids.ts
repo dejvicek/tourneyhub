@@ -1,4 +1,4 @@
-// The demo's fixed ids. Each area of the seed has its own range of numbers,
+// The fake API's fixed ids. Each area of the seed has its own range of numbers,
 // so seed files written in parallel never give two rows the same id.
 
 /** The areas of the seed and their id ranges (src/test/fake/README.md). */
@@ -13,8 +13,8 @@ export const SEED_AREAS = {
 export type SeedArea = keyof typeof SEED_AREAS;
 
 /**
- * An id in UUIDv7 form; fixed, so links into the demo stay valid. Given an
- * area, `n` must lie in its range. Rows the demo creates at run time pass no
+ * An id in UUIDv7 form; fixed, so links into the fake API's data stay valid. Given an
+ * area, `n` must lie in its range. Rows the fake API creates at run time pass no
  * area.
  */
 export function testId(n: number, area?: SeedArea): string {
@@ -32,5 +32,5 @@ export function testId(n: number, area?: SeedArea): string {
 export const TEST_USER_ID = testId(1, "foundation");
 export const TEST_LEAGUE_ID = testId(2, "foundation");
 export const TEST_SEASON_ID = testId(3, "foundation");
-export const TEST_SHARE_TOKEN = "demo-share-token-k3vQ9xLr2TbW8sNe";
+export const TEST_SHARE_TOKEN = "test-share-token-k3vQ9xLr2TbW8sNe";
 export const TEST_EMAIL = "organizer@demo.tourneyhub.test";

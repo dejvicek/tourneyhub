@@ -1,4 +1,4 @@
-// The screen areas' additions to the demo seed, applied by createSeed() in
+// The screen areas' additions to the fake API's seed, applied by createSeed() in
 // seed.ts in this order. Each area adds one line for its own file, which
 // exports a SeedPart and takes its ids from its range in ids.ts:
 //

@@ -2,9 +2,9 @@ import { QueryClient } from "@tanstack/react-query";
 import { screen, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { generatePath } from "react-router";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { provisionalApi } from "@/api/provisional";
+import { api } from "@/api/client";
 import { axeViolations } from "@/features/auth/axeCheck";
 import { publicQueries } from "@/features/public/api";
 import { i18n } from "@/i18n";
@@ -77,13 +77,7 @@ function qualifiersOnTheKnockout(tournamentId: string, qualifiers: number) {
 
 describe("share-link views", () => {
   beforeEach(async () => {
-    // The season standings and the places are the demo's routes only.
-    vi.stubEnv("VITE_DEMO", "true");
     await i18n.changeLanguage("en");
-  });
-
-  afterEach(() => {
-    vi.unstubAllEnvs();
   });
 
   it("FR-070: shows the league, the live fields and the standings, without setup tournaments", async () => {
@@ -166,7 +160,7 @@ describe("share-link views", () => {
     if (monster === undefined) {
       throw new Error("The seed has a Monster DYP");
     }
-    const { data: expected = [] } = await provisionalApi.GET(
+    const { data: expected = [] } = await api.GET(
       "/api/v1/public/{share_token}/tournaments/{tournament_id}/standings",
       {
         params: {
@@ -371,7 +365,7 @@ describe("share-link views", () => {
   });
 });
 
-describe("share-link views outside demo mode", () => {
+describe("share-link views, where the backend serves the season routes", () => {
   beforeEach(async () => {
     await i18n.changeLanguage("en");
   });

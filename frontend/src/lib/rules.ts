@@ -1,22 +1,20 @@
 // The rules the product team has not settled yet (GitHub issue #24). Each
 // value below is what PRD.md says today; the comment names the rule and the
-// proposal in the issue. Screens and demo handlers read these values instead
+// proposal in the issue. Screens and the fake API's handlers read these values instead
 // of hard-coding them, so a decision changes one line here.
 //
 // The engine in the backend decides the real behaviour; these values only
-// keep the demo and the screens consistent until it does.
-
-export const RULES_ISSUE = "https://github.com/dejvicek/tourneyhub/issues/24";
+// keep the fake API and the screens consistent until it does.
 
 /** BR-051: the order in which round-robin rounds are played. */
 export type RoundRobinOrder =
-  /** PRD: unspecified; the demo plays the circle method's rounds in order. */
+  /** PRD: unspecified; the fake API plays the circle method's rounds in order. */
   | "circle"
   /** Issue #24: reverse the circle rounds, so seeds 1 and 2 meet last. */
   | "top_seeds_last";
 
 /** BR-058, BR-063: who sits out when the entries do not divide evenly. */
-export type SitOutRule =
+type SitOutRule =
   /** PRD: fewest sit-outs first, then the lowest placed (Swiss) or by lot (Monster DYP). */
   | "fewest_sit_outs"
   /** Issue #24: the same, and never twice in a row while it can be avoided. */
@@ -28,7 +26,7 @@ export type RoundRobinTiebreaker =
 export type SwissTiebreaker = "bh1" | "bh2" | "score_difference";
 
 /** BR-092: when the score of every game is required. */
-export type GameScoreRequirement =
+type GameScoreRequirement =
   /** PRD: every game of a Swiss or Monster DYP round, except walkovers. */
   | "swiss_and_monster_dyp"
   /** Issue #24: only when score difference is an enabled tie-breaker. */
@@ -45,7 +43,7 @@ export const MONSTER_KNOCKOUT_MODES = [
 ] as const;
 export type MonsterKnockoutMode = (typeof MONSTER_KNOCKOUT_MODES)[number];
 
-export interface Rules {
+interface Rules {
   roundRobinOrder: RoundRobinOrder;
   sitOuts: SitOutRule;
   topPlayersSitOutExempt: boolean;
@@ -64,7 +62,7 @@ export const rules: Readonly<Rules> = {
   /**
    * BR-058, BR-063. Issue #24 proposed "fewest_sit_outs_not_twice_in_a_row".
    * The PRD (BR-058, BR-063 as reviewed in #46) picks first those who did not
-   * sit out the round before, then the fewest sit-outs; this demo still orders
+   * sit out the round before, then the fewest sit-outs; the fake API still orders
    * by the fewest sit-outs only, and does not count a missed round as a sit-out
    * for the order (BR-064, BR-067). The behaviour change is tracked in issue
    * #60. The default points for sitting out are 0 (FR-039), picked by the
@@ -105,7 +103,7 @@ export const rules: Readonly<Rules> = {
   monsterKnockoutModes: MONSTER_KNOCKOUT_MODES,
 };
 
-// Settled rules the demo also needs, from PRD.md, kept here so that the
+// Settled rules the fake API also needs, from PRD.md, kept here so that the
 // handlers and screens share them.
 /** BR-070, BR-122: group-phase points for a win, a draw and a loss. */
 export const MATCH_POINTS = { win: 2, draw: 1, loss: 0 } as const;

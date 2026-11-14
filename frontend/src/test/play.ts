@@ -1,5 +1,5 @@
 // Test helpers of the play screens (screens 6–8): the running DYP of the
-// demo's seed.
+// fake API's seed.
 import { generatePath } from "react-router";
 
 import { paths } from "@/lib/paths";

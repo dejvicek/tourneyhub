@@ -1,4 +1,4 @@
-// demo only, the engine decides
+// stand-in, the engine decides
 //
 // Stand-ins for the engine of the finals screens (backend tourneyhub.engine,
 // ADR-009): knockout brackets with byes, tournament places, Swiss and Monster
@@ -42,7 +42,7 @@ type Ids = () => string;
 /** The value, which the caller's own checks guarantee. */
 export function need<T>(value: T | null | undefined): T {
   if (value === null || value === undefined) {
-    throw new Error("The demo engine is inconsistent");
+    throw new Error("The fake engine is inconsistent");
   }
   return value;
 }
@@ -447,7 +447,7 @@ export function bracketOf(t: StoredTournament): BracketRead | null {
           seed:
             side.entry_id === null ? null : (seedOf.get(side.entry_id) ?? null),
           is_bye: side.is_bye,
-          // The demo's standings never end level, so no lot decides a seed.
+          // The fake API's standings never end level, so no lot decides a seed.
           decided_by_lot: false,
         })) as BracketMatch["sides"],
         outcome: match.outcome,
@@ -475,7 +475,7 @@ export function bracketOf(t: StoredTournament): BracketRead | null {
 
 // ---------------------------------------------------------------- ranking
 
-/** demo only: a row of the order the draws, the places and the knockout use. */
+/** stand-in: a row of the order the draws, the places and the knockout use. */
 export interface SwissRankingRow {
   place: number;
   entry_id: string;
@@ -488,7 +488,7 @@ export interface SwissRankingRow {
   is_disabled: boolean;
 }
 
-/** demo only: the Swiss and Monster DYP order with its tie-breakers. */
+/** stand-in: the Swiss and Monster DYP order with its tie-breakers. */
 export interface RankingRead {
   /** The enabled tie-breakers, in order. */
   tiebreakers: SwissTiebreaker[];
@@ -500,7 +500,7 @@ export interface RankingRead {
 type Compared = Omit<SwissRankingRow, "place">;
 
 /**
- * demo only: Swiss and Monster DYP standings (BR-070–BR-073). Entries are
+ * stand-in: Swiss and Monster DYP standings (BR-070–BR-073). Entries are
  * players (Monster DYP, both of a team get the points) or pairs; a side's
  * members are found by their players.
  */
@@ -673,7 +673,7 @@ export function reasonOf(
 }
 
 /**
- * demo only: tournament places (BR-100–BR-104) with their reasons and the
+ * stand-in: tournament places (BR-100–BR-104) with their reasons and the
  * placement points of the table (BR-110, BR-111). Before the tournament is
  * finished only the places already decided are listed. Returns undefined for
  * a tournament the base engine already handles (a plain round robin).
@@ -940,7 +940,7 @@ export interface DrawnRound {
 }
 
 /**
- * demo only: the next round of a Swiss (BR-055–BR-058) or Monster DYP
+ * stand-in: the next round of a Swiss (BR-055–BR-058) or Monster DYP
  * (BR-060–BR-063), from the active entries and the current standings.
  */
 export function drawNextRound(
@@ -1123,7 +1123,7 @@ export interface PlannedEntry {
 }
 
 /**
- * demo only: the knockout's entries from the standings (BR-080–BR-085). The
+ * stand-in: the knockout's entries from the standings (BR-080–BR-085). The
  * disabled do not qualify (BR-080). `mode` null plays the entries as they are
  * (BR-085); the draw counter makes the lot repeatable.
  */

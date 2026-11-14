@@ -1,6 +1,6 @@
-// demo only, the engine decides
+// stand-in, the engine decides
 //
-// The demo's tournaments for the finals screens (9–13): a DYP evening with
+// The fake API's tournaments for the finals screens (9–13): a DYP evening with
 // its knockout under way, a Monster DYP of 15 players after round 5, a Swiss
 // after round 3, and two knockouts without a group phase (8 and 16 spots,
 // with byes). Added to the seed by seed.ts.

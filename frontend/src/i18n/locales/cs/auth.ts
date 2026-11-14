@@ -11,8 +11,6 @@ export const auth: CsMessages<Messages["auth"]> = {
     wrong: "E-mail nebo heslo nesouhlasí.",
     noAccount: "Ještě nemáte účet?",
     signUp: "Zaregistrujte se s registračním kódem",
-    demoTitle: "Ukázkový účet",
-    demoFill: "Vyplnit ukázkový účet",
   },
   signUp: {
     title: "Registrace",
@@ -26,7 +24,6 @@ export const auth: CsMessages<Messages["auth"]> = {
     submitting: "Vytváření účtu…",
     haveAccount: "Už účet máte?",
     logIn: "Přihlásit se",
-    demoCode: "V ukázce je registrační kód {{code}}.",
   },
   changePassword: {
     title: "Změna hesla",

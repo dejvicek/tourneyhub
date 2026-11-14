@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import { api, ApiError, dataOf } from "@/api/client";
-import { provisionalApi } from "@/api/provisional";
 
 import {
   createDraft,
@@ -307,7 +306,7 @@ describe("the fake API for tournament setup", () => {
     const running = await tournamentOf(id);
     const matchId = running.fields[0]?.match_id ?? "";
     await dataOf(
-      provisionalApi.PUT(
+      api.PUT(
         "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/matches/{match_id}/result",
         {
           params: { path: { ...league, tournament_id: id, match_id: matchId } },

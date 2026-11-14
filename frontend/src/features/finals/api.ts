@@ -24,10 +24,8 @@ type RoundCreate = components["schemas"]["RoundCreate"];
 
 type TiebreakersWrite = components["schemas"]["TiebreakersWrite"];
 
-// Provisional routes, "finals" section of the provisional paths
-// (src/api/provisionalPaths.ts), except the places (P8), the season effect (P10a),
-// the knockout (P10b) and the Swiss rounds and tie-breakers (P12), which the
-// backend serves. The Swiss standings come from GET …/play (playQueries in
+// The finals routes: places, season effect, knockout, Swiss rounds and
+// tie-breakers. The Swiss standings come from GET …/play (playQueries in
 // features/fields/api.ts). Keys start with the entity (docs/style/frontend-style.md §8.1).
 const tournamentKey = (leagueId: string, tournamentId: string) =>
   ["leagues", leagueId, "tournaments", tournamentId] as const;

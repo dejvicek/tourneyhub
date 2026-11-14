@@ -1,6 +1,6 @@
 // Fake handlers: leagues, their settings and seasons (FR-007, FR-010–FR-013,
 // FR-020, FR-021, FR-070). The backend serves these routes; the handlers
-// follow its schema (src/api/schema.d.ts) so the demo and the tests still
+// follow its schema (src/api/schema.d.ts) so the fake API and the tests still
 // answer them.
 import { newId } from "@/lib/newId";
 import { DEFAULT_PLACEMENT_POINTS } from "@/lib/rules";
@@ -27,7 +27,7 @@ function findSeason(leagueId: string, seasonId: string) {
 
 const INT_MAX = 2 ** 31 - 1;
 
-/** The signed-in organizer: the demo's refresh session (handlers/auth.ts). */
+/** The signed-in organizer: the fake API's refresh session (handlers/auth.ts). */
 function organizerId(): string | null {
   return outsideDb().signedInUserId;
 }
