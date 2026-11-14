@@ -34,7 +34,7 @@ The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. 
 - [x] D3 Move the routes the backend already covers or can cover with little work:
   - [x] Finishing a tournament on the finals screen calls `POST …/finish` instead of `PUT …/state`. ([#111](https://github.com/dejvicek/tourneyhub/pull/111))
   - [x] `GET …/players/{player_id}/tournaments` (BR-002, FR-012), together with Q25. ([#111](https://github.com/dejvicek/tourneyhub/pull/111))
-  - [x] `PUT …/setup/top-players` (FR-041), together with Q11 ([#104](https://github.com/dejvicek/tourneyhub/pull/104)).
+  - [x] `PUT …/setup/top-players` (FR-041), together with Q11 ([#103](https://github.com/dejvicek/tourneyhub/pull/103), [#104](https://github.com/dejvicek/tourneyhub/pull/104)).
 - [ ] D4 Routes that come with P12–P14 (section 4). The screens are not hidden: until a route exists, the screen that calls it gets a 404 on the real server:
   - [x] P12, P13: the screens move from the provisional `…/ranking` to `GET …/play` and the public `…/standings`; `PUT …/tiebreakers`, `POST …/rounds` and `DELETE …/rounds/{round_id}` exist in the backend, and the screens still have to switch to them. ([#97](https://github.com/dejvicek/tourneyhub/pull/97))
   - [ ] P14:
@@ -66,11 +66,10 @@ The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. 
     - [ ] Step 2: replacements.
     - [ ] Order of re-mixed pairs sharing a place ([#94](https://github.com/dejvicek/tourneyhub/issues/94), waiting for an answer).
     - [x] Check the bracket size of round 1 in `remix_state` ([#96](https://github.com/dejvicek/tourneyhub/issues/96)) ([#107](https://github.com/dejvicek/tourneyhub/pull/107)).
-  - [x] Screen 13 and marking top players on the real API ([#105](https://github.com/dejvicek/tourneyhub/pull/105)).
+  - [x] Screen 13 and marking top players on the real API ([#104](https://github.com/dejvicek/tourneyhub/pull/104), [#105](https://github.com/dejvicek/tourneyhub/pull/105)).
   - [x] Which draw to use when every grouping repeats a partner ([#79](https://github.com/dejvicek/tourneyhub/issues/79), [#83](https://github.com/dejvicek/tourneyhub/pull/83)).
 - [ ] **P14 Late players and disabling** (FR-044, FR-047, FR-048; BR-045, BR-054, BR-064, BR-067)
   - [x] Disable and enable a participant (written as a target state, ADR-008). ([#113](https://github.com/dejvicek/tourneyhub/pull/113))
-  - [ ] Disabling during the group phase of a tournament with a knockout, on screen 12 ([#112](https://github.com/dejvicek/tourneyhub/issues/112), waiting for an answer).
   - [ ] Late entries in Swiss and Monster DYP.
   - [ ] A late pair in Doubles (FR-047).
   - [ ] Reschedule a round robin for a late entry, keeping seeds 1 and 2 last (BR-054, BR-051) ([#62](https://github.com/dejvicek/tourneyhub/issues/62)).
