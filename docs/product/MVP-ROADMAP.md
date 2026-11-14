@@ -40,11 +40,11 @@ The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. 
   - [x] P14:
     - [x] `GET …/participants` and `PUT …/entries/{entry_id}/disabled`. ([#113](https://github.com/dejvicek/tourneyhub/pull/113))
     - [x] `POST …/entries` (late players). ([#115](https://github.com/dejvicek/tourneyhub/pull/115))
-- [ ] D5 Delete the demo: `src/demo/`, `src/api/provisional.ts` and `src/api/provisionalPaths.ts`, the exports of `src/lib/rules.ts` only the demo read, the `dev:demo` script, the demo settings in `vite.config.ts`, `main.tsx` and CI, and the mentions in `CLAUDE.md` and `docs/style/frontend-style.md`. Done when no demo code is left and lint, typecheck, unit tests, build and e2e pass.
-  - [ ] ESLint also stops `./test/…` and `./demo/…` imports from files directly in `src/`, and dynamic `import()` of them.
-  - [ ] Comments in `src/test/fake/` that still say "demo", and the ESLint globs and comments for the demo's tests, which match nothing since D2.
-  - [ ] Tests that call `provisionalApi` (six files) and the two tests of `providesProvisionalRoutes()` (`src/lib/demoMode.ts`) move to `api` once D3 and D4 switch their routes.
-  - [ ] Decide whether the fake engines in `src/test/fake/` (about 3,700 lines that mirror server logic) are replaced by plain fixtures; no issue tracks it yet.
+- [x] D5 Delete the demo: `src/demo/`, `src/api/provisional.ts` and `src/api/provisionalPaths.ts`, the exports of `src/lib/rules.ts` only the demo read, the `dev:demo` script, the demo settings in `vite.config.ts`, `main.tsx` and CI, and the mentions in `CLAUDE.md` and `docs/style/frontend-style.md`. Done when no demo code is left and lint, typecheck, unit tests, build and e2e pass. ([#121](https://github.com/dejvicek/tourneyhub/pull/121))
+  - [x] ESLint also stops `./test/…` imports from files directly in `src/`, and dynamic `import()` of them (the `demo` folder is gone, so `./demo/…` needs no rule).
+  - [x] Comments in `src/test/fake/` that still say "demo", and the ESLint globs and comments for the demo's tests, which match nothing since D2.
+  - [x] Tests that call `provisionalApi` (six files) move to `api` once D3 and D4 switch their routes. `providesProvisionalRoutes()` (`src/lib/demoMode.ts`) has no tests or callers and is deleted.
+  - [x] Decide whether the fake engines in `src/test/fake/` (about 4,600 lines that mirror server logic) are replaced by plain fixtures: they stay for the MVP, and [#120](https://github.com/dejvicek/tourneyhub/issues/120) tracks the replacement.
 
 ## 4. Rest of the MVP
 
