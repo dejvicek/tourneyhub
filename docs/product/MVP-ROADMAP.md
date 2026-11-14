@@ -72,7 +72,8 @@ The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. 
   - [x] Disable and enable a participant (written as a target state, ADR-008). ([#113](https://github.com/dejvicek/tourneyhub/pull/113))
   - [x] Late entries in Swiss and Monster DYP. ([#115](https://github.com/dejvicek/tourneyhub/pull/115))
   - [ ] A late pair in Doubles (FR-047).
-  - [ ] Reschedule a round robin for a late entry, keeping seeds 1 and 2 last (BR-054, BR-051) ([#62](https://github.com/dejvicek/tourneyhub/issues/62)).
+  - [ ] Round robin with late entries: a PRD decision is open (FR-047, BR-054); [#62](https://github.com/dejvicek/tourneyhub/issues/62) closed, an exact search of BR-054 is too slow for 16 entries.
+  - [ ] Round robin: seeds 1 and 2 as the last match of the last round (BR-051) ([#116](https://github.com/dejvicek/tourneyhub/issues/116)).
   - [ ] A late entry takes a bye; warning about the Buchholz tie-breakers.
   - [x] Screen 12 on the real API. ([#115](https://github.com/dejvicek/tourneyhub/pull/115))
 - [ ] **P15 Deployment** (ADR-005, ADR-014)
