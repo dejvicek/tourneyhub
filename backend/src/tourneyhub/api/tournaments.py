@@ -13,6 +13,7 @@ from tourneyhub.api.tournament_models import (
     FieldRead,
     FinishWrite,
     HalvesWrite,
+    LateEntryWrite,
     MatchRead,
     PairsWrite,
     ParticipantRead,
@@ -907,6 +908,45 @@ def set_entry_disabled(
         user_id=user.id,
         entry_id=entry_id,
         disabled=body.disabled,
+        clock=clock,
+    )
+    return ParticipantRead.model_validate(participant)
+
+
+@router.post(
+    "/tournaments/{tournament_id}/entries",
+    status_code=HTTPStatus.CREATED,
+    responses=_WRITE_ERRORS,
+)
+def add_late_entry(
+    league_id: UUID,
+    tournament_id: UUID,
+    body: LateEntryWrite,
+    session: SessionDep,
+    user: CurrentUserDep,
+    clock: ClockDep,
+) -> ParticipantRead:
+    """Add a late player to a running Swiss or Monster DYP (FR-047, BR-067).
+
+    The player comes from the league's list and starts on 0 points; they are
+    drawn from the next round on, also while a round is in play. Missed rounds
+    earn nothing and count as sit-outs for the sit-out order only.
+    `from_round_no` must be the newest group round's number plus one, else 409
+    `round_number_changed` with `current_round_no`. An unknown player is 404
+    `player_not_found`, a removed one 409 `player_removed`; a closed season is
+    409 `season_closed`, a tournament not in progress 409
+    `tournament_not_in_progress`. A group phase that is not a Swiss or Monster
+    DYP is 422 `format_not_supported`, a started knockout 422
+    `group_phase_locked`, a DYP or Doubles 422 `late_entry_not_allowed`, and a
+    player already picked 422 `player_already_in_tournament`.
+    """
+    participant = tournament_service.add_late_entry(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user.id,
+        player_id=body.player_id,
+        from_round_no=body.from_round_no,
         clock=clock,
     )
     return ParticipantRead.model_validate(participant)

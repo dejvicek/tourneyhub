@@ -74,7 +74,7 @@ const apiClient = {
 const demoInternals = {
   regex: "^(@/|(\\.\\./)+)demo(/|$)",
   message:
-    "Only main.tsx starts the demo; app code imports nothing from src/demo (the rules are in @/lib/rules, provisional types in @/api/provisionalTypes).",
+    "Only main.tsx starts the demo; app code imports nothing from src/demo (the rules are in @/lib/rules).",
 };
 // src/test holds the tests' helpers and the fake API (src/test/fake); app
 // code never imports it, so no test code reaches a production bundle.

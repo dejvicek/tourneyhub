@@ -9,6 +9,7 @@ from pydantic import JsonValue
 from sqlalchemy.orm import Session
 
 from tourneyhub.db.models.entries import Entry, EntryMember
+from tourneyhub.db.models.leagues import League
 from tourneyhub.db.models.matches import Match, MatchSide, MatchSidePlayer, Round
 from tourneyhub.db.models.tournaments import Tournament, TournamentPhase
 from tourneyhub.engine.errors import EngineError
@@ -42,7 +43,7 @@ from tourneyhub.errors import (
 )
 from tourneyhub.services.engine_errors import to_app_error
 from tourneyhub.services.leagues import get_league
-from tourneyhub.services.tournaments.entries import _check_dyp_draw
+from tourneyhub.services.tournaments.entries import _check_dyp_draw, _seed
 from tourneyhub.services.tournaments.fields import _fill_fields
 from tourneyhub.services.tournaments.monster_dyp import (
     draw_monster,
@@ -649,10 +650,11 @@ def back_to_setup(
     with their matches and participation, are deleted and the fields freed: a
     knockout without a group phase keeps its phase, the format of setup, and
     loses its bracket (D4);
-    the entries, seeds and draws stay, and every disabled flag is cleared
-    (ADR-010, DATA-MODEL §4.4).
+    the entries and draws stay, and every disabled flag is cleared (ADR-010,
+    DATA-MODEL §4.4). The seeds stay too, unless a late entry joined: then they
+    are set again by the seeding method (see `_reset_to_setup`).
     """
-    _, tournament = _lock_tournament(
+    league, tournament = _lock_tournament(
         session,
         league_id=league_id,
         tournament_id=tournament_id,
@@ -671,20 +673,32 @@ def back_to_setup(
     )
     if results:
         raise RuleViolationError(ErrorCode.TOURNAMENT_HAS_RESULTS, results=results)
-    _reset_to_setup(session, tournament, clock())
+    _reset_to_setup(session, league, tournament, clock())
     return read_tournament(
         session, league_id=league_id, tournament_id=tournament.id, user_id=user_id
     )
 
 
-def _reset_to_setup(session: Session, tournament: Tournament, now: datetime) -> None:
+def _reset_to_setup(
+    session: Session, league: League, tournament: Tournament, now: datetime
+) -> None:
     """Delete every round and put the tournament back in setup (FR-036, FR-046).
 
     The fields are freed and the rounds go with their matches, results and
-    participation; the phases, entries, seeds and draws stay, and every
-    disabled flag is cleared (DATA-MODEL §4.4, §4.5). Going back to setup and
+    participation; the phases, entries and draws stay, and every disabled flag
+    is cleared (DATA-MODEL §4.4, §4.5). The seeds stay as they are, which keeps
+    a hand order, except when a late entry joined (a `not_joined` participation
+    row marks it). Then the main entries are seeded again by the seeding
+    method and the league ranking of setup, so the late entry is an ordinary
+    entry of the setup (DATA-MODEL §4.5, FR-047). Going back to setup and
     deleting a Swiss's round 1 share it.
     """
+    has_late_entry = any(
+        row.status is Participation.NOT_JOINED
+        for phase in tournament.phases
+        for round_ in phase.rounds
+        for row in round_.participation
+    )
     for field in tournament.fields:
         if field.match_id is not None:
             field.match_id = None
@@ -697,3 +711,6 @@ def _reset_to_setup(session: Session, tournament: Tournament, now: datetime) -> 
     tournament.state = TournamentState.SETUP
     tournament.updated_at = now
     session.flush()
+    if has_late_entry:
+        _seed(tournament, _ranking(session, league=league, tournament=tournament))
+        session.flush()

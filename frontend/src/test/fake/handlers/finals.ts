@@ -53,11 +53,6 @@ function notFound(ids: Ids) {
   return apiError(404, "not_found", { tournament_id: ids.tournament_id });
 }
 
-/** 409: the request expected a state the tournament no longer has (ADR-008). */
-function stale(reason: string, expected: number, current: number) {
-  return apiError(409, "bad_request", { reason, expected, current });
-}
-
 /** 422: the state refuses the request and a reload would change nothing. */
 function refused(reason: string) {
   return apiError(422, "validation_failed", { reason });
@@ -314,36 +309,61 @@ export const finalsHandlers = [
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/entries",
     ({ params, body }) => {
       const t = findTournament(params.league_id, params.tournament_id);
-      const group = t ? groupPhase(t) : undefined;
-      if (!t || !group) {
+      if (!t) {
         return notFound(params);
+      }
+      // The refusals in the backend's order (FR-047, BR-067).
+      const player = db().players.find(
+        (p) => p.id === body.player_id && p.league_id === t.league_id,
+      );
+      if (!player) {
+        return apiError(404, "player_not_found", { player_id: body.player_id });
+      }
+      if (player.removed_at !== null) {
+        return apiError(409, "player_removed", { player_id: player.id });
+      }
+      if (
+        db().seasons.some((s) => s.id === t.season_id && s.state === "closed")
+      ) {
+        return apiError(409, "season_closed");
+      }
+      if (t.state !== "in_progress") {
+        return apiError(409, "tournament_not_in_progress", { state: t.state });
+      }
+      const group = groupPhase(t);
+      if (!group || !usesRounds(t)) {
+        return apiError(422, "format_not_supported", {
+          format: group?.format ?? null,
+        });
+      }
+      const locked = groupLocked(t);
+      if (locked) {
+        return locked;
+      }
+      if (t.type === "dyp" || t.type === "doubles") {
+        return apiError(422, "late_entry_not_allowed", { type: t.type });
+      }
+      if (t.entries.some((e) => e.player_ids.includes(player.id))) {
+        return apiError(422, "player_already_in_tournament", {
+          player_id: player.id,
+        });
       }
       const next = roundsOf(t, group).length + 1;
       if (body.from_round_no !== next) {
-        return stale("round_number", body.from_round_no, next);
-      }
-      // FR-047, BR-067: only Swiss and Monster DYP take late players here.
-      if (!usesRounds(t) || knockoutPhase(t)) {
-        return refused("late_entries_not_allowed");
-      }
-      const player = db().players.find(
-        (p) =>
-          p.id === body.player_id &&
-          p.league_id === t.league_id &&
-          p.removed_at === null,
-      );
-      if (!player) {
-        return apiError(404, "not_found", { player_id: body.player_id });
-      }
-      if (t.entries.some((e) => e.player_ids.includes(player.id))) {
-        return refused("already_playing");
+        return apiError(409, "round_number_changed", {
+          current_round_no: next - 1,
+        });
       }
       const ids = idFactory();
       const entry = {
         id: ids(),
         stage: "main" as const,
         kind: "player" as const,
-        seed: Math.max(0, ...t.entries.map((e) => e.seed ?? 0)) + 1,
+        // The next seed in a Singles Swiss; a Monster DYP seeds nobody.
+        seed:
+          group.format === "swiss"
+            ? Math.max(0, ...t.entries.map((e) => e.seed ?? 0)) + 1
+            : null,
         player_ids: [player.id],
         is_disabled: false,
         is_top_player: false,

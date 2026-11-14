@@ -13,6 +13,7 @@ import {
   tournamentOf,
 } from "../setupTestHelpers";
 import { TEST_LEAGUE_ID, TEST_SHARE_TOKEN, testId } from "./ids";
+import { db } from "./store";
 
 // Ids of the finals seed (seedFinals.ts).
 const DYP_EVENING = testId(3200);
@@ -491,33 +492,171 @@ describe("the finals in the fake API", () => {
     });
   });
 
-  it("warns nothing and starts a late player with 0 points from the next round (BR-067)", async () => {
-    const players = await dataOf(
-      provisionalApi.GET("/api/v1/leagues/{league_id}/players", {
-        params: { path: { league_id: TEST_LEAGUE_ID } },
-      }),
-    );
-    const tournament = await dataOf(
-      provisionalApi.GET(root, { params: { path: base(MONSTER) } }),
-    );
-    const outside = players.find(
-      (p) => !tournament.entries.some((e) => e.player_ids.includes(p.id)),
-    );
-    const late = await dataOf(
-      provisionalApi.POST(`${root}/entries`, {
-        params: { path: base(MONSTER) },
-        body: { player_id: outside?.id ?? "", from_round_no: 6 },
-      }),
-    );
-    expect(late).toMatchObject({ joined_round: 6, state: "playing" });
-    const play = await dataOf(
-      api.GET(`${root}/play`, { params: { path: base(MONSTER) } }),
-    );
-    expect(
-      play.standings.find((r) => r.entry_id === late.entry_id),
-    ).toMatchObject({
-      points: 0,
-      played: 0,
+  describe("adds a late player like the backend (FR-047, BR-067)", () => {
+    const outsider = async (id: string) => {
+      const players = await dataOf(
+        api.GET("/api/v1/leagues/{league_id}/players", {
+          params: { path: { league_id: TEST_LEAGUE_ID } },
+        }),
+      );
+      const tournament = await dataOf(
+        api.GET(root, { params: { path: base(id) } }),
+      );
+      return {
+        tournament,
+        playerId:
+          players.find(
+            (p) => !tournament.entries.some((e) => e.player_ids.includes(p.id)),
+          )?.id ?? "",
+      };
+    };
+    const add = (id: string, playerId: string, fromRound: number) =>
+      dataOf(
+        api.POST(`${root}/entries`, {
+          params: { path: base(id) },
+          body: { player_id: playerId, from_round_no: fromRound },
+        }),
+      );
+    const nextRound = (t: { rounds: unknown[] }) => t.rounds.length + 1;
+
+    it("warns nothing and starts a late player with 0 points from the next round", async () => {
+      const { playerId } = await outsider(MONSTER);
+      const late = await add(MONSTER, playerId, 6);
+      expect(late).toMatchObject({ joined_round: 6, state: "playing" });
+      const play = await dataOf(
+        api.GET(`${root}/play`, { params: { path: base(MONSTER) } }),
+      );
+      expect(
+        play.standings.find((r) => r.entry_id === late.entry_id),
+      ).toMatchObject({
+        points: 0,
+        played: 0,
+      });
+      const tournament = await dataOf(
+        api.GET(root, { params: { path: base(MONSTER) } }),
+      );
+      // A Monster DYP seeds nobody.
+      expect(
+        tournament.entries.find((e) => e.id === late.entry_id)?.seed,
+      ).toBeNull();
+    });
+
+    it("gives a late player in a Singles Swiss the next seed", async () => {
+      const { tournament, playerId } = await outsider(SWISS);
+      const late = await add(SWISS, playerId, nextRound(tournament));
+      const after = await dataOf(
+        api.GET(root, { params: { path: base(SWISS) } }),
+      );
+      const seeds = tournament.entries.map((e) => e.seed ?? 0);
+      expect(after.entries.find((e) => e.id === late.entry_id)?.seed).toBe(
+        Math.max(...seeds) + 1,
+      );
+    });
+
+    it("answers 404 player_not_found for a player of no league", async () => {
+      await expect(add(MONSTER, testId(999_999), 6)).rejects.toMatchObject({
+        status: 404,
+        code: "player_not_found",
+      });
+    });
+
+    it("answers 409 player_removed for a removed player", async () => {
+      const { playerId } = await outsider(MONSTER);
+      const player = db().players.find((p) => p.id === playerId);
+      if (player) {
+        player.removed_at = "2026-11-01T10:00:00Z";
+      }
+      await expect(add(MONSTER, playerId, 6)).rejects.toMatchObject({
+        status: 409,
+        code: "player_removed",
+      });
+    });
+
+    it("answers 409 season_closed once the season is closed", async () => {
+      const { playerId } = await outsider(MONSTER);
+      for (const season of db().seasons) {
+        season.state = "closed";
+      }
+      await expect(add(MONSTER, playerId, 6)).rejects.toMatchObject({
+        status: 409,
+        code: "season_closed",
+      });
+    });
+
+    it("answers 409 tournament_not_in_progress once the tournament is finished", async () => {
+      const { playerId } = await outsider(SWISS);
+      await dataOf(
+        api.POST(`${root}/finish`, {
+          params: { path: base(SWISS) },
+          body: { expected_state: "in_progress" },
+        }),
+      );
+      await expect(add(SWISS, playerId, 4)).rejects.toMatchObject({
+        status: 409,
+        code: "tournament_not_in_progress",
+      });
+    });
+
+    it("answers 422 format_not_supported for a round robin", async () => {
+      const { playerId } = await outsider(DYP_EVENING);
+      await expect(add(DYP_EVENING, playerId, 1)).rejects.toMatchObject({
+        status: 422,
+        code: "format_not_supported",
+      });
+    });
+
+    it("answers 422 group_phase_locked once the knockout has started", async () => {
+      const { playerId } = await outsider(SWISS);
+      const swiss = db().tournaments.find((t) => t.id === SWISS);
+      const group = swiss?.phases.find((p) => p.kind === "group");
+      if (swiss && group) {
+        swiss.phases.push({
+          ...group,
+          id: testId(999_001),
+          kind: "knockout",
+          format: "single_elimination",
+        });
+      }
+      await expect(add(SWISS, playerId, 4)).rejects.toMatchObject({
+        status: 422,
+        code: "group_phase_locked",
+      });
+    });
+
+    it("answers 422 late_entry_not_allowed in a DYP or Doubles Swiss", async () => {
+      const { playerId } = await outsider(SWISS);
+      const swiss = db().tournaments.find((t) => t.id === SWISS);
+      for (const type of ["dyp", "doubles"] as const) {
+        if (swiss) {
+          swiss.type = type;
+        }
+        await expect(add(SWISS, playerId, 4)).rejects.toMatchObject({
+          status: 422,
+          code: "late_entry_not_allowed",
+          detail: { type },
+        });
+      }
+    });
+
+    it("answers 422 player_already_in_tournament for a player who plays", async () => {
+      const tournament = await dataOf(
+        api.GET(root, { params: { path: base(MONSTER) } }),
+      );
+      await expect(
+        add(MONSTER, tournament.entries[0]?.player_ids[0] ?? "", 6),
+      ).rejects.toMatchObject({
+        status: 422,
+        code: "player_already_in_tournament",
+      });
+    });
+
+    it("answers 409 round_number_changed with the current round number", async () => {
+      const { playerId } = await outsider(MONSTER);
+      await expect(add(MONSTER, playerId, 5)).rejects.toMatchObject({
+        status: 409,
+        code: "round_number_changed",
+        detail: { current_round_no: 5 },
+      });
     });
   });
 

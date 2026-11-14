@@ -152,6 +152,12 @@ views "III. Flows" {
       tourneyhub.api.tournamentsApi -> tourneyhub.db.play "frees its fields, deletes the round with its matches and participation; round 1: back to setup"
       tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "204"
     }
+    opt "the organizer adds a late player (FR-047, BR-067)" {
+      tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "POST …/entries with the player and the expected next round_no"
+      tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the league and the tournament: a removed player 409, not in progress 409, not a Singles Swiss or Monster DYP 422, already picked 422, another round_no 409 round_number_changed"
+      tourneyhub.api.tournamentsApi -> tourneyhub.db.play "stores the pick, the entry (next seed in a Swiss) and not_joined participation for every round so far, also while a round is in play"
+      tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "201: the participant; the next round draws them on 0 points, missed rounds count as sit-outs for the order only"
+    }
     opt "the organizer disables or re-enables an entry (FR-044)" {
       tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "PUT …/entries/{entry_id}/disabled with the target state"
       tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the league and the tournament: not in progress 409, not a Swiss or Monster DYP group phase or a Lord have mercy knockout 422; sets entries.is_disabled, a repeat changes nothing"

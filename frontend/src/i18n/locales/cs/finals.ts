@@ -49,6 +49,9 @@ export const finals: CsMessages<Messages["finals"]> = {
       "Další kolo potřebuje aspoň {{minimum}} hráče, kteří nejsou vyřazeni ze hry.",
     groupPhaseLocked:
       "Vyřazovací fáze je vylosovaná, takže kola i rozhodující pravidla jsou pevná. Nejdřív vyřazovací fázi smažte.",
+    lateEntryNotAllowed:
+      "Do tohoto turnaje se hráči přihlásit později nemohou.",
+    playerAlreadyInTournament: "Tento hráč už v turnaji je.",
   },
   place: {
     label: "{{place}}{{suffix}}",
