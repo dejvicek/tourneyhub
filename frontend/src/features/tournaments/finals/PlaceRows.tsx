@@ -2,11 +2,11 @@ import { useTranslation } from "react-i18next";
 
 import type { PlaceData } from "@/features/finals/api";
 
-type PlaceDetail = PlaceData;
-type PlaceReason = PlaceData["reason"];
-
 import { pairPlaces, useGroupName } from "./placePairs";
 import { usePlaceLabel } from "./usePlaceLabel";
+
+type PlaceDetail = PlaceData;
+type PlaceReason = PlaceData["reason"];
 
 interface PlaceRowsProps {
   rows: readonly PlaceDetail[];

@@ -185,7 +185,7 @@ export function RemixKnockout({
       )}
       <RemixRounds
         knockout={data}
-        ctx={{ playerName: roster.player, resultHref, canChange: true }}
+        ctx={{ playerName: roster.player, resultHref }}
       />
       <PlacesSoFar
         rows={places.data?.rows ?? []}

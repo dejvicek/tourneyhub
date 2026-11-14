@@ -21,8 +21,6 @@ export interface RemixContext {
   playerName: (playerId: string) => string;
   /** Where "Enter result" goes for a match; null when it cannot be entered. */
   resultHref: (match: RemixMatch) => string | null;
-  /** Whether the viewer may change results (the organizer, not the share link). */
-  canChange: boolean;
 }
 
 /** The title of a match in its round: "Semifinal 1", "Third place". */

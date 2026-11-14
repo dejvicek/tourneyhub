@@ -95,7 +95,6 @@ function PublicRemixKnockout({ shareToken, tournament, players }: Props) {
           ctx={{
             playerName: (playerId) => names.ofPlayers([playerId]),
             resultHref: () => null,
-            canChange: false,
           }}
         />
       )}
