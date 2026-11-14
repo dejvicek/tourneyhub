@@ -5,7 +5,7 @@
 // DYP standings with BH1 and BH2, naive pairing of the next round, and the
 // knockout formed after Monster DYP rounds. Minimal and deterministic; the
 // open rules of issue #24 are read from rules.ts.
-import type { ParticipantRead } from "@/api/provisionalTypes";
+import type { components } from "@/api/schema";
 import {
   MATCH_POINTS,
   type MonsterKnockoutMode,
@@ -34,6 +34,8 @@ import type {
 import { createRng, roundRobinStandings, withPoints } from "./engine";
 import { isRemix, remixPlaces, syncRemix } from "./remixEngine";
 import type { StoredTournament } from "./seed";
+
+type ParticipantRead = components["schemas"]["ParticipantRead"];
 
 type Ids = () => string;
 
@@ -838,6 +840,11 @@ export function participantsOf(t: StoredTournament): ParticipantRead[] {
   const latest = rounds[rounds.length - 1];
   return t.entries
     .filter((entry) => entry.stage === "main")
+    .toSorted(
+      (a, b) =>
+        (a.seed ?? Number.MAX_SAFE_INTEGER) -
+        (b.seed ?? Number.MAX_SAFE_INTEGER),
+    )
     .map((entry) => {
       const note = noteOf(t, entry.id);
       const sat = latest?.sitting_out.includes(entry.id) ?? false;

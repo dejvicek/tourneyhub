@@ -1,9 +1,9 @@
 import { useTranslation } from "react-i18next";
 
-import type { ParticipantRead } from "@/api/provisionalTypes";
 import type { components } from "@/api/schema";
 import { cn } from "@/lib/utils";
 
+type ParticipantRead = components["schemas"]["ParticipantRead"];
 type Tiebreaker = components["schemas"]["Tiebreaker"];
 
 /**

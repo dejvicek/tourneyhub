@@ -182,14 +182,14 @@ describe("the finals in the fake API", () => {
 
   it("FR-032, BR-064: fake Monster DYP needs four players who are not disabled", async () => {
     const entries = await dataOf(
-      provisionalApi.GET(`${root}/participants`, {
+      api.GET(`${root}/participants`, {
         params: { path: base(MONSTER) },
       }),
     );
     const playing = entries.filter((e) => e.state !== "disabled");
     for (const entry of playing.slice(3)) {
       await dataOf(
-        provisionalApi.PUT(`${root}/entries/{entry_id}/disabled`, {
+        api.PUT(`${root}/entries/{entry_id}/disabled`, {
           params: { path: { ...base(MONSTER), entry_id: entry.entry_id } },
           body: { disabled: true },
         }),
@@ -361,14 +361,14 @@ describe("the finals in the fake API", () => {
 
   it("disables and enables a player with the target state (BR-064)", async () => {
     const entries = await dataOf(
-      provisionalApi.GET(`${root}/participants`, {
+      api.GET(`${root}/participants`, {
         params: { path: base(MONSTER) },
       }),
     );
     const playing = entries.find((e) => e.state === "playing");
     const set = (disabled: boolean) =>
       dataOf(
-        provisionalApi.PUT(`${root}/entries/{entry_id}/disabled`, {
+        api.PUT(`${root}/entries/{entry_id}/disabled`, {
           params: {
             path: { ...base(MONSTER), entry_id: playing?.entry_id ?? "" },
           },
@@ -388,6 +388,93 @@ describe("the finals in the fake API", () => {
     expect(await set(false)).toMatchObject({
       state: "playing",
       disabled_since_round: null,
+    });
+  });
+
+  describe("refuses disabling like the backend (BR-064)", () => {
+    const disable = (id: string, entryId: string) =>
+      dataOf(
+        api.PUT(`${root}/entries/{entry_id}/disabled`, {
+          params: { path: { ...base(id), entry_id: entryId } },
+          body: { disabled: true },
+        }),
+      );
+    const firstEntry = async (id: string) =>
+      (
+        await dataOf(
+          api.GET(`${root}/participants`, { params: { path: base(id) } }),
+        )
+      )[0]?.entry_id ?? "";
+
+    it("answers 404 entry_not_found for an unknown or a non-main entry", async () => {
+      await expect(disable(MONSTER, testId(999_999))).rejects.toMatchObject({
+        status: 404,
+        code: "entry_not_found",
+      });
+      await dataOf(
+        provisionalApi.PUT(`${root}/knockout`, {
+          params: { path: base(MONSTER) },
+          body: { ...KNOCKOUT, mode: "singles" },
+        }),
+      );
+      const tournament = await dataOf(
+        provisionalApi.GET(root, { params: { path: base(MONSTER) } }),
+      );
+      const knockoutEntry = tournament.entries.find(
+        (e) => e.stage === "knockout",
+      );
+      await expect(
+        disable(MONSTER, knockoutEntry?.id ?? ""),
+      ).rejects.toMatchObject({ status: 404, code: "entry_not_found" });
+    });
+
+    it("answers 409 tournament_not_in_progress once the tournament is finished", async () => {
+      const entryId = await firstEntry(SWISS);
+      await dataOf(
+        api.POST(`${root}/finish`, {
+          params: { path: base(SWISS) },
+          body: { expected_state: "in_progress" },
+        }),
+      );
+      await expect(disable(SWISS, entryId)).rejects.toMatchObject({
+        status: 409,
+        code: "tournament_not_in_progress",
+      });
+    });
+
+    it("answers 422 disable_not_allowed for a round robin and for a Monster DYP knockout other than Lord have mercy", async () => {
+      await expect(
+        disable(DYP_EVENING, await firstEntry(DYP_EVENING)),
+      ).rejects.toMatchObject({ status: 422, code: "disable_not_allowed" });
+      const entryId = await firstEntry(MONSTER);
+      await dataOf(
+        provisionalApi.PUT(`${root}/knockout`, {
+          params: { path: base(MONSTER) },
+          body: { ...KNOCKOUT, mode: "singles" },
+        }),
+      );
+      await expect(disable(MONSTER, entryId)).rejects.toMatchObject({
+        status: 422,
+        code: "disable_not_allowed",
+      });
+    });
+
+    it("allows it during the Lord have mercy knockout", async () => {
+      const entryId = await firstEntry(MONSTER);
+      await dataOf(
+        provisionalApi.PUT(`${root}/knockout`, {
+          params: { path: base(MONSTER) },
+          body: {
+            ...KNOCKOUT,
+            third_place_match: true,
+            mode: "lord_have_mercy",
+          },
+        }),
+      );
+      expect(await disable(MONSTER, entryId)).toMatchObject({
+        entry_id: entryId,
+        state: "disabled",
+      });
     });
   });
 
