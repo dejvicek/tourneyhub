@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 import pytest
 from sqlalchemy.orm import Session
@@ -460,6 +460,7 @@ def test_br002_fr012_the_unfinished_tournaments_block_a_removal_and_are_listed(
     in_setup = make_tournament(league=league)
     running = make_tournament(league=league, state=TournamentState.IN_PROGRESS)
     finished = make_tournament(league=league, state=TournamentState.FINISHED)
+    in_setup.date = date(2026, 11, 12)  # created first, but later than `running`
     for tournament in (in_setup, running, finished):
         _pick(session, tournament, ana, now)
 
@@ -470,13 +471,13 @@ def test_br002_fr012_the_unfinished_tournaments_block_a_removal_and_are_listed(
         _set_removed(session, league, ana, now, removed=True)
 
     assert [(t.id, t.state) for t in listed] == [
-        (in_setup.id, TournamentState.SETUP),
         (running.id, TournamentState.IN_PROGRESS),
+        (in_setup.id, TournamentState.SETUP),
     ]
-    assert listed[0].player_count == 1
+    assert listed[1].player_count == 1
     assert raised.value.code is ErrorCode.PLAYER_IN_UNFINISHED_TOURNAMENT
     assert raised.value.detail == {
-        "tournament_ids": [str(in_setup.id), str(running.id)]
+        "tournament_ids": [str(running.id), str(in_setup.id)]
     }
     assert ana.removed_at is None
 

@@ -1,7 +1,7 @@
 import threading
 import unicodedata
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid7
 
@@ -893,6 +893,7 @@ def test_br002_fr012_get_tournaments_lists_the_unfinished_ones_as_summaries(
     in_setup = make_tournament(league=league)
     running = make_tournament(league=league, state=TournamentState.IN_PROGRESS)
     finished = make_tournament(league=league, state=TournamentState.FINISHED)
+    in_setup.date = date(2026, 11, 12)  # created first, but later than `running`
     headers = auth_header(league.owner_user_id)
     ana = _add(client, league, "Ana", headers)
     session.add_all(
@@ -909,14 +910,14 @@ def test_br002_fr012_get_tournaments_lists_the_unfinished_ones_as_summaries(
     assert response.status_code == 200
     listed = response.json()
     assert [(t["id"], t["state"]) for t in listed] == [
-        (str(in_setup.id), "setup"),
         (str(running.id), "in_progress"),
+        (str(in_setup.id), "setup"),
     ]
-    assert listed[0] | {"phases": []} == {
+    assert listed[1] | {"phases": []} == {
         "id": str(in_setup.id),
         "season_id": str(season_id),
         "name": "Thursday",
-        "date": "2026-11-05",
+        "date": "2026-11-12",
         "type": "singles",
         "state": "setup",
         "phases": [],
