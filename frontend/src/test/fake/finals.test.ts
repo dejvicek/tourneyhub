@@ -311,12 +311,25 @@ describe("the finals in the fake API", () => {
 
       const groups = await secondRound(id);
 
+      // The mark may sit out by lot (top players are not exempt, BR-061/BR-063),
+      // so the expected leaders come from the players who actually play: the
+      // mark if that player plays, then the best by league ranking among the others.
       const playing = groups.flat();
-      const bestInLeague = picked.find(
+      const markPlays = marks.some((mark) => playing.includes(mark));
+      const unmarkedPlaying = picked.filter(
         (player) => !marks.includes(player) && playing.includes(player),
       );
-      expect(bestInLeague).toBeDefined();
-      expect(groups.map((group) => group[0])).toEqual([marks[0], bestInLeague]);
+      const expected = markPlays
+        ? [marks[0], unmarkedPlaying[0]]
+        : unmarkedPlaying.slice(0, 2);
+      // Either way at least one leader is an unmarked top player.
+      expect(unmarkedPlaying.length).toBeGreaterThan(1);
+      const leaders = groups.map((group) => group[0]);
+      expect(leaders).toHaveLength(2);
+      expect(leaders).toEqual(expect.arrayContaining(expected));
+      if (markPlays) {
+        expect(leaders).toEqual([marks[0], unmarkedPlaying[0]]);
+      }
     });
   });
 
