@@ -7,13 +7,9 @@
 //
 // Names follow the API's conventions (ADR-008, DATA-MODEL.md): /api/v1,
 // snake_case, UUIDs, enumerations as string literals.
-import type { LateEntryWrite } from "@/api/provisionalTypes";
 import type { components, paths as GeneratedPaths } from "@/api/schema";
 
-type Uuid = string;
-
 type ErrorResponse = components["schemas"]["ErrorResponse"];
-type ParticipantRead = components["schemas"]["ParticipantRead"];
 
 /** Never in the backend: the seeded account the login shows in demo mode. */
 export interface DemoAccount {
@@ -35,23 +31,11 @@ interface NoParams {
   path?: never;
   cookie?: never;
 }
-interface Params<P> {
-  query?: never;
-  header?: never;
-  path: P;
-  cookie?: never;
-}
 interface Get<P, R> {
   parameters: P;
   requestBody?: never;
   responses: { 200: Json<R> } & Errors;
 }
-interface Post<P, B, R> {
-  parameters: P;
-  requestBody: { content: { "application/json": B } };
-  responses: { 201: Json<R> } & Errors;
-}
-type Tournament = Params<{ league_id: Uuid; tournament_id: Uuid }>;
 
 /** Routes the fake API serves that the generated schema does not have yet. */
 export interface ProvisionalPaths {
@@ -59,11 +43,6 @@ export interface ProvisionalPaths {
 
   // demo only: the backend never has this route
   "/api/v1/demo/account": { get: Get<NoParams, DemoAccount> };
-
-  // finals: late players
-  "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/entries": {
-    post: Post<Tournament, LateEntryWrite, ParticipantRead>;
-  };
 }
 
 /**

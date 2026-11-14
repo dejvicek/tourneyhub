@@ -2,15 +2,15 @@
 
 An MSW fake API of the backend, owned by the tests. The Vitest suite serves it through `src/test/server.ts`; demo mode (`pnpm dev:demo`, `src/demo/`) boots the same handlers in the browser until the demo goes (MVP-ROADMAP D5). A reload or a new test starts again from the seed. ESLint stops app code from importing anything here, and stops tests and `src/test` from importing `src/demo`.
 
-| File                 | What it holds                                                                                                                                                                                     |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `contract.ts`        | Short names for the API types the fake API and its tests use; the provisional paths are in `src/api/provisionalPaths.ts`, the hand-written types the screens use in `src/api/provisionalTypes.ts` |
-| `ids.ts`             | `testId()` and each area's id range                                                                                                                                                               |
-| `seed.ts`            | One league, 16 players, Season 1, two finished tournaments and a DYP running its round robin                                                                                                      |
-| `seedParts.ts`       | The screen areas' own seed files, which `seed.ts` applies after its own data                                                                                                                      |
-| `store.ts`           | The in-memory data and what the backend would compute on read                                                                                                                                     |
-| `engine.ts`          | Stand-ins for schedules, draws, standings and places (`// demo only, the engine decides`)                                                                                                         |
-| `handlers/<area>.ts` | The fake API, one module per area; `allHandlers.ts` lists them                                                                                                                                    |
+| File                 | What it holds                                                                                                            |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `contract.ts`        | Short names for the API types the fake API and its tests use; the provisional paths are in `src/api/provisionalPaths.ts` |
+| `ids.ts`             | `testId()` and each area's id range                                                                                      |
+| `seed.ts`            | One league, 16 players, Season 1, two finished tournaments and a DYP running its round robin                             |
+| `seedParts.ts`       | The screen areas' own seed files, which `seed.ts` applies after its own data                                             |
+| `store.ts`           | The in-memory data and what the backend would compute on read                                                            |
+| `engine.ts`          | Stand-ins for schedules, draws, standings and places (`// demo only, the engine decides`)                                |
+| `handlers/<area>.ts` | The fake API, one module per area; `allHandlers.ts` lists them                                                           |
 
 ## Adding a screen
 
@@ -48,6 +48,6 @@ export const seedParts: SeedPart[] = [seedFinals];
 
 Once the backend serves a route and it is in `backend/openapi.json`:
 
-1. Delete the route from `src/api/provisionalPaths.ts`, and any type only it used from `src/api/provisionalTypes.ts`. `pnpm typecheck` then shows every call that still uses the provisional types.
+1. Delete the route from `src/api/provisionalPaths.ts`, and any type only it used. `pnpm typecheck` then shows every call that still uses the provisional types.
 2. In the feature's `api.ts`, change `provisionalApi` to `api` for that route, and take its types from `@/api/schema`.
 3. Keep the handler, typed from the generated schema, so the demo and the tests still answer the route.
