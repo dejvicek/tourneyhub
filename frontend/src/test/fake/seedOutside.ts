@@ -1,18 +1,16 @@
-// The outside area's part of the demo (auth, leagues, players, public), ids
+// The outside area's part of the fake API's seed (auth, leagues, players, public), ids
 // testId(4000)–testId(4999). It adds another organizer's league, which the
-// demo organizer never sees (FR-007), and holds the demo's accounts and
-// sessions. The credentials are fake seed values; the login screen shows
-// them in demo mode only, read through GET /api/v1/demo/account, so they
-// never reach a production bundle.
+// seeded organizer never sees (FR-007), and holds the fake API's accounts and
+// sessions. The credentials are fake seed values for tests only.
 import { DEFAULT_PLACEMENT_POINTS } from "@/lib/rules";
 
 import type { UserRead } from "./contract";
 import { TEST_USER_ID, testId } from "./ids";
 import type { SeedPart } from "./seed";
 
-/** The demo organizer's password: 15 characters or more, as P2b requires. */
-export const TEST_PASSWORD = "thursday-foosball-demo";
-/** The instance's sign-up code in the demo (FR-001). */
+/** The seeded organizer's password: 15 characters or more, as P2b requires. */
+export const TEST_PASSWORD = "thursday-foosball-test";
+/** The instance's sign-up code in the fake API (FR-001). */
 export const TEST_SIGNUP_CODE = "FOOSBALL-2026";
 
 /** A second organizer, so that ownership shows (FR-007). */
@@ -32,7 +30,7 @@ export const seedOutside: SeedPart = {
       default_field_count: 1,
       default_match_format: "bo3",
       default_goals_per_game: 7,
-      share_token: "demo-share-token-friday-Zp4mQ8rTv2Lw",
+      share_token: "test-share-token-friday-Zp4mQ8rTv2Lw",
     });
     state.seasons.push({
       id: kit.id(4002),
@@ -72,7 +70,7 @@ export interface OutsideState {
   accounts: StoredAccount[];
   /**
    * The user whose refresh cookie the browser holds, or null after a log
-   * out. The demo starts signed in as the organizer, so that every screen
+   * out. The fake API starts signed in as the organizer, so that every screen
    * opens; a reload starts again from here.
    */
   signedInUserId: string | null;

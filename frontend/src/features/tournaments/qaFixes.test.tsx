@@ -1,5 +1,5 @@
-// Fixes from the demo's QA report (tmp/demo/qa/REPORT.md); each test names
-// its defect.
+// Fixes from a QA pass over the screens (the report was tmp/demo/qa/REPORT.md);
+// each test names its defect.
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { generatePath } from "react-router";

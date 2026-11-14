@@ -17,7 +17,7 @@ import { route } from "../route";
 import type { StoredAccount, Throttle } from "../seedOutside";
 import { outsideDb } from "../store";
 
-const TEST_ACCESS_TOKEN = "demo-access-token";
+const TEST_ACCESS_TOKEN = "test-access-token";
 /** P2b's MIN_PASSWORD_LENGTH (ADR-006; FR-002 says 12, a PRD question). */
 const MIN_PASSWORD_LENGTH = 15;
 const EMAIL = /^[^@\s]+@[^@\s.]+(\.[^@\s.]+)+$/;

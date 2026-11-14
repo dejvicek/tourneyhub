@@ -1,4 +1,4 @@
-// demo only, the engine decides
+// stand-in, the engine decides
 //
 // Simple stand-ins for the tournament engine (backend tourneyhub.engine,
 // ADR-009), so that the fake API returns schedules, draws, standings and
@@ -43,7 +43,7 @@ export interface Pairing<T> {
   sittingOut: T[];
 }
 
-/** demo only, the engine decides: round-robin rounds by the circle method (BR-050, BR-051). */
+/** stand-in, the engine decides: round-robin rounds by the circle method (BR-050, BR-051). */
 export function roundRobinRounds<T>(
   entries: readonly T[],
   order: RoundRobinOrder = rules.roundRobinOrder,
@@ -81,7 +81,7 @@ export function roundRobinRounds<T>(
 }
 
 /**
- * demo only, the engine decides: a DYP draw (BR-031–BR-033). The ranked
+ * stand-in, the engine decides: a DYP draw (BR-031–BR-033). The ranked
  * players split into a top and a bottom half; with an odd number the lot
  * leaves one out first.
  */
@@ -105,7 +105,7 @@ export function drawDypPairs<T>(
   };
 }
 
-/** demo only, the engine decides: round 1 of a bracket, 1 v N, 2 v N-1 … (seeds in order). */
+/** stand-in, the engine decides: round 1 of a bracket, 1 v N, 2 v N-1 … (seeds in order). */
 export function knockoutFirstRound<T>(seeds: readonly T[]): [T, T][] {
   const matches: [T, T][] = [];
   for (let i = 0; i < seeds.length / 2; i++) {
@@ -114,7 +114,7 @@ export function knockoutFirstRound<T>(seeds: readonly T[]): [T, T][] {
   return matches;
 }
 
-/** demo only: a plausible game, the winner reaching the goals per game. */
+/** stand-in: a plausible game, the winner reaching the goals per game. */
 export function randomGame(
   rng: () => number,
   goalsPerGame: number,
@@ -144,7 +144,7 @@ const WALKOVER_GAMES: Record<MatchFormat, number> = {
   bo5: 3,
 };
 
-/** demo only, the engine decides: games won minus lost by one side (BR-101). */
+/** stand-in, the engine decides: games won minus lost by one side (BR-101). */
 export function gameDifference(
   match: MatchRead,
   side: 0 | 1,
@@ -165,7 +165,7 @@ export function gameDifference(
 }
 
 /**
- * demo only, the engine decides: round-robin standings (BR-070, BR-101), with
+ * stand-in, the engine decides: round-robin standings (BR-070, BR-101), with
  * the tie-breakers of rules.roundRobinTiebreakers. A sit-out is counted but
  * earns no points here: only Swiss and Monster DYP score it (BR-071).
  */
@@ -301,7 +301,7 @@ export function roundRobinStandings(
   return result;
 }
 
-/** demo only, the engine decides: the points of a place shared by several entries (BR-110, BR-111). */
+/** stand-in, the engine decides: the points of a place shared by several entries (BR-110, BR-111). */
 export function splitPlacementPoints(
   table: readonly number[],
   place: number,
@@ -314,7 +314,7 @@ export function splitPlacementPoints(
   return Math.floor(total / sharing);
 }
 
-/** demo only, the engine decides: placement points for every place (BR-110, BR-111). */
+/** stand-in, the engine decides: placement points for every place (BR-110, BR-111). */
 export function withPoints(
   places: readonly Omit<PlaceRow, "points_per_player">[],
   table: readonly number[],
@@ -330,7 +330,7 @@ export function withPoints(
 }
 
 /**
- * demo only, the engine decides: places after a 4-entry knockout without a
+ * stand-in, the engine decides: places after a 4-entry knockout without a
  * third-place match (BR-102, BR-103): the semifinal losers share 3rd, the
  * others follow in their group-phase order.
  */
@@ -361,7 +361,7 @@ export function placesAfterFourKnockout(
   return [...top, ...rest];
 }
 
-/** demo only, the engine decides: season standings from finished tournaments (FR-061, §7.14). */
+/** stand-in, the engine decides: season standings from finished tournaments (FR-061, §7.14). */
 export function seasonStandings(
   results: readonly {
     places: readonly PlaceRow[];
@@ -400,7 +400,7 @@ export function seasonStandings(
 }
 
 /**
- * demo only, the engine decides: the matches waiting for a field, in
+ * stand-in, the engine decides: the matches waiting for a field, in
  * schedule order (FR-092, BR-130): no result, not on a field, both sides known.
  */
 export function waitingMatches(
@@ -419,7 +419,7 @@ export function waitingMatches(
 }
 
 /**
- * demo only, the engine decides: each free field, lowest number first, takes
+ * stand-in, the engine decides: each free field, lowest number first, takes
  * the first waiting match none of whose players is on another field (BR-130,
  * BR-131). Returns the new placements.
  */

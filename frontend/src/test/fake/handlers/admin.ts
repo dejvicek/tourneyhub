@@ -85,8 +85,8 @@ export const adminHandlers = [
     if (caller instanceof Response) {
       return caller;
     }
-    // demo only: the backend makes it with `secrets`.
-    setCode(`demo-${newId().replaceAll("-", "").slice(-17)}`);
+    // stand-in: the backend makes it with `secrets`.
+    setCode(`test-${newId().replaceAll("-", "").slice(-17)}`);
     return signupCode();
   }),
 
@@ -149,8 +149,8 @@ export const adminHandlers = [
           ]);
         }
       }
-      // demo only: the backend makes it with `secrets`.
-      const generated = chosen === null ? `demo-${newId()}` : null;
+      // stand-in: the backend makes it with `secrets`.
+      const generated = chosen === null ? `test-${newId()}` : null;
       target.password = chosen ?? generated ?? "";
       target.user.must_change_password = true;
       return { temporary_password: generated };

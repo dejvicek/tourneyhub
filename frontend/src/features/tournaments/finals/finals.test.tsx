@@ -1261,7 +1261,7 @@ describe("Lots in the bracket (BR-074, ADR-009)", () => {
     const bracket = structuredClone(real.data);
     const semifinal = bracket?.rounds[0]?.matches[0];
     if (!semifinal?.sides[0]) {
-      throw new Error("the demo's semifinal has sides");
+      throw new Error("the fake API's semifinal has sides");
     }
     semifinal.sides[0].decided_by_lot = true;
     server.use(

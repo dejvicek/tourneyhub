@@ -1,4 +1,4 @@
-// Typed MSW handlers for the demo's fake API. A handler names its route as
+// Typed MSW handlers for the fake API. A handler names its route as
 // the contract does ("/api/v1/leagues/{league_id}"), gets the path
 // parameters and the body typed from it, and returns the success body the
 // contract declares, or a Response made by apiError().
@@ -70,7 +70,7 @@ export function route<M extends Method, P extends PathsWith<M>>(
     const result: unknown = await resolve({
       // MSW parses the parameters the contract names from the same path.
       params: params as PathParams<Operation<P, M>>,
-      // demo only: the fake API trusts its typed caller and validates nothing.
+      // stand-in: the fake API trusts its typed caller and validates nothing.
       body: (text === "" ? undefined : JSON.parse(text)) as RequestBody<
         Operation<P, M>
       >,

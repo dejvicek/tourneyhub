@@ -1,4 +1,4 @@
-// demo only, the engine decides
+// stand-in, the engine decides
 //
 // Stand-in for the Lord have mercy knockout of the backend (BR-084, BR-140 to
 // BR-146, ADR-009): the pairs change every round, so the knockout starts with

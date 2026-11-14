@@ -1,13 +1,12 @@
 // Short names for the API types the fake API and its tests use. Most are
-// aliases of generated types (src/api/schema.d.ts); the provisional paths
-// themselves are in src/api/provisionalPaths.ts. Grouped by area, like the
+// aliases of generated types (src/api/schema.d.ts). Grouped by area, like the
 // handlers in src/test/fake/handlers/.
 import type { components } from "@/api/schema";
 
 type Uuid = string;
 
 export type ErrorResponse = components["schemas"]["ErrorResponse"];
-// Generated types the provisional ones below build on.
+// Generated types.
 export type LeagueRead = components["schemas"]["LeagueRead"];
 export type SeasonRead = components["schemas"]["SeasonRead"];
 export type UserRead = components["schemas"]["UserRead"];
@@ -75,8 +74,7 @@ export type ResultWrite = components["schemas"]["ResultWrite"];
 // ================================================================ play
 // The running group phase, its fields and its end (screens 6–8, FR-040,
 // FR-060, FR-090–FR-094): all generated now. Owned by the play screens;
-// other areas append their own sections, which merge into ProvisionalPaths
-// above.
+// other areas append their own sections.
 
 // The play read, finishing and the places (P8): generated. The play read's
 // standings serve every format's Standings tab (FR-060).

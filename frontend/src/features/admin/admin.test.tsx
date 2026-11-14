@@ -595,11 +595,11 @@ describe("the forced new password", () => {
     // The admin reset the password while this tab was open.
     server.use(
       http.get("/api/v1/leagues", () => {
-        const demo = outsideDb().accounts.find(
+        const account = outsideDb().accounts.find(
           (a) => a.user.id === TEST_USER_ID,
         );
-        if (demo) {
-          demo.user.must_change_password = true;
+        if (account) {
+          account.user.must_change_password = true;
         }
         return HttpResponse.json(
           { code: "password_change_required", detail: {} },

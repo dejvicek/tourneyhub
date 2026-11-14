@@ -1,4 +1,4 @@
-// demo only, the engine decides
+// stand-in, the engine decides
 //
 // Stand-ins for the engine's setup behaviour (ADR-009, ADR-010): the league
 // ranking, DYP halves and draws, seeding, the generated schedule and the
@@ -1130,7 +1130,7 @@ export const MAX_KNOCKOUT_ENTRIES = 256;
 /**
  * The reason the tournament cannot start, with the backend's codes (FR-032,
  * FR-033); null when it can. Unlike the backend, which generates only the
- * round robin and the knockout without a group phase so far, the demo starts
+ * round robin and the knockout without a group phase so far, the fake API starts
  * every format.
  */
 export function startProblem(t: StoredTournament): SetupFailure | null {
@@ -1255,7 +1255,7 @@ export function start(
 /**
  * FR-036: back to setup is possible while no match in the tournament has a
  * result (BR-096): until the first result is entered, and again once every
- * result is cleared (FR-053). This demo counts the matches with an outcome.
+ * result is cleared (FR-053). This fake counts the matches with an outcome.
  */
 export function backToSetup(t: StoredTournament): SetupFailure | null {
   if (t.state !== "in_progress") {

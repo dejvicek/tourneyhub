@@ -43,7 +43,7 @@ import { LoadError, Loading } from "./finals/StateMessage";
 import { TiebreakerSheet } from "./finals/TiebreakerSheet";
 import { useEntryCount } from "./play/useEntryNoun";
 
-/** BR-068: log2 of the entries, rounded up (the demo's engine has the same rule). */
+/** BR-068: log2 of the entries, rounded up (the fake API's engine has the same rule). */
 function recommendedRounds(count: number): number {
   return Math.max(1, Math.ceil(Math.log2(Math.max(count, 1))));
 }
