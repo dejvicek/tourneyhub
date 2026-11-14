@@ -34,6 +34,7 @@ import { testId } from "../ids";
 import {
   canDrawNext,
   drawRemixRound,
+  forgetReplacements,
   isRemix,
   remixMatchesLeft,
   remixRead,
@@ -149,6 +150,7 @@ function removeKnockout(t: StoredTournament, phaseId: string): void {
   t.rounds = t.rounds.filter((r) => r.phase_id !== phaseId);
   t.phases = t.phases.filter((p) => p.id !== phaseId);
   t.entries = t.entries.filter((e) => e.stage !== "knockout");
+  forgetReplacements(t, gone);
   t.fields = t.fields.map((field) =>
     field.match_id !== null && gone.has(field.match_id)
       ? { ...field, match_id: null }
@@ -296,6 +298,8 @@ export const finalsHandlers = [
       }
       // BR-066: the newest round goes with its matches and results.
       const gone = new Set(round.matches.map((m) => m.id));
+      // BR-154: the replacements drawn with the round are undone.
+      forgetReplacements(t, gone);
       t.rounds = t.rounds.filter((r) => r.id !== round.id);
       t.fields = t.fields.map((field) =>
         field.match_id !== null && gone.has(field.match_id)
@@ -661,6 +665,8 @@ export const finalsHandlers = [
         return null;
       }
       const gone = new Set(round.matches.map((m) => m.id));
+      // BR-154: the replacements drawn with the round are undone.
+      forgetReplacements(t, gone);
       t.rounds = t.rounds.filter((r) => r.id !== round.id);
       t.fields = t.fields.map((field) =>
         field.match_id !== null && gone.has(field.match_id)

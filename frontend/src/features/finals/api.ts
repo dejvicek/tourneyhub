@@ -455,13 +455,16 @@ export type RemixRoundData = RemixKnockoutData["rounds"][number];
 export type RemixMatchData = RemixRoundData["matches"][number];
 export type RemixSideData = RemixMatchData["sides"][number];
 
+export type RemixPlayerData = RemixKnockoutData["players"][number];
+
 /**
  * The share link's rounds view: the organizer's without what only the
- * organizer sees (`can_draw_next`, `result_count`, `winner_locked`; FR-070).
+ * organizer sees (`can_draw_next`, `next_draw`, `players`, `result_count`,
+ * `winner_locked`; FR-070).
  */
 export type PublicRemixKnockoutData = Omit<
   RemixKnockoutData,
-  "can_draw_next" | "rounds"
+  "can_draw_next" | "next_draw" | "players" | "rounds"
 > & {
   rounds: (Omit<RemixRoundData, "result_count" | "matches"> & {
     matches: Omit<RemixMatchData, "winner_locked">[];

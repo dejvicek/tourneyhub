@@ -114,6 +114,7 @@ export type RemixRead = components["schemas"]["RemixKnockoutRead"];
 export type RemixRound = components["schemas"]["RemixRoundRead"];
 export type RemixMatch = components["schemas"]["RemixMatchRead"];
 export type RemixSide = components["schemas"]["RemixSideRead"];
+export type RemixReplacement = components["schemas"]["RemixReplacementRead"];
 export type PublicRemixRead = components["schemas"]["PublicRemixKnockoutRead"];
 
 // The Swiss rounds and tie-breakers (P12): generated. Adding a round carries
