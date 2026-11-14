@@ -762,6 +762,7 @@ type PlaceReasonKind = Literal[
     "lost_third_place",
     "lost_in_round",
     "group_place",
+    "replaced",
 ]
 
 
@@ -781,7 +782,10 @@ class PlaceReasonRead(ResponseModel):
     entry (BR-145): `partner_entry_id` is the main entry of the partner of
     the player's last knockout match, null for a player who did not qualify
     and everywhere else; `opponent_entry_id` is null; `group_place` is the
-    player's own.
+    player's own. A player who was replaced (BR-151) has `replaced`: placed as
+    if knocked out in `round`, the round of the seat their replacement gave
+    up, with `partner_entry_id` the other player of that pair now and no
+    `score`.
     """
 
     kind: PlaceReasonKind
