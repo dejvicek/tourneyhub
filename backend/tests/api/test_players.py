@@ -1,7 +1,7 @@
 import threading
 import unicodedata
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid7
 
@@ -13,7 +13,9 @@ from sqlalchemy.orm import Session
 from tourneyhub.app import create_app
 from tourneyhub.db.models.accounts import User
 from tourneyhub.db.models.leagues import League, Player
+from tourneyhub.db.models.tournaments import Tournament, TournamentPlayer
 from tourneyhub.engine.accounts import Language
+from tourneyhub.engine.tournaments import TournamentState
 from tourneyhub.services import leagues as league_service
 from tourneyhub.services import players as player_service
 from tourneyhub.settings import Settings
@@ -872,3 +874,105 @@ def test_br011_a_rename_racing_a_removal_applies_after_the_removal(
     with Session(committing_engine) as check:
         [player] = check.scalars(select(Player)).all()
         assert (player.name, player.removed_at is not None) == ("Anna", True)
+
+
+def _blocking_url(league: League | UUID, player_id: str) -> str:
+    return f"{_players_url(league)}/{player_id}/tournaments"
+
+
+def test_br002_fr012_get_tournaments_lists_the_unfinished_ones_as_summaries(
+    client: TestClient,
+    session: Session,
+    make_league: Callable[..., League],
+    make_tournament: Callable[..., Tournament],
+    auth_header: Callable[..., dict[str, str]],
+    now: datetime,
+) -> None:
+    league = make_league()
+    season_id = next(iter(league.seasons)).id
+    in_setup = make_tournament(league=league)
+    running = make_tournament(league=league, state=TournamentState.IN_PROGRESS)
+    finished = make_tournament(league=league, state=TournamentState.FINISHED)
+    in_setup.date = date(2026, 11, 12)  # created first, but later than `running`
+    headers = auth_header(league.owner_user_id)
+    ana = _add(client, league, "Ana", headers)
+    session.add_all(
+        TournamentPlayer(
+            tournament_id=tournament.id, player_id=UUID(ana["id"]), created_at=now
+        )
+        for tournament in (in_setup, running, finished)
+    )
+    session.flush()
+
+    response = client.get(_blocking_url(league, ana["id"]), headers=headers)
+    refused = _put(client, league, ana["id"], "removed", {"removed": True}, headers)
+
+    assert response.status_code == 200
+    listed = response.json()
+    assert [(t["id"], t["state"]) for t in listed] == [
+        (str(running.id), "in_progress"),
+        (str(in_setup.id), "setup"),
+    ]
+    assert listed[1] | {"phases": []} == {
+        "id": str(in_setup.id),
+        "season_id": str(season_id),
+        "name": "Thursday",
+        "date": "2026-11-12",
+        "type": "singles",
+        "state": "setup",
+        "phases": [],
+        "current_phase_id": None,
+        "current_phase_done": False,
+        "player_count": 1,
+        "progress": None,
+        "winner_player_ids": None,
+    }
+    assert refused == (
+        422,
+        {
+            "code": "player_in_unfinished_tournament",
+            "detail": {"tournament_ids": [t["id"] for t in listed]},
+        },
+    )
+
+
+def test_br002_fr012_get_tournaments_is_empty_when_nothing_blocks_a_removal(
+    client: TestClient,
+    make_league: Callable[..., League],
+    auth_header: Callable[..., dict[str, str]],
+) -> None:
+    league = make_league()
+    headers = auth_header(league.owner_user_id)
+    ana = _add(client, league, "Ana", headers)
+
+    response = client.get(_blocking_url(league, ana["id"]), headers=headers)
+
+    assert (response.status_code, response.json()) == (200, [])
+
+
+def test_owasp_api1_fr012_get_tournaments_of_a_foreign_league_or_player_is_not_found(
+    client: TestClient,
+    make_league: Callable[..., League],
+    make_user: Callable[..., User],
+    auth_header: Callable[..., dict[str, str]],
+) -> None:
+    owner = make_user()
+    mine = make_league(owner_user_id=owner.id)
+    other = make_league(owner_user_id=owner.id)
+    headers = auth_header(owner.id)
+    ana = _add(client, mine, "Ana", headers)
+    foreign = _add(client, other, "Bob", headers)
+
+    stranger = client.get(
+        _blocking_url(mine, ana["id"]), headers=auth_header(make_user().id)
+    )
+    unknown_league = client.get(_blocking_url(uuid7(), ana["id"]), headers=headers)
+    other_player = client.get(_blocking_url(mine, foreign["id"]), headers=headers)
+    unknown_player = client.get(_blocking_url(mine, str(uuid7())), headers=headers)
+
+    league_gone = {"code": "league_not_found", "detail": {}}
+    player_gone = {"code": "player_not_found", "detail": {}}
+    assert (stranger.status_code, stranger.json()) == (404, league_gone)
+    assert (unknown_league.status_code, unknown_league.json()) == (404, league_gone)
+    assert (other_player.status_code, other_player.json()) == (404, player_gone)
+    assert (unknown_player.status_code, unknown_player.json()) == (404, player_gone)

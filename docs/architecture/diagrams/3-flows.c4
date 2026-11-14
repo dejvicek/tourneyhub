@@ -360,6 +360,8 @@ views "III. Flows" {
       }
     }
     organizer -> tourneyhub.spa.organizerUi "removes a player"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "GET the player's tournaments"
+    tourneyhub.spa.organizerUi <- tourneyhub.api.leaguesApi "200: the unfinished tournaments the player is picked for; any of them blocks the removal (FR-012)"
     tourneyhub.spa.organizerUi -> tourneyhub.api.leaguesApi "PUT removed: true"
     tourneyhub.api.leaguesApi -> tourneyhub.db.leagues "locks the league, sets removed_at; the row and the name stay"
     tourneyhub.api.leaguesApi -> tourneyhub.db.tournaments "not picked for an unfinished tournament (BR-002): 422 with their ids"

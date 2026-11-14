@@ -31,9 +31,9 @@ The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. 
 
 - [x] D1 Move out of `src/demo` what the app uses: `rules.ts` (with the Lord have mercy filter, so the option stays hidden on the knockout start screen), the types from `contract.ts`, and the helpers of the finals screens (`StartKnockoutPage`, `names.ts`, `score.ts`, `RankingTable`, `TiebreakerSheet`). Done when only `src/api/provisional.ts` and `main.tsx` import from the demo outside `src/demo` and the tests. ([#91](https://github.com/dejvicek/tourneyhub/pull/91))
 - [x] D2 Tests without the demo: Vitest gets its own MSW handlers and test data instead of the demo store and seed. Done when nothing in `src/test/` imports from `@/demo/`. ([#101](https://github.com/dejvicek/tourneyhub/pull/101))
-- [ ] D3 Move the routes the backend already covers or can cover with little work:
-  - [ ] Finishing a tournament on the finals screen calls `POST …/finish` instead of `PUT …/state`.
-  - [ ] `GET …/players/{player_id}/tournaments` (BR-002, FR-012), together with Q25.
+- [x] D3 Move the routes the backend already covers or can cover with little work:
+  - [x] Finishing a tournament on the finals screen calls `POST …/finish` instead of `PUT …/state`. ([#111](https://github.com/dejvicek/tourneyhub/pull/111))
+  - [x] `GET …/players/{player_id}/tournaments` (BR-002, FR-012), together with Q25. ([#111](https://github.com/dejvicek/tourneyhub/pull/111))
   - [x] `PUT …/setup/top-players` (FR-041), together with Q11 ([#104](https://github.com/dejvicek/tourneyhub/pull/104)).
 - [ ] D4 Routes that come with P12–P14 (section 4). Until they exist, the screens that need them are hidden:
   - [x] P12, P13: the screens move from the provisional `…/ranking` to `GET …/play` and the public `…/standings`; `PUT …/tiebreakers`, `POST …/rounds` and `DELETE …/rounds/{round_id}` exist in the backend, and the screens still have to switch to them. ([#97](https://github.com/dejvicek/tourneyhub/pull/97))

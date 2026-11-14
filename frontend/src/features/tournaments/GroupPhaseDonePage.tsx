@@ -22,6 +22,7 @@ import { resultMutations } from "@/features/results/api";
 import { useRouteParam } from "@/hooks/useRouteParam";
 import { paths } from "@/lib/paths";
 
+import { finishErrorText } from "./finals/errorText";
 import { MinusIcon, PlusIcon } from "./play/icons";
 import { entryPlayers, groupProgress, shortName } from "./play/model";
 import { Notice } from "./play/Notice";
@@ -312,9 +313,7 @@ export function GroupPhaseDonePage() {
                     role="alert"
                     className="text-body-md font-bold text-destructive"
                   >
-                    {finish.error.status === 409
-                      ? t("roundRobin.done.finishChanged")
-                      : t("roundRobin.done.finishFailed")}
+                    {finishErrorText(t, finish.error)}
                   </p>
                 )}
                 {/* FR-040: finishing asks first; the design draws no confirm. */}

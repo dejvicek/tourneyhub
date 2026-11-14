@@ -30,7 +30,7 @@ export const resultMutations = {
       onSettled: (_data, _error, _variables, _result, { client }) =>
         client.invalidateQueries({ queryKey: ["leagues", leagueId] }),
     }),
-  /** Finishes after the round robin: its standings become the places (FR-040). */
+  /** Finishes after the round robin or the Swiss rounds: the standings become the places (FR-040). */
   finish: (leagueId: string, tournamentId: string) =>
     mutationOptions({
       mutationFn: () =>

@@ -37,11 +37,16 @@ function nameValidation(name: string): Problem | undefined {
   return nameProblem(tidyName(name), loc);
 }
 
-/** BR-002: the unfinished tournaments the player is picked for (setup) or plays in. */
+/**
+ * BR-002: the unfinished tournaments the player is picked for (setup) or plays
+ * in, oldest date first, then by id, as the backend lists them.
+ */
 function unfinishedTournaments(playerId: string) {
-  return db().tournaments.filter(
-    (t) => t.state !== "finished" && isPicked(t, playerId),
-  );
+  return db()
+    .tournaments.filter((t) => t.state !== "finished" && isPicked(t, playerId))
+    .sort((a, b) =>
+      a.date !== b.date ? (a.date < b.date ? -1 : 1) : a.id < b.id ? -1 : 1,
+    );
 }
 
 function toRead({ id, name, removed_at }: PlayerRead): PlayerRead {

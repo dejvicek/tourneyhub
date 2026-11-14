@@ -2,7 +2,7 @@ from collections.abc import Callable
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
 
 from tourneyhub.db.models.leagues import Player
@@ -11,6 +11,7 @@ from tourneyhub.engine.leagues import MAX_PLAYERS_PER_LEAGUE
 from tourneyhub.engine.tournaments import TournamentState
 from tourneyhub.errors import ErrorCode, NotFoundError, RuleViolationError
 from tourneyhub.services.leagues import get_league, lock_league
+from tourneyhub.services.tournaments import TournamentSummary, load_summaries
 
 
 def list_players(
@@ -46,6 +47,42 @@ def _lock_player(
     if player is None:
         raise NotFoundError(ErrorCode.PLAYER_NOT_FOUND)
     return player
+
+
+def _unfinished_tournaments(player_id: UUID) -> Select[Tournament]:
+    """The tournaments a player is picked for that are not finished (BR-002).
+
+    Setup counts as not finished. Oldest date first. The removal check and the
+    list that explains a refused removal (FR-012) both use this one query.
+    """
+    return (
+        select(Tournament)
+        .join(TournamentPlayer, TournamentPlayer.tournament_id == Tournament.id)
+        .where(
+            TournamentPlayer.player_id == player_id,
+            Tournament.state != TournamentState.FINISHED,
+        )
+        .order_by(Tournament.date, Tournament.id)
+    )
+
+
+def list_unfinished_tournaments(
+    session: Session, *, league_id: UUID, player_id: UUID, user_id: UUID
+) -> list[TournamentSummary]:
+    """Return the tournaments that block removing a player (BR-002, FR-012).
+
+    These are the tournaments the player is picked for that are not finished,
+    setup included, oldest date first; none means the player can be removed. A
+    read takes no lock. Another organizer's league is 404 `league_not_found`,
+    and a player of another league is 404 `player_not_found`.
+    """
+    league = get_league(session, league_id=league_id, user_id=user_id)
+    player = session.scalar(
+        select(Player.id).where(Player.league_id == league.id, Player.id == player_id)
+    )
+    if player is None:
+        raise NotFoundError(ErrorCode.PLAYER_NOT_FOUND)
+    return load_summaries(session, _unfinished_tournaments(player))
 
 
 def _refuse_a_taken_name(
@@ -160,19 +197,11 @@ def set_player_removed(
         session, league_id=league_id, player_id=player_id, user_id=user_id
     )
     if removed and player.removed_at is None:
-        unfinished = session.scalars(
-            select(Tournament.id)
-            .join(TournamentPlayer, TournamentPlayer.tournament_id == Tournament.id)
-            .where(
-                TournamentPlayer.player_id == player.id,
-                Tournament.state != TournamentState.FINISHED,
-            )
-            .order_by(Tournament.date, Tournament.id)
-        ).all()
+        unfinished = session.scalars(_unfinished_tournaments(player.id)).all()
         if unfinished:
             raise RuleViolationError(
                 ErrorCode.PLAYER_IN_UNFINISHED_TOURNAMENT,
-                tournament_ids=[str(tournament_id) for tournament_id in unfinished],
+                tournament_ids=[str(tournament.id) for tournament in unfinished],
             )
         player.removed_at = now = clock()
     elif not removed and player.removed_at is not None:

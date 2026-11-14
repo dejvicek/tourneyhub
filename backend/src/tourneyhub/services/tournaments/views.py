@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import Select, select
 from sqlalchemy.orm import Session, selectinload
 
 from tourneyhub.db.models.entries import Entry
@@ -291,13 +291,29 @@ def list_season_tournaments(
     query = select(Tournament).where(Tournament.season_id == season_id)
     if past_setup:
         query = query.where(Tournament.state != TournamentState.SETUP)
+    return load_summaries(
+        session,
+        query.order_by(
+            Tournament.date.desc(), Tournament.created_at.desc(), Tournament.id
+        ),
+    )
+
+
+def load_summaries(
+    session: Session, query: Select[Tournament]
+) -> list[TournamentSummary]:
+    """Return the tournaments `query` selects as list summaries, in its order.
+
+    The season's list (FR-022) and the tournaments that block a player's removal
+    (BR-002, FR-012) share it, so both summarize a tournament the same way.
+    """
     tournaments = session.scalars(
         query.options(
             selectinload(Tournament.phases),
             _ROUNDS.selectinload(Round.matches).selectinload(Match.sides),
             selectinload(Tournament.players),
             selectinload(Tournament.entries).selectinload(Entry.members),
-        ).order_by(Tournament.date.desc(), Tournament.created_at.desc(), Tournament.id)
+        )
     ).all()
     return [_summary_of(tournament) for tournament in tournaments]
 
