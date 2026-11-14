@@ -4,7 +4,7 @@
 // knockout. The logic is finalsEngine.ts (`// demo only, the engine decides`).
 // A write sends the target state, or the number it expects (ADR-008); an
 // expectation that is stale answers 409, which the screens meet with a reload.
-import type { ParticipantRead } from "@/api/provisionalTypes";
+import type { components } from "@/api/schema";
 import { MONSTER_KNOCKOUT_MODES, rules } from "@/lib/rules";
 
 import type {
@@ -156,6 +156,8 @@ function removeKnockout(t: StoredTournament, phaseId: string): void {
   );
   t.state = "in_progress";
 }
+
+type ParticipantRead = components["schemas"]["ParticipantRead"];
 
 function participant(
   t: StoredTournament,
@@ -358,15 +360,24 @@ export const finalsHandlers = [
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/entries/{entry_id}/disabled",
     ({ params, body }) => {
       const t = findTournament(params.league_id, params.tournament_id);
-      const group = t ? groupPhase(t) : undefined;
-      const entry = t?.entries.find(
+      if (!t) {
+        return notFound(params);
+      }
+      const group = groupPhase(t);
+      const entry = t.entries.find(
         (e) => e.id === params.entry_id && e.stage === "main",
       );
-      if (!t || !group || !entry) {
-        return apiError(404, "not_found", { entry_id: params.entry_id });
+      if (!entry) {
+        return apiError(404, "entry_not_found", { entry_id: params.entry_id });
       }
-      if (!usesRounds(t) || knockoutPhase(t)) {
-        return refused("disable_not_allowed");
+      if (t.state !== "in_progress") {
+        return apiError(409, "tournament_not_in_progress", { state: t.state });
+      }
+      // The Lord have mercy knockout, or a Swiss or Monster DYP group phase
+      // while no knockout has started.
+      const allowed = knockoutPhase(t) ? isRemix(t) : usesRounds(t);
+      if (!group || !allowed) {
+        return apiError(422, "disable_not_allowed", {});
       }
       if (entry.is_disabled !== body.disabled) {
         entry.is_disabled = body.disabled;

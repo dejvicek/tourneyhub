@@ -34,10 +34,12 @@ The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. 
 - [x] D3 Move the routes the backend already covers or can cover with little work:
   - [x] Finishing a tournament on the finals screen calls `POST …/finish` instead of `PUT …/state`. ([#111](https://github.com/dejvicek/tourneyhub/pull/111))
   - [x] `GET …/players/{player_id}/tournaments` (BR-002, FR-012), together with Q25. ([#111](https://github.com/dejvicek/tourneyhub/pull/111))
-  - [x] `PUT …/setup/top-players` (FR-041), together with Q11 ([#104](https://github.com/dejvicek/tourneyhub/pull/104)).
-- [ ] D4 Routes that come with P12–P14 (section 4). Until they exist, the screens that need them are hidden:
+  - [x] `PUT …/setup/top-players` (FR-041), together with Q11 ([#103](https://github.com/dejvicek/tourneyhub/pull/103), [#104](https://github.com/dejvicek/tourneyhub/pull/104)).
+- [ ] D4 Routes that come with P12–P14 (section 4). The screens are not hidden: until a route exists, the screen that calls it gets a 404 on the real server:
   - [x] P12, P13: the screens move from the provisional `…/ranking` to `GET …/play` and the public `…/standings`; `PUT …/tiebreakers`, `POST …/rounds` and `DELETE …/rounds/{round_id}` exist in the backend, and the screens still have to switch to them. ([#97](https://github.com/dejvicek/tourneyhub/pull/97))
-  - [ ] P14: `GET …/participants`, `POST …/entries`, `PUT …/entries/{entry_id}/disabled`.
+  - [ ] P14:
+    - [x] `GET …/participants` and `PUT …/entries/{entry_id}/disabled`. ([#113](https://github.com/dejvicek/tourneyhub/pull/113))
+    - [ ] `POST …/entries` (late players).
 - [ ] D5 Delete the demo: `src/demo/`, `src/api/provisional.ts` and `src/api/provisionalPaths.ts`, what is left in `src/api/provisionalTypes.ts`, the exports of `src/lib/rules.ts` only the demo read, the `dev:demo` script, the demo settings in `vite.config.ts`, `main.tsx` and CI, and the mentions in `CLAUDE.md` and `docs/style/frontend-style.md`. Done when no demo code is left and lint, typecheck, unit tests, build and e2e pass.
   - [ ] ESLint also stops `./test/…` and `./demo/…` imports from files directly in `src/`, and dynamic `import()` of them.
   - [ ] Comments in `src/test/fake/` that still say "demo", and the ESLint globs and comments for the demo's tests, which match nothing since D2.
@@ -60,15 +62,16 @@ The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. 
   - [ ] Lord have mercy re-mix ([#63](https://github.com/dejvicek/tourneyhub/issues/63)):
     - [x] Step 1, data model and engine: a stored draw per knockout round (DATA-MODEL D4 and D5, ADR-009, ADR-010); the draw of later rounds, the result lock and places per player in the engine ([#93](https://github.com/dejvicek/tourneyhub/pull/93)).
     - [x] Step 1, services, API and screens: drawing and deleting a knockout round, finishing, the round-by-round view on the organizer's screen and on the share link, and the option on the start-knockout screen ([#107](https://github.com/dejvicek/tourneyhub/pull/107), [#108](https://github.com/dejvicek/tourneyhub/pull/108)).
-    - [ ] Step 1, disabling a player in the knockout: needs P14's disable route (decision A; FR-044, BR-147).
+    - [ ] Step 1, disabling a player in the knockout: P14's disable route accepts it; the knockout screen still needs the control (decision A; FR-044, BR-147).
     - [ ] Step 2: replacements.
     - [ ] Order of re-mixed pairs sharing a place ([#94](https://github.com/dejvicek/tourneyhub/issues/94), waiting for an answer).
     - [x] Check the bracket size of round 1 in `remix_state` ([#96](https://github.com/dejvicek/tourneyhub/issues/96)) ([#107](https://github.com/dejvicek/tourneyhub/pull/107)).
-  - [x] Screen 13 and marking top players on the real API ([#105](https://github.com/dejvicek/tourneyhub/pull/105)).
+  - [x] Screen 13 and marking top players on the real API ([#104](https://github.com/dejvicek/tourneyhub/pull/104), [#105](https://github.com/dejvicek/tourneyhub/pull/105)).
   - [x] Which draw to use when every grouping repeats a partner ([#79](https://github.com/dejvicek/tourneyhub/issues/79), [#83](https://github.com/dejvicek/tourneyhub/pull/83)).
 - [ ] **P14 Late players and disabling** (FR-044, FR-047, FR-048; BR-045, BR-054, BR-064, BR-067)
-  - [ ] Disable and enable a participant (written as a target state, ADR-008).
+  - [x] Disable and enable a participant (written as a target state, ADR-008). ([#113](https://github.com/dejvicek/tourneyhub/pull/113))
   - [ ] Late entries in Swiss and Monster DYP.
+  - [ ] A late pair in Doubles (FR-047).
   - [ ] Reschedule a round robin for a late entry, keeping seeds 1 and 2 last (BR-054, BR-051) ([#62](https://github.com/dejvicek/tourneyhub/issues/62)).
   - [ ] A late entry takes a bye; warning about the Buchholz tie-breakers.
   - [ ] Screen 12 on the real API.

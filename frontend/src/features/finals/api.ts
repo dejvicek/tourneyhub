@@ -8,10 +8,12 @@ import {
 
 import { api, dataOf } from "@/api/client";
 import { provisionalApi } from "@/api/provisional";
-import type { DisabledWrite, LateEntryWrite } from "@/api/provisionalTypes";
+import type { LateEntryWrite } from "@/api/provisionalTypes";
 import type { components } from "@/api/schema";
 import { tournamentQueries } from "@/features/tournaments/api";
 import type { MonsterKnockoutMode } from "@/lib/rules";
+
+type DisabledWrite = components["schemas"]["DisabledWrite"];
 
 type KnockoutWrite = components["schemas"]["KnockoutWrite"];
 type KnockoutDrawWrite = components["schemas"]["KnockoutDrawWrite"];
@@ -79,7 +81,7 @@ export const finalsQueries = {
       queryKey: [...tournamentKey(leagueId, tournamentId), "participants"],
       queryFn: ({ signal }) =>
         dataOf(
-          provisionalApi.GET(
+          api.GET(
             "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/participants",
             { params: pathOf(leagueId, tournamentId), signal },
           ),
@@ -229,7 +231,7 @@ export const finalsMutations = {
       scope: scope(leagueId),
       mutationFn: (variables: { entryId: string } & DisabledWrite) =>
         dataOf(
-          provisionalApi.PUT(
+          api.PUT(
             "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/entries/{entry_id}/disabled",
             {
               params: {

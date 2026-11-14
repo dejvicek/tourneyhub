@@ -25,6 +25,11 @@ from tourneyhub.services.tournaments.fields import (
     remove_field,
 )
 from tourneyhub.services.tournaments.monster_dyp import set_top_players
+from tourneyhub.services.tournaments.participants import (
+    Participant,
+    list_participants,
+    set_entry_disabled,
+)
 from tourneyhub.services.tournaments.places import (
     PlacesView,
     finished_season_points,
@@ -83,6 +88,7 @@ __all__ = [
     "GroupStandingRow",
     "KnockoutBracket",
     "MatchResult",
+    "Participant",
     "PlacesView",
     "SideView",
     "TournamentSummary",
@@ -98,6 +104,7 @@ __all__ = [
     "finished_season_points",
     "group_standings",
     "knockout_bracket",
+    "list_participants",
     "list_season_tournaments",
     "list_tournaments",
     "load_summaries",
@@ -110,6 +117,7 @@ __all__ = [
     "remove_field",
     "set_doubles_pairs",
     "set_dyp_halves",
+    "set_entry_disabled",
     "set_match_result",
     "set_seed_order",
     "set_seeding_method",
