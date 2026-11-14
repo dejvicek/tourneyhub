@@ -1,3 +1,4 @@
+import { MutationObserver, QueryClient } from "@tanstack/react-query";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
@@ -6,10 +7,13 @@ import { generatePath } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { provisionalApi } from "@/api/provisional";
+import { finalsMutations, finalsQueries } from "@/features/finals/api";
+import { resultMutations } from "@/features/results/api";
+import { shortName } from "@/features/tournaments/finals/names";
 import { i18n } from "@/i18n";
 import { paths } from "@/lib/paths";
 import { TEST_LEAGUE_ID, testId } from "@/test/fake/ids";
-import { db } from "@/test/fake/store";
+import { db, tournamentRead } from "@/test/fake/store";
 import { stubViewport } from "@/test/media";
 import { renderAt } from "@/test/renderApp";
 import { server } from "@/test/server";
@@ -26,6 +30,7 @@ const SWISS = testId(3450);
 const SPRING_CUP = testId(3600);
 const GRAND_PRIX = testId(3700);
 const ROUND_ROBIN_DONE = testId(3800);
+const LHM = testId(3900);
 
 const at = (path: string, tournamentId: string) =>
   generatePath(path, { leagueId: TEST_LEAGUE_ID, tournamentId });
@@ -315,6 +320,469 @@ describe("Knockout (screen 9)", () => {
   });
 });
 
+describe("Knockout in Lord have mercy (screen 9, BR-155)", () => {
+  const readRounds = () =>
+    new QueryClient().query(finalsQueries.knockoutRounds(TEST_LEAGUE_ID, LHM));
+  const enterResult = async (matchId: string, bestOf3 = false) => {
+    const queryClient = new QueryClient();
+    await new MutationObserver(
+      queryClient,
+      resultMutations.save(TEST_LEAGUE_ID, LHM, matchId),
+    ).mutate({
+      walkover_winner: null,
+      games: Array.from({ length: bestOf3 ? 2 : 1 }, () => ({
+        winner: "side_1" as const,
+        score_1: 10,
+        score_2: 3,
+      })),
+    });
+  };
+  /** Gives every match of the newest round that lacks a result one. */
+  async function finishNewestRound(): Promise<void> {
+    const read = await readRounds();
+    for (const match of read.rounds.at(-1)?.matches ?? []) {
+      if (match.state === "ready" || match.state === "on_field") {
+        await enterResult(match.match_id);
+      }
+    }
+  }
+  const drawRound = (expected: number) => {
+    const queryClient = new QueryClient();
+    return new MutationObserver(
+      queryClient,
+      finalsMutations.drawKnockoutRound(queryClient, TEST_LEAGUE_ID, LHM),
+    ).mutate({ expected_round_no: expected });
+  };
+  const knockoutPath = () => at(paths.knockout, LHM);
+
+  afterEach(() => {
+    server.events.removeAllListeners();
+  });
+
+  it("shows the knockout round by round, not as a bracket (BR-155)", async () => {
+    const calls: string[] = [];
+    server.events.on("request:start", ({ request }) => {
+      calls.push(new URL(request.url).pathname);
+    });
+    renderAt(knockoutPath());
+
+    const rounds = await screen.findByRole("radiogroup", {
+      name: "Rounds of the knockout",
+    });
+    expect(
+      within(rounds).getByRole("radio", { name: "Semifinals" }),
+    ).toBeChecked();
+    expect(screen.getByText("Semifinal 1")).toBeInTheDocument();
+    expect(screen.getByText("Semifinal 2")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Change result, Semifinal 1" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Enter result, Semifinal 2" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "Bracket" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("radiogroup", { name: "Format of the final" }),
+    ).toBeInTheDocument();
+    // The bracket answers 422 in this mode, so it is never asked for.
+    expect(calls.filter((path) => path.endsWith("/bracket"))).toEqual([]);
+    expect(
+      calls.filter((path) => path.endsWith("/knockout/rounds")),
+    ).not.toEqual([]);
+  });
+
+  it("reads a bye as the pair in the team format, then the bye (BR-155)", async () => {
+    const read = await readRounds();
+    const [first, second] = read.rounds.at(-1)?.matches ?? [];
+    if (first === undefined || second === undefined) {
+      throw new Error("The seed has no two matches in the newest round.");
+    }
+    const kept = second.sides[0];
+    if (kept === undefined) throw new Error("The match has no side.");
+    const byeMatch = {
+      ...second,
+      state: "bye" as const,
+      sides: [
+        kept,
+        { entry_id: null, player_ids: [], is_bye: true, left_player_ids: [] },
+      ],
+    };
+    const bye = { ...read.rounds.at(-1), matches: [first, byeMatch] };
+    server.use(
+      http.get(
+        "/api/v1/leagues/:leagueId/tournaments/:tournamentId/knockout/rounds",
+        () =>
+          HttpResponse.json({
+            ...read,
+            rounds: [...read.rounds.slice(0, -1), bye],
+          }),
+      ),
+    );
+    renderAt(knockoutPath());
+
+    expect(kept.player_ids).toHaveLength(2);
+    const text = await screen.findByText(/, bye$/);
+    expect(text).toHaveTextContent(/^.+ \/ .+, bye$/);
+  });
+
+  it("shows the rounds side by side on a desktop, the rounds not drawn yet muted (BR-155)", async () => {
+    stubViewport(1280);
+    renderAt(knockoutPath());
+
+    const rounds = await screen.findByRole("region", {
+      name: "Rounds of the knockout",
+    });
+    expect(
+      within(rounds).getByRole("group", { name: "Semifinals" }),
+    ).toBeInTheDocument();
+    expect(
+      within(rounds).getByText("Drawn after the semifinals"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Knockout" }),
+    ).toBeInTheDocument();
+  });
+
+  it("offers the next round only when can_draw_next, and draws it with the expected number (BR-140)", async () => {
+    const sent: unknown[] = [];
+    server.use(
+      http.post(
+        "/api/v1/leagues/:leagueId/tournaments/:tournamentId/knockout/rounds",
+        async ({ request }) => {
+          sent.push(await request.clone().json());
+        },
+      ),
+    );
+    const user = userEvent.setup();
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    renderAt(knockoutPath(), queryClient);
+
+    expect(
+      await screen.findByText("In progress: the semifinals"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("1 match has no result yet.")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Draw the/ }),
+    ).not.toBeInTheDocument();
+
+    // The last result of the round arrives; the screen reloads.
+    await finishNewestRound();
+    await queryClient.invalidateQueries(
+      finalsQueries.knockoutRounds(TEST_LEAGUE_ID, LHM),
+    );
+    expect(await screen.findByText("Semifinals complete")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Draw the final" }));
+
+    expect(await screen.findByText("Third place")).toBeInTheDocument();
+    expect(sent).toEqual([{ expected_round_no: 2 }]);
+    expect(
+      screen.queryByRole("button", { name: /^Draw the/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the new round on a phone after a draw, even if another was picked (BR-140)", async () => {
+    const user = userEvent.setup();
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    renderAt(knockoutPath(), queryClient);
+
+    const rounds = await screen.findByRole("radiogroup", {
+      name: "Rounds of the knockout",
+    });
+    await user.click(within(rounds).getByRole("radio", { name: "Semifinals" }));
+    await finishNewestRound();
+    await queryClient.invalidateQueries(
+      finalsQueries.knockoutRounds(TEST_LEAGUE_ID, LHM),
+    );
+    await user.click(
+      await screen.findByRole("button", { name: "Draw the final" }),
+    );
+
+    expect(await screen.findByRole("radio", { name: "Final" })).toBeChecked();
+  });
+
+  it("draws the next round in Czech with Czech plurals (BR-140)", async () => {
+    await i18n.changeLanguage("cs");
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    renderAt(knockoutPath(), queryClient);
+
+    expect(
+      await screen.findByText("1 zápas ještě nemá výsledek."),
+    ).toBeInTheDocument();
+    await finishNewestRound();
+    await queryClient.invalidateQueries(
+      finalsQueries.knockoutRounds(TEST_LEAGUE_ID, LHM),
+    );
+    expect(
+      await screen.findByRole("button", { name: /^Vylosovat: / }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the 409 round_number_changed text and reloads", async () => {
+    await finishNewestRound();
+    let reads = 0;
+    server.use(
+      http.get(
+        "/api/v1/leagues/:leagueId/tournaments/:tournamentId/knockout/rounds",
+        () => {
+          reads += 1;
+        },
+      ),
+      http.post(
+        "/api/v1/leagues/:leagueId/tournaments/:tournamentId/knockout/rounds",
+        () =>
+          HttpResponse.json(
+            { code: "round_number_changed", detail: { current_round_no: 2 } },
+            { status: 409 },
+          ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderAt(knockoutPath());
+
+    const draw = await screen.findByRole("button", { name: "Draw the final" });
+    const readsBeforeClick = reads;
+    await user.click(draw);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The rounds changed on another device, so they were reloaded. Check them and try again.",
+    );
+    await waitFor(() => {
+      expect(reads).toBeGreaterThan(readsBeforeClick);
+    });
+  });
+
+  it("names how many results deleting the newest round removes (FR-046)", async () => {
+    await finishNewestRound();
+    const drawn = await drawRound(2);
+    const final = drawn.rounds
+      .at(-1)
+      ?.matches.find((m) => m.kind === "standard");
+    await enterResult(final?.match_id ?? "", true);
+    const user = userEvent.setup();
+    renderAt(knockoutPath());
+
+    await user.click(
+      await screen.findByRole("button", { name: "Delete the final" }),
+    );
+
+    const dialog = await screen.findByRole("alertdialog", {
+      name: "Delete the final?",
+    });
+    expect(dialog).toHaveTextContent(
+      "The drawn pairs and 1 result are removed.",
+    );
+    expect(dialog).not.toHaveTextContent("deletes the knockout");
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("says deleting round 1 deletes the knockout, then opens the tournament (BR-087)", async () => {
+    const user = userEvent.setup();
+    const view = renderAt(knockoutPath());
+
+    await user.click(
+      await screen.findByRole("button", { name: "Delete the semifinals" }),
+    );
+    const dialog = await screen.findByRole("alertdialog", {
+      name: "Delete the semifinals?",
+    });
+    expect(dialog).toHaveTextContent(
+      "The drawn pairs and 1 result are removed. This deletes the knockout and unlocks the group phase.",
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Delete the semifinals" }),
+    );
+
+    await waitFor(() => {
+      expect(view.state.location.pathname).not.toBe(knockoutPath());
+    });
+    expect(
+      await screen.findByRole("heading", { name: "Round 2 is complete" }),
+    ).toBeInTheDocument();
+  });
+
+  it("marks players who left and stay in the draw (BR-149)", async () => {
+    const read = await readRounds();
+    const waiting = read.rounds
+      .flatMap((round) => round.matches)
+      .find((match) => match.state === "on_field");
+    const left = waiting?.sides[0]?.player_ids[0] ?? "";
+    const marked = {
+      ...read,
+      left_player_ids: [left],
+      rounds: read.rounds.map((round) => ({
+        ...round,
+        matches: round.matches.map((match) => ({
+          ...match,
+          sides: match.sides.map((side) => ({
+            ...side,
+            left_player_ids: side.player_ids.filter((id) => id === left),
+          })),
+        })),
+      })),
+    };
+    server.use(
+      http.get(
+        "/api/v1/leagues/:leagueId/tournaments/:tournamentId/knockout/rounds",
+        () => HttpResponse.json(marked),
+      ),
+    );
+    renderAt(knockoutPath());
+
+    expect(
+      await screen.findByText(/no longer plays but stays in the draw/),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("No longer playing")).toHaveLength(1);
+  });
+
+  /** The rounds with the first `count` players marked as having left (BR-149). */
+  async function withLeft(count: number): Promise<void> {
+    const read = await readRounds();
+    const players = read.rounds
+      .flatMap((round) => round.matches)
+      .flatMap((match) => match.sides)
+      .flatMap((side) => side.player_ids);
+    server.use(
+      http.get(
+        "/api/v1/leagues/:leagueId/tournaments/:tournamentId/knockout/rounds",
+        () =>
+          HttpResponse.json({
+            ...read,
+            left_player_ids: players.slice(0, count),
+          }),
+      ),
+    );
+  }
+
+  it("says several players who left no longer play (BR-149)", async () => {
+    await withLeft(2);
+    renderAt(knockoutPath());
+
+    expect(
+      await screen.findByText(/ no longer play but stay in the draw$/),
+    ).toBeInTheDocument();
+  });
+
+  it("says in Czech that one player left, and the plural for two (BR-149)", async () => {
+    await i18n.changeLanguage("cs");
+    await withLeft(1);
+    renderAt(knockoutPath());
+
+    expect(
+      await screen.findByText(/^Už nehraje, ale zůstává v losování: /),
+    ).toBeInTheDocument();
+  });
+
+  it("marks fixed winners (BR-146)", async () => {
+    const user = userEvent.setup();
+    await finishNewestRound();
+    await drawRound(2);
+    renderAt(knockoutPath());
+
+    const rounds = await screen.findByRole("radiogroup", {
+      name: "Rounds of the knockout",
+    });
+    expect(within(rounds).getByRole("radio", { name: "Final" })).toBeChecked();
+    expect(screen.queryByText("Winner fixed")).not.toBeInTheDocument();
+
+    await user.click(within(rounds).getByRole("radio", { name: "Semifinals" }));
+
+    expect(await screen.findAllByText("Winner fixed")).toHaveLength(2);
+  });
+
+  it("has no axe violations", async () => {
+    renderAt(knockoutPath());
+    await screen.findByText("Semifinal 1");
+    expect(await violations()).toEqual([]);
+  });
+
+  it("has no axe violations in the desktop columns", async () => {
+    stubViewport(1280);
+    renderAt(knockoutPath());
+    await screen.findByRole("region", { name: "Rounds of the knockout" });
+    expect(await violations()).toEqual([]);
+  });
+
+  it("deletes a later round and stays on the screen, its winners no longer fixed (BR-146, FR-046)", async () => {
+    const user = userEvent.setup();
+    await finishNewestRound();
+    await drawRound(2);
+    const view = renderAt(knockoutPath());
+
+    const rounds = await screen.findByRole("radiogroup", {
+      name: "Rounds of the knockout",
+    });
+    await user.click(within(rounds).getByRole("radio", { name: "Semifinals" }));
+    expect(await screen.findAllByText("Winner fixed")).toHaveLength(2);
+
+    await user.click(screen.getByRole("button", { name: "Delete the final" }));
+    const dialog = await screen.findByRole("alertdialog", {
+      name: "Delete the final?",
+    });
+    await user.click(
+      within(dialog).getByRole("button", { name: "Delete the final" }),
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("radio", { name: "Final" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(view.state.location.pathname).toBe(knockoutPath());
+    expect(await screen.findByText("Semifinals complete")).toBeInTheDocument();
+    expect(screen.queryByText("Winner fixed")).not.toBeInTheDocument();
+  });
+
+  it("opens the tournament after deleting round 1 even when the tournament reloads first (BR-087)", async () => {
+    const user = userEvent.setup();
+    const view = renderAt(knockoutPath());
+
+    await user.click(
+      await screen.findByRole("button", { name: "Delete the semifinals" }),
+    );
+    const dialog = await screen.findByRole("alertdialog");
+    // Every reload but the tournament's own waits for the gate, so the
+    // tournament arrives first and the screen swaps to "no knockout" while the
+    // delete is still settling. An empty resolver falls through to the fake API.
+    let open = (): void => undefined;
+    const gate = new Promise<void>((resolve) => {
+      open = resolve;
+    });
+    server.use(
+      http.get("/api/v1/*", async ({ request }) => {
+        if (!new URL(request.url).pathname.endsWith(LHM)) {
+          await gate;
+        }
+      }),
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Delete the semifinals" }),
+    );
+    // The rounds view is gone: the tournament no longer has a knockout.
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("button", {
+          name: "Delete the semifinals",
+          hidden: true,
+        }),
+      ).not.toBeInTheDocument();
+    });
+    open();
+
+    await waitFor(() => {
+      expect(view.state.location.pathname).toBe(at(paths.tournament, LHM));
+    });
+  });
+});
+
 describe("Changing a knockout result (FR-053, BR-094)", () => {
   it("corrects a played semifinal and clears it again from the bracket", async () => {
     const user = userEvent.setup();
@@ -459,6 +927,93 @@ describe("Lots in the bracket (BR-074, ADR-009)", () => {
     renderAt(at(paths.knockout, DYP_EVENING));
 
     expect(await screen.findAllByText("By lot")).toHaveLength(1);
+  });
+});
+
+describe("Finished in Lord have mercy (screen 10, BR-145)", () => {
+  /** Per-player place rows, partners sharing a place, as the backend sends them. */
+  function lordHaveMercyPlaces() {
+    const tournament = db().tournaments.find((t) => t.id === LHM);
+    const singles = (tournament?.entries ?? []).filter(
+      (e) => e.player_ids.length === 1,
+    );
+    const name = (index: number) => {
+      const id = singles[index]?.player_ids[0];
+      const player = db().players.find((p) => p.id === id);
+      return shortName(player?.name ?? "");
+    };
+    const row = (
+      index: number,
+      place: number,
+      partner: number,
+      kind: "won_final" | "lost_final" | "lost_in_round",
+    ) => ({
+      entry_id: singles[index]?.id ?? "",
+      place,
+      points_per_player: 10 - place,
+      reason: {
+        kind,
+        round: kind === "lost_in_round" ? "semifinal" : "final",
+        score: kind === "won_final" ? [10, 3] : null,
+        opponent_entry_id: null,
+        partner_entry_id: singles[partner]?.id ?? null,
+        group_place: null,
+        group_format: null,
+      },
+    });
+    server.use(
+      // The fake cannot finish a knockout it did not play, so the detail says so.
+      http.get("*/api/v1/leagues/:league/tournaments/:tournament", () =>
+        HttpResponse.json({
+          ...(tournament === undefined ? {} : tournamentRead(tournament)),
+          state: "finished",
+        }),
+      ),
+      http.get("*/api/v1/leagues/:league/tournaments/:tournament/places", () =>
+        HttpResponse.json({
+          complete: true,
+          rows: [
+            row(0, 1, 1, "won_final"),
+            row(1, 1, 0, "won_final"),
+            row(2, 2, 3, "lost_final"),
+            row(3, 2, 2, "lost_final"),
+            row(4, 3, 5, "lost_in_round"),
+            row(5, 3, 4, "lost_in_round"),
+            row(6, 3, 7, "lost_in_round"),
+            row(7, 3, 6, "lost_in_round"),
+          ],
+        }),
+      ),
+    );
+    return { name };
+  }
+
+  it("Finished: Lord have mercy winners read 'Both get' and name no unknown opponent", async () => {
+    const { name } = lordHaveMercyPlaces();
+    renderAt(at(paths.finished, LHM));
+
+    const winners = await screen.findByRole("region", { name: "Winners" });
+    expect(winners).toHaveTextContent(`${name(0)} / ${name(1)}`);
+    expect(within(winners).getAllByText(/ \/ /)).toHaveLength(1);
+    expect(winners).toHaveTextContent("Won the final 10:3");
+    expect(winners).not.toHaveTextContent("Unknown");
+    expect(winners).not.toHaveTextContent("against");
+    expect(winners).toHaveTextContent("Both get 9 season points.");
+  });
+
+  it("lists partners on one line and does not call two pairs on a place shared (BR-145)", async () => {
+    const { name } = lordHaveMercyPlaces();
+    renderAt(at(paths.finished, LHM));
+
+    const places = await screen.findByRole("region", { name: "Final places" });
+    const rows = within(places).getAllByRole("listitem");
+    expect(rows).toHaveLength(3);
+    expect(rows[1]).toHaveTextContent(`${name(2)} / ${name(3)}`);
+    expect(rows[1]).not.toHaveTextContent("Shared");
+    expect(rows[1]).toHaveTextContent("+8 each");
+    expect(rows[2]).toHaveTextContent(`${name(4)} / ${name(5)}`);
+    expect(rows[2]).toHaveTextContent(`${name(6)} / ${name(7)}`);
+    expect(rows[2]).toHaveTextContent("Shared. Lost in the semifinals.");
   });
 });
 
@@ -1053,7 +1608,7 @@ describe("Late and disabled players (screen 12)", () => {
 });
 
 describe("Start the knockout (screen 13)", () => {
-  it("offers the three modes from the rules and previews each", async () => {
+  it("offers the four modes, Lord have mercy last (FR-045, BR-084)", async () => {
     const user = userEvent.setup();
     renderAt(at(paths.startKnockout, MONSTER));
 
@@ -1064,16 +1619,17 @@ describe("Start the knockout (screen 13)", () => {
       within(modes)
         .getAllByRole("radio")
         .map((radio) => radio.parentElement?.textContent ?? ""),
-    ).toHaveLength(3);
-    for (const name of ["Seeded pairs", "Singles", "A little mercy"]) {
+    ).toHaveLength(4);
+    for (const name of [
+      "Seeded pairs",
+      "Singles",
+      "A little mercy",
+      "Lord have mercy",
+    ]) {
       expect(
         within(modes).getByRole("radio", { name: new RegExp(`^${name}`) }),
       ).toBeInTheDocument();
     }
-    // Not offered until the re-mix is built (issue #63).
-    expect(
-      within(modes).queryByRole("radio", { name: /^Lord have mercy/ }),
-    ).not.toBeInTheDocument();
     // Seeded pairs: 8 players make 4 pairs and semifinals.
     expect(screen.getAllByText("VS")).toHaveLength(2);
     expect(
@@ -1087,6 +1643,79 @@ describe("Start the knockout (screen 13)", () => {
       ).toBeInTheDocument();
     });
     expect(screen.getAllByText("VS")).toHaveLength(4);
+  });
+
+  it("keeps Draw the knockout disabled and names the problem when can_start is false (BR-080)", async () => {
+    server.use(
+      http.get(
+        "/api/v1/leagues/:leagueId/tournaments/:tournamentId/knockout/preview",
+        () =>
+          HttpResponse.json({
+            can_start: false,
+            problem: { code: "knockout_mode_required", detail: {} },
+            draw_counter: 0,
+            is_cut_by_lot: false,
+            max_qualifiers: 4,
+            qualifiers: 4,
+            entries: [1, 2, 3, 4].map((seed) => ({
+              seed,
+              members: [{ entry_id: `e${String(seed)}`, place: seed }],
+              decided_by_lot: false,
+            })),
+            first_round: [
+              [1, 4],
+              [2, 3],
+            ],
+            bracket_size: 4,
+            locks_round_no: 1,
+            skipped_entry_ids: [],
+          }),
+      ),
+    );
+    renderAt(at(paths.startKnockout, MONSTER));
+
+    expect(
+      await screen.findByText("Pick how the teams are formed."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Draw the knockout" }),
+    ).toBeDisabled();
+  });
+
+  it("shows one warning, not two, while the last group round is unfinished (BR-080)", async () => {
+    const monster = db().tournaments.find((t) => t.id === MONSTER);
+    const open = monster?.rounds.at(-1)?.matches[0];
+    if (open === undefined) throw new Error("The seed has a group round");
+    open.outcome = null;
+    server.use(
+      http.get(
+        "/api/v1/leagues/:leagueId/tournaments/:tournamentId/knockout/preview",
+        () =>
+          HttpResponse.json({
+            can_start: false,
+            problem: { code: "group_phase_not_done", detail: {} },
+            draw_counter: 0,
+            is_cut_by_lot: false,
+            max_qualifiers: 4,
+            qualifiers: 4,
+            entries: [],
+            first_round: [],
+            bracket_size: 4,
+            locks_round_no: 1,
+            skipped_entry_ids: [],
+          }),
+      ),
+    );
+    renderAt(at(paths.startKnockout, MONSTER));
+
+    expect(
+      await screen.findByText("This tournament is not at this step."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "Every group match needs a result before the knockout is drawn.",
+      ),
+    ).not.toBeInTheDocument();
   });
 
   it("says which disabled player can't go through (BR-080)", async () => {

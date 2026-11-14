@@ -8,9 +8,11 @@ import {
   findMatch,
   formatOf,
   groupLocked,
+  outcomeOf,
   phaseOf,
   writeResult,
 } from "../playEngine";
+import { isRemix, remixLocked, remixRounds } from "../remixEngine";
 import { apiError, route } from "../route";
 import { findLeague, findTournament } from "../store";
 
@@ -47,10 +49,17 @@ export const resultHandlers = [
       if (groupLocked(t, match)) {
         return apiError(422, "group_phase_locked", {});
       }
-      if (knockoutLocked(t, match)) {
+      const clearing = body.walkover_winner === null && body.games.length === 0;
+      if (isRemix(t)) {
+        // BR-146: drawing a round locks the winners of the round before.
+        if (remixLocked(t, match, clearing ? null : outcomeOf(body))) {
+          return apiError(422, "round_locked", {
+            round_no: remixRounds(t).length,
+          });
+        }
+      } else if (knockoutLocked(t, match)) {
         return apiError(422, "result_locked", {});
       }
-      const clearing = body.walkover_winner === null && body.games.length === 0;
       if (!clearing) {
         const refusal = checkResult(
           body,

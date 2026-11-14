@@ -23,7 +23,10 @@ import {
   finalsMutations,
   finalsQueries,
 } from "@/features/finals/api";
-import { tournamentQueries } from "@/features/tournaments/api";
+import {
+  type TournamentDetail,
+  tournamentQueries,
+} from "@/features/tournaments/api";
 import { useLayout } from "@/hooks/useLayout";
 import { useRouteParam } from "@/hooks/useRouteParam";
 import { paths } from "@/lib/paths";
@@ -33,9 +36,11 @@ import { BracketView, CompactBracket, RoundList } from "./finals/BracketView";
 import { errorText } from "./finals/errorText";
 import { FinalFormat } from "./finals/FinalFormat";
 import { resultPath } from "./finals/links";
-import { useRoster } from "./finals/names";
+import { type Roster, useRoster } from "./finals/names";
 import { Notice } from "./finals/Notice";
 import { PlacesSoFar } from "./finals/PlacesSoFar";
+import { isLordHaveMercy } from "./finals/remix";
+import { RemixKnockout } from "./finals/RemixKnockout";
 import { ScreenHeader } from "./finals/ScreenHeader";
 import { LoadError, Loading } from "./finals/StateMessage";
 
@@ -44,6 +49,7 @@ import { LoadError, Loading } from "./finals/StateMessage";
  * bracket for 4, 8 or 16 spots with byes, the third-place match, the final in
  * its own format, which can change while the final has no result (FR-054),
  * and the places already decided. Results are entered in the result screens.
+ * A Lord have mercy knockout is read round by round instead (BR-155).
  */
 export function KnockoutPage() {
   const { t } = useTranslation();
@@ -58,16 +64,61 @@ export function KnockoutPage() {
 }
 
 function KnockoutContent() {
+  const leagueId = useRouteParam("leagueId");
+  const tournamentId = useRouteParam("tournamentId");
+  const tournament = useQuery(tournamentQueries.detail(leagueId, tournamentId));
+  const roster = useRoster(leagueId, tournament.data?.entries);
+
+  if (tournament.isError) {
+    return (
+      <LoadError
+        onRetry={() => {
+          void tournament.refetch();
+        }}
+      />
+    );
+  }
+  if (tournament.data === undefined) {
+    return <Loading />;
+  }
+  // BR-155: a Lord have mercy knockout is read round by round and has no
+  // bracket (its route answers 422), so only the chosen child queries.
+  return isLordHaveMercy(tournament.data.phases) ? (
+    <RemixKnockout
+      leagueId={leagueId}
+      tournamentId={tournamentId}
+      tournament={tournament.data}
+      roster={roster}
+    />
+  ) : (
+    <BracketKnockout
+      leagueId={leagueId}
+      tournamentId={tournamentId}
+      tournament={tournament.data}
+      roster={roster}
+    />
+  );
+}
+
+interface BracketKnockoutProps {
+  leagueId: string;
+  tournamentId: string;
+  tournament: TournamentDetail;
+  roster: Roster;
+}
+
+function BracketKnockout({
+  leagueId,
+  tournamentId,
+  tournament,
+  roster,
+}: BracketKnockoutProps) {
   const { t } = useTranslation();
   const layout = useLayout();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const leagueId = useRouteParam("leagueId");
-  const tournamentId = useRouteParam("tournamentId");
-  const tournament = useQuery(tournamentQueries.detail(leagueId, tournamentId));
   const bracket = useQuery(finalsQueries.bracket(leagueId, tournamentId));
   const places = useQuery(finalsQueries.places(leagueId, tournamentId));
-  const roster = useRoster(leagueId, tournament.data?.entries);
   const removal = useMutation(
     finalsMutations.deleteKnockout(queryClient, leagueId, tournamentId),
   );
@@ -76,19 +127,17 @@ function KnockoutContent() {
   if (bracket.error instanceof ApiError && bracket.error.status === 404) {
     return <Notice tone="info" title={t("finals.knockout.noKnockout")} />;
   }
-  if (tournament.isError || bracket.isError) {
+  if (bracket.isError) {
     return (
       <LoadError
         onRetry={() => {
-          void tournament.refetch();
           void bracket.refetch();
         }}
       />
     );
   }
-  const data = tournament.data;
   const shape = bracket.data;
-  if (data === undefined || shape === undefined) {
+  if (shape === undefined) {
     return <Loading />;
   }
 
@@ -118,6 +167,9 @@ function KnockoutContent() {
     ) : (
       <BracketView bracket={shape} ctx={ctx} />
     );
+  const final = shape.rounds
+    .at(-1)
+    ?.matches.find((match) => match.kind === "standard");
   const decided = (
     <PlacesSoFar
       rows={places.data?.rows ?? []}
@@ -127,7 +179,7 @@ function KnockoutContent() {
 
   return (
     <div className="space-y-6">
-      {data.state === "finished" && (
+      {tournament.state === "finished" && (
         // FR-037: the last result finishes the tournament; its places are screen 10.
         <Notice tone="info" title={t("finals.knockout.finishedTitle")}>
           <Link
@@ -152,7 +204,8 @@ function KnockoutContent() {
       <FinalFormat
         leagueId={leagueId}
         tournamentId={tournamentId}
-        bracket={shape}
+        finalMatchFormat={shape.final_match_format}
+        finalHasResult={final?.outcome !== null}
       />
       {shape.has_group_phase && (
         <section className="space-y-2">

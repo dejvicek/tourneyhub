@@ -12,7 +12,10 @@ type FinalChoice = "same" | FinalFormat;
 interface FinalFormatProps {
   leagueId: string;
   tournamentId: string;
-  bracket: BracketData;
+  /** The final's own format; null lets it play the knockout's. */
+  finalMatchFormat: BracketData["final_match_format"];
+  /** Whether the final has a result; the control hides then (BR-096). */
+  finalHasResult: boolean;
 }
 
 /**
@@ -23,7 +26,8 @@ interface FinalFormatProps {
 export function FinalFormat({
   leagueId,
   tournamentId,
-  bracket,
+  finalMatchFormat,
+  finalHasResult,
 }: FinalFormatProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -31,27 +35,22 @@ export function FinalFormat({
     finalsMutations.setFinalFormat(queryClient, leagueId, tournamentId),
   );
 
-  const final = bracket.rounds
-    .at(-1)
-    ?.matches.find((match) => match.kind === "standard");
   const failure = change.isError && (
     <p role="alert" className="text-body-sm">
       {errorText(t, change.error)}
     </p>
   );
   // The control shows only while the final has no result (BR-096). A refused
-  // change (409 `match_has_result` from a stale screen) reloads the bracket
+  // change (409 `match_has_result` from a stale screen) reloads the knockout
   // with the result, so its message must outlive the control.
-  if (final?.outcome !== null) {
+  if (finalHasResult) {
     return failure || null;
   }
   const shown = change.isPending
     ? change.variables.final_match_format
-    : bracket.final_match_format;
+    : finalMatchFormat;
   const formats: readonly FinalFormat[] =
-    bracket.final_match_format === "bo1"
-      ? ["bo1", "bo3", "bo5"]
-      : ["bo3", "bo5"];
+    finalMatchFormat === "bo1" ? ["bo1", "bo3", "bo5"] : ["bo3", "bo5"];
 
   return (
     <section className="space-y-2">

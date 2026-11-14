@@ -4,6 +4,7 @@
 // backend answers it; the token is never echoed.
 import { bracketOf, syncBracket } from "../finalsEngine";
 import { publicStandings } from "../playEngine";
+import { publicRemixRead } from "../remixEngine";
 import { apiError, route } from "../route";
 import type { StoredTournament } from "../seed";
 import {
@@ -15,6 +16,7 @@ import {
   sharedLeague,
   tournamentRead,
 } from "../store";
+import { noBracket, notRemix } from "./finals";
 
 /** A tournament of the share token's league that viewers may see (FR-070). */
 function visibleTournament(
@@ -103,8 +105,27 @@ export const publicHandlers = [
           tournament_id: params.tournament_id,
         });
       }
-      syncBracket(t);
-      return bracketOf(t) ?? apiError(404, "knockout_not_found", {});
+      return (
+        noBracket(t) ??
+        (syncBracket(t),
+        bracketOf(t) ?? apiError(404, "knockout_not_found", {}))
+      );
+    },
+  ),
+
+  // FR-070: a Lord have mercy knockout round by round, without the organizer's fields.
+  route(
+    "get",
+    "/api/v1/public/{share_token}/tournaments/{tournament_id}/knockout/rounds",
+    ({ params }) => {
+      if (sharedLeague(params.share_token) === undefined) {
+        return unknownLink();
+      }
+      const t = visibleTournament(params.share_token, params.tournament_id);
+      if (!t) {
+        return apiError(404, "tournament_not_found", {});
+      }
+      return notRemix(t) ?? publicRemixRead(t);
     },
   ),
 

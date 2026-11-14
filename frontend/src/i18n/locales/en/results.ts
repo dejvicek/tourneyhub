@@ -89,6 +89,10 @@ export const results = {
       title: "This result is locked",
       body: "A later match already has a result. To change this one, clear that result first.",
     },
+    winner: {
+      title: "The winner is fixed",
+      body: "A later knockout round is drawn. You can correct the score while the same pair wins. To change the winner, delete the knockout rounds after this one.",
+    },
   },
   errors: {
     draw: "Draws aren't allowed here.",
@@ -101,6 +105,8 @@ export const results = {
       "A later match already has a result. Clear that result first.",
     lockedRound:
       "This round is locked because round {{round}} is drawn. Delete the newer rounds to change it.",
+    lockedWinner:
+      "The winner is fixed because a later knockout round is drawn. Correct the score, or delete the knockout rounds after this one to change the winner.",
     sidesChanged:
       "The pairs in this match changed; the screen has been refreshed.",
     seasonClosed:

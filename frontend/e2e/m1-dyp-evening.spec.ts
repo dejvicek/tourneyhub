@@ -714,7 +714,7 @@ test.describe("the share link (§5.1.8)", () => {
       const results = shared.getByRole("region", { name: "Results" });
       for (let round = 1; round <= ROUNDS; round++) {
         await expect(
-          results.getByRole("region", {
+          results.getByRole("group", {
             name: `Round ${n(round)}`,
             exact: true,
           }),

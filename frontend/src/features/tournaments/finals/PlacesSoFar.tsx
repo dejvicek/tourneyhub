@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import type { PlaceData as PlaceDetail } from "@/features/finals/api";
 
+import { pairPlaces, useGroupName } from "./placePairs";
 import { usePlaceLabel } from "./usePlaceLabel";
 
 interface PlacesSoFarProps {
@@ -17,7 +18,9 @@ export function PlacesSoFar({ rows, entryName }: PlacesSoFarProps) {
     style: "short",
     type: "unit",
   });
-  const places = [...new Set(rows.map((row) => row.place))];
+  const groupName = useGroupName(entryName);
+  const groups = pairPlaces(rows);
+  const places = [...new Set(groups.map((group) => group.place))];
   return (
     <section aria-labelledby="places-so-far" className="space-y-2">
       <h2 id="places-so-far" className="font-display text-display-section">
@@ -30,9 +33,9 @@ export function PlacesSoFar({ rows, entryName }: PlacesSoFarProps) {
       ) : (
         <ul className="space-y-1 text-body-md">
           {places.map((place) => {
-            const names = rows
-              .filter((row) => row.place === place)
-              .map((row) => entryName(row.entry_id));
+            const names = groups
+              .filter((group) => group.place === place)
+              .map((group) => groupName(group.entryIds));
             return (
               <li key={place}>
                 {t(

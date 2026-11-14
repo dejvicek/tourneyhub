@@ -123,10 +123,38 @@ export const finals = {
       "The bracket and its results are removed. The group phase is unlocked, and you choose again what comes next.",
     deleteConfirm: "Delete the knockout",
   },
+  remix: {
+    betweenTitle: "{{round}} complete",
+    drawNext: "Draw the {{name}}",
+    inProgressBody_one: "{{count}} match has no result yet.",
+    inProgressBody_other: "{{count}} matches have no result yet.",
+    deleteRound: "Delete the {{round}}",
+    deleteTitle: "Delete the {{round}}?",
+    deleteBody_one:
+      "The drawn pairs and {{count}} result are removed. The winners of the round before can be changed again.",
+    deleteBody_other:
+      "The drawn pairs and {{count}} results are removed. The winners of the round before can be changed again.",
+    deleteBodyNone:
+      "The drawn pairs are removed. The winners of the round before can be changed again.",
+    deleteBodyFirstNone:
+      "The drawn pairs are removed. This deletes the knockout and unlocks the group phase.",
+    deleteBodyFirst_one:
+      "The drawn pairs and {{count}} result are removed. This deletes the knockout and unlocks the group phase.",
+    deleteBodyFirst_other:
+      "The drawn pairs and {{count}} results are removed. This deletes the knockout and unlocks the group phase.",
+    leftNotice_one: "{{names}} no longer plays but stays in the draw",
+    leftNotice_other: "{{names}} no longer play but stay in the draw",
+    inProgressTitle: "In progress: the {{round}}",
+    winnerFixed: "Winner fixed",
+    left: "No longer playing",
+    drawnAfter: "Drawn after the {{previous}}",
+    drawnLater: "Drawn later",
+  },
   finished: {
     title: "Finished",
     winners: "Winners",
     wonFinal: "Won the final {{score}} against {{opponent}}",
+    wonFinalScore: "Won the final {{score}}",
     wonStandings: "First in the standings",
     earnsEach_one: "Both get {{count}} season point.",
     earnsEach_other: "Both get {{count}} season points.",

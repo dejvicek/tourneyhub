@@ -33,7 +33,7 @@ import { paths } from "@/lib/paths";
 import { type MonsterKnockoutMode, rules } from "@/lib/rules";
 import { cn } from "@/lib/utils";
 
-import { errorText } from "./finals/errorText";
+import { errorText, problemText } from "./finals/errorText";
 import { localDate, useRoster } from "./finals/names";
 import { Notice } from "./finals/Notice";
 import { ScreenHeader } from "./finals/ScreenHeader";
@@ -206,7 +206,8 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
       ? groupRounds
       : groupRounds.slice(-1)
     ).every((r) => r.matches.every((m) => m.outcome !== null));
-  const canDraw = roundDone && entriesCount >= (thirdPlace ? 4 : 2);
+  const canDraw =
+    plan.can_start && roundDone && entriesCount >= (thirdPlace ? 4 : 2);
   const mainCount = data.entries.filter((e) => e.stage === "main").length;
   const followers = mainCount - shown;
   const entryLabel = (seed: number): string => {
@@ -562,6 +563,11 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
           {errorText(t, drawAgain.error)}
         </p>
       )}
+      {plan.problem !== null &&
+        // The unfinished round is already said above; do not warn twice.
+        !(!roundDone && plan.problem.code === "group_phase_not_done") && (
+          <Notice tone="warning" title={problemText(t, plan.problem)} />
+        )}
       {drawKnockout.isError && (
         <p role="alert" className="text-body-sm">
           {errorText(t, drawKnockout.error)}

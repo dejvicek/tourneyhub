@@ -5,6 +5,10 @@ import { generatePath, Link } from "react-router";
 import { DocumentTitle } from "@/components/DocumentTitle";
 import { PageFallback } from "@/components/PageFallback";
 import { Badge } from "@/components/ui/badge";
+import {
+  pairPlaces,
+  useGroupName,
+} from "@/features/tournaments/finals/placePairs";
 import { qualifiersOf } from "@/features/tournaments/finals/qualifiers";
 import { RankingTable } from "@/features/tournaments/finals/RankingTable";
 import { useRouteParam } from "@/hooks/useRouteParam";
@@ -166,21 +170,23 @@ function Places({
 }) {
   const { t } = useTranslation();
   const names = useNames(players, tournament);
+  const groupName = useGroupName(names.ofEntry);
   const places = useQuery(
     publicQueries.places(shareToken, tournament.id, true),
   );
   if (places.data === undefined || places.data.rows.length === 0) {
     return null;
   }
+  const groups = pairPlaces(places.data.rows);
   return (
     <section aria-labelledby="places" className="space-y-3">
       <h2 id="places" className="font-display text-display-section">
         {t("publicView.tournament.placesHeading")}
       </h2>
       <ol className="rounded-lg border border-border-surface bg-card px-4 text-card-foreground">
-        {[...new Set(places.data.rows.map((row) => row.place))].map((place) => {
-          const group = places.data.rows.filter((row) => row.place === place);
-          const first = group[0];
+        {[...new Set(groups.map((group) => group.place))].map((place) => {
+          const inPlace = groups.filter((group) => group.place === place);
+          const first = inPlace[0]?.first;
           if (first === undefined) {
             return null;
           }
@@ -199,12 +205,12 @@ function Places({
                 {t("publicView.table.placeValue", { place })}
               </span>
               <div className="min-w-0 flex-1 space-y-1">
-                {group.map((row) => (
+                {inPlace.map((group) => (
                   <p
-                    key={row.entry_id}
+                    key={group.entryIds.join()}
                     className="text-body-md font-bold break-words"
                   >
-                    {names.ofEntry(row.entry_id)}
+                    {groupName(group.entryIds)}
                   </p>
                 ))}
               </div>
@@ -416,6 +422,20 @@ function Results({
 }) {
   const { t } = useTranslation();
   const names = useNames(players, tournament);
+  // Both phases count rounds from 1, so with a knockout each label names its
+  // phase.
+  const hasKnockout = tournament.phases.some(
+    (phase) => phase.kind === "knockout",
+  );
+  const labelOf = (round: PublicTournament["rounds"][number]): string => {
+    const kind = tournament.phases.find((p) => p.id === round.phase_id)?.kind;
+    if (!hasKnockout || kind === undefined) {
+      return t("publicView.tournament.round", { number: round.round_no });
+    }
+    return kind === "knockout"
+      ? t("publicView.tournament.knockoutRound", { number: round.round_no })
+      : t("publicView.tournament.groupRound", { number: round.round_no });
+  };
   const rounds = tournament.rounds
     .map((round) => ({
       ...round,
@@ -435,8 +455,11 @@ function Results({
         </p>
       ) : (
         rounds.map((round) => (
-          <section
+          // A group, not a landmark: the group phase and the knockout both
+          // have a "Round 1".
+          <div
             key={round.id}
+            role="group"
             aria-labelledby={round.id}
             className="space-y-2"
           >
@@ -444,7 +467,7 @@ function Results({
               id={round.id}
               className="text-body-sm font-bold text-muted-foreground"
             >
-              {t("publicView.tournament.round", { number: round.round_no })}
+              {labelOf(round)}
             </h3>
             <ul className="rounded-lg border border-border-surface bg-card px-4 text-card-foreground">
               {round.played.map((match) => {
@@ -507,7 +530,7 @@ function Results({
                 );
               })}
             </ul>
-          </section>
+          </div>
         ))
       )}
     </section>

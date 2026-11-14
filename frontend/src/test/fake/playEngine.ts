@@ -23,6 +23,7 @@ import type {
   TournamentStandingRow,
 } from "./contract";
 import { fillFields, gameDifference } from "./engine";
+import { isRemix, remixRoundCount } from "./remixEngine";
 import type { StoredTournament } from "./seed";
 import { tournamentStandings } from "./store";
 
@@ -312,8 +313,10 @@ export function formatOf(t: StoredTournament, match: MatchRead): MatchFormat {
   }
   if (phase.kind === "knockout" && phase.final_match_format !== null) {
     const rounds = t.rounds.filter((r) => r.phase_id === phase.id);
-    const last = rounds.at(-1);
-    if (last?.id === match.round_id && match.kind === "standard") {
+    const round = rounds.find((r) => r.id === match.round_id);
+    // A Lord have mercy knockout draws its rounds one at a time (BR-140).
+    const finalNo = isRemix(t) ? remixRoundCount(t) : rounds.at(-1)?.round_no;
+    if (round?.round_no === finalNo && match.kind === "standard") {
       return phase.final_match_format;
     }
   }
@@ -420,7 +423,7 @@ export function checkResult(
 type Outcome = NonNullable<MatchRead["outcome"]>;
 
 /** The outcome a checked result makes: the walkover's winner, else the games' majority. */
-function outcomeOf(body: ResultWrite): Outcome {
+export function outcomeOf(body: ResultWrite): Outcome {
   if (body.walkover_winner !== null) {
     return body.walkover_winner;
   }
