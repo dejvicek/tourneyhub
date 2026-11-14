@@ -438,7 +438,7 @@ describe("Knockout in Lord have mercy (screen 9, BR-155)", () => {
       within(rounds).getByRole("group", { name: "Semifinals" }),
     ).toBeInTheDocument();
     expect(
-      within(rounds).getByText("Drawn after the Semifinals"),
+      within(rounds).getByText("Drawn after the semifinals"),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { level: 1, name: "Knockout" }),
@@ -482,6 +482,28 @@ describe("Knockout in Lord have mercy (screen 9, BR-155)", () => {
     expect(
       screen.queryByRole("button", { name: /^Draw the/ }),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows the new round on a phone after a draw, even if another was picked (BR-140)", async () => {
+    const user = userEvent.setup();
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    renderAt(knockoutPath(), queryClient);
+
+    const rounds = await screen.findByRole("radiogroup", {
+      name: "Rounds of the knockout",
+    });
+    await user.click(within(rounds).getByRole("radio", { name: "Semifinals" }));
+    await finishNewestRound();
+    await queryClient.invalidateQueries(
+      finalsQueries.knockoutRounds(TEST_LEAGUE_ID, LHM),
+    );
+    await user.click(
+      await screen.findByRole("button", { name: "Draw the final" }),
+    );
+
+    expect(await screen.findByRole("radio", { name: "Final" })).toBeChecked();
   });
 
   it("draws the next round in Czech with Czech plurals (BR-140)", async () => {

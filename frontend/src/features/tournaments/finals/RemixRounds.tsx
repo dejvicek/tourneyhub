@@ -72,10 +72,10 @@ function RoundPicker({ knockout, ctx }: Props) {
 
 /**
  * Tablet and desktop: the drawn rounds side by side, then the rounds not
- * drawn yet as muted columns (ruling 5).
+ * drawn yet as muted columns (BR-155).
  */
 function RoundColumns({ knockout, ctx }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const undrawn = Array.from(
     { length: Math.max(0, knockout.round_count - knockout.rounds.length) },
     (_, offset) => {
@@ -122,7 +122,9 @@ function RoundColumns({ knockout, ctx }: Props) {
                 {previous === null
                   ? t("finals.remix.drawnLater")
                   : t("finals.remix.drawnAfter", {
-                      previous: t(`finals.roundName.${previous}`),
+                      previous: t(
+                        `finals.roundName.${previous}`,
+                      ).toLocaleLowerCase(i18n.resolvedLanguage),
                     })}
               </p>
             </div>
@@ -137,7 +139,8 @@ function RoundColumns({ knockout, ctx }: Props) {
 export function RemixRounds({ knockout, ctx }: Props) {
   const layout = useLayout();
   return layout === "phone" ? (
-    <RoundPicker knockout={knockout} ctx={ctx} />
+    // A new round resets the picked one, so the newest shows after a draw.
+    <RoundPicker key={knockout.rounds.length} knockout={knockout} ctx={ctx} />
   ) : (
     <RoundColumns knockout={knockout} ctx={ctx} />
   );
