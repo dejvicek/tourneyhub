@@ -4,7 +4,7 @@ import { http, HttpResponse } from "msw";
 import { generatePath } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { provisionalApi } from "@/api/provisional";
+import { api } from "@/api/client";
 import { axeViolations } from "@/features/auth/axeCheck";
 import { publicQueries } from "@/features/public/api";
 import { i18n } from "@/i18n";
@@ -166,7 +166,7 @@ describe("share-link views", () => {
     if (monster === undefined) {
       throw new Error("The seed has a Monster DYP");
     }
-    const { data: expected = [] } = await provisionalApi.GET(
+    const { data: expected = [] } = await api.GET(
       "/api/v1/public/{share_token}/tournaments/{tournament_id}/standings",
       {
         params: {

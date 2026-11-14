@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import { api, ApiError, dataOf } from "@/api/client";
-import { provisionalApi } from "@/api/provisional";
 import { rules } from "@/lib/rules";
 
 import {
@@ -30,9 +29,9 @@ const base = (tournamentId: string) => ({
 const root = "/api/v1/leagues/{league_id}/tournaments/{tournament_id}";
 
 const bracket = (id: string) =>
-  dataOf(provisionalApi.GET(`${root}/bracket`, { params: { path: base(id) } }));
+  dataOf(api.GET(`${root}/bracket`, { params: { path: base(id) } }));
 const places = (id: string) =>
-  dataOf(provisionalApi.GET(`${root}/places`, { params: { path: base(id) } }));
+  dataOf(api.GET(`${root}/places`, { params: { path: base(id) } }));
 
 /** Enters a result for every match that can be played, until none is left. */
 async function playOut(id: string): Promise<void> {
@@ -52,7 +51,7 @@ async function playOut(id: string): Promise<void> {
               { winner: "side_1" as const, score_1: 10, score_2: 4 },
             ];
       await dataOf(
-        provisionalApi.PUT(`${root}/matches/{match_id}/result`, {
+        api.PUT(`${root}/matches/{match_id}/result`, {
           params: { path: { ...base(id), match_id: match.match_id } },
           body: { walkover_winner: null, games },
         }),
@@ -199,7 +198,7 @@ describe("the finals in the fake API", () => {
       );
     }
     const tournament = await dataOf(
-      provisionalApi.GET(root, { params: { path: base(MONSTER) } }),
+      api.GET(root, { params: { path: base(MONSTER) } }),
     );
 
     await expect(
@@ -256,7 +255,7 @@ describe("the finals in the fake API", () => {
       const first = (await tournamentOf(id)).rounds[0];
       for (const match of first?.matches ?? []) {
         await dataOf(
-          provisionalApi.PUT(`${root}/matches/{match_id}/result`, {
+          api.PUT(`${root}/matches/{match_id}/result`, {
             params: { path: { ...base(id), match_id: match.id } },
             body: {
               walkover_winner: null,
@@ -338,7 +337,7 @@ describe("the finals in the fake API", () => {
 
   it("deletes only the newest round, by its id (BR-066)", async () => {
     const tournament = await dataOf(
-      provisionalApi.GET(root, { params: { path: base(SWISS) } }),
+      api.GET(root, { params: { path: base(SWISS) } }),
     );
     const [first, , third] = tournament.rounds;
     const remove = (roundId: string) =>
@@ -415,13 +414,13 @@ describe("the finals in the fake API", () => {
         code: "entry_not_found",
       });
       await dataOf(
-        provisionalApi.PUT(`${root}/knockout`, {
+        api.PUT(`${root}/knockout`, {
           params: { path: base(MONSTER) },
           body: { ...KNOCKOUT, mode: "singles" },
         }),
       );
       const tournament = await dataOf(
-        provisionalApi.GET(root, { params: { path: base(MONSTER) } }),
+        api.GET(root, { params: { path: base(MONSTER) } }),
       );
       const knockoutEntry = tournament.entries.find(
         (e) => e.stage === "knockout",
@@ -451,7 +450,7 @@ describe("the finals in the fake API", () => {
       ).rejects.toMatchObject({ status: 422, code: "disable_not_allowed" });
       const entryId = await firstEntry(MONSTER);
       await dataOf(
-        provisionalApi.PUT(`${root}/knockout`, {
+        api.PUT(`${root}/knockout`, {
           params: { path: base(MONSTER) },
           body: { ...KNOCKOUT, mode: "singles" },
         }),
@@ -477,7 +476,7 @@ describe("the finals in the fake API", () => {
     it("allows it during the Lord have mercy knockout", async () => {
       const entryId = await firstEntry(MONSTER);
       await dataOf(
-        provisionalApi.PUT(`${root}/knockout`, {
+        api.PUT(`${root}/knockout`, {
           params: { path: base(MONSTER) },
           body: {
             ...KNOCKOUT,
@@ -667,7 +666,7 @@ describe("the finals in the fake API", () => {
       it("previews and draws it (FR-045, BR-081–BR-084)", async () => {
         const paired = mode !== "singles";
         const preview = await dataOf(
-          provisionalApi.GET(`${root}/knockout/preview`, {
+          api.GET(`${root}/knockout/preview`, {
             params: {
               path: base(MONSTER),
               query: { qualifiers: 8, third_place_match: false, mode },
@@ -709,7 +708,7 @@ describe("the finals in the fake API", () => {
         }
 
         await dataOf(
-          provisionalApi.PUT(`${root}/knockout`, {
+          api.PUT(`${root}/knockout`, {
             params: { path: base(MONSTER) },
             body: { ...KNOCKOUT, third_place_match: true, mode },
           }),
@@ -726,7 +725,7 @@ describe("the finals in the fake API", () => {
         expect(drawn.size).toBe(paired ? 4 : 8);
         expect(drawn.third_place_match).toBe(true);
         const tournament = await dataOf(
-          provisionalApi.GET(root, { params: { path: base(MONSTER) } }),
+          api.GET(root, { params: { path: base(MONSTER) } }),
         );
         expect(tournament.phases.at(-1)).toMatchObject({
           kind: "knockout",
@@ -739,19 +738,19 @@ describe("the finals in the fake API", () => {
 
   it("deletes the knockout and unlocks the group phase (FR-046, BR-087)", async () => {
     const drawn = await dataOf(
-      provisionalApi.PUT(`${root}/knockout`, {
+      api.PUT(`${root}/knockout`, {
         params: { path: base(MONSTER) },
         body: { ...KNOCKOUT, mode: "singles" },
       }),
     );
     const phaseId = drawn.phases.find((p) => p.kind === "knockout")?.id ?? "";
     await dataOf(
-      provisionalApi.DELETE(`${root}/phases/{phase_id}`, {
+      api.DELETE(`${root}/phases/{phase_id}`, {
         params: { path: { ...base(MONSTER), phase_id: phaseId } },
       }),
     );
     const tournament = await dataOf(
-      provisionalApi.GET(root, { params: { path: base(MONSTER) } }),
+      api.GET(root, { params: { path: base(MONSTER) } }),
     );
     expect(tournament.phases.some((p) => p.kind === "knockout")).toBe(false);
     expect(tournament.entries.some((e) => e.stage === "knockout")).toBe(false);
@@ -779,7 +778,7 @@ describe("the Lord have mercy knockout in the fake API", () => {
   /** BR-084: 8 qualifiers make 4 pairs, so 2 semifinals, then the final and the third-place match. */
   const startRemix = () =>
     dataOf(
-      provisionalApi.PUT(`${root}/knockout`, {
+      api.PUT(`${root}/knockout`, {
         params: { path: remixBase },
         body: {
           ...KNOCKOUT,
@@ -807,7 +806,7 @@ describe("the Lord have mercy knockout in the fake API", () => {
     score = 10,
   ) =>
     dataOf(
-      provisionalApi.PUT(`${root}/matches/{match_id}/result`, {
+      api.PUT(`${root}/matches/{match_id}/result`, {
         params: { path: resultPath(matchId) },
         body: {
           walkover_winner: null,
@@ -821,7 +820,7 @@ describe("the Lord have mercy knockout in the fake API", () => {
     );
   const clear = (matchId: string) =>
     dataOf(
-      provisionalApi.PUT(`${root}/matches/{match_id}/result`, {
+      api.PUT(`${root}/matches/{match_id}/result`, {
         params: { path: resultPath(matchId) },
         body: { walkover_winner: null, games: [] },
       }),
@@ -979,7 +978,7 @@ describe("the Lord have mercy knockout in the fake API", () => {
       code: "knockout_not_found",
     });
     const tournament = await dataOf(
-      provisionalApi.GET(root, { params: { path: remixBase } }),
+      api.GET(root, { params: { path: remixBase } }),
     );
     expect(tournament.phases.some((p) => p.kind === "knockout")).toBe(false);
     expect(tournament.state).toBe("in_progress");
@@ -991,8 +990,7 @@ describe("the Lord have mercy knockout in the fake API", () => {
     const drawn = await drawRound(2);
     const [final, third] = drawn.rounds[1]?.matches ?? [];
     const state = async () =>
-      (await dataOf(provisionalApi.GET(root, { params: { path: remixBase } })))
-        .state;
+      (await dataOf(api.GET(root, { params: { path: remixBase } }))).state;
     await enter(final?.match_id ?? "");
     expect(await state()).toBe("in_progress");
     await enter(third?.match_id ?? "");
@@ -1023,7 +1021,7 @@ describe("the Lord have mercy knockout in the fake API", () => {
     const result = await places(MONSTER);
     expect(result.complete).toBe(true);
     const tournament = await dataOf(
-      provisionalApi.GET(root, { params: { path: remixBase } }),
+      api.GET(root, { params: { path: remixBase } }),
     );
     const main = tournament.entries.filter((e) => e.stage === "main");
     // One row per player, not per pair.
@@ -1064,7 +1062,7 @@ describe("the Lord have mercy knockout in the fake API", () => {
     await expect(bracket(MONSTER)).rejects.toMatchObject(expected);
     await expect(
       dataOf(
-        provisionalApi.GET(
+        api.GET(
           "/api/v1/public/{share_token}/tournaments/{tournament_id}/bracket",
           {
             params: {
@@ -1085,7 +1083,7 @@ describe("the Lord have mercy knockout in the fake API", () => {
       code: "knockout_not_found",
     });
     await dataOf(
-      provisionalApi.PUT(`${root}/knockout`, {
+      api.PUT(`${root}/knockout`, {
         params: { path: remixBase },
         body: { ...KNOCKOUT, mode: "seeded_pairs" },
       }),
@@ -1119,7 +1117,7 @@ describe("the Lord have mercy knockout in the fake API", () => {
     /** Starts 4 pairs without a third-place match, so the semifinal losers are knocked out. */
     const startPlain = () =>
       dataOf(
-        provisionalApi.PUT(`${root}/knockout`, {
+        api.PUT(`${root}/knockout`, {
           params: { path: remixBase },
           body: { ...KNOCKOUT, mode: "lord_have_mercy" },
         }),
@@ -1310,7 +1308,7 @@ describe("the Lord have mercy knockout in the fake API", () => {
       const result = await places(MONSTER);
 
       const main = (
-        await dataOf(provisionalApi.GET(root, { params: { path: remixBase } }))
+        await dataOf(api.GET(root, { params: { path: remixBase } }))
       ).entries.filter((e) => e.stage === "main");
       expect(result.rows).toHaveLength(main.length);
       const byEntry = new Map(result.rows.map((r) => [r.entry_id, r]));

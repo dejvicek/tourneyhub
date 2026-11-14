@@ -448,6 +448,15 @@ export default defineConfig([
     },
   },
   {
+    // These tests read what the fake API holds straight through `api`.
+    files: [
+      "src/features/fields/fields.test.tsx",
+      "src/features/public/public.test.tsx",
+      "src/features/tournaments/finals/finals.test.tsx",
+    ],
+    rules: { "no-restricted-imports": restrictImports(demoFromTests) },
+  },
+  {
     // The fake API, its tests and its helper call the API through the clients.
     files: ["src/test/fake/**/*.ts", "src/test/setupTestHelpers.ts"],
     rules: { "no-restricted-imports": restrictImports(demoFromTests) },

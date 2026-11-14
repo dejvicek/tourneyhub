@@ -6,7 +6,7 @@ import { delay, http, HttpResponse } from "msw";
 import { generatePath } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { provisionalApi } from "@/api/provisional";
+import { api } from "@/api/client";
 import { finalsMutations, finalsQueries } from "@/features/finals/api";
 import { resultMutations } from "@/features/results/api";
 import { shortName } from "@/features/tournaments/finals/names";
@@ -42,11 +42,11 @@ const ids = (tournamentId: string) => ({
 
 /** Plays the DYP evening's final, so that the tournament finishes (FR-037). */
 async function playFinal(tournamentId: string): Promise<void> {
-  const bracket = await provisionalApi.GET(`${root}/bracket`, {
+  const bracket = await api.GET(`${root}/bracket`, {
     params: { path: ids(tournamentId) },
   });
   const final = bracket.data?.rounds.at(-1)?.matches[0];
-  const saved = await provisionalApi.PUT(`${root}/matches/{match_id}/result`, {
+  const saved = await api.PUT(`${root}/matches/{match_id}/result`, {
     params: {
       path: { ...ids(tournamentId), match_id: final?.match_id ?? "" },
     },
@@ -1183,7 +1183,7 @@ describe("Changing a knockout result (FR-053, BR-094)", () => {
 
   it("refuses the change when the sheet is opened on a locked match", async () => {
     await playFinal(DYP_EVENING);
-    const bracket = await provisionalApi.GET(`${root}/bracket`, {
+    const bracket = await api.GET(`${root}/bracket`, {
       params: { path: ids(DYP_EVENING) },
     });
     const semifinal = bracket.data?.rounds[0]?.matches[0];
@@ -1202,20 +1202,17 @@ describe("Changing a knockout result (FR-053, BR-094)", () => {
     expect(
       within(sheet).queryByRole("button", { name: "Clear result" }),
     ).not.toBeInTheDocument();
-    const refused = await provisionalApi.PUT(
-      `${root}/matches/{match_id}/result`,
-      {
-        params: {
-          path: { ...ids(DYP_EVENING), match_id: semifinal?.match_id ?? "" },
-        },
-        body: { walkover_winner: null, games: [] },
+    const refused = await api.PUT(`${root}/matches/{match_id}/result`, {
+      params: {
+        path: { ...ids(DYP_EVENING), match_id: semifinal?.match_id ?? "" },
       },
-    );
+      body: { walkover_winner: null, games: [] },
+    });
     expect(refused.response.status).toBe(422);
   });
 
   it("shows the bracket's seeds in the result sheet, not the setup's (D14)", async () => {
-    const bracket = await provisionalApi.GET(`${root}/bracket`, {
+    const bracket = await api.GET(`${root}/bracket`, {
       params: { path: ids(DYP_EVENING) },
     });
     const semifinal = bracket.data?.rounds[0]?.matches[0];
@@ -1238,13 +1235,13 @@ describe("Changing a knockout result (FR-053, BR-094)", () => {
 
 describe("The sides a result names (ADR-008, BR-094)", () => {
   it("is refused by the fake API when the entries are not the ones on the match", async () => {
-    const bracket = await provisionalApi.GET(`${root}/bracket`, {
+    const bracket = await api.GET(`${root}/bracket`, {
       params: { path: ids(DYP_EVENING) },
     });
     const final = bracket.data?.rounds.at(-1)?.matches[0];
     const [one, two] = final?.sides ?? [];
     const put = (expected: [string, string]) =>
-      provisionalApi.PUT(`${root}/matches/{match_id}/result`, {
+      api.PUT(`${root}/matches/{match_id}/result`, {
         params: {
           path: { ...ids(DYP_EVENING), match_id: final?.match_id ?? "" },
         },
@@ -1268,7 +1265,7 @@ describe("The sides a result names (ADR-008, BR-094)", () => {
 
 describe("Lots in the bracket (BR-074, ADR-009)", () => {
   it("marks the seeds a lot decided", async () => {
-    const real = await provisionalApi.GET(`${root}/bracket`, {
+    const real = await api.GET(`${root}/bracket`, {
       params: { path: ids(DYP_EVENING) },
     });
     const bracket = structuredClone(real.data);
@@ -1771,18 +1768,15 @@ async function monsterOfNine(): Promise<string> {
 async function playAllMatches(tournamentId: string): Promise<void> {
   const tournament = await tournamentOf(tournamentId);
   for (const match of tournament.rounds.flatMap((round) => round.matches)) {
-    const saved = await provisionalApi.PUT(
-      `${root}/matches/{match_id}/result`,
-      {
-        params: {
-          path: { ...ids(tournamentId), match_id: match.id },
-        },
-        body: {
-          walkover_winner: null,
-          games: [{ winner: "side_1", score_1: 10, score_2: 3 }],
-        },
+    const saved = await api.PUT(`${root}/matches/{match_id}/result`, {
+      params: {
+        path: { ...ids(tournamentId), match_id: match.id },
       },
-    );
+      body: {
+        walkover_winner: null,
+        games: [{ winner: "side_1", score_1: 10, score_2: 3 }],
+      },
+    });
     expect(saved.response.ok).toBe(true);
   }
 }
@@ -1798,12 +1792,9 @@ describe("Monster DYP between rounds on the real response shapes (screen 11)", (
     const sitter = tournament.entries.find(
       (e) => e.id === round?.sitting_out[0],
     );
-    const players = await provisionalApi.GET(
-      "/api/v1/leagues/{league_id}/players",
-      {
-        params: { path: { league_id: TEST_LEAGUE_ID } },
-      },
-    );
+    const players = await api.GET("/api/v1/leagues/{league_id}/players", {
+      params: { path: { league_id: TEST_LEAGUE_ID } },
+    });
     const full = players.data?.find(
       (p) => p.id === sitter?.player_ids[0],
     )?.name;
@@ -2335,7 +2326,7 @@ describe("Start the knockout (screen 13)", () => {
     await user.click(screen.getByRole("button", { name: "Draw the knockout" }));
     await screen.findByText("Semifinal 1");
 
-    const tournament = await provisionalApi.GET(root, {
+    const tournament = await api.GET(root, {
       params: { path: ids(ROUND_ROBIN_DONE) },
     });
     expect(
@@ -2361,7 +2352,7 @@ describe("Start the knockout (screen 13)", () => {
     );
     await screen.findByText("Semifinal 1");
 
-    const preview = await provisionalApi.GET(`${root}/knockout/preview`, {
+    const preview = await api.GET(`${root}/knockout/preview`, {
       params: {
         path: ids(ROUND_ROBIN_DONE),
         query: { qualifiers: 4, third_place_match: false },

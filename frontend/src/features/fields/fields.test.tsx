@@ -2,7 +2,7 @@ import { configure, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { provisionalApi } from "@/api/provisional";
+import { api } from "@/api/client";
 import { i18n } from "@/i18n";
 import { TEST_LEAGUE_ID } from "@/test/fake/ids";
 import { onField, paths, playPath, runningDyp } from "@/test/play";
@@ -94,7 +94,7 @@ describe("fields (screens 6b–6d)", () => {
     // A third, free field.
     const t = runningDyp();
     t.fields.push({ id: "field-3", number: 3, match_id: null });
-    const { data: play } = await provisionalApi.GET(
+    const { data: play } = await api.GET(
       "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/play",
       { params: { path: { league_id: TEST_LEAGUE_ID, tournament_id: t.id } } },
     );
@@ -109,7 +109,7 @@ describe("fields (screens 6b–6d)", () => {
     ).toBeDisabled();
 
     // The fake API refuses it too.
-    const response = await provisionalApi.PUT(
+    const response = await api.PUT(
       "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/fields/placements",
       {
         params: { path: { league_id: TEST_LEAGUE_ID, tournament_id: t.id } },
@@ -140,7 +140,7 @@ describe("fields (screens 6b–6d)", () => {
       "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/fields/placements";
 
     // The screen saw the match waiting, but it is on Field 1.
-    const stale = await provisionalApi.PUT(url, {
+    const stale = await api.PUT(url, {
       params: { path },
       body: {
         placements: [
@@ -156,7 +156,7 @@ describe("fields (screens 6b–6d)", () => {
     expect(stale.error?.code).toBe("placement_changed");
 
     // Two matches on fields that do not swap with each other.
-    const rotation = await provisionalApi.PUT(url, {
+    const rotation = await api.PUT(url, {
       params: { path },
       body: {
         placements: [
