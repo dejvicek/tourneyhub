@@ -478,7 +478,14 @@ describe("share-link views outside demo mode", () => {
       expect(screen.getAllByText("No longer playing")).toHaveLength(1);
     });
 
-    it("never asks for the bracket (review focus 1)", async () => {
+    it("has no axe violations (BR-155)", async () => {
+      renderAt(pageOf("Lord have mercy night"));
+
+      await screen.findByRole("radiogroup", { name: "Rounds of the knockout" });
+      expect(await axeViolations()).toEqual([]);
+    });
+
+    it("never asks for the bracket (BR-155)", async () => {
       server.use(
         http.get("*/api/v1/public/:token/tournaments/:id/bracket", () =>
           HttpResponse.json({ code: "internal_error" }, { status: 500 }),

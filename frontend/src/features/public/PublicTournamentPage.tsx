@@ -441,8 +441,11 @@ function Results({
         </p>
       ) : (
         rounds.map((round) => (
-          <section
+          // A group, not a landmark: the group phase and the knockout both
+          // have a "Round 1".
+          <div
             key={round.id}
+            role="group"
             aria-labelledby={round.id}
             className="space-y-2"
           >
@@ -513,7 +516,7 @@ function Results({
                 );
               })}
             </ul>
-          </section>
+          </div>
         ))
       )}
     </section>
