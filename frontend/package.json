@@ -10,7 +10,6 @@
   "scripts": {
     "generate:api": "openapi-typescript ../backend/openapi.json --output src/api/schema.d.ts",
     "dev": "pnpm run generate:api && vite",
-    "dev:demo": "pnpm run generate:api && vite --mode demo",
     "build": "pnpm run generate:api && tsc --build && vite build",
     "preview": "vite preview",
     "typecheck": "pnpm run generate:api && tsc --build --noEmit . e2e",

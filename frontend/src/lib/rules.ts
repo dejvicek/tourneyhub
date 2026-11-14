@@ -6,8 +6,6 @@
 // The engine in the backend decides the real behaviour; these values only
 // keep the demo and the screens consistent until it does.
 
-export const RULES_ISSUE = "https://github.com/dejvicek/tourneyhub/issues/24";
-
 /** BR-051: the order in which round-robin rounds are played. */
 export type RoundRobinOrder =
   /** PRD: unspecified; the demo plays the circle method's rounds in order. */
@@ -16,7 +14,7 @@ export type RoundRobinOrder =
   | "top_seeds_last";
 
 /** BR-058, BR-063: who sits out when the entries do not divide evenly. */
-export type SitOutRule =
+type SitOutRule =
   /** PRD: fewest sit-outs first, then the lowest placed (Swiss) or by lot (Monster DYP). */
   | "fewest_sit_outs"
   /** Issue #24: the same, and never twice in a row while it can be avoided. */
@@ -28,7 +26,7 @@ export type RoundRobinTiebreaker =
 export type SwissTiebreaker = "bh1" | "bh2" | "score_difference";
 
 /** BR-092: when the score of every game is required. */
-export type GameScoreRequirement =
+type GameScoreRequirement =
   /** PRD: every game of a Swiss or Monster DYP round, except walkovers. */
   | "swiss_and_monster_dyp"
   /** Issue #24: only when score difference is an enabled tie-breaker. */
@@ -45,7 +43,7 @@ export const MONSTER_KNOCKOUT_MODES = [
 ] as const;
 export type MonsterKnockoutMode = (typeof MONSTER_KNOCKOUT_MODES)[number];
 
-export interface Rules {
+interface Rules {
   roundRobinOrder: RoundRobinOrder;
   sitOuts: SitOutRule;
   topPlayersSitOutExempt: boolean;

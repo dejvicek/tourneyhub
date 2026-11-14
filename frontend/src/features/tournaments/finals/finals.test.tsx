@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { delay, http, HttpResponse } from "msw";
 import { generatePath } from "react-router";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { api } from "@/api/client";
 import { finalsMutations, finalsQueries } from "@/features/finals/api";
@@ -80,19 +80,9 @@ async function violations(): Promise<string[]> {
 
 beforeEach(async () => {
   await i18n.changeLanguage("en");
-  // These screens read provisional routes, which only the demo serves.
-  vi.stubEnv("VITE_DEMO", "true");
 });
 
-afterEach(() => {
-  vi.unstubAllEnvs();
-});
-
-describe("outside demo mode, where the backend serves the season routes (P10a)", () => {
-  beforeEach(() => {
-    vi.stubEnv("VITE_DEMO", "");
-  });
-
+describe("where the backend serves the season routes (P10a)", () => {
   /** The paths of every request the page makes while it settles. */
   function requested(): string[] {
     const urls: string[] = [];
