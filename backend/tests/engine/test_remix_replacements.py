@@ -572,7 +572,16 @@ def semifinals_with(*replacements: Replacement) -> list[RemixMatch]:
                 match(2, 2, (2, 9), (11, 3), replacements=[came_in(3, 12)]),
             ],
             "not knocked out",
-            id="BR-153-still-in",
+            id="BR-153-replaced-in-the-same-round",
+        ),
+        pytest.param(
+            [
+                *QUARTERFINALS,
+                match(2, 1, (1, 9), (4, 10), replacements=[came_in(9, 3)]),
+                match(2, 2, (2, 11), (12, 5)),
+            ],
+            "not knocked out",
+            id="BR-147-a-winner-of-the-round-before",
         ),
         pytest.param(
             [
@@ -626,6 +635,16 @@ def test_br153_remix_state_refuses_a_replaced_player_coming_in_later() -> None:
 
     with pytest.raises(ValueError, match="not knocked out"):
         state_of([*QUARTERFINALS, *semifinals, *final], third_place_match=False)
+
+
+def test_br147_remix_state_refuses_a_waiting_semifinal_loser_as_a_replacement() -> None:
+    final = [
+        match(3, 1, (1, 6), (4, 9), replacements=[came_in(4, 2)]),
+        match(3, 1, (10, 11), (12, 7), third=True, replacements=[came_in(7, 4)]),
+    ]
+
+    with pytest.raises(ValueError, match="not knocked out"):
+        state_of([*QUARTERFINALS, *SEMIFINALS, *final])
 
 
 def test_br148_remix_state_refuses_a_third_place_replacement_from_the_final_pool() -> (
