@@ -33,8 +33,4 @@ export const common: CsMessages<typeof reference> = {
   },
   close: "Zavřít",
   loading: "Načítání…",
-  demo: {
-    notice:
-      "Ukázkový režim: data jsou smyšlená a po novém načtení začínají znovu.",
-  },
 };

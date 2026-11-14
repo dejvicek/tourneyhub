@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, Outlet } from "react-router";
 
-import { DemoNotice } from "@/components/DemoNotice";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
 
 /**
@@ -30,7 +29,6 @@ export function AppShell({ account }: { account?: ReactNode }) {
         </div>
       </header>
       <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-4 py-6">
-        <DemoNotice />
         <Outlet />
       </main>
     </div>

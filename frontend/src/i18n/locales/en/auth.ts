@@ -11,8 +11,6 @@ export const auth = {
     wrong: "The email or password is wrong.",
     noAccount: "No account yet?",
     signUp: "Sign up with the sign-up code",
-    demoTitle: "Demo account",
-    demoFill: "Fill in the demo account",
   },
   signUp: {
     title: "Sign up",
@@ -26,7 +24,6 @@ export const auth = {
     submitting: "Creating the account…",
     haveAccount: "Already have an account?",
     logIn: "Log in",
-    demoCode: "In the demo the sign-up code is {{code}}.",
   },
   changePassword: {
     title: "Change your password",

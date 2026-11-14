@@ -1,11 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type SubmitEvent, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router";
 
 import { DocumentTitle } from "@/components/DocumentTitle";
 import { Button } from "@/components/ui/button";
-import { isDemoMode } from "@/lib/demoMode";
 import { paths } from "@/lib/paths";
 
 import { authMutations, authQueries } from "./api";
@@ -84,14 +83,6 @@ export function LoginPage() {
   return (
     <AuthLayout title={t("auth.login.title")} lead={t("auth.login.lead")}>
       <DocumentTitle screen={t("auth.login.title")} />
-      {isDemoMode(import.meta.env) && (
-        <DemoAccount
-          onFill={(account) => {
-            setEmail(account.email);
-            setPassword(account.password);
-          }}
-        />
-      )}
       <form noValidate onSubmit={submit} className="space-y-4">
         <FormField
           label={t("auth.login.email")}
@@ -146,45 +137,5 @@ export function LoginPage() {
         </Link>
       </p>
     </AuthLayout>
-  );
-}
-
-/** Demo mode only: the seeded account, from the demo's fake API. */
-function DemoAccount({
-  onFill,
-}: {
-  onFill: (account: { email: string; password: string }) => void;
-}) {
-  const { t } = useTranslation();
-  const account = useQuery(authQueries.demoAccount());
-
-  if (account.data === undefined) {
-    return null;
-  }
-  const { email, password } = account.data;
-  return (
-    <section
-      aria-labelledby="demo-account"
-      className="space-y-2 rounded-lg bg-notice-info px-4 py-3.5 text-notice-info-foreground"
-    >
-      <h2 id="demo-account" className="text-body-md font-bold">
-        {t("auth.login.demoTitle")}
-      </h2>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-body-sm">
-        <dt className="font-bold">{t("auth.login.email")}</dt>
-        <dd className="min-w-0 break-words">{email}</dd>
-        <dt className="font-bold">{t("auth.login.password")}</dt>
-        <dd className="min-w-0 break-words">{password}</dd>
-      </dl>
-      <Button
-        type="button"
-        variant="outline"
-        onClick={() => {
-          onFill({ email, password });
-        }}
-      >
-        {t("auth.login.demoFill")}
-      </Button>
-    </section>
   );
 }
