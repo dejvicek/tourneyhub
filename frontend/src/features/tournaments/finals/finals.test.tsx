@@ -758,7 +758,7 @@ describe("Knockout in Lord have mercy (screen 9, BR-155)", () => {
     });
     server.use(
       http.get("/api/v1/*", async ({ request }) => {
-        if (!new URL(request.url).pathname.endsWith(`/tournaments/${LHM}`)) {
+        if (!new URL(request.url).pathname.endsWith(LHM)) {
           await gate;
         }
       }),
