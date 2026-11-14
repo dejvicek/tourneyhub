@@ -7,13 +7,13 @@ import {
 } from "@tanstack/react-query";
 
 import { api, dataOf } from "@/api/client";
-import { provisionalApi } from "@/api/provisional";
-import type { LateEntryWrite } from "@/api/provisionalTypes";
 import type { components } from "@/api/schema";
 import { tournamentQueries } from "@/features/tournaments/api";
 import type { MonsterKnockoutMode } from "@/lib/rules";
 
 type DisabledWrite = components["schemas"]["DisabledWrite"];
+
+type LateEntryWrite = components["schemas"]["LateEntryWrite"];
 
 type KnockoutWrite = components["schemas"]["KnockoutWrite"];
 type KnockoutDrawWrite = components["schemas"]["KnockoutDrawWrite"];
@@ -256,7 +256,7 @@ export const finalsMutations = {
       scope: scope(leagueId),
       mutationFn: (body: LateEntryWrite) =>
         dataOf(
-          provisionalApi.POST(
+          api.POST(
             "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/entries",
             { params: { path: pathOf(leagueId, tournamentId).path }, body },
           ),

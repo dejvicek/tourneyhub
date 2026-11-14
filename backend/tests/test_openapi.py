@@ -27,6 +27,7 @@ def test_main_prints_a_schema_with_function_names_as_operation_ids(
         "set_signup_code",
         "change_password",
         "add_field",
+        "add_late_entry",
         "add_player",
         "add_round",
         "back_to_setup",

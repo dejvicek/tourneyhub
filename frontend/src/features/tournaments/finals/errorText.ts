@@ -7,7 +7,7 @@ type KnockoutProblemRead = components["schemas"]["KnockoutProblemRead"];
 
 /**
  * The refusals of the knockout's and the Swiss rounds' writes with a text of
- * their own (ADR-008; FR-040, FR-043, FR-046, BR-065, BR-066).
+ * their own (ADR-008; FR-040, FR-043, FR-046, FR-047, BR-065, BR-066).
  */
 const CODE_TEXTS = {
   group_phase_not_done: "finals.errors.groupNotDone",
@@ -26,6 +26,8 @@ const CODE_TEXTS = {
   group_phase_locked: "finals.errors.groupPhaseLocked",
   knockout_mode_required: "finals.errors.modeRequired",
   qualifiers_odd: "finals.errors.qualifiersOdd",
+  late_entry_not_allowed: "finals.errors.lateEntryNotAllowed",
+  player_already_in_tournament: "finals.errors.playerAlreadyInTournament",
 } as const satisfies Partial<Record<ErrorCode, string>>;
 
 function hasText(code: ErrorCode | undefined): code is keyof typeof CODE_TEXTS {

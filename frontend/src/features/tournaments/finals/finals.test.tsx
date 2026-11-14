@@ -1890,6 +1890,27 @@ describe("Late and disabled players (screen 12)", () => {
     expect(shown.map((name) => name.textContent)).toEqual(czechOrder);
   });
 
+  it.each(["dyp", "doubles"] as const)(
+    "offers no late player in a %s Swiss, but still disabling (BR-067)",
+    async (type) => {
+      const swiss = db().tournaments.find((t) => t.id === SWISS);
+      if (swiss) {
+        swiss.type = type;
+      }
+      renderAt(at(paths.lateAndDisabled, SWISS));
+
+      expect(
+        await screen.findByText("This tournament takes no late players."),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Add a late player" }),
+      ).not.toBeInTheDocument();
+      expect(
+        (await screen.findAllByRole("button", { name: /^Disable / })).length,
+      ).toBeGreaterThan(0);
+    },
+  );
+
   it("has no axe violations", async () => {
     renderAt(at(paths.lateAndDisabled, MONSTER));
     await screen.findByRole("heading", { name: "15 players, 14 active" });

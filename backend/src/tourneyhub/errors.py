@@ -102,6 +102,9 @@ class ErrorCode(StrEnum):
     DISABLE_NOT_ALLOWED = (
         "disable_not_allowed"  # the current phase allows none (BR-064)
     )
+    # Late players (FR-047, BR-067)
+    LATE_ENTRY_NOT_ALLOWED = "late_entry_not_allowed"  # the type takes no late player
+    PLAYER_ALREADY_IN_TOURNAMENT = "player_already_in_tournament"
     # Fields (FR-090 to FR-094)
     FIELD_NOT_FOUND = "field_not_found"
     FIELD_NUMBER_CHANGED = "field_number_changed"  # the expected new number is stale

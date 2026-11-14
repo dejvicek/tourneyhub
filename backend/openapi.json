@@ -575,6 +575,8 @@
           "round_locked",
           "entry_not_found",
           "disable_not_allowed",
+          "late_entry_not_allowed",
+          "player_already_in_tournament",
           "field_not_found",
           "field_number_changed",
           "field_not_free",
@@ -1153,6 +1155,28 @@
         ],
         "title": "Language",
         "type": "string"
+      },
+      "LateEntryWrite": {
+        "additionalProperties": false,
+        "description": "Add a late player to a running Swiss or Monster DYP (FR-047, BR-067).\n\n`from_round_no` is the round the player is expected to start in: the\nnewest group round's number plus one (ADR-008).",
+        "properties": {
+          "from_round_no": {
+            "minimum": 1.0,
+            "title": "From Round No",
+            "type": "integer"
+          },
+          "player_id": {
+            "format": "uuid",
+            "title": "Player Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "player_id",
+          "from_round_no"
+        ],
+        "title": "LateEntryWrite",
+        "type": "object"
       },
       "LeagueCreate": {
         "additionalProperties": false,
@@ -7647,6 +7671,105 @@
         "summary": "Read Bracket",
         "tags": [
           "knockout"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/entries": {
+      "post": {
+        "description": "Add a late player to a running Swiss or Monster DYP (FR-047, BR-067).\n\nThe player comes from the league's list and starts on 0 points; they are\ndrawn from the next round on, also while a round is in play. Missed rounds\nearn nothing and count as sit-outs for the sit-out order only.\n`from_round_no` must be the newest group round's number plus one, else 409\n`round_number_changed` with `current_round_no`. An unknown player is 404\n`player_not_found`, a removed one 409 `player_removed`; a closed season is\n409 `season_closed`, a tournament not in progress 409\n`tournament_not_in_progress`. A group phase that is not a Swiss or Monster\nDYP is 422 `format_not_supported`, a started knockout 422\n`group_phase_locked`, a DYP or Doubles 422 `late_entry_not_allowed`, and a\nplayer already picked 422 `player_already_in_tournament`.",
+        "operationId": "add_late_entry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LateEntryWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParticipantRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Add Late Entry",
+        "tags": [
+          "tournaments"
         ]
       }
     },

@@ -24,6 +24,7 @@ from tourneyhub.services.tournaments.fields import (
     place_matches,
     remove_field,
 )
+from tourneyhub.services.tournaments.late import add_late_entry
 from tourneyhub.services.tournaments.monster_dyp import set_top_players
 from tourneyhub.services.tournaments.participants import (
     Participant,
@@ -94,6 +95,7 @@ __all__ = [
     "TournamentSummary",
     "TournamentView",
     "add_field",
+    "add_late_entry",
     "add_round",
     "back_to_setup",
     "create_tournament",

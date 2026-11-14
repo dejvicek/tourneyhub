@@ -50,6 +50,8 @@ export const finals = {
       "Another round needs at least {{minimum}} players who are not disabled.",
     groupPhaseLocked:
       "The knockout is drawn, so the rounds and the tie-breakers are fixed. Delete the knockout first.",
+    lateEntryNotAllowed: "This tournament takes no late players.",
+    playerAlreadyInTournament: "This player is already in the tournament.",
   },
   place: {
     label: "{{place}}{{suffix}}",

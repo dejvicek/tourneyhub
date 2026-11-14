@@ -58,28 +58,28 @@ def _discard_entries(session: Session, tournament: Tournament) -> None:
 
 def _new_entry(
     tournament: Tournament, player_ids: Iterable[UUID], now: datetime
-) -> None:
+) -> Entry:
     entry_id = uuid7()
     members = sorted(player_ids)
-    tournament.entries.append(
-        Entry(
-            id=entry_id,
-            tournament_id=tournament.id,
-            stage=EntryStage.MAIN,
-            kind=EntryKind.PLAYER if len(members) == 1 else EntryKind.PAIR,
-            created_at=now,
-            members=[
-                EntryMember(
-                    entry_id=entry_id,
-                    player_id=player_id,
-                    tournament_id=tournament.id,
-                    stage=EntryStage.MAIN,
-                    created_at=now,
-                )
-                for player_id in members
-            ],
-        )
+    entry = Entry(
+        id=entry_id,
+        tournament_id=tournament.id,
+        stage=EntryStage.MAIN,
+        kind=EntryKind.PLAYER if len(members) == 1 else EntryKind.PAIR,
+        created_at=now,
+        members=[
+            EntryMember(
+                entry_id=entry_id,
+                player_id=player_id,
+                tournament_id=tournament.id,
+                stage=EntryStage.MAIN,
+                created_at=now,
+            )
+            for player_id in members
+        ],
     )
+    tournament.entries.append(entry)
+    return entry
 
 
 def _set_entries(

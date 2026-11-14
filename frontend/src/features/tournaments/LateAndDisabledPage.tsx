@@ -72,9 +72,13 @@ function PlayersContent() {
   const roundsPlayed = data.rounds.filter(
     (r) => r.phase_id === group?.id,
   ).length;
-  const takesLate =
+  const takesRounds =
     (group?.format === "swiss" || group?.format === "monster_dyp") &&
     !data.phases.some((phase) => phase.kind === "knockout");
+  // FR-047, BR-067: a Singles Swiss or a Monster DYP takes late players; a DYP
+  // or Doubles Swiss does not, though its players can still be disabled.
+  const takesLate =
+    takesRounds && (group.format === "monster_dyp" || data.type === "singles");
   const activeCount = rows.filter((row) => row.state !== "disabled").length;
   const inTournament = new Set(data.entries.flatMap((e) => e.player_ids));
   const points = new Map(
@@ -185,7 +189,7 @@ function PlayersContent() {
                     {statusLine(row)}
                   </p>
                 </div>
-                {takesLate && (
+                {takesRounds && (
                   <Button
                     type="button"
                     variant="outline"
