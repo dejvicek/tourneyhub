@@ -298,8 +298,6 @@ export const finalsHandlers = [
       }
       // BR-066: the newest round goes with its matches and results.
       const gone = new Set(round.matches.map((m) => m.id));
-      // BR-154: the replacements drawn with the round are undone.
-      forgetReplacements(t, gone);
       t.rounds = t.rounds.filter((r) => r.id !== round.id);
       t.fields = t.fields.map((field) =>
         field.match_id !== null && gone.has(field.match_id)
