@@ -63,8 +63,39 @@ def _ranking(
     and the order must not shift as other tournaments finish. So a started
     tournament skips the standings, which are two reads of every finished
     tournament of two seasons on each poll of a viewer, and ranks everyone
-    equal, by lot.
+    equal, by lot. A draw that needs the standings of now, as a later round of
+    a Monster DYP does, asks `_current_ranking`.
     """
+    return _rank_league(
+        session,
+        league=league,
+        tournament=tournament,
+        with_standings=tournament.state is TournamentState.SETUP,
+    )
+
+
+def _current_ranking(
+    session: Session, *, league: League, tournament: Tournament
+) -> tuple[RankedPlayer, ...]:
+    """The league ranking as of now, whatever the tournament's state (BR-020).
+
+    The same ranking a setup shows and the start draws round 1 from, but read
+    again from the finished tournaments: a Monster DYP picks the top players of
+    each of its first rounds from it (BR-061).
+    """
+    return _rank_league(
+        session, league=league, tournament=tournament, with_standings=True
+    )
+
+
+def _rank_league(
+    session: Session,
+    *,
+    league: League,
+    tournament: Tournament,
+    with_standings: bool,
+) -> tuple[RankedPlayer, ...]:
+    """The league's players ranked, by the standings or all equal, by lot."""
     player_ids = session.scalars(
         select(Player.id).where(
             Player.league_id == league.id, Player.removed_at.is_(None)
@@ -72,7 +103,7 @@ def _ranking(
     ).all()
     current: dict[PlayerId, SeasonStandingRow] = {}
     last: dict[PlayerId, SeasonStandingRow] = {}
-    if tournament.state is TournamentState.SETUP:
+    if with_standings:
         season = _season_of(league, tournament.season_id)
         current = _standings_by_player(session, season)
         previous = _previous_season(league, season)
@@ -136,12 +167,15 @@ class PlacesView:
 
 
 def _require_played_group(tournament: Tournament) -> TournamentPhase:
-    """The round robin or Swiss of a tournament, with or without a knockout after it.
+    """The round robin, Swiss or Monster DYP of a tournament, with or without a knockout.
 
-    Monster DYP is not played yet: 422 `format_not_supported` until it is.
+    A knockout after a Monster DYP is not served yet, so the shared
+    `PLAYED_GROUP_FORMATS` leaves Monster DYP out and it is accepted here.
     """
     group = _group_phase(tournament)
-    if group is None or group.format not in PLAYED_GROUP_FORMATS:
+    if group is None or group.format not in PLAYED_GROUP_FORMATS | {
+        PhaseFormat.MONSTER_DYP
+    }:
         last = tournament.phases[-1]
         raise RuleViolationError(ErrorCode.FORMAT_NOT_SUPPORTED, format=last.format)
     return group
@@ -256,8 +290,8 @@ def _placed(tournament: Tournament, placement_points: Sequence[int]) -> _Placed:
     order (BR-103). A knockout without a group phase places every entry by
     BR-102 alone (FR-031). Each player earns the placement points of their
     place, entries sharing a place the average of the places they cover,
-    rounded down (BR-110, BR-111). Monster DYP is 422 `format_not_supported`
-    until it is played.
+    rounded down (BR-110, BR-111). A Monster DYP's places are one player's
+    each, by their main entry (BR-100, BR-103).
     """
     group = _group_phase(tournament)
     knockout = knockout_bracket(tournament)

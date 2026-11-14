@@ -546,16 +546,6 @@ def test_adr008_the_same_tiebreakers_again_change_nothing(
     assert phase.updated_at is None
 
 
-def test_fr060_a_monster_dyp_has_no_standings_yet(
-    setup: Callable[..., Json], read: Callable[..., Json]
-) -> None:
-    ready = setup(4, type="monster_dyp", group_phase="monster_dyp")
-
-    play = read(ready["tournament_id"], "/play")
-
-    assert play == {"waiting": [], "standings": [], "group_done": False}
-
-
 @pytest.mark.parametrize(
     "order",
     [

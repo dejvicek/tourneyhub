@@ -524,6 +524,7 @@
           "draws_not_allowed",
           "player_removed",
           "player_not_picked",
+          "too_many_top_players",
           "draw_counter_changed",
           "seeding_method_changed",
           "seed_order_changed",
@@ -2003,7 +2004,7 @@
         "type": "object"
       },
       "PlayRead": {
-        "description": "The running group phase, computed on read (ADR-009, FR-060, FR-092).\n\n`waiting` is the waiting list: requeued matches first, then schedule order\n(BR-130, BR-132). `standings` are the group phase's, best first: a round\nrobin's (BR-101) or a Swiss's (BR-072 to BR-074); a Monster DYP has none\nyet. `group_done` says every group-phase match has a result, in a Swiss\nevery match of the newest round, so the organizer chooses: knockout or\nfinish, or in a Swiss also the next round (FR-040).",
+        "description": "The running group phase, computed on read (ADR-009, FR-060, FR-092).\n\n`waiting` is the waiting list: requeued matches first, then schedule order\n(BR-130, BR-132). `standings` are the group phase's, best first: a round\nrobin's (BR-101), a Swiss's or a Monster DYP's (BR-072 to BR-074), a\nMonster DYP's one row per player. `group_done` says every group-phase\nmatch has a result, in a Swiss and a Monster DYP every match of the newest\nround, so the organizer chooses: knockout or finish, or in a Swiss also\nthe next round (FR-040).",
         "properties": {
           "group_done": {
             "title": "Group Done",
@@ -2811,7 +2812,7 @@
         "type": "object"
       },
       "PublicStandingRow": {
-        "description": "One entry's line in the group-phase standings, for viewers (FR-060).\n\nA round robin's (BR-101) or a Swiss's (BR-072 to BR-074). `place` is\nshared by entries still level (BR-074), and the next place skips\n(BR-104). `points` come from the matches; in a Swiss they also include\nthe points for sitting out, as soon as the round is drawn (BR-076), and a\nround robin gives none (BR-071). `bh1` and `bh2` are the Swiss's\n(BR-073), null in a round robin. `game_difference` ranks a round robin in\nevery match format; the screen shows its column only in BO3 and BO5\n(BR-101). The organizer's extras, the form and what ranks one entry above\nthe next, are not part of it.",
+        "description": "One entry's line in the group-phase standings, for viewers (FR-060).\n\nA round robin's (BR-101), a Swiss's or a Monster DYP's (BR-072 to\nBR-074); a Monster DYP's row is a player's, by their main entry. `place`\nis shared by entries still level (BR-074), and the next place skips\n(BR-104). `points` come from the matches; in a Swiss and a Monster DYP\nthey also include the points for sitting out, as soon as the round is\ndrawn (BR-076, BR-077), and a round robin gives none (BR-071). `bh1` and\n`bh2` are the Swiss's and the Monster DYP's (BR-073), null in a round\nrobin. `game_difference` ranks a round robin in\nevery match format; the screen shows its column only in BO3 and BO5\n(BR-101). The organizer's extras, the form and what ranks one entry above\nthe next, are not part of it.",
         "properties": {
           "bh1": {
             "anyOf": [
@@ -3792,6 +3793,20 @@
           "tiebreakers"
         ],
         "title": "TiebreakersWrite",
+        "type": "object"
+      },
+      "TopPlayersWrite": {
+        "additionalProperties": false,
+        "description": "The players the organizer marks as Monster DYP top players (FR-041, BR-061).\n\nThe target state: a player not listed is not marked. At most one per match\nof round 1 (422 `too_many_top_players`).",
+        "properties": {
+          "player_ids": {
+            "$ref": "#/components/schemas/PlayerIds"
+          }
+        },
+        "required": [
+          "player_ids"
+        ],
+        "title": "TopPlayersWrite",
         "type": "object"
       },
       "TournamentCreate": {
@@ -7051,7 +7066,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/finish": {
       "post": {
-        "description": "Finish a round robin or a Swiss without a knockout, once the UI has asked (FR-040).\n\nA tournament that is not in progress is 409 `tournament_not_in_progress`\n(detail `state`), so a repeat changes nothing. A match without a result is\n422 `group_phase_not_done` (detail `matches_left`). A tournament with a\nknockout, which finishes with its last result (FR-037), or a Monster DYP\nis 422 `format_not_supported`.\nThe standings become the places (`GET \u2026/places`).",
+        "description": "Finish a round robin, Swiss or Monster DYP without a knockout (FR-040).\n\nThe UI asks first.\n\nA tournament that is not in progress is 409 `tournament_not_in_progress`\n(detail `state`), so a repeat changes nothing. A match without a result is\n422 `group_phase_not_done` (detail `matches_left`). A tournament with a\nknockout, which finishes with its last result (FR-037), is 422\n`format_not_supported`.\nThe standings become the places (`GET \u2026/places`).",
         "operationId": "finish_tournament",
         "parameters": [
           {
@@ -7763,7 +7778,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/places": {
       "get": {
-        "description": "Return the places and the season points of a finished tournament (\u00a77.13, \u00a77.14).\n\nComputed on read. Before the tournament finishes, `complete` is false and\nthere are no rows. With a knockout, its entries take the top places and\nthe others follow in their group-phase order (BR-102, BR-103); without a\ngroup phase, every entry is placed by the knockout, and its reason has no\n`group_place` and no `group_format`. A Monster DYP is 422\n`format_not_supported` until it is played.",
+        "description": "Return the places and the season points of a finished tournament (\u00a77.13, \u00a77.14).\n\nComputed on read. Before the tournament finishes, `complete` is false and\nthere are no rows. With a knockout, its entries take the top places and\nthe others follow in their group-phase order (BR-102, BR-103); without a\ngroup phase, every entry is placed by the knockout, and its reason has no\n`group_place` and no `group_format`.",
         "operationId": "read_places",
         "parameters": [
           {
@@ -7921,7 +7936,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/rounds": {
       "post": {
-        "description": "Draw the next round of a Swiss from the current standings (FR-040, FR-042).\n\nEntries play their neighbour in the standings without meeting anyone\ntwice while that can be avoided (BR-056, BR-057, ADR-011); with an odd\nnumber one sits out (BR-058). Disabled entries are not drawn (BR-064).\nThe rounds before it lock (BR-065), and its first matches take the free\nfields (BR-130). Returns the new round, with what a lot decided and\nwhich pairs repeat (ADR-009).\n\n409: `round_number_changed` (the body's `expected_round_no` is not the\nnewest round's number plus one; detail `current_round_no`, the newest\nround's), `tournament_not_in_progress` (detail `state`) or\n`season_closed`. 422: `format_not_supported` (not a Swiss; detail\n`format`), `group_phase_locked` (the knockout is drawn; detail\n`phase_id`), `round_not_complete` (a match of the newest round has no\nresult; detail `matches_left`) or `not_enough_entries` (fewer than 2\nentries that are not disabled).",
+        "description": "Draw the next round of a Swiss or Monster DYP from the standings (FR-040, FR-042).\n\nA Swiss: entries play their neighbour in the standings without meeting\nanyone twice while that can be avoided (BR-056, BR-057, ADR-011); with an\nodd number one sits out (BR-058). A Monster DYP: players are grouped in\nfours by their standing, the 1st and 4th against the 2nd and 3rd, with the\ntop players of the league ranking apart in rounds 1 and 2 and nobody\ngetting a partner twice while that can be avoided (BR-060 to BR-062); the\nextra one to three players sit out (BR-063). Disabled entries are not\ndrawn (BR-064). The rounds before it lock (BR-065), and its first matches\ntake the free fields (BR-130). Returns the new round, with what a lot\ndecided and which pairs repeat (ADR-009).\n\n409: `round_number_changed` (the body's `expected_round_no` is not the\nnewest round's number plus one; detail `current_round_no`, the newest\nround's), `tournament_not_in_progress` (detail `state`) or\n`season_closed`. 422: `format_not_supported` (not a Swiss or Monster DYP;\ndetail `format`), `group_phase_locked` (the knockout is drawn; detail\n`phase_id`), `round_not_complete` (a match of the newest round has no\nresult; detail `matches_left`), `not_enough_entries` (a Swiss with fewer\nthan 2 entries that are not disabled) or `not_enough_players` (a Monster\nDYP with fewer than 4 players that are not disabled; details `minimum`,\n`given`).",
         "operationId": "add_round",
         "parameters": [
           {
@@ -8020,7 +8035,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/rounds/{round_id}": {
       "delete": {
-        "description": "Delete the newest round of a Swiss, with its results; the UI asks first (FR-046).\n\nThe round before it unlocks (BR-066). Deleting round 1 takes the\ntournament back to setup, results or not: every round goes, the\nentries, seeds and draws stay, and every disabled flag is cleared.\n\nAn unknown round, or a repeated delete, is 404 `round_not_found`: it is\ngone. 409: `round_not_newest` (a later round exists; detail `round_id`,\nthe newest round's), `tournament_not_in_progress` (detail `state`) or\n`season_closed`. 422: `format_not_supported` (not a Swiss; detail\n`format`) or `group_phase_locked` (the knockout is drawn: delete it\nfirst, BR-087; detail `phase_id`).",
+        "description": "Delete the newest round of a Swiss or Monster DYP, with its results (FR-046).\n\nThe UI asks first.\n\nThe round before it unlocks (BR-066). Deleting round 1 takes the\ntournament back to setup, results or not: every round goes, the\nentries, seeds, draws and top-player marks stay, and every disabled flag\nis cleared.\n\nAn unknown round, or a repeated delete, is 404 `round_not_found`: it is\ngone. 409: `round_not_newest` (a later round exists; detail `round_id`,\nthe newest round's), `tournament_not_in_progress` (detail `state`) or\n`season_closed`. 422: `format_not_supported` (not a Swiss or Monster DYP;\ndetail `format`) or `group_phase_locked` (the knockout is drawn: delete it\nfirst, BR-087; detail `phase_id`).",
         "operationId": "delete_round",
         "parameters": [
           {
@@ -8670,7 +8685,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/preview": {
       "get": {
-        "description": "Return what \"Generate and start\" would create, and write nothing (FR-035).\n\nA tournament that cannot start is still 200 with `can_start` false and the\n`problem`: `players_without_partner`, `not_enough_entries`,\n`too_many_entries_for_round_robin` (detail `limit`: 64),\n`too_many_entries_for_knockout` (detail `limit`: 256),\n`format_not_supported` (Monster DYP), the DYP codes of a draw that cannot be made, or\n`tournament_not_in_setup` for a started tournament. Another league's\ntournament is 404.",
+        "description": "Return what \"Generate and start\" would create, and write nothing (FR-035).\n\nA tournament that cannot start is still 200 with `can_start` false and the\n`problem`: `players_without_partner`, `not_enough_entries`,\n`too_many_entries_for_round_robin` (detail `limit`: 64),\n`too_many_entries_for_knockout` (detail `limit`: 256),\nthe DYP codes of a draw that cannot be made, or\n`tournament_not_in_setup` for a started tournament. Another league's\ntournament is 404.",
         "operationId": "read_schedule_preview",
         "parameters": [
           {
@@ -8945,9 +8960,108 @@
         ]
       }
     },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/setup/top-players": {
+      "put": {
+        "description": "Mark the Monster DYP top players, the target state (FR-041, BR-061).\n\nAt most one per match of round 1: 422 `too_many_top_players` with `max`;\n409 `player_not_picked` for a player who is not in the tournament. Other\ntypes: 409 `tournament_type_changed`.",
+        "operationId": "set_top_players",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TopPlayersWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TournamentSetupRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Top Players",
+        "tags": [
+          "tournaments"
+        ]
+      }
+    },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/start": {
       "post": {
-        "description": "Generate the schedule and start the tournament (FR-035).\n\nA round robin gets all its rounds (BR-050 to BR-052); a Swiss gets round\n1, the top half of the seeds against the bottom half, the lowest seed\nsitting out with an odd number (BR-055, BR-058), and adds the next rounds\nwith `POST \u2026/rounds`; a knockout without\na group phase gets its whole bracket from the setup seeds, the byes for\nthe top seeds (BR-040 to BR-044). The first matches take the fields\n(BR-130). A started tournament is 409 `tournament_not_in_setup`; a stale\n`expected_draw_counter` is 409 `draw_counter_changed`, and an\n`expected_seed_order` that is not the entries' current order, seed 1\nfirst, 409 `seed_order_changed`: the review shows the new setup. Monster\nDYP is 422 `format_not_supported` for now. An incomplete setup is 422:\n`players_without_partner` (Doubles), `not_enough_players`,\n`dyp_halves_incomplete`, `dyp_halves_unequal`, `too_many_left_out` (DYP),\n`not_enough_entries` (FR-032: 2, or 4 with a third-place match),\n`too_many_entries_for_round_robin` (detail `limit`: 64) or\n`too_many_entries_for_knockout` (detail `limit`: 256).",
+        "description": "Generate the schedule and start the tournament (FR-035).\n\nA round robin gets all its rounds (BR-050 to BR-052); a Swiss gets round\n1, the top half of the seeds against the bottom half, the lowest seed\nsitting out with an odd number (BR-055, BR-058), and adds the next rounds\nwith `POST \u2026/rounds`; a knockout without\na group phase gets its whole bracket from the setup seeds, the byes for\nthe top seeds (BR-040 to BR-044). The first matches take the fields\n(BR-130). A started tournament is 409 `tournament_not_in_setup`; a stale\n`expected_draw_counter` is 409 `draw_counter_changed`, and an\n`expected_seed_order` that is not the entries' current order, seed 1\nfirst, 409 `seed_order_changed`: the review shows the new setup. A Monster\nDYP gets round 1, groups of four by the league ranking with a top player\nleading each, the extra players sitting out (BR-060, BR-061, BR-063); its\n`expected_seed_order` is the preview's, the entries in league-ranking\norder. An incomplete setup is 422:\n`players_without_partner` (Doubles), `not_enough_players`,\n`dyp_halves_incomplete`, `dyp_halves_unequal`, `too_many_left_out` (DYP),\n`not_enough_entries` (FR-032: 2, 4 with a third-place match, 4 players\nin a Monster DYP),\n`too_many_entries_for_round_robin` (detail `limit`: 64) or\n`too_many_entries_for_knockout` (detail `limit`: 256).",
         "operationId": "start_tournament",
         "parameters": [
           {
@@ -9570,7 +9684,7 @@
     },
     "/api/v1/public/{share_token}/tournaments/{tournament_id}/places": {
       "get": {
-        "description": "Return the places and the season points of a finished tournament (FR-070).\n\nBefore the tournament finishes, `complete` is false and there are no rows.\nWith a knockout, its entries take the top places by BR-102, the others\nfollow in their group-phase order (BR-103); a Monster DYP is 422\n`format_not_supported` until it is played. A tournament in setup\nis 404 `tournament_not_found`.",
+        "description": "Return the places and the season points of a finished tournament (FR-070).\n\nBefore the tournament finishes, `complete` is false and there are no rows.\nWith a knockout, its entries take the top places by BR-102, the others\nfollow in their group-phase order (BR-103). A tournament in setup\nis 404 `tournament_not_found`.",
         "operationId": "read_public_places",
         "parameters": [
           {
@@ -9633,7 +9747,7 @@
     },
     "/api/v1/public/{share_token}/tournaments/{tournament_id}/standings": {
       "get": {
-        "description": "Return the group phase's standings as they are now (FR-060, FR-070).\n\nA round robin's or a Swiss's; a tournament without a group phase, or a\nMonster DYP, has an empty list. A tournament in setup is 404\n`tournament_not_found`, like an unknown one or one of another league.",
+        "description": "Return the group phase's standings as they are now (FR-060, FR-070).\n\nA round robin's, a Swiss's or a Monster DYP's, one row per player in a\nMonster DYP; a tournament without a group phase has an empty list. A\ntournament in setup is 404\n`tournament_not_found`, like an unknown one or one of another league.",
         "operationId": "read_public_standings",
         "parameters": [
           {

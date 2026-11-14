@@ -213,11 +213,21 @@ _TOURNAMENT_INVARIANTS = {
             WHERE e.tournament_id = ph.tournament_id AND e.stage = 'main'
         )
     """,
+    # A Monster DYP team is a side without an entry (D2): its entries are those
+    # of its players.
     "a group round whose participation disagrees with its matches (D5)": """
         SELECT p.round_id, p.entry_id FROM round_participation p
         WHERE (p.status = 'played') <> EXISTS (
             SELECT FROM match_sides s JOIN matches m ON m.id = s.match_id
-            WHERE m.round_id = p.round_id AND s.entry_id = p.entry_id
+            WHERE m.round_id = p.round_id AND (
+                s.entry_id = p.entry_id
+                OR s.entry_id IS NULL AND EXISTS (
+                    SELECT FROM match_side_players sp
+                    JOIN entry_members em ON em.player_id = sp.player_id
+                    WHERE sp.match_id = s.match_id AND sp.side = s.side
+                        AND em.entry_id = p.entry_id
+                )
+            )
         )
     """,
     "games without a result, a result without games, or a gap (D11)": """

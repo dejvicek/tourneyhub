@@ -81,12 +81,14 @@ class PublicTournamentRead(ResponseModel):
 class PublicStandingRow(ResponseModel):
     """One entry's line in the group-phase standings, for viewers (FR-060).
 
-    A round robin's (BR-101) or a Swiss's (BR-072 to BR-074). `place` is
-    shared by entries still level (BR-074), and the next place skips
-    (BR-104). `points` come from the matches; in a Swiss they also include
-    the points for sitting out, as soon as the round is drawn (BR-076), and a
-    round robin gives none (BR-071). `bh1` and `bh2` are the Swiss's
-    (BR-073), null in a round robin. `game_difference` ranks a round robin in
+    A round robin's (BR-101), a Swiss's or a Monster DYP's (BR-072 to
+    BR-074); a Monster DYP's row is a player's, by their main entry. `place`
+    is shared by entries still level (BR-074), and the next place skips
+    (BR-104). `points` come from the matches; in a Swiss and a Monster DYP
+    they also include the points for sitting out, as soon as the round is
+    drawn (BR-076, BR-077), and a round robin gives none (BR-071). `bh1` and
+    `bh2` are the Swiss's and the Monster DYP's (BR-073), null in a round
+    robin. `game_difference` ranks a round robin in
     every match format; the screen shows its column only in BO3 and BO5
     (BR-101). The organizer's extras, the form and what ranks one entry above
     the next, are not part of it.
@@ -233,8 +235,9 @@ def read_public_standings(
 ) -> list[PublicStandingRow]:
     """Return the group phase's standings as they are now (FR-060, FR-070).
 
-    A round robin's or a Swiss's; a tournament without a group phase, or a
-    Monster DYP, has an empty list. A tournament in setup is 404
+    A round robin's, a Swiss's or a Monster DYP's, one row per player in a
+    Monster DYP; a tournament without a group phase has an empty list. A
+    tournament in setup is 404
     `tournament_not_found`, like an unknown one or one of another league.
     """
     rows = public_service.read_shared_standings(
@@ -254,8 +257,7 @@ def read_public_places(
 
     Before the tournament finishes, `complete` is false and there are no rows.
     With a knockout, its entries take the top places by BR-102, the others
-    follow in their group-phase order (BR-103); a Monster DYP is 422
-    `format_not_supported` until it is played. A tournament in setup
+    follow in their group-phase order (BR-103). A tournament in setup
     is 404 `tournament_not_found`.
     """
     places = public_service.read_shared_places(

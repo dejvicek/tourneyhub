@@ -53,6 +53,7 @@ class ErrorCode(StrEnum):
     # Setup
     PLAYER_REMOVED = "player_removed"  # a removed player cannot be picked (BR-002)
     PLAYER_NOT_PICKED = "player_not_picked"
+    TOO_MANY_TOP_PLAYERS = "too_many_top_players"  # FR-041, BR-061
     DRAW_COUNTER_CHANGED = "draw_counter_changed"
     SEEDING_METHOD_CHANGED = "seeding_method_changed"
     SEED_ORDER_CHANGED = "seed_order_changed"
@@ -63,7 +64,7 @@ class ErrorCode(StrEnum):
     # Start and back to setup
     TOURNAMENT_NOT_IN_PROGRESS = "tournament_not_in_progress"
     TOURNAMENT_HAS_RESULTS = "tournament_has_results"  # FR-036
-    FORMAT_NOT_SUPPORTED = "format_not_supported"  # Monster DYP, until it is served
+    FORMAT_NOT_SUPPORTED = "format_not_supported"  # Monster DYP knockout, not yet
     PLAYERS_WITHOUT_PARTNER = "players_without_partner"  # Doubles (BR-030)
     # FR-032: 64 entries today, 16 after the #48 follow-up (issue to open after
     # approval).

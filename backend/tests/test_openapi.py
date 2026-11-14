@@ -77,6 +77,7 @@ def test_main_prints_a_schema_with_function_names_as_operation_ids(
         "set_tiebreakers",
         "set_seeding_method",
         "set_tournament_format",
+        "set_top_players",
         "set_tournament_players",
         "sign_up",
         "start_season",

@@ -5,12 +5,18 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, insert, select
 from sqlalchemy.orm import Session, selectinload
 
 from tourneyhub.db.models.entries import Entry
 from tourneyhub.db.models.leagues import League, Season
-from tourneyhub.db.models.matches import Match, MatchSide, Round
+from tourneyhub.db.models.matches import (
+    Match,
+    MatchSide,
+    MatchSidePlayer,
+    Round,
+    RoundParticipation,
+)
 from tourneyhub.db.models.tournaments import Tournament, TournamentPhase
 from tourneyhub.engine.fields import FieldSlot, MatchSlot
 from tourneyhub.engine.ids import EntryId, FieldId, MatchId, PlayerId
@@ -282,6 +288,34 @@ def _match_slots(tournament: Tournament) -> list[MatchSlot]:
         for round_ in phase.rounds
         for match in round_.matches
     ]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _ScheduleRows:
+    """The rows of drawn rounds, one list per table, in insert order (D2, D5)."""
+
+    rounds: list[dict[str, object]]
+    matches: list[dict[str, object]]
+    sides: list[dict[str, object]]
+    side_players: list[dict[str, object]]
+    participation: list[dict[str, object]]
+    slots: list[MatchSlot]
+
+
+def _insert_schedule(session: Session, rows: _ScheduleRows) -> None:
+    """Write the schedule's rows in bulk, parents first.
+
+    A 64-entry double round robin has 4,032 matches and some 20,000 to 30,000
+    other rows; one ORM object per row would be far too slow.
+    """
+    for model, table_rows in (
+        (Round, rows.rounds),
+        (Match, rows.matches),
+        (MatchSide, rows.sides),
+        (MatchSidePlayer, rows.side_players),
+        (RoundParticipation, rows.participation),
+    ):
+        session.execute(insert(model), table_rows)
 
 
 def _field_slots(tournament: Tournament) -> list[FieldSlot]:

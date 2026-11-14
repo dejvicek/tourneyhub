@@ -1,5 +1,6 @@
-"""The play view and the group standings (round robin and Swiss)."""
+"""The play view and the group standings (round robin, Swiss and Monster DYP)."""
 
+from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from typing import assert_never
@@ -7,12 +8,21 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from tourneyhub.db.models.entries import Entry
 from tourneyhub.db.models.leagues import League
-from tourneyhub.db.models.matches import Match
+from tourneyhub.db.models.matches import Match, MatchSide
 from tourneyhub.db.models.tournaments import Tournament, TournamentPhase
 from tourneyhub.engine.fields import waiting_order
-from tourneyhub.engine.ids import EntryId
+from tourneyhub.engine.ids import EntryId, PlayerId
+from tourneyhub.engine.monster_dyp import (
+    MonsterMatch,
+    MonsterRound,
+    MonsterStanding,
+    Team,
+    monster_standings,
+)
 from tourneyhub.engine.standings import (
+    WALKOVER_GAMES,
     FormResult,
     PlayedMatch,
     RoundRobinTiebreaker,
@@ -26,7 +36,9 @@ from tourneyhub.engine.swiss import (
     swiss_standings,
 )
 from tourneyhub.engine.tournaments import (
+    MatchFormat,
     MatchOutcome,
+    Outcome,
     Participation,
     PhaseFormat,
     Tiebreaker,
@@ -62,12 +74,15 @@ class WaitingMatch:
 class GroupStandingRow:
     """One entry's line in the group-phase standings, of any format (FR-060).
 
-    A round robin's rows come from BR-101, a Swiss's from BR-070 to BR-074.
+    A round robin's rows come from BR-101, a Swiss's and a Monster DYP's from
+    BR-070 to BR-074; a Monster DYP's row is a player's, by their main entry.
     `place` is shared by entries still level (BR-074). `form` and `ahead_by`
-    are the round robin's: a Swiss has an empty form and no `ahead_by`, since
-    its tie-breakers are the phase's own (FR-043). `bh1` and `bh2` are the
-    Swiss's (BR-073), None in a round robin. `game_difference` is games won
-    minus games lost (BR-101); it ranks only a round robin.
+    are the round robin's: a Swiss and a Monster DYP have an empty form and no
+    `ahead_by`, since their tie-breakers are the phase's own (FR-043). `bh1`
+    and `bh2` are the Swiss's and the Monster DYP's (BR-073), None in a round
+    robin. `game_difference` is games won minus games lost (BR-101), a Monster
+    DYP player's those of their team in each match; it ranks only a round
+    robin.
     """
 
     place: int
@@ -90,10 +105,10 @@ class GroupStandingRow:
 class PlayView:
     """The running group phase as the play screens read it, computed on read.
 
-    `standings` are the group phase's: a round robin's (BR-101) or a Swiss's
-    (BR-070 to BR-074); a Monster DYP has none yet. `group_done` says every
-    group-phase match has a result (FR-040); in a Swiss, every match of the
-    newest round, since the rounds before it are complete.
+    `standings` are the group phase's: a round robin's (BR-101), a Swiss's or
+    a Monster DYP's (BR-070 to BR-074). `group_done` says every
+    group-phase match has a result (FR-040); in a Swiss and a Monster DYP,
+    every match of the newest round, since the rounds before it are complete.
     """
 
     waiting: tuple[WaitingMatch, ...]
@@ -239,13 +254,153 @@ def _swiss_game_differences(
     }
 
 
+def _player_of(entry: Entry) -> PlayerId:
+    """The one player of a Monster DYP main entry (DATA-MODEL §4.4)."""
+    [member] = entry.members
+    return PlayerId(member.player_id)
+
+
+def _team(side: MatchSide) -> Team:
+    """A Monster DYP side's two players (DATA-MODEL D2)."""
+    players = sorted(PlayerId(row.player_id) for row in side.players)
+    if len(players) != 2:  # noqa: PLR2004  (a team is two partners, BR-060)
+        msg = f"side {side.side} of match {side.match_id} has {len(players)} players"
+        raise ValueError(msg)
+    return players[0], players[1]
+
+
+def monster_rounds(
+    tournament: Tournament, group: TournamentPhase
+) -> tuple[MonsterRound, ...]:
+    """A Monster DYP phase's stored rounds as the engine reads them (D2, D5, D11).
+
+    A team is the players of a side, which has no entry (D2). A match's score
+    difference sums the games that have a score (BR-073); a walkover has
+    none. The players who sat a round out are those of its `sat_out` rows; a
+    disabled or not yet joined player is in neither list (BR-064, BR-067).
+    """
+    player_of = {entry.id: _player_of(entry) for entry in _main_entries(tournament)}
+    rounds: list[MonsterRound] = []
+    for round_ in group.rounds:
+        matches: list[MonsterMatch] = []
+        for match in round_.matches:
+            side_1, side_2 = sorted(match.sides, key=lambda side: side.side)
+            matches.append(
+                MonsterMatch(
+                    team_1=_team(side_1),
+                    team_2=_team(side_2),
+                    outcome=None
+                    if match.outcome is None
+                    else MatchOutcome(match.outcome),
+                    score_difference=sum(
+                        game.score_1 - game.score_2
+                        for game in match.games
+                        if game.score_1 is not None and game.score_2 is not None
+                    ),
+                )
+            )
+        rounds.append(
+            MonsterRound(
+                round_no=round_.round_no,
+                matches=tuple(matches),
+                sat_out=tuple(
+                    player_of[row.entry_id]
+                    for row in sorted(round_.participation, key=lambda r: r.entry_id)
+                    if row.status is Participation.SAT_OUT
+                ),
+            )
+        )
+    return tuple(rounds)
+
+
+def monster_standings_of(
+    tournament: Tournament, group: TournamentPhase
+) -> tuple[MonsterStanding, ...]:
+    """The Monster DYP standings now, one line per player, by position.
+
+    Every main entry's player is in them, disabled ones included (BR-064).
+    Both players of a team get its points (BR-070), and a player who sits out
+    gets the phase's points as soon as the round is drawn (BR-076, BR-077);
+    the tie-breakers are the phase's, in its order (BR-072, FR-043); the lot
+    uses the tournament's seed (BR-074, ADR-010).
+    """
+    return monster_standings(
+        (_player_of(entry) for entry in _main_entries(tournament)),
+        monster_rounds(tournament, group),
+        tiebreakers=[Tiebreaker(t) for t in group.tiebreakers or ()],
+        sit_out_points=group.sit_out_points or 0,  # the CHECK sets it for Monster DYP
+        rng_seed=tournament.rng_seed,
+    )
+
+
+def _side_1_games(match: Match, match_format: MatchFormat) -> int:
+    """Side 1's games won minus games lost in one match (BR-101).
+
+    A walkover counts the games needed to win, as the round-robin tally does.
+    """
+    if match.is_walkover:
+        games = WALKOVER_GAMES[match_format]
+        return games if match.outcome is Outcome.SIDE_1 else -games
+    winners = [game.winner for game in match.games]
+    return winners.count(Outcome.SIDE_1) - winners.count(Outcome.SIDE_2)
+
+
+def _monster_game_differences(group: TournamentPhase) -> Counter[PlayerId]:
+    """Each player's games won minus games lost by their team (BR-101).
+
+    Shown only, never a Monster DYP tie-breaker (BR-072).
+    """
+    differences: Counter[PlayerId] = Counter()
+    for round_ in group.rounds:
+        for match in round_.matches:
+            if match.outcome is None:
+                continue
+            games = _side_1_games(match, group.match_format)
+            for side in match.sides:
+                for row in side.players:
+                    differences[PlayerId(row.player_id)] += (
+                        games if side.side == 1 else -games
+                    )
+    return differences
+
+
+def _monster_rows(
+    tournament: Tournament, group: TournamentPhase
+) -> tuple[GroupStandingRow, ...]:
+    """The Monster DYP standings as rows, one per player's main entry (FR-060)."""
+    entry_of = {
+        _player_of(entry): EntryId(entry.id) for entry in _main_entries(tournament)
+    }
+    games = _monster_game_differences(group)
+    return tuple(
+        GroupStandingRow(
+            place=row.place,
+            entry_id=entry_of[row.player_id],
+            played=row.played,
+            won=row.won,
+            drawn=row.drawn,
+            lost=row.lost,
+            sat_out=row.sat_out,
+            points=row.points,
+            game_difference=games[row.player_id],
+            score_difference=row.score_difference,
+            form=(),
+            ahead_by=None,
+            bh1=row.bh1,
+            bh2=row.bh2,
+        )
+        for row in monster_standings_of(tournament, group)
+    )
+
+
 def group_standings(
     tournament: Tournament, phase: TournamentPhase
 ) -> tuple[GroupStandingRow, ...]:
     """The group phase's standings now, best first (FR-060, ADR-009).
 
     A round robin's by BR-101 (`_standings_of`), a Swiss's by BR-070 to
-    BR-074 (`_swiss_standings_of`). A Monster DYP has none yet.
+    BR-074 (`_swiss_standings_of`), a Monster DYP's by the same rules, one
+    row per player (`monster_standings_of`).
     """
     match phase.format:
         case PhaseFormat.ROUND_ROBIN:
@@ -289,7 +444,9 @@ def group_standings(
                 )
                 for row in _swiss_standings_of(tournament, phase)
             )
-        case PhaseFormat.MONSTER_DYP | PhaseFormat.SINGLE_ELIMINATION:
+        case PhaseFormat.MONSTER_DYP:
+            return _monster_rows(tournament, phase)
+        case PhaseFormat.SINGLE_ELIMINATION:
             return ()
         case _:
             assert_never(phase.format)
@@ -356,11 +513,11 @@ def read_play(
 def view_group_standings(
     session: Session, *, league: League, tournament_id: UUID, past_setup: bool = False
 ) -> tuple[GroupStandingRow, ...]:
-    """Return the group phase's standings now: a round robin's or a Swiss's (FR-060).
+    """Return the group phase's standings now, of any group format (FR-060).
 
     The same standings as the play read's (`read_play`); none without a group
-    phase or for a Monster DYP. With `past_setup`, a tournament in setup is
-    404 `tournament_not_found` (FR-070).
+    phase. With `past_setup`, a tournament in setup is 404
+    `tournament_not_found` (FR-070).
     """
     tournament = _load_tournament(
         session, league=league, tournament_id=tournament_id, past_setup=past_setup

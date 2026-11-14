@@ -216,6 +216,16 @@ class HalvesWrite(RequestModel):
     ]
 
 
+class TopPlayersWrite(RequestModel):
+    """The players the organizer marks as Monster DYP top players (FR-041, BR-061).
+
+    The target state: a player not listed is not marked. At most one per match
+    of round 1 (422 `too_many_top_players`).
+    """
+
+    player_ids: PlayerIds
+
+
 class SeedingWrite(RequestModel):
     """Seed by league ranking or by random shuffle (FR-034, BR-021, BR-022)."""
 
@@ -631,10 +641,11 @@ class PlayRead(ResponseModel):
 
     `waiting` is the waiting list: requeued matches first, then schedule order
     (BR-130, BR-132). `standings` are the group phase's, best first: a round
-    robin's (BR-101) or a Swiss's (BR-072 to BR-074); a Monster DYP has none
-    yet. `group_done` says every group-phase match has a result, in a Swiss
-    every match of the newest round, so the organizer chooses: knockout or
-    finish, or in a Swiss also the next round (FR-040).
+    robin's (BR-101), a Swiss's or a Monster DYP's (BR-072 to BR-074), a
+    Monster DYP's one row per player. `group_done` says every group-phase
+    match has a result, in a Swiss and a Monster DYP every match of the newest
+    round, so the organizer chooses: knockout or finish, or in a Swiss also
+    the next round (FR-040).
     """
 
     waiting: list[WaitingMatchRead]

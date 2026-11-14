@@ -211,8 +211,8 @@ def test_br051_the_preview_names_the_players_who_sit_out_each_round(
                 "group_phase": "monster_dyp",
                 "round_robin_legs": None,
             },
-            4,
-            id="monster-dyp",
+            3,
+            id="monster-dyp-FR-032",
         ),
     ],
 )
@@ -231,11 +231,7 @@ def test_fr035_a_setup_that_cannot_start_names_the_reason_the_start_gives(
 
     assert status == 200
     assert preview["problem"] == refusal
-    assert refusal["code"] in {
-        "not_enough_entries",
-        "not_enough_players",
-        "format_not_supported",
-    }
+    assert refusal["code"] in {"not_enough_entries", "not_enough_players"}
     assert preview["can_start"] is False
     assert preview["rounds"] == []
     assert (preview["match_count"], preview["round_count"]) == (None, None)

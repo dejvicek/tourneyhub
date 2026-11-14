@@ -29,6 +29,7 @@ from tourneyhub.api.tournament_models import (
     StartWrite,
     SwissRoundRead,
     TiebreakersWrite,
+    TopPlayersWrite,
     TournamentCreate,
     TournamentFormatWrite,
     TournamentRead,
@@ -152,11 +153,15 @@ def start_tournament(
     (BR-130). A started tournament is 409 `tournament_not_in_setup`; a stale
     `expected_draw_counter` is 409 `draw_counter_changed`, and an
     `expected_seed_order` that is not the entries' current order, seed 1
-    first, 409 `seed_order_changed`: the review shows the new setup. Monster
-    DYP is 422 `format_not_supported` for now. An incomplete setup is 422:
+    first, 409 `seed_order_changed`: the review shows the new setup. A Monster
+    DYP gets round 1, groups of four by the league ranking with a top player
+    leading each, the extra players sitting out (BR-060, BR-061, BR-063); its
+    `expected_seed_order` is the preview's, the entries in league-ranking
+    order. An incomplete setup is 422:
     `players_without_partner` (Doubles), `not_enough_players`,
     `dyp_halves_incomplete`, `dyp_halves_unequal`, `too_many_left_out` (DYP),
-    `not_enough_entries` (FR-032: 2, or 4 with a third-place match),
+    `not_enough_entries` (FR-032: 2, 4 with a third-place match, 4 players
+    in a Monster DYP),
     `too_many_entries_for_round_robin` (detail `limit`: 64) or
     `too_many_entries_for_knockout` (detail `limit`: 256).
     """
@@ -320,6 +325,32 @@ def set_dyp_halves(
     return TournamentSetupRead.model_validate(setup)
 
 
+@router.put("/tournaments/{tournament_id}/setup/top-players", responses=_WRITE_ERRORS)
+def set_top_players(
+    league_id: UUID,
+    tournament_id: UUID,
+    body: TopPlayersWrite,
+    session: SessionDep,
+    user: CurrentUserDep,
+    clock: ClockDep,
+) -> TournamentSetupRead:
+    """Mark the Monster DYP top players, the target state (FR-041, BR-061).
+
+    At most one per match of round 1: 422 `too_many_top_players` with `max`;
+    409 `player_not_picked` for a player who is not in the tournament. Other
+    types: 409 `tournament_type_changed`.
+    """
+    setup = tournament_service.set_top_players(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user.id,
+        player_ids=body.player_ids,
+        clock=clock,
+    )
+    return TournamentSetupRead.model_validate(setup)
+
+
 @router.put("/tournaments/{tournament_id}/setup/seeding", responses=_WRITE_ERRORS)
 def set_seeding_method(
     league_id: UUID,
@@ -379,7 +410,7 @@ def read_schedule_preview(
     `problem`: `players_without_partner`, `not_enough_entries`,
     `too_many_entries_for_round_robin` (detail `limit`: 64),
     `too_many_entries_for_knockout` (detail `limit`: 256),
-    `format_not_supported` (Monster DYP), the DYP codes of a draw that cannot be made, or
+    the DYP codes of a draw that cannot be made, or
     `tournament_not_in_setup` for a started tournament. Another league's
     tournament is 404.
     """
@@ -514,23 +545,29 @@ def add_round(
     user: CurrentUserDep,
     clock: ClockDep,
 ) -> SwissRoundRead:
-    """Draw the next round of a Swiss from the current standings (FR-040, FR-042).
+    """Draw the next round of a Swiss or Monster DYP from the standings (FR-040, FR-042).
 
-    Entries play their neighbour in the standings without meeting anyone
-    twice while that can be avoided (BR-056, BR-057, ADR-011); with an odd
-    number one sits out (BR-058). Disabled entries are not drawn (BR-064).
-    The rounds before it lock (BR-065), and its first matches take the free
-    fields (BR-130). Returns the new round, with what a lot decided and
-    which pairs repeat (ADR-009).
+    A Swiss: entries play their neighbour in the standings without meeting
+    anyone twice while that can be avoided (BR-056, BR-057, ADR-011); with an
+    odd number one sits out (BR-058). A Monster DYP: players are grouped in
+    fours by their standing, the 1st and 4th against the 2nd and 3rd, with the
+    top players of the league ranking apart in rounds 1 and 2 and nobody
+    getting a partner twice while that can be avoided (BR-060 to BR-062); the
+    extra one to three players sit out (BR-063). Disabled entries are not
+    drawn (BR-064). The rounds before it lock (BR-065), and its first matches
+    take the free fields (BR-130). Returns the new round, with what a lot
+    decided and which pairs repeat (ADR-009).
 
     409: `round_number_changed` (the body's `expected_round_no` is not the
     newest round's number plus one; detail `current_round_no`, the newest
     round's), `tournament_not_in_progress` (detail `state`) or
-    `season_closed`. 422: `format_not_supported` (not a Swiss; detail
-    `format`), `group_phase_locked` (the knockout is drawn; detail
+    `season_closed`. 422: `format_not_supported` (not a Swiss or Monster DYP;
+    detail `format`), `group_phase_locked` (the knockout is drawn; detail
     `phase_id`), `round_not_complete` (a match of the newest round has no
-    result; detail `matches_left`) or `not_enough_entries` (fewer than 2
-    entries that are not disabled).
+    result; detail `matches_left`), `not_enough_entries` (a Swiss with fewer
+    than 2 entries that are not disabled) or `not_enough_players` (a Monster
+    DYP with fewer than 4 players that are not disabled; details `minimum`,
+    `given`).
     """
     round_ = tournament_service.add_round(
         session,
@@ -556,17 +593,20 @@ def delete_round(
     user: CurrentUserDep,
     clock: ClockDep,
 ) -> None:
-    """Delete the newest round of a Swiss, with its results; the UI asks first (FR-046).
+    """Delete the newest round of a Swiss or Monster DYP, with its results (FR-046).
+
+    The UI asks first.
 
     The round before it unlocks (BR-066). Deleting round 1 takes the
     tournament back to setup, results or not: every round goes, the
-    entries, seeds and draws stay, and every disabled flag is cleared.
+    entries, seeds, draws and top-player marks stay, and every disabled flag
+    is cleared.
 
     An unknown round, or a repeated delete, is 404 `round_not_found`: it is
     gone. 409: `round_not_newest` (a later round exists; detail `round_id`,
     the newest round's), `tournament_not_in_progress` (detail `state`) or
-    `season_closed`. 422: `format_not_supported` (not a Swiss; detail
-    `format`) or `group_phase_locked` (the knockout is drawn: delete it
+    `season_closed`. 422: `format_not_supported` (not a Swiss or Monster DYP;
+    detail `format`) or `group_phase_locked` (the knockout is drawn: delete it
     first, BR-087; detail `phase_id`).
     """
     tournament_service.delete_round(
@@ -735,13 +775,15 @@ def finish_tournament(
     user: CurrentUserDep,
     clock: ClockDep,
 ) -> TournamentRead:
-    """Finish a round robin or a Swiss without a knockout, once the UI has asked (FR-040).
+    """Finish a round robin, Swiss or Monster DYP without a knockout (FR-040).
+
+    The UI asks first.
 
     A tournament that is not in progress is 409 `tournament_not_in_progress`
     (detail `state`), so a repeat changes nothing. A match without a result is
     422 `group_phase_not_done` (detail `matches_left`). A tournament with a
-    knockout, which finishes with its last result (FR-037), or a Monster DYP
-    is 422 `format_not_supported`.
+    knockout, which finishes with its last result (FR-037), is 422
+    `format_not_supported`.
     The standings become the places (`GET …/places`).
     """
     tournament = tournament_service.finish_tournament(
@@ -767,8 +809,7 @@ def read_places(
     there are no rows. With a knockout, its entries take the top places and
     the others follow in their group-phase order (BR-102, BR-103); without a
     group phase, every entry is placed by the knockout, and its reason has no
-    `group_place` and no `group_format`. A Monster DYP is 422
-    `format_not_supported` until it is played.
+    `group_place` and no `group_format`.
     """
     places = tournament_service.read_places(
         session, league_id=league_id, tournament_id=tournament_id, user_id=user.id
