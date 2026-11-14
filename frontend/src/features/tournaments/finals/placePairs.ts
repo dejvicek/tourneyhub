@@ -13,6 +13,8 @@ export interface PlaceGroup<R extends PairableRow> {
   entryIds: string[];
   /** The first row of the group; its reason and points stand for all of it. */
   first: R;
+  /** Every row of the group: the first, then the partner's if any. */
+  rows: R[];
 }
 
 /**
@@ -45,6 +47,7 @@ export function pairPlaces<R extends PairableRow>(
           ? [row.entry_id]
           : [row.entry_id, partner.entry_id],
       first: row,
+      rows: partner === undefined ? [row] : [row, partner],
     });
   }
   return groups;

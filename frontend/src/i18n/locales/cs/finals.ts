@@ -195,6 +195,23 @@ export const finals: CsMessages<Messages["finals"]> = {
       group_round_robin: "{{place}} místo ve hře každý s každým",
       group_standings: "{{place}} místo v tabulce",
       shared: "Společné místo. {{reason}}.",
+      replacedIn: {
+        round_of_256:
+          "Nahrazen náhradníkem, umístěn jako při konci v 1/128 finále",
+        round_of_128:
+          "Nahrazen náhradníkem, umístěn jako při konci v 1/64 finále",
+        round_of_64:
+          "Nahrazen náhradníkem, umístěn jako při konci v 1/32 finále",
+        round_of_32:
+          "Nahrazen náhradníkem, umístěn jako při konci v šestnáctifinále",
+        round_of_16:
+          "Nahrazen náhradníkem, umístěn jako při konci v osmifinále",
+        quarterfinal:
+          "Nahrazen náhradníkem, umístěn jako při konci ve čtvrtfinále",
+        semifinal: "Nahrazen náhradníkem, umístěn jako při konci v semifinále",
+        final: "Nahrazen náhradníkem, umístěn jako při konci ve finále",
+      },
+      named: "{{name}}: {{reason}}",
     },
     pointsEach: "+{{points}} každý",
     pointsOwn: "+{{points}}",

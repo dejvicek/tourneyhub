@@ -38,6 +38,11 @@ function useReasonText() {
           return t("finals.finished.reason.lost_third_place");
         case "lost_in_round":
           return t(`finals.finished.reason.lostIn.${reason.round ?? "final"}`);
+        case "replaced":
+          // BR-151: placed as if knocked out in the round of the seat they took.
+          return t(
+            `finals.finished.reason.replacedIn.${reason.round ?? "final"}`,
+          );
         case "group_place":
           return reason.group_format === "round_robin"
             ? t("finals.finished.reason.group_round_robin", {
@@ -70,6 +75,15 @@ export function PlaceRows({ rows, entryName, isPair }: PlaceRowsProps) {
         }
         const first = head.first;
         const points = first.points_per_player;
+        // BR-151: a replaced player shares the place of the pair whose seat
+        // they took, so the place reads by the others' reason and each
+        // replaced player gets a line of their own.
+        const rowsHere = inPlace.flatMap((group) => group.rows);
+        const main =
+          rowsHere.find((row) => row.reason.kind !== "replaced") ?? first;
+        const replaced = rowsHere.filter(
+          (row) => row !== main && row.reason.kind === "replaced",
+        );
         return (
           <li
             key={place}
@@ -88,8 +102,19 @@ export function PlaceRows({ rows, entryName, isPair }: PlaceRowsProps) {
                 </p>
               ))}
               <p className="text-body-sm text-muted-foreground">
-                {reasonText(first.reason, inPlace.length > 1)}
+                {reasonText(main.reason, inPlace.length > 1)}
               </p>
+              {replaced.map((row) => (
+                <p
+                  key={row.entry_id}
+                  className="text-body-sm text-muted-foreground"
+                >
+                  {t("finals.finished.reason.named", {
+                    name: entryName(row.entry_id),
+                    reason: reasonText(row.reason, false),
+                  })}
+                </p>
+              ))}
             </div>
             <span className="text-body-md font-bold text-primary">
               {points === 0

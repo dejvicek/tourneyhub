@@ -932,7 +932,7 @@ describe("Lots in the bracket (BR-074, ADR-009)", () => {
 
 describe("Finished in Lord have mercy (screen 10, BR-145)", () => {
   /** Per-player place rows, partners sharing a place, as the backend sends them. */
-  function lordHaveMercyPlaces() {
+  function lordHaveMercyPlaces(replacedSeventh = false) {
     const tournament = db().tournaments.find((t) => t.id === LHM);
     const singles = (tournament?.entries ?? []).filter(
       (e) => e.player_ids.length === 1,
@@ -946,14 +946,17 @@ describe("Finished in Lord have mercy (screen 10, BR-145)", () => {
       index: number,
       place: number,
       partner: number,
-      kind: "won_final" | "lost_final" | "lost_in_round",
+      kind: "won_final" | "lost_final" | "lost_in_round" | "replaced",
     ) => ({
       entry_id: singles[index]?.id ?? "",
       place,
       points_per_player: 10 - place,
       reason: {
         kind,
-        round: kind === "lost_in_round" ? "semifinal" : "final",
+        round:
+          kind === "lost_in_round" || kind === "replaced"
+            ? "semifinal"
+            : "final",
         score: kind === "won_final" ? [10, 3] : null,
         opponent_entry_id: null,
         partner_entry_id: singles[partner]?.id ?? null,
@@ -979,7 +982,7 @@ describe("Finished in Lord have mercy (screen 10, BR-145)", () => {
             row(3, 2, 2, "lost_final"),
             row(4, 3, 5, "lost_in_round"),
             row(5, 3, 4, "lost_in_round"),
-            row(6, 3, 7, "lost_in_round"),
+            row(6, 3, 7, replacedSeventh ? "replaced" : "lost_in_round"),
             row(7, 3, 6, "lost_in_round"),
           ],
         }),
@@ -1014,6 +1017,32 @@ describe("Finished in Lord have mercy (screen 10, BR-145)", () => {
     expect(rows[2]).toHaveTextContent(`${name(4)} / ${name(5)}`);
     expect(rows[2]).toHaveTextContent(`${name(6)} / ${name(7)}`);
     expect(rows[2]).toHaveTextContent("Shared. Lost in the semifinals.");
+  });
+
+  it("says a replaced player is placed as knocked out in the round of the seat they took (BR-151)", async () => {
+    const { name } = lordHaveMercyPlaces(true);
+    renderAt(at(paths.finished, LHM));
+
+    const places = await screen.findByRole("region", { name: "Final places" });
+    const third = within(places).getAllByRole("listitem")[2];
+    expect(third).toHaveTextContent(`${name(6)} / ${name(7)}`);
+    // The place reads by the others' reason; the replaced player has a line.
+    expect(third).toHaveTextContent("Shared. Lost in the semifinals.");
+    expect(third).toHaveTextContent(
+      `${name(6)}: Replaced, placed as knocked out in the semifinals`,
+    );
+  });
+
+  it("says it in Czech (BR-151)", async () => {
+    await i18n.changeLanguage("cs");
+    const { name } = lordHaveMercyPlaces(true);
+    renderAt(at(paths.finished, LHM));
+
+    expect(
+      await screen.findByText(
+        `${name(6)}: Nahrazen náhradníkem, umístěn jako při konci v semifinále`,
+      ),
+    ).toBeInTheDocument();
   });
 });
 
