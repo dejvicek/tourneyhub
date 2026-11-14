@@ -655,7 +655,7 @@ describe("the finals in the fake API", () => {
       await expect(add(MONSTER, playerId, 5)).rejects.toMatchObject({
         status: 409,
         code: "round_number_changed",
-        detail: { current_round_no: 6 },
+        detail: { current_round_no: 5 },
       });
     });
   });

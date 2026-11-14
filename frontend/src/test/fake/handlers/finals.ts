@@ -351,7 +351,7 @@ export const finalsHandlers = [
       const next = roundsOf(t, group).length + 1;
       if (body.from_round_no !== next) {
         return apiError(409, "round_number_changed", {
-          current_round_no: next,
+          current_round_no: next - 1,
         });
       }
       const ids = idFactory();
