@@ -48,6 +48,8 @@ export function RemixPlayers({
       ),
     ),
   );
+  // No draw follows the final's round, so nobody comes in any more.
+  const lastDrawn = knockout.rounds.length === knockout.round_count;
   // The players of the newest round's matches still to be played.
   const playing = new Set(
     (knockout.rounds.at(-1)?.matches ?? [])
@@ -72,9 +74,17 @@ export function RemixPlayers({
       if (!player.is_disabled) {
         return t("finals.remix.players.stillIn");
       }
-      return playing.has(player.player_id)
-        ? t("finals.remix.players.leftOpen")
+      if (playing.has(player.player_id)) {
+        return t("finals.remix.players.leftOpen");
+      }
+      return lastDrawn
+        ? t("finals.remix.players.leftLast")
         : t("finals.remix.players.leftNext");
+    }
+    if (lastDrawn) {
+      return player.is_disabled
+        ? t("finals.remix.players.notHereLast")
+        : t("finals.remix.players.knockedOutLast");
     }
     return player.is_disabled
       ? t("finals.remix.players.notHere")
@@ -102,7 +112,9 @@ export function RemixPlayers({
       </h2>
       <div id={listId} hidden={!open} className="space-y-2">
         <p className="text-body-sm text-muted-foreground">
-          {t("finals.remix.players.help")}
+          {lastDrawn
+            ? t("finals.remix.players.helpLast")
+            : t("finals.remix.players.help")}
         </p>
         <ul className="border-t border-border">
           {knockout.players.map((player) => {

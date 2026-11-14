@@ -1006,6 +1006,43 @@ describe("Knockout in Lord have mercy (screen 9, BR-155)", () => {
 
       expect(await violations()).toEqual([]);
     });
+
+    it("says plain statuses once the final's round is drawn, as nobody comes in any more (BR-147, BR-148)", async () => {
+      withoutThirdPlace();
+      await finishNewestRound();
+      await drawRound(2);
+      const out = (await readRounds()).players.filter(
+        (p) => p.status === "knocked_out",
+      );
+      expect(out).toHaveLength(4);
+      await setDisabled(out[0]?.entry_id ?? "");
+      const user = userEvent.setup();
+      renderAt(knockoutPath());
+      await openPlayers(user);
+
+      expect(screen.getAllByText("Knocked out.")).toHaveLength(3);
+      expect(screen.getByText("Not here.")).toBeInTheDocument();
+      expect(screen.queryByText(/as a replacement/)).toBeNull();
+      expect(screen.queryByText(/next draw/)).toBeNull();
+    });
+
+    it("says a final winner who left has left, with no next draw (BR-147)", async () => {
+      await finishNewestRound();
+      const drawn = await drawRound(2);
+      const final = drawn.rounds[1]?.matches.find((m) => m.kind === "standard");
+      await enterResult(final?.match_id ?? "", true);
+      const winner = final?.sides[0]?.player_ids[0] ?? "";
+      const entry = (await readRounds()).players.find(
+        (p) => p.player_id === winner,
+      );
+      await setDisabled(entry?.entry_id ?? "");
+      const user = userEvent.setup();
+      renderAt(knockoutPath());
+      await openPlayers(user);
+
+      expect(screen.getByText("Has left.")).toBeInTheDocument();
+      expect(screen.queryByText(/next draw/)).toBeNull();
+    });
   });
 });
 
