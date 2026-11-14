@@ -65,6 +65,7 @@ The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. 
     - [x] Step 1, disabling a player in the knockout: the control on the knockout screen, through P14's disable route (decision A; FR-044, BR-147) ([#118](https://github.com/dejvicek/tourneyhub/pull/118)).
     - [x] Step 2: replacements ([#118](https://github.com/dejvicek/tourneyhub/pull/118)).
     - [ ] Order of re-mixed pairs sharing a place ([#94](https://github.com/dejvicek/tourneyhub/issues/94), waiting for an answer).
+    - [ ] Decisions of the replacements PR to confirm: the draw's guard, the ranking of BR-148 across the final and the third-place match, the Czech label, an e2e spec ([#119](https://github.com/dejvicek/tourneyhub/issues/119), waiting for an answer).
     - [x] Check the bracket size of round 1 in `remix_state` ([#96](https://github.com/dejvicek/tourneyhub/issues/96)) ([#107](https://github.com/dejvicek/tourneyhub/pull/107)).
   - [x] Screen 13 and marking top players on the real API ([#104](https://github.com/dejvicek/tourneyhub/pull/104), [#105](https://github.com/dejvicek/tourneyhub/pull/105)).
   - [x] Which draw to use when every grouping repeats a partner ([#79](https://github.com/dejvicek/tourneyhub/issues/79), [#83](https://github.com/dejvicek/tourneyhub/pull/83)).
