@@ -16,6 +16,7 @@ The MVP is split into 16 packages, P1 to P16. The critical path is P1 → P5 →
 - [x] P9 Fields ([#50](https://github.com/dejvicek/tourneyhub/pull/50)).
 - [x] P10 Knockout, finishing and season standings ([#57](https://github.com/dejvicek/tourneyhub/pull/57), [#58](https://github.com/dejvicek/tourneyhub/pull/58), [#66](https://github.com/dejvicek/tourneyhub/pull/66)).
 - [x] P11 Share link ([#44](https://github.com/dejvicek/tourneyhub/pull/44)) and milestone M1, the DYP evening end to end in e2e ([#47](https://github.com/dejvicek/tourneyhub/pull/47)).
+- [x] Remove the demo mode, D1 to D5 ([#91](https://github.com/dejvicek/tourneyhub/pull/91), [#97](https://github.com/dejvicek/tourneyhub/pull/97), [#101](https://github.com/dejvicek/tourneyhub/pull/101), [#103](https://github.com/dejvicek/tourneyhub/pull/103), [#104](https://github.com/dejvicek/tourneyhub/pull/104), [#111](https://github.com/dejvicek/tourneyhub/pull/111), [#113](https://github.com/dejvicek/tourneyhub/pull/113), [#115](https://github.com/dejvicek/tourneyhub/pull/115), [#121](https://github.com/dejvicek/tourneyhub/pull/121)). The fake API of the frontend tests stays; [#120](https://github.com/dejvicek/tourneyhub/issues/120) tracks replacing its engines with fixtures.
 
 ## 2. Small follow-ups
 
@@ -25,28 +26,7 @@ The MVP is split into 16 packages, P1 to P16. The critical path is P1 → P5 →
 - [ ] [#106](https://github.com/dejvicek/tourneyhub/issues/106) (sit-out column in the standings, FR-060)
 - [x] [#109](https://github.com/dejvicek/tourneyhub/issues/109) (flaky fake test: Monster DYP round-2 top player by league ranking) ([#110](https://github.com/dejvicek/tourneyhub/pull/110))
 
-## 3. Remove the demo mode
-
-The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. The team now works against the real backend, so the demo goes. Today app code and tests still depend on it, and the screens call 12 routes the backend lacks through `provisionalApi`.
-
-- [x] D1 Move out of `src/demo` what the app uses: `rules.ts` (with the Lord have mercy filter, so the option stays hidden on the knockout start screen), the types from `contract.ts`, and the helpers of the finals screens (`StartKnockoutPage`, `names.ts`, `score.ts`, `RankingTable`, `TiebreakerSheet`). Done when only `src/api/provisional.ts` and `main.tsx` import from the demo outside `src/demo` and the tests. ([#91](https://github.com/dejvicek/tourneyhub/pull/91))
-- [x] D2 Tests without the demo: Vitest gets its own MSW handlers and test data instead of the demo store and seed. Done when nothing in `src/test/` imports from `@/demo/`. ([#101](https://github.com/dejvicek/tourneyhub/pull/101))
-- [x] D3 Move the routes the backend already covers or can cover with little work:
-  - [x] Finishing a tournament on the finals screen calls `POST …/finish` instead of `PUT …/state`. ([#111](https://github.com/dejvicek/tourneyhub/pull/111))
-  - [x] `GET …/players/{player_id}/tournaments` (BR-002, FR-012), together with Q25. ([#111](https://github.com/dejvicek/tourneyhub/pull/111))
-  - [x] `PUT …/setup/top-players` (FR-041), together with Q11 ([#103](https://github.com/dejvicek/tourneyhub/pull/103), [#104](https://github.com/dejvicek/tourneyhub/pull/104)).
-- [x] D4 Routes that come with P12–P14 (section 4). The screens are not hidden: until a route exists, the screen that calls it gets a 404 on the real server:
-  - [x] P12, P13: the screens move from the provisional `…/ranking` to `GET …/play` and the public `…/standings`; `PUT …/tiebreakers`, `POST …/rounds` and `DELETE …/rounds/{round_id}` exist in the backend, and the screens still have to switch to them. ([#97](https://github.com/dejvicek/tourneyhub/pull/97))
-  - [x] P14:
-    - [x] `GET …/participants` and `PUT …/entries/{entry_id}/disabled`. ([#113](https://github.com/dejvicek/tourneyhub/pull/113))
-    - [x] `POST …/entries` (late players). ([#115](https://github.com/dejvicek/tourneyhub/pull/115))
-- [x] D5 Delete the demo: `src/demo/`, `src/api/provisional.ts` and `src/api/provisionalPaths.ts`, the exports of `src/lib/rules.ts` only the demo read, the `dev:demo` script, the demo settings in `vite.config.ts`, `main.tsx` and CI, and the mentions in `CLAUDE.md` and `docs/style/frontend-style.md`. Done when no demo code is left and lint, typecheck, unit tests, build and e2e pass. ([#121](https://github.com/dejvicek/tourneyhub/pull/121))
-  - [x] ESLint also stops `./test/…` imports from files directly in `src/`, and dynamic `import()` of them (the `demo` folder is gone, so `./demo/…` needs no rule).
-  - [x] Comments in `src/test/fake/` that still say "demo", and the ESLint globs and comments for the demo's tests, which match nothing since D2.
-  - [x] Tests that call `provisionalApi` (six files) move to `api` once D3 and D4 switch their routes. `providesProvisionalRoutes()` (`src/lib/demoMode.ts`) has no tests or callers and is deleted.
-  - [x] Decide whether the fake engines in `src/test/fake/` (about 4,600 lines that mirror server logic) are replaced by plain fixtures: they stay for the MVP, and [#120](https://github.com/dejvicek/tourneyhub/issues/120) tracks the replacement.
-
-## 4. Rest of the MVP
+## 3. Rest of the MVP
 
 - [ ] **P12 Swiss** (FR-040, FR-042, FR-043, FR-046; BR-055 – BR-058, BR-065, BR-066, BR-068, BR-072 – BR-074; ADR-011)
   - [x] Engine: pairing, standings with BH1 and BH2, recommended number of rounds ([#38](https://github.com/dejvicek/tourneyhub/pull/38), [#43](https://github.com/dejvicek/tourneyhub/pull/43)).
