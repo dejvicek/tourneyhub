@@ -183,7 +183,12 @@ class MatchSide(Base):
 
 
 class MatchSidePlayer(Base):
-    """A player on a side, listed for every stored side (DATA-MODEL §4.5)."""
+    """A player on a side, listed for every stored side (DATA-MODEL §4.5).
+
+    `replaced_player_id` names the player this one came in for, on a side of
+    a Lord have mercy round after round 1 only (BR-148, D4); the application
+    ensures where it is set.
+    """
 
     __tablename__ = "match_side_players"
     __table_args__ = (
@@ -201,11 +206,22 @@ class MatchSidePlayer(Base):
             deferrable=True,
             initially="DEFERRED",
         ),
+        # The deferred reference of DATA-MODEL §2, as for player_id.
+        ForeignKeyConstraint(
+            ["replaced_player_id"],
+            ["players.id"],
+            name="fk_match_side_players_replaced_player_id_players",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
         # Nobody plays on both sides.
         UniqueConstraint("match_id", "player_id"),
+        # A replacement comes in for somebody else (BR-148).
+        CheckConstraint("replaced_player_id <> player_id", name="replaced_player"),
     )
 
     match_id: Mapped[UUID] = mapped_column(primary_key=True)
     side: Mapped[int] = mapped_column(primary_key=True)
     player_id: Mapped[UUID] = mapped_column(primary_key=True, index=True)
+    replaced_player_id: Mapped[UUID | None] = mapped_column(index=True)
     created_at: Mapped[datetime]

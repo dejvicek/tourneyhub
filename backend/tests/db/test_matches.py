@@ -245,6 +245,12 @@ def test_br092_a_game_may_have_no_score_or_one_that_fits(
             id="D2-player-on-both-sides",
         ),
         pytest.param(
+            "UPDATE match_side_players SET replaced_player_id = player_id"
+            " WHERE match_id = :id",
+            "ck_match_side_players_replaced_player",
+            id="BR-148-replaced-by-themself",
+        ),
+        pytest.param(
             "INSERT INTO rounds (id, phase_id, round_no, created_at)"
             " SELECT gen_random_uuid(), phase_id, 1, now() FROM rounds r"
             " JOIN matches m ON m.round_id = r.id WHERE m.id = :id",
