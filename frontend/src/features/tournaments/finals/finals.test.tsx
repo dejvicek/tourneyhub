@@ -1544,6 +1544,42 @@ describe("Start the knockout (screen 13)", () => {
     ).toBeDisabled();
   });
 
+  it("shows one warning, not two, while the last group round is unfinished (BR-080)", async () => {
+    const monster = db().tournaments.find((t) => t.id === MONSTER);
+    const open = monster?.rounds.at(-1)?.matches[0];
+    if (open === undefined) throw new Error("The seed has a group round");
+    open.outcome = null;
+    server.use(
+      http.get(
+        "/api/v1/leagues/:leagueId/tournaments/:tournamentId/knockout/preview",
+        () =>
+          HttpResponse.json({
+            can_start: false,
+            problem: { code: "group_phase_not_done", detail: {} },
+            draw_counter: 0,
+            is_cut_by_lot: false,
+            max_qualifiers: 4,
+            qualifiers: 4,
+            entries: [],
+            first_round: [],
+            bracket_size: 4,
+            locks_round_no: 1,
+            skipped_entry_ids: [],
+          }),
+      ),
+    );
+    renderAt(at(paths.startKnockout, MONSTER));
+
+    expect(
+      await screen.findByText("This tournament is not at this step."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "Every group match needs a result before the knockout is drawn.",
+      ),
+    ).not.toBeInTheDocument();
+  });
+
   it("says which disabled player can't go through (BR-080)", async () => {
     renderAt(at(paths.startKnockout, MONSTER));
     expect(await screen.findByText(/can't go through/)).toBeInTheDocument();

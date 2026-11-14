@@ -224,8 +224,13 @@ export function RemixKnockout({
                 </AlertDialogCancel>
                 <AlertDialogAction
                   onClick={() => {
-                    removal.mutate(newest.round_id, {
-                      onSuccess: () => {
+                    // The reload after the delete can swap this component for
+                    // the "no knockout" view before a per-call onSuccess runs,
+                    // so the navigation hangs on the promise (errors show via
+                    // removal.isError).
+                    removal
+                      .mutateAsync(newest.round_id)
+                      .then(() => {
                         // BR-087: deleting round 1 deleted the knockout.
                         if (newest.round_no === 1) {
                           void navigate(
@@ -235,8 +240,8 @@ export function RemixKnockout({
                             }),
                           );
                         }
-                      },
-                    });
+                      })
+                      .catch(() => undefined);
                   }}
                 >
                   {deleteLabel}
