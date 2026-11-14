@@ -160,6 +160,7 @@ export const finals: CsMessages<Messages["finals"]> = {
     left: "Už nehraje",
     drawnAfter: "Losuje se po: {{previous}}",
     drawnLater: "Losuje se později",
+    cameIn: "{{in}} hraje za hráče {{out}}",
   },
   finished: {
     title: "Dohráno",

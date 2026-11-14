@@ -146,6 +146,19 @@ function SideRow({
         {won && (
           <span className="sr-only"> ({t("finals.knockout.winner")})</span>
         )}
+        {side.replacements.map((replacement) => (
+          // BR-155: who came in for whom, on a line of its own so a long
+          // pair still fits a phone.
+          <span
+            key={replacement.player_id}
+            className="block text-caption font-normal text-muted-foreground"
+          >
+            {t("finals.remix.cameIn", {
+              in: ctx.playerName(replacement.player_id),
+              out: ctx.playerName(replacement.replaced_player_id),
+            })}
+          </span>
+        ))}
       </span>
       {score !== undefined && (
         <span className="font-display text-score-s">{score}</span>

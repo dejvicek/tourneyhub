@@ -149,6 +149,7 @@ export const finals = {
     left: "No longer playing",
     drawnAfter: "Drawn after the {{previous}}",
     drawnLater: "Drawn later",
+    cameIn: "{{in}} in for {{out}}",
   },
   finished: {
     title: "Finished",

@@ -406,7 +406,13 @@ describe("Knockout in Lord have mercy (screen 9, BR-155)", () => {
       state: "bye" as const,
       sides: [
         kept,
-        { entry_id: null, player_ids: [], is_bye: true, left_player_ids: [] },
+        {
+          entry_id: null,
+          player_ids: [],
+          is_bye: true,
+          left_player_ids: [],
+          replacements: [],
+        },
       ],
     };
     const bye = { ...read.rounds.at(-1), matches: [first, byeMatch] };

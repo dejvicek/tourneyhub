@@ -1,3 +1,4 @@
+import { QueryClient } from "@tanstack/react-query";
 import { screen, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { generatePath } from "react-router";
@@ -5,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { provisionalApi } from "@/api/provisional";
 import { axeViolations } from "@/features/auth/axeCheck";
+import { publicQueries } from "@/features/public/api";
 import { i18n } from "@/i18n";
 import { paths } from "@/lib/paths";
 import { TEST_SHARE_TOKEN, testId } from "@/test/fake/ids";
@@ -488,6 +490,40 @@ describe("share-link views outside demo mode", () => {
 
       await screen.findByRole("radiogroup", { name: "Rounds of the knockout" });
       expect(screen.getAllByText("No longer playing")).toHaveLength(1);
+    });
+
+    it("marks who came in for whom (BR-155)", async () => {
+      const tournament = db().tournaments.find(
+        (t) => t.name === "Lord have mercy night",
+      );
+      const read = await new QueryClient().query(
+        publicQueries.knockoutRounds(
+          TEST_SHARE_TOKEN,
+          tournament?.id ?? "",
+          true,
+        ),
+      );
+      const side = read.rounds[0]?.matches[0]?.sides[0];
+      const incoming = side?.player_ids[0] ?? "";
+      const out =
+        tournament?.entries.find(
+          (e) => e.stage === "main" && !e.player_ids.includes(incoming),
+        )?.player_ids[0] ?? "";
+      if (side !== undefined) {
+        side.replacements = [{ player_id: incoming, replaced_player_id: out }];
+      }
+      server.use(
+        http.get("*/api/v1/public/:token/tournaments/:id/knockout/rounds", () =>
+          HttpResponse.json(read),
+        ),
+      );
+      const nameOf = (id: string) =>
+        db().players.find((p) => p.id === id)?.name ?? "";
+      renderAt(pageOf("Lord have mercy night"));
+
+      expect(
+        await screen.findByText(`${nameOf(incoming)} in for ${nameOf(out)}`),
+      ).toBeInTheDocument();
     });
 
     it("has no axe violations (BR-155)", async () => {
