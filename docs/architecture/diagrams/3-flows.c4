@@ -152,6 +152,11 @@ views "III. Flows" {
       tourneyhub.api.tournamentsApi -> tourneyhub.db.play "frees its fields, deletes the round with its matches and participation; round 1: back to setup"
       tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "204"
     }
+    opt "the organizer disables or re-enables an entry (FR-044)" {
+      tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "PUT …/entries/{entry_id}/disabled with the target state"
+      tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the league and the tournament: not in progress 409, not a Swiss or Monster DYP group phase or a Lord have mercy knockout 422; sets entries.is_disabled, a repeat changes nothing"
+      tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: the participant; the next round leaves a disabled entry out (BR-064)"
+    }
     opt "the organizer reorders the tie-breakers" {
       tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "PUT …/tiebreakers with the enabled ones in order"
       tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "stores the phase's tiebreakers; a finished tournament 409, a knockout drawn 422"
