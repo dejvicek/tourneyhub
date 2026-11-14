@@ -128,9 +128,6 @@ export function RemixKnockout({
   const nextDraw = data.next_draw;
   const entryOf = (playerId: string) =>
     data.players.find((player) => player.player_id === playerId)?.entry_id;
-  const pendingEntryId = setDisabled.isPending
-    ? setDisabled.variables.entryId
-    : null;
   const change = (entryId: string, disabled: boolean, done: string) => {
     setDisabled.mutate(
       { entryId, disabled },
@@ -283,7 +280,7 @@ export function RemixKnockout({
         <RemixPlayers
           knockout={data}
           playerName={roster.player}
-          pendingEntryId={pendingEntryId}
+          busy={setDisabled.isPending}
           onChange={(player, disabled) => {
             const name = roster.player(player.player_id);
             change(

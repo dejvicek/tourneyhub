@@ -1043,6 +1043,51 @@ describe("Knockout in Lord have mercy (screen 9, BR-155)", () => {
       expect(screen.getByText("Has left.")).toBeInTheDocument();
       expect(screen.queryByText(/next draw/)).toBeNull();
     });
+
+    /** Holds every disable or enable request until the returned function runs. */
+    function holdDisableRequests(): () => void {
+      let release = (): void => undefined;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      server.use(
+        http.put(
+          "/api/v1/leagues/:leagueId/tournaments/:tournamentId/entries/:entryId/disabled",
+          // An empty resolver falls through to the fake API.
+          async () => {
+            await gate;
+          },
+        ),
+      );
+      return release;
+    }
+
+    it("takes one change at a time: every row waits while one is saved (FR-044)", async () => {
+      const release = holdDisableRequests();
+      const user = userEvent.setup();
+      renderAt(knockoutPath());
+      await openPlayers(user);
+      const [first] = screen.getAllByRole("button", { name: /^Disable / });
+      if (first === undefined) throw new Error("The list has players.");
+
+      await user.click(first);
+
+      await waitFor(() => {
+        for (const button of screen.getAllByRole("button", {
+          name: /^(Disable|Enable) /,
+        })) {
+          expect(button).toBeDisabled();
+        }
+      });
+      release();
+      await waitFor(() => {
+        for (const button of screen.getAllByRole("button", {
+          name: /^(Disable|Enable) /,
+        })) {
+          expect(button).toBeEnabled();
+        }
+      });
+    });
   });
 });
 

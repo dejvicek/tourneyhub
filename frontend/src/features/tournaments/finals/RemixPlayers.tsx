@@ -9,8 +9,8 @@ import { cn } from "@/lib/utils";
 interface RemixPlayersProps {
   knockout: RemixKnockoutData;
   playerName: (playerId: string) => string;
-  /** The entry whose change is being saved, or null. */
-  pendingEntryId: string | null;
+  /** A change is being saved: one request at a time, so every button waits. */
+  busy: boolean;
   onChange: (player: RemixPlayerData, disabled: boolean) => void;
 }
 
@@ -25,7 +25,7 @@ interface RemixPlayersProps {
 export function RemixPlayers({
   knockout,
   playerName,
-  pendingEntryId,
+  busy,
   onChange,
 }: RemixPlayersProps) {
   const { t, i18n } = useTranslation();
@@ -140,7 +140,7 @@ export function RemixPlayers({
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={pendingEntryId === player.entry_id}
+                  disabled={busy}
                   aria-label={
                     disabled
                       ? t("finals.players.enableFor", { name })
