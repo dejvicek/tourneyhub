@@ -9,6 +9,7 @@ import {
   pickPlayers,
   setupOf,
   startBody,
+  startTournament,
   tournamentOf,
 } from "../setupTestHelpers";
 import { TEST_LEAGUE_ID, TEST_SHARE_TOKEN, testId } from "./ids";
@@ -454,6 +455,18 @@ describe("the finals in the fake API", () => {
         }),
       );
       await expect(disable(MONSTER, entryId)).rejects.toMatchObject({
+        status: 422,
+        code: "disable_not_allowed",
+      });
+    });
+
+    it("answers 422 disable_not_allowed, not 404, for a knockout-only tournament", async () => {
+      const id = await createDraft({ type: "singles", group_phase: "none" });
+      await pickPlayers(id, 6);
+      await startTournament(id);
+      const entryId = await firstEntry(id);
+
+      await expect(disable(id, entryId)).rejects.toMatchObject({
         status: 422,
         code: "disable_not_allowed",
       });

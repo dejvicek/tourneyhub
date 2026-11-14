@@ -367,7 +367,7 @@ export const finalsHandlers = [
       const entry = t.entries.find(
         (e) => e.id === params.entry_id && e.stage === "main",
       );
-      if (!group || !entry) {
+      if (!entry) {
         return apiError(404, "entry_not_found", { entry_id: params.entry_id });
       }
       if (t.state !== "in_progress") {
@@ -376,8 +376,8 @@ export const finalsHandlers = [
       // The Lord have mercy knockout, or a Swiss or Monster DYP group phase
       // while no knockout has started.
       const allowed = knockoutPhase(t) ? isRemix(t) : usesRounds(t);
-      if (!allowed) {
-        return apiError(422, "disable_not_allowed", { phase_id: group.id });
+      if (!group || !allowed) {
+        return apiError(422, "disable_not_allowed", {});
       }
       if (entry.is_disabled !== body.disabled) {
         entry.is_disabled = body.disabled;
