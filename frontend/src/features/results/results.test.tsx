@@ -394,6 +394,21 @@ describe("result entry in a Lord have mercy knockout (BR-146)", () => {
       matchId,
     });
 
+  it("offers Clear result for an unlocked match of the newest round once the rounds are loaded (BR-146)", async () => {
+    const played = db()
+      .tournaments.find((t) => t.id === LHM)
+      ?.rounds.at(-1)
+      ?.matches.find((m) => m.outcome !== null);
+    if (played === undefined) throw new Error("The seed has a played match");
+    renderAt(knockoutResult(played.id));
+
+    const sheet = await screen.findByRole("dialog");
+    expect(
+      await within(sheet).findByRole("button", { name: "Clear result" }),
+    ).toBeInTheDocument();
+    expect(within(sheet).queryByText("The winner is fixed")).toBeNull();
+  });
+
   it("offers no clear or walkover while the rounds are not loaded (BR-146)", async () => {
     server.use(
       http.get(
@@ -437,7 +452,7 @@ describe("result entry in a Lord have mercy knockout (BR-146)", () => {
       await within(sheet).findByText("The winner is fixed"),
     ).toBeInTheDocument();
     expect(sheet).toHaveTextContent(
-      "Round 2 of the knockout is drawn. You can correct the score while the same pair wins. To change the winner, delete the newest knockout round.",
+      "A later knockout round is drawn. You can correct the score while the same pair wins. To change the winner, delete the knockout rounds after this one.",
     );
     expect(
       within(sheet).queryByRole("button", { name: "Clear result" }),
@@ -493,7 +508,7 @@ describe("result entry in a Lord have mercy knockout (BR-146)", () => {
     );
 
     expect(await within(sheet).findByRole("alert")).toHaveTextContent(
-      "The winner is fixed because round 2 is drawn. Correct the score, or delete the newest knockout round to change the winner.",
+      "The winner is fixed because a later knockout round is drawn. Correct the score, or delete the knockout rounds after this one to change the winner.",
     );
   });
 

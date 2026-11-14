@@ -69,9 +69,7 @@ function useResultError(
   }
   // BR-146: in a Lord have mercy knockout the lock keeps the winner, not the round.
   if (error.code === "round_locked" && inKnockout) {
-    return t("results.errors.lockedWinner", {
-      round: Number(error.detail.round_no),
-    });
+    return t("results.errors.lockedWinner");
   }
   if (hasText(error.code)) {
     return t(CODE_TEXTS[error.code], {
@@ -250,9 +248,7 @@ export function ResultEntry({
     <div className="space-y-4">
       {lock !== null && (
         <Notice variant="warning" title={t(`results.locked.${lock}.title`)}>
-          {t(`results.locked.${lock}.body`, {
-            round: rounds.data?.rounds.at(-1)?.round_no ?? 0,
-          })}
+          {t(`results.locked.${lock}.body`)}
         </Notice>
       )}
       {walkover ? (
