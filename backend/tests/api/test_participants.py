@@ -622,7 +622,7 @@ def test_fr044_before_a_swiss_round_everyone_is_playing_in_seed_order(
     )
 
 
-def test_br067_the_entry_that_sat_out_the_latest_round_is_marked(
+def test_br058_the_entry_that_sat_out_the_latest_round_is_marked(
     create: Callable[..., str],
     start: Callable[[str], Json],
     participants: Callable[[str], list[Json]],
