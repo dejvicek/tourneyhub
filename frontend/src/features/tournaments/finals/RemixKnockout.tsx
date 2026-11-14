@@ -197,9 +197,9 @@ export function RemixKnockout({
                       // focus when the next candidate takes the row.
                       <li
                         key={replacement.replaced_player_id}
-                        className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1"
+                        className="flex flex-wrap items-center gap-x-3 gap-y-1"
                       >
-                        <span className="min-w-0 flex-1 basis-48">
+                        <span className="min-w-0 flex-1 basis-48 md:flex-none md:basis-auto">
                           {t("finals.remix.comesIn", {
                             in: incoming,
                             out: roster.player(replacement.replaced_player_id),
