@@ -208,6 +208,15 @@ def _with_status(knockout: Knockout, status: str) -> list[str]:
     return [p["player_id"] for p in knockout.players() if p["status"] == status]
 
 
+def _group_places(knockout: Knockout) -> dict[str, int]:
+    """Each player's place in the group-phase standings, shared by ties."""
+    player_of = {p["entry_id"]: p["player_id"] for p in knockout.players()}
+    return {
+        player_of[row["entry_id"]]: row["place"]
+        for row in knockout.get("/play")["standings"]
+    }
+
+
 def _final(view: Json) -> Json:
     final: Json = view["rounds"][1]["matches"][0]
     return final
@@ -225,15 +234,19 @@ def test_fr049_br148_the_preview_names_the_best_placed_replacement(
     knockout: Knockout,
 ) -> None:
     leaving = _with_status(knockout, "still_in")[0]
-    best_loser = _with_status(knockout, "knocked_out")[0]
+    losers = _with_status(knockout, "knocked_out")
     knockout.set_disabled(leaving, disabled=True)
 
     view = knockout.view()
 
-    assert view["next_draw"] == {
-        "replacements": [{"player_id": best_loser, "replaced_player_id": leaving}],
-        "staying_player_ids": [],
-    }
+    [planned] = view["next_draw"]["replacements"]
+    assert planned["replaced_player_id"] == leaving
+    assert view["next_draw"]["staying_player_ids"] == []
+    # The best group-phase place among the knocked-out players; a tie there
+    # goes to the lot (BR-074), which the engine's tests pin.
+    place = _group_places(knockout)
+    assert planned["player_id"] in losers
+    assert place[planned["player_id"]] == min(place[p] for p in losers)
     assert view["left_player_ids"] == [leaving]
     assert knockout.player(leaving) | {"entry_id": None} == {
         "player_id": leaving,
