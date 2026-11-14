@@ -68,6 +68,7 @@ The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. 
   - [x] Which draw to use when every grouping repeats a partner ([#79](https://github.com/dejvicek/tourneyhub/issues/79), [#83](https://github.com/dejvicek/tourneyhub/pull/83)).
 - [ ] **P14 Late players and disabling** (FR-044, FR-047, FR-048; BR-045, BR-054, BR-064, BR-067)
   - [ ] Disable and enable a participant (written as a target state, ADR-008).
+  - [ ] Disabling during the group phase of a tournament with a knockout, on screen 12 ([#112](https://github.com/dejvicek/tourneyhub/issues/112), waiting for an answer).
   - [ ] Late entries in Swiss and Monster DYP.
   - [ ] Reschedule a round robin for a late entry, keeping seeds 1 and 2 last (BR-054, BR-051) ([#62](https://github.com/dejvicek/tourneyhub/issues/62)).
   - [ ] A late entry takes a bye; warning about the Buchholz tie-breakers.
