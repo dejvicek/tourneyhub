@@ -71,7 +71,7 @@ def headers(
 
 
 class Knockout:
-    """A Lord have mercy knockout of 4 pairs, its round 1 played, side 1 winning."""
+    """A Lord have mercy knockout of every player, its round 1 played, side 1 winning."""
 
     def __init__(
         self,
@@ -79,7 +79,11 @@ class Knockout:
         league: League,
         headers: dict[str, str],
         players: list[Player],
+        *,
+        third_place_match: bool = False,
     ) -> None:
+        self.qualifiers = len(players)
+        self.third_place_match = third_place_match
         self.client = client
         self.league = league
         self.headers = headers
@@ -130,7 +134,8 @@ class Knockout:
     def _start_knockout(self) -> None:
         tournament = self.get("")
         shown = self.get(
-            f"/knockout/preview?qualifiers=8&third_place_match=false&mode={MODE}"
+            f"/knockout/preview?qualifiers={self.qualifiers}"
+            f"&third_place_match={str(self.third_place_match).lower()}&mode={MODE}"
         )
         response = self.client.put(
             self.url("/knockout"),
@@ -140,8 +145,8 @@ class Knockout:
                     m["entry_id"] for e in shown["entries"] for m in e["members"]
                 ],
                 "expected_draw_counter": shown["draw_counter"],
-                "qualifiers": 8,
-                "third_place_match": False,
+                "qualifiers": self.qualifiers,
+                "third_place_match": self.third_place_match,
                 "match_format": "bo1",
                 "final_match_format": None,
                 "mode": MODE,
@@ -201,6 +206,18 @@ def knockout(
 ) -> Knockout:
     players = [make_player(league=league, name=f"P{n}") for n in range(1, 9)]
     return Knockout(client, league, headers, players)
+
+
+@pytest.fixture
+def quarterfinals(
+    client: TestClient,
+    league: League,
+    headers: dict[str, str],
+    make_player: Callable[..., Player],
+) -> Knockout:
+    """16 players in 8 pairs with a third-place match, the quarterfinals played."""
+    players = [make_player(league=league, name=f"P{n}") for n in range(1, 17)]
+    return Knockout(client, league, headers, players, third_place_match=True)
 
 
 def _with_status(knockout: Knockout, status: str) -> list[str]:
@@ -413,3 +430,79 @@ def test_br151_br111_a_replaced_player_takes_the_seat_given_up(
     assert {row["entry_id"]: row["reason"]["kind"] for row in public.json()["rows"]}[
         entry_of[leaving]
     ] == "replaced"
+
+
+def _play_round(knockout: Knockout, round_no: int) -> None:
+    """Side 1 wins every match of a drawn round."""
+    for match in knockout.view()["rounds"][round_no - 1]["matches"]:
+        knockout.result(match["match_id"], _win("side_1"))
+
+
+def test_br148_br151_a_semifinal_loser_is_replaced_in_the_third_place_match(
+    quarterfinals: Knockout,
+) -> None:
+    knockout = quarterfinals
+    quarterfinal_losers = {
+        p
+        for m in knockout.view()["rounds"][0]["matches"]
+        for p in m["sides"][1]["player_ids"]
+    }
+    knockout.draw(2)
+    _play_round(knockout, 2)
+    semifinal_losers = [
+        p
+        for m in knockout.view()["rounds"][1]["matches"]
+        for p in m["sides"][1]["player_ids"]
+    ]
+    leaving = semifinal_losers[0]
+    knockout.set_disabled(leaving, disabled=True)
+
+    [planned] = knockout.view()["next_draw"]["replacements"]
+    drawn = knockout.draw(3)
+
+    came_in = planned["player_id"]
+    assert planned["replaced_player_id"] == leaving
+    assert came_in in quarterfinal_losers
+    final, third = drawn["rounds"][2]["matches"]
+    assert (final["kind"], third["kind"]) == ("standard", "third_place")
+    assert came_in not in _players(final)
+    assert _players(third) == set(semifinal_losers) - {leaving} | {came_in}
+    assert sorted(_marks(third), key=len) == [[], [planned]]
+    assert _marks(final) == [[], []]
+    _play_round(knockout, 3)
+    places = knockout.get("/places")
+    entry_of = {p["player_id"]: p["entry_id"] for p in knockout.players()}
+    row = next(r for r in places["rows"] if r["entry_id"] == entry_of[leaving])
+    assert row["place"] == 5
+    assert row["reason"]["kind"] == "replaced"
+    assert row["reason"]["round"] == "quarterfinal"
+    assert (
+        sorted(r["place"] for r in places["rows"])
+        == [1] * 2 + [2] * 2 + [3] * 2 + [4] * 2 + [5] * 8
+    )
+
+
+def test_br148_br149_variant_3_too_few_candidates_through_the_api(
+    knockout: Knockout,
+) -> None:
+    place = _group_places(knockout)
+    winners = _with_status(knockout, "still_in")
+    losers = _with_status(knockout, "knocked_out")
+    # Two winners with different group places; at most two players share one.
+    better = min(winners, key=lambda p: place[p])
+    worse = next(p for p in winners if place[p] > place[better])
+    available = losers[0]
+    for player_id in [better, worse, *losers[1:]]:
+        knockout.set_disabled(player_id, disabled=True)
+
+    preview = knockout.view()["next_draw"]
+    drawn = knockout.draw(2)
+
+    assert preview == {
+        "replacements": [{"player_id": available, "replaced_player_id": worse}],
+        "staying_player_ids": [better],
+    }
+    final = _final(drawn)
+    assert _players(final) == set(winners) - {worse} | {available}
+    assert sorted(_marks(final), key=len) == [[], preview["replacements"]]
+    assert drawn["left_player_ids"] == [better]
