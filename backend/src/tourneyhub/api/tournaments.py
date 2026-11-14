@@ -480,7 +480,8 @@ def set_match_result(
     A walkover with games is 422 `validation_failed`.
 
     A knockout match after the first round has derived sides: the body names
-    the entries the screen saw in `expected_sides`. Other entries, or a side
+    the entries the screen saw in `expected_sides`. A Lord have mercy
+    knockout stores the sides of every round, so it needs no expectation. Other entries, or a side
     still to come, are 409 `match_sides_changed` (detail `entry_ids`, the
     current ones); none is 422 `expected_sides_required`.
 
@@ -492,7 +493,9 @@ def set_match_result(
     knockout finishes the tournament (FR-037). In a Swiss, a result of a
     round before the newest is 422 `round_locked` (BR-065, detail
     `round_no`, the newest round's); deleting the newest round unlocks it
-    (BR-066).
+    (BR-066). In a Lord have mercy knockout, once the next round is drawn a
+    result keeps its winner: it is 422 `round_locked` to clear or flip it
+    (BR-146).
     """
     match = tournament_service.set_match_result(
         session,
@@ -833,6 +836,7 @@ def places_read(places: PlacesView) -> PlacesRead:
                     opponent_entry_id=row.opponent_entry_id,
                     group_place=row.group_place,
                     group_format=places.group_format,
+                    partner_entry_id=row.partner_entry_id,
                 ),
             )
             for row in places.rows

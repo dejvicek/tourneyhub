@@ -131,6 +131,7 @@ class PublicPlaceReasonRead(ResponseModel):
     opponent_entry_id: UUID | None
     group_place: int | None
     group_format: PhaseFormat | None
+    partner_entry_id: UUID | None
 
 
 class PublicPlaceRead(ResponseModel):
@@ -168,6 +169,7 @@ def _public_places(places: PlacesView) -> PublicPlacesRead:
                     opponent_entry_id=row.opponent_entry_id,
                     group_place=row.group_place,
                     group_format=places.group_format,
+                    partner_entry_id=row.partner_entry_id,
                 ),
             )
             for row in places.rows

@@ -1859,7 +1859,7 @@
         "type": "string"
       },
       "PlaceReasonRead": {
-        "description": "Why an entry has its place (\u00a77.13).\n\nAn entry that did not go through to the knockout, or every entry of a\ngroup phase without one, has `group_place`: its place in the standings\nand the phase's format (BR-103). A knockout entry has the final, the\nthird-place match or `lost_in_round` with the `round` it went out in, the\n`score` of that match (the entry's first: a BO1 game's goals, else the\ngames won; null for a walkover or a game without a score) and the\nopponent (BR-102); its `group_place` is that of the entry it continues,\nnull for a pair after Monster DYP rounds, which continues no single entry.",
+        "description": "Why an entry has its place (\u00a77.13).\n\nAn entry that did not go through to the knockout, or every entry of a\ngroup phase without one, has `group_place`: its place in the standings\nand the phase's format (BR-103). A knockout entry has the final, the\nthird-place match or `lost_in_round` with the `round` it went out in, the\n`score` of that match (the entry's first: a BO1 game's goals, else the\ngames won; null for a walkover or a game without a score) and the\nopponent (BR-102); its `group_place` is that of the entry it continues,\nnull for a pair after Monster DYP rounds, which continues no single entry.\n\nAfter a Lord have mercy knockout every row is one player's, by their main\nentry (BR-145): `partner_entry_id` is the main entry of the partner of\nthe player's last knockout match, null for a player who did not qualify\nand everywhere else; `opponent_entry_id` is null; `group_place` is the\nplayer's own.",
         "properties": {
           "group_format": {
             "anyOf": [
@@ -1896,6 +1896,18 @@
               }
             ],
             "title": "Opponent Entry Id"
+          },
+          "partner_entry_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Partner Entry Id"
           },
           "round": {
             "anyOf": [
@@ -1935,7 +1947,8 @@
           "score",
           "opponent_entry_id",
           "group_place",
-          "group_format"
+          "group_format",
+          "partner_entry_id"
         ],
         "title": "PlaceReasonRead",
         "type": "object"
@@ -2736,6 +2749,18 @@
             ],
             "title": "Opponent Entry Id"
           },
+          "partner_entry_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Partner Entry Id"
+          },
           "round": {
             "anyOf": [
               {
@@ -2774,7 +2799,8 @@
           "score",
           "opponent_entry_id",
           "group_place",
-          "group_format"
+          "group_format",
+          "partner_entry_id"
         ],
         "title": "PublicPlaceReasonRead",
         "type": "object"
@@ -2819,6 +2845,253 @@
           "name"
         ],
         "title": "PublicPlayerRead",
+        "type": "object"
+      },
+      "PublicRemixKnockoutRead": {
+        "description": "A Lord have mercy knockout round by round through the share link (FR-070).\n\nA separate allowlist, like `PublicBracketRead`: it leaves out what is the\norganizer's, `can_draw_next`, `result_count` and `winner_locked` (BR-140,\nBR-146), and keeps `left_player_ids` (FR-049).",
+        "properties": {
+          "final_match_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KnockoutMatchFormat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "left_player_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Left Player Ids",
+            "type": "array"
+          },
+          "match_format": {
+            "$ref": "#/components/schemas/MatchFormat"
+          },
+          "phase_id": {
+            "format": "uuid",
+            "title": "Phase Id",
+            "type": "string"
+          },
+          "round_count": {
+            "title": "Round Count",
+            "type": "integer"
+          },
+          "rounds": {
+            "items": {
+              "$ref": "#/components/schemas/PublicRemixRoundRead"
+            },
+            "title": "Rounds",
+            "type": "array"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          },
+          "third_place_match": {
+            "title": "Third Place Match",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "phase_id",
+          "size",
+          "round_count",
+          "third_place_match",
+          "match_format",
+          "final_match_format",
+          "left_player_ids",
+          "rounds"
+        ],
+        "title": "PublicRemixKnockoutRead",
+        "type": "object"
+      },
+      "PublicRemixMatchRead": {
+        "description": "A match of a drawn Lord have mercy round for viewers; no `winner_locked`.",
+        "properties": {
+          "field_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field Number"
+          },
+          "is_walkover": {
+            "title": "Is Walkover",
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MatchKind"
+          },
+          "match_format": {
+            "$ref": "#/components/schemas/MatchFormat"
+          },
+          "match_id": {
+            "format": "uuid",
+            "title": "Match Id",
+            "type": "string"
+          },
+          "number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Outcome"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "sides": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "$ref": "#/components/schemas/PublicRemixSideRead"
+              },
+              {
+                "$ref": "#/components/schemas/PublicRemixSideRead"
+              }
+            ],
+            "title": "Sides",
+            "type": "array"
+          },
+          "state": {
+            "$ref": "#/components/schemas/RemixMatchState"
+          }
+        },
+        "required": [
+          "match_id",
+          "number",
+          "position",
+          "kind",
+          "state",
+          "sides",
+          "outcome",
+          "is_walkover",
+          "score",
+          "match_format",
+          "field_number"
+        ],
+        "title": "PublicRemixMatchRead",
+        "type": "object"
+      },
+      "PublicRemixRoundRead": {
+        "properties": {
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/PublicRemixMatchRead"
+            },
+            "title": "Matches",
+            "type": "array"
+          },
+          "name": {
+            "$ref": "#/components/schemas/RoundName"
+          },
+          "round_id": {
+            "format": "uuid",
+            "title": "Round Id",
+            "type": "string"
+          },
+          "round_no": {
+            "title": "Round No",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "round_id",
+          "round_no",
+          "name",
+          "matches"
+        ],
+        "title": "PublicRemixRoundRead",
+        "type": "object"
+      },
+      "PublicRemixSideRead": {
+        "description": "A side of a Lord have mercy match for viewers (FR-070, FR-049).",
+        "properties": {
+          "entry_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Id"
+          },
+          "is_bye": {
+            "title": "Is Bye",
+            "type": "boolean"
+          },
+          "left_player_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Left Player Ids",
+            "type": "array"
+          },
+          "player_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Player Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "player_ids",
+          "entry_id",
+          "is_bye",
+          "left_player_ids"
+        ],
+        "title": "PublicRemixSideRead",
         "type": "object"
       },
       "PublicSeasonStandingRow": {
@@ -3074,9 +3347,281 @@
         "title": "RankingRow",
         "type": "object"
       },
+      "RemixKnockoutRead": {
+        "description": "A Lord have mercy knockout round by round, computed on read (D4, BR-155).\n\n`size` is twice the round-1 matches and `round_count` the rounds the\nknockout will have; `rounds` holds those drawn so far. `can_draw_next` says\nthe next round can be drawn (BR-140). `left_player_ids` are all the players\nwho have left but stay in (FR-049). The final plays `final_match_format`,\nor `match_format` when it is null (BR-120).",
+        "properties": {
+          "can_draw_next": {
+            "title": "Can Draw Next",
+            "type": "boolean"
+          },
+          "final_match_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KnockoutMatchFormat"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "left_player_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Left Player Ids",
+            "type": "array"
+          },
+          "match_format": {
+            "$ref": "#/components/schemas/MatchFormat"
+          },
+          "phase_id": {
+            "format": "uuid",
+            "title": "Phase Id",
+            "type": "string"
+          },
+          "round_count": {
+            "title": "Round Count",
+            "type": "integer"
+          },
+          "rounds": {
+            "items": {
+              "$ref": "#/components/schemas/RemixRoundRead"
+            },
+            "title": "Rounds",
+            "type": "array"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          },
+          "third_place_match": {
+            "title": "Third Place Match",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "phase_id",
+          "size",
+          "round_count",
+          "third_place_match",
+          "match_format",
+          "final_match_format",
+          "can_draw_next",
+          "left_player_ids",
+          "rounds"
+        ],
+        "title": "RemixKnockoutRead",
+        "type": "object"
+      },
+      "RemixMatchRead": {
+        "description": "A match of a drawn Lord have mercy round (BR-155).\n\n`number` counts the tournament's matches, the group phase's first; a bye\nhas none, and the third-place match comes after the final. `state`: `bye`;\n`played`; `on_field`; `ready`. `score` is side 1's: a BO1 game's goals,\nelse the games won. `winner_locked` says a later round is drawn, so the\nresult can be corrected but not cleared or given to the other pair\n(BR-146).",
+        "properties": {
+          "field_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field Number"
+          },
+          "is_walkover": {
+            "title": "Is Walkover",
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MatchKind"
+          },
+          "match_format": {
+            "$ref": "#/components/schemas/MatchFormat"
+          },
+          "match_id": {
+            "format": "uuid",
+            "title": "Match Id",
+            "type": "string"
+          },
+          "number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Outcome"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "maxItems": 2,
+                "minItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "sides": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "$ref": "#/components/schemas/RemixSideRead"
+              },
+              {
+                "$ref": "#/components/schemas/RemixSideRead"
+              }
+            ],
+            "title": "Sides",
+            "type": "array"
+          },
+          "state": {
+            "$ref": "#/components/schemas/RemixMatchState"
+          },
+          "winner_locked": {
+            "title": "Winner Locked",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "match_id",
+          "number",
+          "position",
+          "kind",
+          "state",
+          "sides",
+          "outcome",
+          "is_walkover",
+          "score",
+          "match_format",
+          "field_number",
+          "winner_locked"
+        ],
+        "title": "RemixMatchRead",
+        "type": "object"
+      },
+      "RemixMatchState": {
+        "enum": [
+          "bye",
+          "played",
+          "on_field",
+          "ready"
+        ],
+        "type": "string"
+      },
+      "RemixRoundRead": {
+        "description": "A drawn round; `result_count` counts the matches with a result in it.",
+        "properties": {
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/RemixMatchRead"
+            },
+            "title": "Matches",
+            "type": "array"
+          },
+          "name": {
+            "$ref": "#/components/schemas/RoundName"
+          },
+          "result_count": {
+            "title": "Result Count",
+            "type": "integer"
+          },
+          "round_id": {
+            "format": "uuid",
+            "title": "Round Id",
+            "type": "string"
+          },
+          "round_no": {
+            "title": "Round No",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "round_id",
+          "round_no",
+          "name",
+          "result_count",
+          "matches"
+        ],
+        "title": "RemixRoundRead",
+        "type": "object"
+      },
+      "RemixSideRead": {
+        "description": "A side of a Lord have mercy match: a pair of players, or a bye (BR-041).\n\n`entry_id` is the round-1 pair entry; a later round's pair has none (D4).\n`player_ids` is empty for a bye. `left_player_ids` are the pair's players\nwho have left but stay in the draw (BR-147, BR-149).",
+        "properties": {
+          "entry_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Id"
+          },
+          "is_bye": {
+            "title": "Is Bye",
+            "type": "boolean"
+          },
+          "left_player_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Left Player Ids",
+            "type": "array"
+          },
+          "player_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Player Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "player_ids",
+          "entry_id",
+          "is_bye",
+          "left_player_ids"
+        ],
+        "title": "RemixSideRead",
+        "type": "object"
+      },
       "ResultWrite": {
         "additionalProperties": false,
-        "description": "A whole result, the target state (ADR-008): every game played, or a walkover.\n\nA walkover names its winner and has no games (FR-052, BR-124). No walkover\nand no games is the empty result, which clears the match's result (FR-053).\n\n`expected_sides` are the entries the screen saw on side 1 and side 2. The\nsides of a knockout match after the first round are derived from the\nwinners (DATA-MODEL D4), so \"side 1 wins\" must name the entry it meant:\nit is required there, and optional for a match whose sides are stored.",
+        "description": "A whole result, the target state (ADR-008): every game played, or a walkover.\n\nA walkover names its winner and has no games (FR-052, BR-124). No walkover\nand no games is the empty result, which clears the match's result (FR-053).\n\n`expected_sides` are the entries the screen saw on side 1 and side 2. The\nsides of a knockout match after the first round are derived from the\nwinners (DATA-MODEL D4), so \"side 1 wins\" must name the entry it meant:\nit is required there, and optional for a match whose sides are stored,\nas in every round of a Lord have mercy knockout. That knockout can answer\n422 `round_locked` (BR-146) once the next round is drawn.",
         "properties": {
           "expected_sides": {
             "anyOf": [
@@ -6742,7 +7287,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/bracket": {
       "get": {
-        "description": "Return the knockout with its sides derived from the results (D4).\n\nA tournament without a knockout is 404 `knockout_not_found`.",
+        "description": "Return the knockout with its sides derived from the results (D4).\n\nA tournament without a knockout is 404 `knockout_not_found`; a Lord have\nmercy knockout, read with `\u2026/knockout/rounds`, is 422 `format_not_supported`\n(detail `format`, `mode`).",
         "operationId": "read_bracket",
         "parameters": [
           {
@@ -7309,7 +7854,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout": {
       "put": {
-        "description": "Draw the knockout after the round robin or the Swiss and start it (FR-045).\n\nThe best entries of the standings go through as they are, seeded by their\nplace; entries still level are ordered by lot (BR-074, BR-080, BR-085).\nThe byes go to the top seeds (BR-040 to BR-042); the first matches take\nthe free fields, and the group phase's results lock (BR-053, BR-065).\n\n409: `tournament_not_in_progress` (detail `state`), `current_phase_changed`\n(the knockout already exists, detail `current_phase_id`),\n`draw_counter_changed` (detail `draw_counter`, the current one),\n`qualifiers_changed` (the cut or the seeds are not the previewed ones,\ndetail `entry_ids`, the current ones) or `season_closed`. 422:\n`format_not_supported` (no group phase, or Lord have mercy; detail\n`format`, and `mode` for Lord have mercy), `knockout_mode_required`\n(Monster DYP rounds without a `mode`; detail `format`),\n`group_phase_not_done` (detail `matches_left`), `qualifiers_odd` (a pair\nmode with an odd number; detail `given`), `qualifiers_out_of_range`\n(detail `minimum`, `maximum`, `given`) or `knockout_mode_not_applicable`\n(detail `format`).",
+        "description": "Draw the knockout after the round robin or the Swiss and start it (FR-045).\n\nThe best entries of the standings go through as they are, seeded by their\nplace; entries still level are ordered by lot (BR-074, BR-080, BR-085).\nThe byes go to the top seeds (BR-040 to BR-042); the first matches take\nthe free fields, and the group phase's results lock (BR-053, BR-065).\nA Lord have mercy knockout (BR-084) stores only round 1; the later rounds\nare drawn one at a time.\n\n409: `tournament_not_in_progress` (detail `state`), `current_phase_changed`\n(the knockout already exists, detail `current_phase_id`),\n`draw_counter_changed` (detail `draw_counter`, the current one),\n`qualifiers_changed` (the cut or the seeds are not the previewed ones,\ndetail `entry_ids`, the current ones) or `season_closed`. 422:\n`format_not_supported` (no group phase; detail `format`),\n`knockout_mode_required` (Monster DYP rounds without a `mode`; detail\n`format`),\n`group_phase_not_done` (detail `matches_left`), `qualifiers_odd` (a pair\nmode with an odd number; detail `given`), `qualifiers_out_of_range`\n(detail `minimum`, `maximum`, `given`) or `knockout_mode_not_applicable`\n(detail `format`).",
         "operationId": "start_knockout",
         "parameters": [
           {
@@ -7606,7 +8151,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout/preview": {
       "get": {
-        "description": "Return the cut, the seeds and the byes the knockout would get (FR-045).\n\nWrites nothing. A knockout that cannot start is still 200, with the\n`problem` its start would answer: `tournament_not_in_progress`,\n`current_phase_changed` (the knockout exists), `season_closed`,\n`format_not_supported` (no group phase, or Lord have mercy),\n`knockout_mode_required` (Monster DYP rounds without a `mode`),\n`group_phase_not_done` or `knockout_mode_not_applicable` (a `mode` after a\nround robin or a Swiss). After Monster DYP rounds `qualifiers` counts\nplayers and a pair mode shows an even count of at least twice the fewest\nentries (BR-080).",
+        "description": "Return the cut, the seeds and the byes the knockout would get (FR-045).\n\nWrites nothing. A knockout that cannot start is still 200, with the\n`problem` its start would answer: `tournament_not_in_progress`,\n`current_phase_changed` (the knockout exists), `season_closed`,\n`format_not_supported` (no group phase),\n`knockout_mode_required` (Monster DYP rounds without a `mode`),\n`group_phase_not_done` or `knockout_mode_not_applicable` (a `mode` after a\nround robin or a Swiss). After Monster DYP rounds `qualifiers` counts\nplayers and a pair mode shows an even count of at least twice the fewest\nentries (BR-080).",
         "operationId": "read_knockout_preview",
         "parameters": [
           {
@@ -7719,9 +8264,277 @@
         ]
       }
     },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout/rounds": {
+      "get": {
+        "description": "Return a Lord have mercy knockout round by round (BR-155, FR-049).\n\nComputed on read from the rounds drawn so far. 404 `knockout_not_found`\nwithout a knockout; 422 `format_not_supported` (detail `format`, `mode`)\nfor a fixed-pair knockout, which `\u2026/bracket` serves.",
+        "operationId": "read_knockout_rounds",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemixKnockoutRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Read Knockout Rounds",
+        "tags": [
+          "knockout"
+        ]
+      },
+      "post": {
+        "description": "Draw the next round of a Lord have mercy knockout (BR-140 to BR-144, BR-156).\n\nThe round before must be complete (BR-140). The players who went through\nare paired by lot; the final's round is drawn the same way (BR-141,\nBR-142) with the third-place match among the semifinal losers (BR-144).\nThe lots hold no draw counter, so the same players always give the same\npairs (BR-156, ADR-010). Disabled players still in are drawn like everyone\nelse (BR-149). The new matches take the free fields, the third-place match\nafter the final (BR-130), and the winners of the round before are locked\n(BR-146). Returns the knockout round by round.\n\n404 `knockout_not_found` without a knockout. 409: `round_number_changed`\n(`expected_round_no` is not the rounds drawn plus one; detail\n`current_round_no`, the newest round's), `tournament_not_in_progress`\n(detail `state`) or `season_closed`. 422: `format_not_supported` (a\nfixed-pair knockout; detail `format`, `mode`) or `round_not_complete` (a\nmatch of the newest round has no result; detail `matches_left`).",
+        "operationId": "draw_knockout_round",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoundCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemixKnockoutRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Draw Knockout Round",
+        "tags": [
+          "knockout"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout/rounds/{round_id}": {
+      "delete": {
+        "description": "Delete the newest round of a Lord have mercy knockout, with its results.\n\nThe round is named by its id: an unknown one, a group round or a repeat is\n404 `round_not_found` (ADR-008). The fields let go of its matches, and\nthe round before is unlocked, so a winner can change; drawing the round\nagain gives the same pairs while the players are the same (FR-046, BR-146,\nBR-156). Deleting round 1 deletes the knockout (BR-087). A finished\ntournament is back in progress (BR-095), which recalculates the season\nstandings (BR-112). 409: `season_closed` or `round_not_newest` (detail\n`round_id`, the newest round's). 422: `format_not_supported` (a\nfixed-pair knockout; detail `format`, `mode`).",
+        "operationId": "delete_knockout_round",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "round_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Round Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Knockout Round",
+        "tags": [
+          "knockout"
+        ]
+      }
+    },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/matches/{match_id}/result": {
       "put": {
-        "description": "Enter, replace or clear a match's result (FR-050 to FR-053, FR-094).\n\nThe body is the whole result, so a repeat changes nothing (ADR-008).\nEntering one frees the match's field, which takes the next waiting match\n(BR-130, BR-131). The empty result clears it: the match waits again, not\nput back on its old field (BR-134), and a finished tournament is back in\nprogress (BR-095). The free fields are then filled, so the first match that\ncan be played takes one, the cleared match included.\n\nA closed season is 409 `season_closed`. An unknown match is 404\n`match_not_found`. A match whose sides are not both known is 422\n`match_sides_unknown` (BR-091). A result that breaks a rule is 422:\n`result_does_not_fit_format` (BR-121, detail `format` and `games`),\n`draws_not_allowed` (BR-090), `game_score_mismatch` (BR-092, detail\n`game_no`) or `scores_required` (Swiss and Monster DYP, detail `game_no`).\nA walkover with games is 422 `validation_failed`.\n\nA knockout match after the first round has derived sides: the body names\nthe entries the screen saw in `expected_sides`. Other entries, or a side\nstill to come, are 409 `match_sides_changed` (detail `entry_ids`, the\ncurrent ones); none is 422 `expected_sides_required`.\n\nThe knockout: once it is drawn, a group-phase result is 422\n`group_phase_locked` (BR-053, detail `phase_id`); a knockout result that a\nlater match it feeds has a result for is 422 `result_locked` (BR-094,\ndetail `match_ids`), and a knockout has no draws (BR-090). A new winner\nchanges the later matches' sides. The result that completes the\nknockout finishes the tournament (FR-037). In a Swiss, a result of a\nround before the newest is 422 `round_locked` (BR-065, detail\n`round_no`, the newest round's); deleting the newest round unlocks it\n(BR-066).",
+        "description": "Enter, replace or clear a match's result (FR-050 to FR-053, FR-094).\n\nThe body is the whole result, so a repeat changes nothing (ADR-008).\nEntering one frees the match's field, which takes the next waiting match\n(BR-130, BR-131). The empty result clears it: the match waits again, not\nput back on its old field (BR-134), and a finished tournament is back in\nprogress (BR-095). The free fields are then filled, so the first match that\ncan be played takes one, the cleared match included.\n\nA closed season is 409 `season_closed`. An unknown match is 404\n`match_not_found`. A match whose sides are not both known is 422\n`match_sides_unknown` (BR-091). A result that breaks a rule is 422:\n`result_does_not_fit_format` (BR-121, detail `format` and `games`),\n`draws_not_allowed` (BR-090), `game_score_mismatch` (BR-092, detail\n`game_no`) or `scores_required` (Swiss and Monster DYP, detail `game_no`).\nA walkover with games is 422 `validation_failed`.\n\nA knockout match after the first round has derived sides: the body names\nthe entries the screen saw in `expected_sides`. A Lord have mercy\nknockout stores the sides of every round, so it needs no expectation. Other entries, or a side\nstill to come, are 409 `match_sides_changed` (detail `entry_ids`, the\ncurrent ones); none is 422 `expected_sides_required`.\n\nThe knockout: once it is drawn, a group-phase result is 422\n`group_phase_locked` (BR-053, detail `phase_id`); a knockout result that a\nlater match it feeds has a result for is 422 `result_locked` (BR-094,\ndetail `match_ids`), and a knockout has no draws (BR-090). A new winner\nchanges the later matches' sides. The result that completes the\nknockout finishes the tournament (FR-037). In a Swiss, a result of a\nround before the newest is 422 `round_locked` (BR-065, detail\n`round_no`, the newest round's); deleting the newest round unlocks it\n(BR-066). In a Lord have mercy knockout, once the next round is drawn a\nresult keeps its winner: it is 422 `round_locked` to clear or flip it\n(BR-146).",
         "operationId": "set_match_result",
         "parameters": [
           {
@@ -9765,7 +10578,7 @@
     },
     "/api/v1/public/{share_token}/tournaments/{tournament_id}/bracket": {
       "get": {
-        "description": "Return a tournament's knockout through the share link (FR-070).\n\nA tournament without a knockout is 404 `knockout_not_found`; one in setup\nis 404 `tournament_not_found`, like an unknown one or one of another\nleague.",
+        "description": "Return a tournament's knockout through the share link (FR-070).\n\nA tournament without a knockout is 404 `knockout_not_found`; a Lord have\nmercy knockout is 422 `format_not_supported`; one in setup is 404\n`tournament_not_found`, like an unknown one or one of another league.",
         "operationId": "read_public_bracket",
         "parameters": [
           {
@@ -9821,6 +10634,69 @@
           }
         },
         "summary": "Read Public Bracket",
+        "tags": [
+          "public"
+        ]
+      }
+    },
+    "/api/v1/public/{share_token}/tournaments/{tournament_id}/knockout/rounds": {
+      "get": {
+        "description": "Return a Lord have mercy knockout round by round through the share link (FR-070).\n\n404 `knockout_not_found` without a knockout; one in setup is 404\n`tournament_not_found`, like an unknown one or one of another league. 422\n`format_not_supported` (detail `format`, `mode`) for a fixed-pair knockout.",
+        "operationId": "read_public_knockout_rounds",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "share_token",
+            "required": true,
+            "schema": {
+              "title": "Share Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicRemixKnockoutRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "summary": "Read Public Knockout Rounds",
         "tags": [
           "public"
         ]

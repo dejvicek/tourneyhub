@@ -202,6 +202,19 @@ _TOURNAMENT_INVARIANTS = {
         JOIN tournament_phases ph ON ph.id = r.phase_id
         WHERE (ph.kind = 'group' OR r.round_no = 1)
             AND (SELECT count(*) FROM match_sides s WHERE s.match_id = m.id) <> 2
+        UNION ALL
+        SELECT m.id FROM matches m
+        JOIN rounds r ON r.id = m.round_id
+        JOIN tournament_phases ph ON ph.id = r.phase_id
+        WHERE ph.monster_knockout_mode = 'lord_have_mercy' AND r.round_no > 1
+            AND (
+                SELECT count(*) FROM match_sides s
+                WHERE s.match_id = m.id AND s.entry_id IS NULL AND NOT s.is_bye
+                    AND (
+                        SELECT count(*) FROM match_side_players sp
+                        WHERE sp.match_id = s.match_id AND sp.side = s.side
+                    ) = 2
+            ) <> 2
     """,
     "a group round without one participation row per main entry (D5)": """
         SELECT r.id FROM rounds r
@@ -247,9 +260,14 @@ _TOURNAMENT_INVARIANTS = {
             SELECT m.id, m.outcome::text AS outcome,
                 CASE WHEN ph.kind = 'knockout' AND m.kind = 'standard'
                     AND ph.final_match_format IS NOT NULL
+                    -- The final's round: the bit length of twice round 1's
+                    -- standard matches, minus 1, drawn or not (BR-120, D4).
                     AND r.round_no = (
-                        SELECT max(r2.round_no) FROM rounds r2
-                        WHERE r2.phase_id = ph.id
+                        SELECT length(ltrim((2 * count(*))::int::bit(32)::text, '0'))
+                            - 1
+                        FROM rounds r1 JOIN matches m1 ON m1.round_id = r1.id
+                        WHERE r1.phase_id = ph.id AND r1.round_no = 1
+                            AND m1.kind = 'standard'
                     )
                 THEN ph.final_match_format ELSE ph.match_format END AS fmt,
                 count(*) AS games,

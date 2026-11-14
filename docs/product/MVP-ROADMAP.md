@@ -22,6 +22,8 @@ The MVP is split into 16 packages, P1 to P16. The critical path is P1 → P5 →
 - [x] Sit-out order: not the round before, then fewest sit-outs (BR-058, BR-063) ([#60](https://github.com/dejvicek/tourneyhub/issues/60), [#87](https://github.com/dejvicek/tourneyhub/pull/87)).
 - [x] Game difference in round-robin standings, column only in best of 3 and best of 5 (BR-101) ([#61](https://github.com/dejvicek/tourneyhub/issues/61), [#85](https://github.com/dejvicek/tourneyhub/pull/85)).
 - [ ] Code for the answers from issue #48 ([#75](https://github.com/dejvicek/tourneyhub/issues/75)); its 19 items Q1–Q46 are ticked there.
+- [ ] [#106](https://github.com/dejvicek/tourneyhub/issues/106) (sit-out column in the standings, FR-060)
+- [x] [#109](https://github.com/dejvicek/tourneyhub/issues/109) (flaky fake test: Monster DYP round-2 top player by league ranking) ([#110](https://github.com/dejvicek/tourneyhub/pull/110))
 
 ## 3. Remove the demo mode
 
@@ -60,7 +62,7 @@ The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. 
     - [ ] Step 1, services, API and screens: drawing and deleting a knockout round, disabling a player in the knockout, finishing, the round-by-round view on the organizer's screen and on the share link, and the option on the start-knockout screen. Needs the Monster DYP services and the knockout modes above.
     - [ ] Step 2: replacements.
     - [ ] Order of re-mixed pairs sharing a place ([#94](https://github.com/dejvicek/tourneyhub/issues/94), waiting for an answer).
-    - [ ] Check the bracket size of round 1 in `remix_state` ([#96](https://github.com/dejvicek/tourneyhub/issues/96)).
+    - [x] Check the bracket size of round 1 in `remix_state` ([#96](https://github.com/dejvicek/tourneyhub/issues/96)) ([#107](https://github.com/dejvicek/tourneyhub/pull/107)).
   - [x] Screen 13 and marking top players on the real API ([#105](https://github.com/dejvicek/tourneyhub/pull/105)).
   - [x] Which draw to use when every grouping repeats a partner ([#79](https://github.com/dejvicek/tourneyhub/issues/79), [#83](https://github.com/dejvicek/tourneyhub/pull/83)).
 - [ ] **P14 Late players and disabling** (FR-044, FR-047, FR-048; BR-045, BR-054, BR-064, BR-067)

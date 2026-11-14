@@ -22,7 +22,6 @@ from sqlalchemy.orm import Session
 
 from tourneyhub.db.models.entries import Entry, EntryMember
 from tourneyhub.db.models.leagues import League
-from tourneyhub.db.models.matches import Match
 from tourneyhub.db.models.tournaments import Tournament, TournamentPhase
 from tourneyhub.engine.errors import EngineError
 from tourneyhub.engine.ids import EntryId
@@ -73,7 +72,6 @@ from tourneyhub.services.tournaments import (
 )
 from tourneyhub.services.tournaments.fields import _fill_fields
 from tourneyhub.services.tournaments.play import _player_of, monster_standings_of
-from tourneyhub.services.tournaments.results import _match_format
 from tourneyhub.services.tournaments.shared import (
     _current_phase,
     _group_phase,
@@ -83,6 +81,10 @@ from tourneyhub.services.tournaments.shared import (
     _match_slots,
     _played,
     _require_open_season,
+    final_round_no,
+    knockout_phase,
+    match_format_of,
+    match_score,
 )
 from tourneyhub.services.tournaments.start import _bracket_rounds
 
@@ -162,10 +164,9 @@ def _require_mode(
     """The mode that forms the knockout's entries (FR-045, BR-081 to BR-084).
 
     After a round robin or a Swiss a mode is 422 `knockout_mode_not_applicable`
-    (detail `format`). After Monster DYP rounds Seeded pairs, Singles and A
-    little mercy go through; no mode is 422 `knockout_mode_required` (detail
-    `format`), and Lord have mercy, whose rounds come later, 422
-    `format_not_supported` (detail `format` and `mode`).
+    (detail `format`). After Monster DYP rounds every mode goes through, Seeded
+    pairs, Singles, A little mercy and Lord have mercy; no mode is 422
+    `knockout_mode_required` (detail `format`).
     """
     if group.format is not PhaseFormat.MONSTER_DYP:
         if mode is not None:
@@ -175,10 +176,6 @@ def _require_mode(
         return None
     if mode is None:
         raise RuleViolationError(ErrorCode.KNOCKOUT_MODE_REQUIRED, format=group.format)
-    if mode is MonsterKnockoutMode.LORD_HAVE_MERCY:
-        raise RuleViolationError(
-            ErrorCode.FORMAT_NOT_SUPPORTED, format=group.format, mode=mode
-        )
     return mode
 
 
@@ -470,7 +467,7 @@ def _start_problem(
             code=ErrorCode.TOURNAMENT_NOT_IN_PROGRESS,
             detail={"state": tournament.state},
         )
-    if knockout_bracket(tournament) is not None:
+    if knockout_phase(tournament) is not None:
         current = _current_phase(tournament)
         return KnockoutProblem(
             code=ErrorCode.CURRENT_PHASE_CHANGED,
@@ -529,12 +526,11 @@ def start_knockout(
     `draw_counter`, the current one), checked right after the phase. A
     tournament not in progress is 409 `tournament_not_in_progress`, a closed
     season 409 `season_closed`. A tournament without a group phase is 422
-    `format_not_supported`, and so is Lord have mercy (detail `format`,
-    `mode`); Monster DYP without a mode is 422 `knockout_mode_required`
-    (detail `format`), a mode after another group phase 422
-    `knockout_mode_not_applicable`, a group-phase match without a result 422
-    `group_phase_not_done`, an odd number of qualifiers in a pair mode 422
-    `qualifiers_odd` (detail `given`) and a number out of range 422
+    `format_not_supported`; Monster DYP without a mode is 422
+    `knockout_mode_required` (detail `format`), a mode after another group
+    phase 422 `knockout_mode_not_applicable`, a group-phase match without a
+    result 422 `group_phase_not_done`, an odd number of qualifiers in a pair
+    mode 422 `qualifiers_odd` (detail `given`) and a number out of range 422
     `qualifiers_out_of_range` (detail `minimum`, `maximum`, `given`; BR-080).
     The request also carries the qualifying entries in seed order that the
     preview showed; a group result that changed the cut or the seeds since is
@@ -545,13 +541,15 @@ def start_knockout(
     through as they are and are seeded by their place; entries still level
     are ordered by the lot `knockout-seeding` (BR-074, BR-085). After Monster
     DYP rounds the best players go through and the mode forms the entries:
-    Seeded pairs (BR-081), Singles (BR-082) or A little mercy (BR-083), whose
-    lot is `<mode>:<draw_counter>` (ADR-010). An entry of one player
-    continues its main entry (`source_entry_id`); a pair has its two players
-    as members and no source (DATA-MODEL §4.4), and stays together for the
-    whole knockout (BR-086). Every bracket match is created, the byes for the
-    top seeds in round 1 (BR-040 to BR-042), with the third-place match in
-    the final's round (BR-044). The phase gets its match format, the league's
+    Seeded pairs (BR-081), Singles (BR-082), A little mercy (BR-083) or Lord
+    have mercy (BR-084), whose lot is `<mode>:<draw_counter>` (ADR-010). An
+    entry of one player continues its main entry (`source_entry_id`); a pair
+    has its two players as members and no source (DATA-MODEL §4.4), and stays
+    together for the whole knockout (BR-086). Every bracket match is created,
+    the byes for the top seeds in round 1 (BR-040 to BR-042), with the
+    third-place match in the final's round (BR-044); Lord have mercy stores
+    only round 1, as its later rounds are drawn when the round before is
+    complete (BR-084, D4). The phase gets its match format, the league's
     default unless the request names one, the final its own or none (BR-120),
     and the mode. The first matches take the free fields (BR-130), and the
     group phase's results are locked from now on (BR-053, BR-065).
@@ -634,7 +632,7 @@ def draw_knockout_again(
         raise ConflictError(
             ErrorCode.TOURNAMENT_NOT_IN_PROGRESS, state=tournament.state
         )
-    if knockout_bracket(tournament) is not None:
+    if knockout_phase(tournament) is not None:
         current = _current_phase(tournament)
         raise ConflictError(
             ErrorCode.CURRENT_PHASE_CHANGED,
@@ -690,7 +688,10 @@ def _write_knockout(
         [EntryId(entry.id) for entry in seeds],
         third_place_match=start.third_place_match,
     )
-    phase.rounds.extend(_bracket_rounds(bracket, members, now))
+    rounds = _bracket_rounds(bracket, members, now)
+    # Lord have mercy draws each later round once the one before is complete (D4).
+    lord_have_mercy = mode is MonsterKnockoutMode.LORD_HAVE_MERCY
+    phase.rounds.extend(rounds[:1] if lord_have_mercy else rounds)
     tournament.updated_at = now
     session.flush()  # the matches exist before a field references one
     _fill_fields(tournament, _match_slots(tournament), now)
@@ -753,7 +754,8 @@ def set_final_format(
     """Give the final a format of its own, or None to play the knockout's (FR-054).
 
     The final is the standard match of the bracket's last round (D4, BR-120);
-    the third-place match keeps the knockout's format. The change is allowed
+    the third-place match keeps the knockout's format. A Lord have mercy
+    final is drawn last, and the format waits for it. The change is allowed
     while the final has no result (BR-096): one with a result, which every
     finished tournament's final has, is 409 `match_has_result` (detail
     `match_id`), as a field placement is: the screen hides the control then, so
@@ -774,16 +776,25 @@ def set_final_format(
         raise ConflictError(
             ErrorCode.TOURNAMENT_NOT_IN_PROGRESS, state=tournament.state
         )
-    knockout = knockout_bracket(tournament)
-    if knockout is None:
+    phase = knockout_phase(tournament)
+    if phase is None:
         raise NotFoundError(ErrorCode.KNOCKOUT_NOT_FOUND)
-    last = max(knockout.phase.rounds, key=lambda round_: round_.round_no)
-    final = next(m for m in last.matches if m.kind is MatchKind.STANDARD)
-    if final.outcome is not None:
+    final_no = final_round_no(phase)
+    final = next(
+        (
+            match
+            for round_ in phase.rounds
+            if round_.round_no == final_no
+            for match in round_.matches
+            if match.kind is MatchKind.STANDARD
+        ),
+        None,  # a Lord have mercy final not drawn yet (D4)
+    )
+    if final is not None and final.outcome is not None:
         raise ConflictError(ErrorCode.MATCH_HAS_RESULT, match_id=str(final.id))
     now = clock()
-    knockout.phase.final_match_format = final_match_format
-    knockout.phase.updated_at = now
+    phase.final_match_format = final_match_format
+    phase.updated_at = now
     tournament.updated_at = now
     session.flush()
     return read_tournament(
@@ -829,7 +840,17 @@ def delete_knockout(
         raise NotFoundError(ErrorCode.PHASE_NOT_FOUND)
     if phase.kind is not PhaseKind.KNOCKOUT or _group_phase(tournament) is None:
         raise RuleViolationError(ErrorCode.PHASE_NOT_DELETABLE, kind=phase.kind)
-    now = clock()
+    _remove_knockout(session, tournament, phase, clock())
+
+
+def _remove_knockout(
+    session: Session, tournament: Tournament, phase: TournamentPhase, now: datetime
+) -> None:
+    """Delete the knockout phase with its matches and entries, and free its fields.
+
+    The fields take the next matches that can be played (BR-130), the group
+    phase is unlocked (BR-087) and a finished tournament is back in progress.
+    """
     matches = {match.id for round_ in phase.rounds for match in round_.matches}
     for field in tournament.fields:
         if field.match_id in matches:
@@ -926,8 +947,10 @@ def view_bracket(
 ) -> BracketView:
     """Return one of the league's knockouts, read without a lock.
 
-    A tournament without a knockout is 404 `knockout_not_found`; an unknown
-    one, one of another league and, with `past_setup`, one in setup are 404
+    A tournament without a knockout is 404 `knockout_not_found`; a Lord have
+    mercy knockout, which has no fixed bracket (BR-084, BR-155), is 422
+    `format_not_supported` (detail `format`, `mode`); an unknown tournament,
+    one of another league and, with `past_setup`, one in setup are 404
     `tournament_not_found` (FR-070).
     """
     tournament = _load_tournament(session, league=league, tournament_id=tournament_id)
@@ -935,7 +958,15 @@ def view_bracket(
         raise NotFoundError(ErrorCode.TOURNAMENT_NOT_FOUND)
     knockout = knockout_bracket(tournament)
     if knockout is None:
-        raise NotFoundError(ErrorCode.KNOCKOUT_NOT_FOUND)
+        phase = knockout_phase(tournament)
+        if phase is None:
+            raise NotFoundError(ErrorCode.KNOCKOUT_NOT_FOUND)
+        # Lord have mercy has no fixed bracket: `…/knockout/rounds` serves it.
+        raise RuleViolationError(
+            ErrorCode.FORMAT_NOT_SUPPORTED,
+            format=phase.format,
+            mode=phase.monster_knockout_mode,
+        )
     return _bracket_view(tournament, knockout)
 
 
@@ -988,8 +1019,8 @@ def _bracket_view(tournament: Tournament, knockout: KnockoutBracket) -> BracketV
             ),
             outcome=row.outcome,
             is_walkover=row.is_walkover,
-            score=_score(row),
-            match_format=_match_format(
+            score=match_score(row),
+            match_format=match_format_of(
                 knockout.phase, rounds_by_no[match.key.round_no], row
             ),
             field_number=on_field.get(row.id),
@@ -1085,23 +1116,6 @@ def _state(match: BracketMatch, field_number: int | None) -> MatchState:
     if not match.is_playable:
         return "waiting"
     return "ready" if field_number is None else "on_field"
-
-
-def _score(match: Match) -> tuple[int, int] | None:
-    """Side 1's score: a BO1 game's goals, else the games won; None before a result."""
-    if match.outcome is None or not match.games:
-        return None
-    first = match.games[0]
-    if (
-        len(match.games) == 1
-        and first.score_1 is not None
-        and first.score_2 is not None
-    ):
-        return (first.score_1, first.score_2)
-    return (
-        sum(game.winner is Outcome.SIDE_1 for game in match.games),
-        sum(game.winner is Outcome.SIDE_2 for game in match.games),
-    )
 
 
 def read_shared_bracket(

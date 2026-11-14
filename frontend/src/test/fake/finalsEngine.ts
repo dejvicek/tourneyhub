@@ -657,6 +657,7 @@ function reasonOf(
     round: null,
     score: null,
     opponent_entry_id: null,
+    partner_entry_id: null,
     group_place: null,
     group_format: null,
     ...extra,

@@ -64,7 +64,7 @@ class ErrorCode(StrEnum):
     # Start and back to setup
     TOURNAMENT_NOT_IN_PROGRESS = "tournament_not_in_progress"
     TOURNAMENT_HAS_RESULTS = "tournament_has_results"  # FR-036
-    # No group phase to follow, or Lord have mercy, whose rounds come later (BR-084)
+    # No group phase to follow, or the other kind of knockout for a bracket or rounds read or write
     FORMAT_NOT_SUPPORTED = "format_not_supported"
     PLAYERS_WITHOUT_PARTNER = "players_without_partner"  # Doubles (BR-030)
     # FR-032: 64 entries today, 16 after the #48 follow-up (issue to open after
@@ -95,7 +95,8 @@ class ErrorCode(StrEnum):
     ROUND_NUMBER_CHANGED = "round_number_changed"  # the expected new number is stale
     ROUND_NOT_COMPLETE = "round_not_complete"  # the newest round has a match left
     ROUND_NOT_NEWEST = "round_not_newest"  # only the newest round can be deleted
-    ROUND_LOCKED = "round_locked"  # a result of a round before the newest (BR-065)
+    # a result of a round before the newest (BR-065) or of a locked Lord have mercy round (BR-146)
+    ROUND_LOCKED = "round_locked"
     # Fields (FR-090 to FR-094)
     FIELD_NOT_FOUND = "field_not_found"
     FIELD_NUMBER_CHANGED = "field_number_changed"  # the expected new number is stale

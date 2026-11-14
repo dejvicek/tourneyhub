@@ -572,7 +572,9 @@ class ResultWrite(RequestModel):
     `expected_sides` are the entries the screen saw on side 1 and side 2. The
     sides of a knockout match after the first round are derived from the
     winners (DATA-MODEL D4), so "side 1 wins" must name the entry it meant:
-    it is required there, and optional for a match whose sides are stored.
+    it is required there, and optional for a match whose sides are stored,
+    as in every round of a Lord have mercy knockout. That knockout can answer
+    422 `round_locked` (BR-146) once the next round is drawn.
     """
 
     walkover_winner: Literal[Outcome.SIDE_1, Outcome.SIDE_2] | None
@@ -749,6 +751,12 @@ class PlaceReasonRead(ResponseModel):
     games won; null for a walkover or a game without a score) and the
     opponent (BR-102); its `group_place` is that of the entry it continues,
     null for a pair after Monster DYP rounds, which continues no single entry.
+
+    After a Lord have mercy knockout every row is one player's, by their main
+    entry (BR-145): `partner_entry_id` is the main entry of the partner of
+    the player's last knockout match, null for a player who did not qualify
+    and everywhere else; `opponent_entry_id` is null; `group_place` is the
+    player's own.
     """
 
     kind: PlaceReasonKind
@@ -757,6 +765,7 @@ class PlaceReasonRead(ResponseModel):
     opponent_entry_id: UUID | None
     group_place: int | None
     group_format: PhaseFormat | None
+    partner_entry_id: UUID | None
 
 
 class PlaceRead(ResponseModel):

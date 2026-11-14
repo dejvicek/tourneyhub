@@ -17,8 +17,7 @@ from tourneyhub.engine.tournaments import (
 from tourneyhub.services import tournaments as tournament_service
 from tourneyhub.services.tournaments import SideView
 from tourneyhub.services.tournaments import play as tournament_play
-from tourneyhub.services.tournaments.results import _match_format
-from tourneyhub.services.tournaments.shared import _match_slots
+from tourneyhub.services.tournaments.shared import _match_slots, match_format_of
 from tourneyhub.services.tournaments.views import _match_view
 
 NOW = datetime(2026, 11, 12, tzinfo=UTC)
@@ -165,7 +164,7 @@ def test_br120_the_final_plays_its_own_format(
     round_ = phase.rounds[round_no - 1]
     match = next(m for m in round_.matches if m.kind is kind)
 
-    assert _match_format(phase, round_, match) is expected
+    assert match_format_of(phase, round_, match) is expected
 
 
 def test_d10_a_field_pointing_at_a_match_the_read_did_not_see_counts_as_free(

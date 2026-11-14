@@ -16,6 +16,11 @@ from tourneyhub.engine.ids import EntryId, PlayerId
 from tourneyhub.engine.knockout import RoundName, knockout_results, round_name
 from tourneyhub.engine.places import EntryPlace, PlacingEntry, place_entries
 from tourneyhub.engine.ranking import PlayerRecord, RankedPlayer, rank_league
+from tourneyhub.engine.remix import (
+    RemixPlace,
+    place_remix_players,
+    remix_season_points,
+)
 from tourneyhub.engine.season_points import PlayerPoints, season_points
 from tourneyhub.engine.season_standings import SeasonStandingRow, season_standings
 from tourneyhub.engine.tournaments import Outcome, PhaseFormat, TournamentState
@@ -26,12 +31,14 @@ from tourneyhub.services.tournaments.play import (
     group_standings,
     tie_groups,
 )
+from tourneyhub.services.tournaments.remix import RemixKnockout, remix_knockout
 from tourneyhub.services.tournaments.shared import (
     _ROUNDS_IN_FULL,
     PLAYED_GROUP_FORMATS,
     KnockoutBracket,
     _group_phase,
     _load_tournament,
+    _main_entries,
     knockout_bracket,
 )
 
@@ -146,6 +153,12 @@ class PlaceView:
     is the entry's place in the group-phase standings, a knockout entry's
     that of the entry it continues; null without a group phase, and for a
     pair after Monster DYP rounds, which continues no single entry (BR-081).
+
+    After a Lord have mercy knockout every row is one player's, by their main
+    entry (BR-145): `partner_entry_id` is the main entry of the partner of the
+    player's last knockout match, null for a player who did not qualify;
+    `opponent_entry_id` is null, since the opponents are two players; and
+    `group_place` is the player's own place in the group phase.
     """
 
     place: int
@@ -156,6 +169,7 @@ class PlaceView:
     score: tuple[int, int] | None
     opponent_entry_id: UUID | None
     group_place: int | None
+    partner_entry_id: UUID | None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -280,6 +294,8 @@ class _Placed:
     knockout: KnockoutBracket | None
     places: tuple[EntryPlace, ...]
     points: tuple[PlayerPoints, ...]
+    remix: tuple[RemixPlace, ...] | None = None
+    remix_knockout: RemixKnockout | None = None
 
 
 def _placed(tournament: Tournament, placement_points: Sequence[int]) -> _Placed:
@@ -292,8 +308,13 @@ def _placed(tournament: Tournament, placement_points: Sequence[int]) -> _Placed:
     BR-102 alone (FR-031). Each player earns the placement points of their
     place, entries sharing a place the average of the places they cover,
     rounded down (BR-110, BR-111). A Monster DYP's places are one player's
-    each, by their main entry (BR-100, BR-103).
+    each, by their main entry (BR-100, BR-103). So is a Lord have mercy
+    knockout's: its pairs change every round, so the players are placed one by
+    one with the partner of their last match (BR-145).
     """
+    remix = remix_knockout(tournament)
+    if remix is not None:
+        return _placed_remix(tournament, remix, placement_points)
     group = _group_phase(tournament)
     knockout = knockout_bracket(tournament)
     if group is None and knockout is not None:
@@ -313,6 +334,76 @@ def _placed(tournament: Tournament, placement_points: Sequence[int]) -> _Placed:
         knockout=knockout,
         places=places,
         points=season_points(places, placement_points),
+    )
+
+
+def _placed_remix(
+    tournament: Tournament, remix: RemixKnockout, placement_points: Sequence[int]
+) -> _Placed:
+    """Place the players of a finished Lord have mercy knockout (BR-145).
+
+    Only the main entries go to the engine: the pair entries of the knockout
+    are not single players (BR-084). The knockout players take the top places
+    by pair (BR-102); the others follow in their group-phase order (BR-103).
+    """
+    group = _require_played_group(tournament)
+    standings = group_standings(tournament, group)
+    rows = place_remix_players(
+        remix.state,
+        entries=[
+            PlacingEntry(
+                entry_id=EntryId(entry.id),
+                player_ids=tuple(PlayerId(m.player_id) for m in entry.members),
+                seed=entry.seed,
+            )
+            for entry in _main_entries(tournament)
+        ],
+        standing=tie_groups(standings),
+    )
+    return _Placed(
+        group=group,
+        standings=standings,
+        knockout=None,
+        places=tuple(
+            EntryPlace(
+                entry_id=row.entry_id, player_ids=(row.player_id,), place=row.place
+            )
+            for row in rows
+        ),
+        points=remix_season_points(rows, placement_points),
+        remix=rows,
+        remix_knockout=remix,
+    )
+
+
+def _remix_reason(
+    row: RemixPlace, remix: RemixKnockout
+) -> tuple[PlaceKind, RoundName, tuple[int, int] | None] | None:
+    """Why a knockout player has their place: their last match (BR-102, BR-145).
+
+    None for a player who did not qualify. A player plays at most one match
+    a round, so the last is the one of the highest round.
+    """
+    played = [
+        match
+        for match in remix.state.matches
+        if row.player_id in match.players and not match.has_bye
+    ]
+    if not played:
+        return None
+    last = max(played, key=lambda match: match.key.round_no)
+    side = 1 if last.side_1 is not None and row.player_id in last.side_1 else 2
+    won = last.winner == (last.side_1 if side == 1 else last.side_2)
+    if last.key.is_third_place:
+        kind: PlaceKind = "won_third_place" if won else "lost_third_place"
+    elif last.key.round_no == remix.state.round_count:
+        kind = "won_final" if won else "lost_final"
+    else:
+        kind = "lost_in_round"
+    return (
+        kind,
+        round_name(last.key.round_no, remix.state.round_count),
+        _score_for(remix.rows[last.key], side),
     )
 
 
@@ -347,6 +438,17 @@ def view_places(
     knockout = placed.knockout
     points = {row.entry_id: row.points for row in placed.points}
     group_place = {row.entry_id: row.place for row in placed.standings}
+    if placed.remix is not None and placed.remix_knockout is not None:
+        return PlacesView(
+            complete=True,
+            group_format=None if placed.group is None else placed.group.format,
+            rows=_remix_place_views(
+                placed.remix,
+                placed.remix_knockout,
+                points=points,
+                group_place=group_place,
+            ),
+        )
     source = {entry.id: entry.source_entry_id for entry in tournament.entries}
     # The entries the bracket drew: knockout entries after a group phase, the
     # main entries of a knockout without one (FR-031).
@@ -374,6 +476,7 @@ def view_places(
                 score=None,
                 opponent_entry_id=None,
                 group_place=in_group,
+                partner_entry_id=None,
             )
         kind, round_, score, opponent = _knockout_reason(entry_id, knockout)
         return PlaceView(
@@ -385,6 +488,7 @@ def view_places(
             score=score,
             opponent_entry_id=opponent,
             group_place=in_group,
+            partner_entry_id=None,
         )
 
     return PlacesView(
@@ -392,6 +496,36 @@ def view_places(
         group_format=None if placed.group is None else placed.group.format,
         rows=tuple(view(place) for place in placed.places),
     )
+
+
+def _remix_place_views(
+    rows: Sequence[RemixPlace],
+    remix: RemixKnockout,
+    *,
+    points: dict[EntryId, int],
+    group_place: dict[EntryId, int],
+) -> tuple[PlaceView, ...]:
+    """One place per player of a Lord have mercy knockout, in the engine's order."""
+    entry_of = {row.player_id: row.entry_id for row in rows}
+    views: list[PlaceView] = []
+    for row in rows:
+        reason = _remix_reason(row, remix)
+        views.append(
+            PlaceView(
+                place=row.place,
+                entry_id=row.entry_id,
+                points_per_player=points.get(row.entry_id, 0),
+                kind="group_place" if reason is None else reason[0],
+                round=None if reason is None else reason[1],
+                score=None if reason is None else reason[2],
+                opponent_entry_id=None,
+                group_place=group_place.get(row.entry_id),
+                partner_entry_id=(
+                    None if row.partner_id is None else entry_of[row.partner_id]
+                ),
+            )
+        )
+    return tuple(views)
 
 
 def finished_season_points(

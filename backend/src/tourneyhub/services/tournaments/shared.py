@@ -32,6 +32,9 @@ from tourneyhub.engine.knockout import (
 from tourneyhub.engine.leagues import SeasonState
 from tourneyhub.engine.tournaments import (
     EntryStage,
+    MatchFormat,
+    MatchKind,
+    MonsterKnockoutMode,
     Outcome,
     PhaseFormat,
     PhaseKind,
@@ -174,10 +177,30 @@ def knockout_phase(tournament: Tournament) -> TournamentPhase | None:
     )
 
 
+def final_round_no(phase: TournamentPhase) -> int:
+    """The number of the knockout round that holds the final, drawn or not (BR-120).
+
+    Round 1 has a match for every two bracket slots, byes included (BR-041),
+    so the bracket's size is twice its standard matches; this holds for a
+    fixed bracket and for a Lord have mercy knockout, whose final is drawn
+    last (D4).
+    """
+    first = next(round_ for round_ in phase.rounds if round_.round_no == 1)
+    standard = sum(match.kind is MatchKind.STANDARD for match in first.matches)
+    return (2 * standard).bit_length() - 1
+
+
 def knockout_bracket(tournament: Tournament) -> KnockoutBracket | None:
-    """The knockout's bracket with its sides derived on read (D4); None without one."""
+    """The fixed-pair bracket with its sides derived on read (D4).
+
+    None without a knockout, and for a Lord have mercy knockout, whose pairs
+    change every round (BR-084): `remix.remix_knockout` reads that one.
+    """
     phase = knockout_phase(tournament)
-    if phase is None:
+    if (
+        phase is None
+        or phase.monster_knockout_mode is MonsterKnockoutMode.LORD_HAVE_MERCY
+    ):
         return None
     keys = {
         match.id: match_key(
@@ -374,3 +397,36 @@ def _load_tournament(
     if tournament is None:
         raise NotFoundError(ErrorCode.TOURNAMENT_NOT_FOUND)
     return tournament
+
+
+def match_format_of(phase: TournamentPhase, round_: Round, match: Match) -> MatchFormat:
+    """The format a match plays: its phase's, or the final's own (BR-120).
+
+    The final is the standard match of the bracket's last round (D4), which a
+    Lord have mercy knockout draws last: until then no stored round holds it.
+    """
+    is_final = (
+        phase.kind is PhaseKind.KNOCKOUT
+        and match.kind is MatchKind.STANDARD
+        and round_.round_no == final_round_no(phase)
+    )
+    if is_final and phase.final_match_format is not None:
+        return MatchFormat(phase.final_match_format)
+    return phase.match_format
+
+
+def match_score(match: Match) -> tuple[int, int] | None:
+    """Side 1's score: a BO1 game's goals, else the games won; None before a result."""
+    if match.outcome is None or not match.games:
+        return None
+    first = match.games[0]
+    if (
+        len(match.games) == 1
+        and first.score_1 is not None
+        and first.score_2 is not None
+    ):
+        return (first.score_1, first.score_2)
+    return (
+        sum(game.winner is Outcome.SIDE_1 for game in match.games),
+        sum(game.winner is Outcome.SIDE_2 for game in match.games),
+    )

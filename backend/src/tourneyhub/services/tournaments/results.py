@@ -11,10 +11,9 @@ from tourneyhub.db.models.matches import Match, MatchGame, Round
 from tourneyhub.db.models.tournaments import Tournament, TournamentPhase
 from tourneyhub.engine.errors import EngineError
 from tourneyhub.engine.knockout import is_complete, locked_by
+from tourneyhub.engine.remix import allows_result
 from tourneyhub.engine.results import Game, match_outcome
 from tourneyhub.engine.tournaments import (
-    MatchFormat,
-    MatchKind,
     Outcome,
     PhaseFormat,
     PhaseKind,
@@ -24,6 +23,7 @@ from tourneyhub.errors import ConflictError, ErrorCode, RuleViolationError
 from tourneyhub.services.engine_errors import to_app_error
 from tourneyhub.services.tournaments.fields import _fill_fields
 from tourneyhub.services.tournaments.places import _ranking
+from tourneyhub.services.tournaments.remix import remix_knockout
 from tourneyhub.services.tournaments.shared import (
     ROUND_BY_ROUND_FORMATS,
     Clock,
@@ -33,6 +33,8 @@ from tourneyhub.services.tournaments.shared import (
     _match_slots,
     _require_open_season,
     knockout_bracket,
+    knockout_phase,
+    match_format_of,
 )
 from tourneyhub.services.tournaments.views import MatchView, _match_view, _setup_of
 
@@ -56,21 +58,6 @@ class MatchResult:
         return self.walkover_winner is None and not self.games
 
 
-def _match_format(phase: TournamentPhase, round_: Round, match: Match) -> MatchFormat:
-    """The format a match plays: its phase's, or the final's own (BR-120).
-
-    The final is the standard match of the bracket's last round (D4).
-    """
-    is_final = (
-        phase.kind is PhaseKind.KNOCKOUT
-        and match.kind is MatchKind.STANDARD
-        and round_.round_no == max(r.round_no for r in phase.rounds)
-    )
-    if is_final and phase.final_match_format is not None:
-        return MatchFormat(phase.final_match_format)
-    return phase.match_format
-
-
 def _outcome_of(
     result: MatchResult,
     *,
@@ -85,7 +72,7 @@ def _outcome_of(
     try:
         return match_outcome(
             result.games,
-            match_format=_match_format(phase, round_, match),
+            match_format=match_format_of(phase, round_, match),
             draws_allowed=league.draws_allowed and phase.kind is PhaseKind.GROUP,
             scores_required=phase.format
             in {PhaseFormat.SWISS, PhaseFormat.MONSTER_DYP},
@@ -150,6 +137,11 @@ def set_match_result(
     third-place match's, finishes the tournament in the same transaction
     (FR-037). In a Swiss, every round but the newest is locked (BR-065):
     422 `round_locked` with the newest `round_no`.
+
+    A Lord have mercy knockout stores the sides of every round, so it needs
+    no derivation or expectation. Once its next round is drawn, a result
+    keeps its winner (BR-146): it can be corrected, but clearing or flipping
+    it is 422 `round_locked`.
     """
     league, tournament = _lock_tournament(
         session,
@@ -168,14 +160,14 @@ def set_match_result(
     now = clock()
     if result.is_empty:
         if match.outcome is not None:
-            _require_unlocked(tournament, phase, round_, match)
+            _require_unlocked(tournament, phase, round_, match, None)
         _clear_result(tournament, match, now)
     else:
         outcome = _outcome_of(
             result, league=league, phase=phase, round_=round_, match=match
         )
         if not _same_result(match, result, outcome):
-            _require_unlocked(tournament, phase, round_, match)
+            _require_unlocked(tournament, phase, round_, match, outcome)
             _write_result(session, tournament, match, result, outcome, now)
             _finish_with_knockout(tournament, now)
     session.flush()
@@ -226,27 +218,43 @@ def _require_expected_sides(
 
 
 def _require_unlocked(
-    tournament: Tournament, phase: TournamentPhase, round_: Round, match: Match
+    tournament: Tournament,
+    phase: TournamentPhase,
+    round_: Round,
+    match: Match,
+    outcome: Outcome | None,
 ) -> None:
-    """Refuse a change to a locked result (BR-053, BR-065, BR-094): 422.
+    """Refuse a change to a locked result (BR-053, BR-065, BR-094, BR-146): 422.
 
     Once the knockout is drawn, every group-phase result is locked,
     `group_phase_locked`. Before that, a Swiss locks every round but the
     newest, `round_locked` with the newest `round_no` (BR-065); deleting the
     newest round unlocks the one before (BR-066), since the newest round is
-    found on every write. A knockout result is locked while a later match it
-    feeds has a result, `result_locked` with those `match_ids` (BR-094).
+    found on every write. A result of a fixed bracket is locked while a later
+    match it feeds has a result, `result_locked` with those `match_ids`
+    (BR-094). In a Lord have mercy knockout, drawing a round locks the winners
+    of the round before: `outcome` (None when the result is cleared) must be
+    the stored winner, else `round_locked` with the newest knockout
+    `round_no` (BR-146).
     """
-    knockout = knockout_bracket(tournament)
-    if knockout is None:
+    drawn = knockout_phase(tournament)
+    if drawn is None:
         newest = phase.rounds[-1]
         if phase.format in ROUND_BY_ROUND_FORMATS and round_ is not newest:
             raise RuleViolationError(ErrorCode.ROUND_LOCKED, round_no=newest.round_no)
         return
     if phase.kind is PhaseKind.GROUP:
-        raise RuleViolationError(
-            ErrorCode.GROUP_PHASE_LOCKED, phase_id=str(knockout.phase.id)
-        )
+        raise RuleViolationError(ErrorCode.GROUP_PHASE_LOCKED, phase_id=str(drawn.id))
+    remix = remix_knockout(tournament)
+    if remix is not None:
+        if not allows_result(remix.state, remix.keys[match.id], outcome):
+            raise RuleViolationError(
+                ErrorCode.ROUND_LOCKED, round_no=remix.state.rounds_drawn
+            )
+        return
+    knockout = knockout_bracket(tournament)
+    if knockout is None:
+        return
     later = locked_by(knockout.bracket, knockout.keys[match.id], knockout.outcomes)
     if later:
         raise RuleViolationError(
@@ -256,13 +264,21 @@ def _require_unlocked(
 
 
 def _finish_with_knockout(tournament: Tournament, now: datetime) -> None:
-    """Finish a tournament whose knockout has every result (FR-037)."""
+    """Finish a tournament whose knockout has every result (FR-037).
+
+    A Lord have mercy knockout is over once its final's round is drawn and
+    played, the third-place match included (BR-142).
+    """
+    if tournament.state is not TournamentState.IN_PROGRESS:
+        return
+    remix = remix_knockout(tournament)
+    if remix is not None:
+        if remix.state.is_complete:
+            tournament.state = TournamentState.FINISHED
+            tournament.updated_at = now
+        return
     knockout = knockout_bracket(tournament)
-    if (
-        knockout is not None
-        and tournament.state is TournamentState.IN_PROGRESS
-        and is_complete(knockout.played.values())
-    ):
+    if knockout is not None and is_complete(knockout.played.values()):
         tournament.state = TournamentState.FINISHED
         tournament.updated_at = now
 

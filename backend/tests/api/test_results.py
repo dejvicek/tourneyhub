@@ -789,6 +789,7 @@ def test_fr040_finishing_turns_the_standings_into_places_and_points(
         "round": None,
         "score": None,
         "opponent_entry_id": None,
+        "partner_entry_id": None,
         "group_place": 1,
         "group_format": "round_robin",
     }

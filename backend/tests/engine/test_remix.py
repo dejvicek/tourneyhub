@@ -660,17 +660,6 @@ def test_br145_a_knockout_of_2_pairs() -> None:
     assert places_of(rows) == {3: 1, 4: 1, 1: 2, 2: 2, 5: 3}
 
 
-def test_br145_a_round_without_losers_adds_no_place() -> None:
-    round_1 = [match(1, k, (2 * k - 1, 2 * k), None) for k in range(1, 5)]
-    matches = list(round_1)
-    while (state := remix_state(matches, third_place_match=False)).can_draw_next:
-        matches += decide(draw_next_round(state, rng_seed=SEED), iter(()))
-
-    rows = place_remix_players(state, entries=entries_for(range(1, 9)))
-
-    assert Counter(places_of(rows).values()) == {1: 2, 2: 2, 3: 4}
-
-
 def test_br145_the_order_of_entries_and_standing_does_not_matter() -> None:
     state = remix_state(play_out(6, third_place_match=True), third_place_match=True)
     entries = entries_for(range(1, 16))
@@ -687,6 +676,13 @@ def test_br145_the_order_of_entries_and_standing_does_not_matter() -> None:
 
 
 # Caller bugs
+
+
+def test_br040_remix_state_refuses_a_round_one_larger_than_its_pairs_need() -> None:
+    round_1 = [match(1, k, (2 * k - 1, 2 * k), None) for k in range(1, 5)]
+
+    with pytest.raises(ValueError, match="bracket"):
+        remix_state(round_1, third_place_match=False)
 
 
 def test_remix_state_refuses_a_match_given_twice() -> None:

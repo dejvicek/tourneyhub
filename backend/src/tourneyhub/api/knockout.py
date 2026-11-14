@@ -15,7 +15,7 @@ from pydantic import Field, JsonValue
 from tourneyhub.api.deps import ClockDep, CurrentUserDep, SessionDep
 from tourneyhub.api.public_headers import PUBLIC_PREFIX
 from tourneyhub.api.schemas import INT_MAX, ErrorResponse, RequestModel, ResponseModel
-from tourneyhub.api.tournament_models import TournamentRead
+from tourneyhub.api.tournament_models import RoundCreate, TournamentRead
 from tourneyhub.engine.knockout import MAX_KNOCKOUT_ENTRIES, RoundName
 from tourneyhub.engine.tournaments import (
     KnockoutMatchFormat,
@@ -26,7 +26,9 @@ from tourneyhub.engine.tournaments import (
 )
 from tourneyhub.errors import ErrorCode
 from tourneyhub.services import knockout as knockout_service
+from tourneyhub.services import remix as remix_service
 from tourneyhub.services.knockout import KnockoutStart
+from tourneyhub.services.remix import RemixMatchState
 
 router = APIRouter(
     prefix="/leagues/{league_id}/tournaments/{tournament_id}",
@@ -47,6 +49,11 @@ _WRITE_ERRORS: dict[int | str, dict[str, object]] = {
     HTTPStatus.CONFLICT: {"model": ErrorResponse},
     HTTPStatus.UNPROCESSABLE_CONTENT: {"model": ErrorResponse},
 }
+
+_REFUSED: dict[int | str, dict[str, object]] = {
+    HTTPStatus.UNPROCESSABLE_CONTENT: {"model": ErrorResponse},
+}
+"""A read of a knockout that is not of the shape asked for is 422 (BR-155)."""
 
 type Qualifiers = Annotated[int, Field(ge=2, le=MAX_KNOCKOUT_ENTRIES)]
 
@@ -276,6 +283,126 @@ class PublicBracketRead(ResponseModel):
     rounds: list[PublicBracketRoundRead]
 
 
+class RemixSideRead(ResponseModel):
+    """A side of a Lord have mercy match: a pair of players, or a bye (BR-041).
+
+    `entry_id` is the round-1 pair entry; a later round's pair has none (D4).
+    `player_ids` is empty for a bye. `left_player_ids` are the pair's players
+    who have left but stay in the draw (BR-147, BR-149).
+    """
+
+    player_ids: list[UUID]
+    entry_id: UUID | None
+    is_bye: bool
+    left_player_ids: list[UUID]
+
+
+class RemixMatchRead(ResponseModel):
+    """A match of a drawn Lord have mercy round (BR-155).
+
+    `number` counts the tournament's matches, the group phase's first; a bye
+    has none, and the third-place match comes after the final. `state`: `bye`;
+    `played`; `on_field`; `ready`. `score` is side 1's: a BO1 game's goals,
+    else the games won. `winner_locked` says a later round is drawn, so the
+    result can be corrected but not cleared or given to the other pair
+    (BR-146).
+    """
+
+    match_id: UUID
+    number: int | None
+    position: int
+    kind: MatchKind
+    state: RemixMatchState
+    sides: tuple[RemixSideRead, RemixSideRead]
+    outcome: Outcome | None
+    is_walkover: bool
+    score: tuple[int, int] | None
+    match_format: MatchFormat
+    field_number: int | None
+    winner_locked: bool
+
+
+class RemixRoundRead(ResponseModel):
+    """A drawn round; `result_count` counts the matches with a result in it."""
+
+    round_id: UUID
+    round_no: int
+    name: RoundName
+    result_count: int
+    matches: list[RemixMatchRead]
+
+
+class RemixKnockoutRead(ResponseModel):
+    """A Lord have mercy knockout round by round, computed on read (D4, BR-155).
+
+    `size` is twice the round-1 matches and `round_count` the rounds the
+    knockout will have; `rounds` holds those drawn so far. `can_draw_next` says
+    the next round can be drawn (BR-140). `left_player_ids` are all the players
+    who have left but stay in (FR-049). The final plays `final_match_format`,
+    or `match_format` when it is null (BR-120).
+    """
+
+    phase_id: UUID
+    size: int
+    round_count: int
+    third_place_match: bool
+    match_format: MatchFormat
+    final_match_format: KnockoutMatchFormat | None
+    can_draw_next: bool
+    left_player_ids: list[UUID]
+    rounds: list[RemixRoundRead]
+
+
+class PublicRemixSideRead(ResponseModel):
+    """A side of a Lord have mercy match for viewers (FR-070, FR-049)."""
+
+    player_ids: list[UUID]
+    entry_id: UUID | None
+    is_bye: bool
+    left_player_ids: list[UUID]
+
+
+class PublicRemixMatchRead(ResponseModel):
+    """A match of a drawn Lord have mercy round for viewers; no `winner_locked`."""
+
+    match_id: UUID
+    number: int | None
+    position: int
+    kind: MatchKind
+    state: RemixMatchState
+    sides: tuple[PublicRemixSideRead, PublicRemixSideRead]
+    outcome: Outcome | None
+    is_walkover: bool
+    score: tuple[int, int] | None
+    match_format: MatchFormat
+    field_number: int | None
+
+
+class PublicRemixRoundRead(ResponseModel):
+    round_id: UUID
+    round_no: int
+    name: RoundName
+    matches: list[PublicRemixMatchRead]
+
+
+class PublicRemixKnockoutRead(ResponseModel):
+    """A Lord have mercy knockout round by round through the share link (FR-070).
+
+    A separate allowlist, like `PublicBracketRead`: it leaves out what is the
+    organizer's, `can_draw_next`, `result_count` and `winner_locked` (BR-140,
+    BR-146), and keeps `left_player_ids` (FR-049).
+    """
+
+    phase_id: UUID
+    size: int
+    round_count: int
+    third_place_match: bool
+    match_format: MatchFormat
+    final_match_format: KnockoutMatchFormat | None
+    left_player_ids: list[UUID]
+    rounds: list[PublicRemixRoundRead]
+
+
 @router.get("/knockout/preview")
 def read_knockout_preview(
     league_id: UUID,
@@ -291,7 +418,7 @@ def read_knockout_preview(
     Writes nothing. A knockout that cannot start is still 200, with the
     `problem` its start would answer: `tournament_not_in_progress`,
     `current_phase_changed` (the knockout exists), `season_closed`,
-    `format_not_supported` (no group phase, or Lord have mercy),
+    `format_not_supported` (no group phase),
     `knockout_mode_required` (Monster DYP rounds without a `mode`),
     `group_phase_not_done` or `knockout_mode_not_applicable` (a `mode` after a
     round robin or a Swiss). After Monster DYP rounds `qualifiers` counts
@@ -339,15 +466,17 @@ def start_knockout(
     place; entries still level are ordered by lot (BR-074, BR-080, BR-085).
     The byes go to the top seeds (BR-040 to BR-042); the first matches take
     the free fields, and the group phase's results lock (BR-053, BR-065).
+    A Lord have mercy knockout (BR-084) stores only round 1; the later rounds
+    are drawn one at a time.
 
     409: `tournament_not_in_progress` (detail `state`), `current_phase_changed`
     (the knockout already exists, detail `current_phase_id`),
     `draw_counter_changed` (detail `draw_counter`, the current one),
     `qualifiers_changed` (the cut or the seeds are not the previewed ones,
     detail `entry_ids`, the current ones) or `season_closed`. 422:
-    `format_not_supported` (no group phase, or Lord have mercy; detail
-    `format`, and `mode` for Lord have mercy), `knockout_mode_required`
-    (Monster DYP rounds without a `mode`; detail `format`),
+    `format_not_supported` (no group phase; detail `format`),
+    `knockout_mode_required` (Monster DYP rounds without a `mode`; detail
+    `format`),
     `group_phase_not_done` (detail `matches_left`), `qualifiers_odd` (a pair
     mode with an odd number; detail `given`), `qualifiers_out_of_range`
     (detail `minimum`, `maximum`, `given`) or `knockout_mode_not_applicable`
@@ -430,6 +559,97 @@ def set_final_format(
     return TournamentRead.model_validate(tournament)
 
 
+@router.post(
+    "/knockout/rounds", status_code=HTTPStatus.CREATED, responses=_WRITE_ERRORS
+)
+def draw_knockout_round(
+    league_id: UUID,
+    tournament_id: UUID,
+    body: RoundCreate,
+    session: SessionDep,
+    user: CurrentUserDep,
+    clock: ClockDep,
+) -> RemixKnockoutRead:
+    """Draw the next round of a Lord have mercy knockout (BR-140 to BR-144, BR-156).
+
+    The round before must be complete (BR-140). The players who went through
+    are paired by lot; the final's round is drawn the same way (BR-141,
+    BR-142) with the third-place match among the semifinal losers (BR-144).
+    The lots hold no draw counter, so the same players always give the same
+    pairs (BR-156, ADR-010). Disabled players still in are drawn like everyone
+    else (BR-149). The new matches take the free fields, the third-place match
+    after the final (BR-130), and the winners of the round before are locked
+    (BR-146). Returns the knockout round by round.
+
+    404 `knockout_not_found` without a knockout. 409: `round_number_changed`
+    (`expected_round_no` is not the rounds drawn plus one; detail
+    `current_round_no`, the newest round's), `tournament_not_in_progress`
+    (detail `state`) or `season_closed`. 422: `format_not_supported` (a
+    fixed-pair knockout; detail `format`, `mode`) or `round_not_complete` (a
+    match of the newest round has no result; detail `matches_left`).
+    """
+    knockout = remix_service.draw_knockout_round(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user.id,
+        expected_round_no=body.expected_round_no,
+        clock=clock,
+    )
+    return RemixKnockoutRead.model_validate(knockout)
+
+
+@router.get("/knockout/rounds", responses=_REFUSED)
+def read_knockout_rounds(
+    league_id: UUID, tournament_id: UUID, session: SessionDep, user: CurrentUserDep
+) -> RemixKnockoutRead:
+    """Return a Lord have mercy knockout round by round (BR-155, FR-049).
+
+    Computed on read from the rounds drawn so far. 404 `knockout_not_found`
+    without a knockout; 422 `format_not_supported` (detail `format`, `mode`)
+    for a fixed-pair knockout, which `…/bracket` serves.
+    """
+    knockout = remix_service.read_knockout_rounds(
+        session, league_id=league_id, tournament_id=tournament_id, user_id=user.id
+    )
+    return RemixKnockoutRead.model_validate(knockout)
+
+
+@router.delete(
+    "/knockout/rounds/{round_id}",
+    status_code=HTTPStatus.NO_CONTENT,
+    responses=_WRITE_ERRORS,
+)
+def delete_knockout_round(
+    league_id: UUID,
+    tournament_id: UUID,
+    round_id: UUID,
+    session: SessionDep,
+    user: CurrentUserDep,
+    clock: ClockDep,
+) -> None:
+    """Delete the newest round of a Lord have mercy knockout, with its results.
+
+    The round is named by its id: an unknown one, a group round or a repeat is
+    404 `round_not_found` (ADR-008). The fields let go of its matches, and
+    the round before is unlocked, so a winner can change; drawing the round
+    again gives the same pairs while the players are the same (FR-046, BR-146,
+    BR-156). Deleting round 1 deletes the knockout (BR-087). A finished
+    tournament is back in progress (BR-095), which recalculates the season
+    standings (BR-112). 409: `season_closed` or `round_not_newest` (detail
+    `round_id`, the newest round's). 422: `format_not_supported` (a
+    fixed-pair knockout; detail `format`, `mode`).
+    """
+    remix_service.delete_knockout_round(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        round_id=round_id,
+        user_id=user.id,
+        clock=clock,
+    )
+
+
 @router.delete(
     "/phases/{phase_id}", status_code=HTTPStatus.NO_CONTENT, responses=_WRITE_ERRORS
 )
@@ -460,13 +680,15 @@ def delete_knockout(
     )
 
 
-@router.get("/bracket")
+@router.get("/bracket", responses=_REFUSED)
 def read_bracket(
     league_id: UUID, tournament_id: UUID, session: SessionDep, user: CurrentUserDep
 ) -> BracketRead:
     """Return the knockout with its sides derived from the results (D4).
 
-    A tournament without a knockout is 404 `knockout_not_found`.
+    A tournament without a knockout is 404 `knockout_not_found`; a Lord have
+    mercy knockout, read with `…/knockout/rounds`, is 422 `format_not_supported`
+    (detail `format`, `mode`).
     """
     bracket = knockout_service.read_bracket(
         session, league_id=league_id, tournament_id=tournament_id, user_id=user.id
@@ -474,17 +696,33 @@ def read_bracket(
     return BracketRead.model_validate(bracket)
 
 
-@public_router.get("/bracket")
+@public_router.get("/bracket", responses=_REFUSED)
 def read_public_bracket(
     share_token: str, tournament_id: UUID, session: SessionDep
 ) -> PublicBracketRead:
     """Return a tournament's knockout through the share link (FR-070).
 
-    A tournament without a knockout is 404 `knockout_not_found`; one in setup
-    is 404 `tournament_not_found`, like an unknown one or one of another
-    league.
+    A tournament without a knockout is 404 `knockout_not_found`; a Lord have
+    mercy knockout is 422 `format_not_supported`; one in setup is 404
+    `tournament_not_found`, like an unknown one or one of another league.
     """
     bracket = knockout_service.read_shared_bracket(
         session, share_token=share_token, tournament_id=tournament_id
     )
     return PublicBracketRead.model_validate(bracket)
+
+
+@public_router.get("/knockout/rounds", responses=_REFUSED)
+def read_public_knockout_rounds(
+    share_token: str, tournament_id: UUID, session: SessionDep
+) -> PublicRemixKnockoutRead:
+    """Return a Lord have mercy knockout round by round through the share link (FR-070).
+
+    404 `knockout_not_found` without a knockout; one in setup is 404
+    `tournament_not_found`, like an unknown one or one of another league. 422
+    `format_not_supported` (detail `format`, `mode`) for a fixed-pair knockout.
+    """
+    knockout = remix_service.read_shared_knockout_rounds(
+        session, share_token=share_token, tournament_id=tournament_id
+    )
+    return PublicRemixKnockoutRead.model_validate(knockout)

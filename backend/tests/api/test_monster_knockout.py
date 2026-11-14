@@ -698,26 +698,6 @@ def test_fr045_a_monster_dyp_knockout_needs_a_mode(
     )
 
 
-def test_br084_lord_have_mercy_is_refused_until_its_rounds_exist(
-    client: TestClient, league_id: UUID, headers: dict[str, str], monster: Json
-) -> None:
-    status, body = _knockout_put(
-        client, league_id, headers, monster, mode="lord_have_mercy"
-    )
-    shown = _monster_preview(
-        client, league_id, headers, monster, mode="lord_have_mercy", qualifiers=8
-    )
-
-    refusal = {
-        "code": "format_not_supported",
-        "detail": {"format": "monster_dyp", "mode": "lord_have_mercy"},
-    }
-    assert (status, body) == (422, refusal)
-    # The preview is a 200 (_get asserts it) that shows the engine's pairs.
-    assert (shown["can_start"], shown["problem"]) == (False, refusal)
-    assert len(shown["entries"]) == 4
-
-
 @pytest.mark.parametrize("mode", ["seeded_pairs", "a_little_mercy"])
 def test_br080_pair_modes_need_an_even_number_of_qualifiers(
     client: TestClient,
