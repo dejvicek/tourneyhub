@@ -22,6 +22,8 @@ export const finals = {
     byLot: "By lot",
   },
   errors: {
+    modeRequired: "Pick how the teams are formed.",
+    qualifiersOdd: "Pairs need an even number of players.",
     groupNotDone:
       "Every group match needs a result before the knockout is drawn.",
     qualifiers:
@@ -321,6 +323,7 @@ export const finals = {
     lockBody:
       "Once the knockout is drawn, round {{round}} results can't be changed. Delete the knockout to unlock them.",
     draw: "Draw the knockout",
+    drawAgain: "Draw again",
     tooFew: "There are too few entries for this knockout.",
     etc: "and so on",
   },

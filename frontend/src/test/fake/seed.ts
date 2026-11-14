@@ -54,6 +54,8 @@ export interface StoredTournament extends Omit<
   "waiting" | "places" | "current_phase_id" | "current_phase_done"
 > {
   league_id: string;
+  /** The knockout's draw counter; 0 when unset (ADR-008, ADR-010). */
+  knockout_draw_counter?: number;
 }
 
 export interface FakeState {

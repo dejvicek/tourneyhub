@@ -1118,6 +1118,73 @@ describe("Start the knockout (screen 13)", () => {
     });
   });
 
+  it("draws the A little mercy pairs again and starts with the new counter (FR-045)", async () => {
+    const user = userEvent.setup();
+    let sent: { expected_qualifier_ids?: string[] } = {};
+    server.use(
+      http.put<never, { expected_qualifier_ids: string[] }>(
+        "/api/v1/leagues/:leagueId/tournaments/:tournamentId/knockout",
+        async ({ request }) => {
+          sent = await request.clone().json();
+          return undefined;
+        },
+      ),
+    );
+    renderAt(at(paths.startKnockout, MONSTER));
+
+    const modes = await screen.findByRole("radiogroup", {
+      name: "How are the knockout teams formed?",
+    });
+    await user.click(
+      within(modes).getByRole("radio", { name: /^A little mercy/ }),
+    );
+    const pairs = async () =>
+      within(await screen.findByRole("region", { name: "Preview" }))
+        .getAllByRole("listitem")
+        .map((row) => row.textContent);
+    await waitFor(async () => {
+      expect(
+        screen.getByRole("button", { name: "Draw again" }),
+      ).toBeInTheDocument();
+      expect((await pairs()).length).toBeGreaterThan(0);
+    });
+    const before = await pairs();
+    await user.click(screen.getByRole("button", { name: "Draw again" }));
+    await waitFor(async () => {
+      expect(await pairs()).not.toEqual(before);
+    });
+    await user.click(screen.getByRole("button", { name: "Draw the knockout" }));
+    await waitFor(() => {
+      expect(sent).toMatchObject({
+        expected_draw_counter: 1,
+        mode: "a_little_mercy",
+      });
+    });
+    // Every member of every pair, not only the first (BR-081).
+    expect(sent.expected_qualifier_ids).toHaveLength(8);
+  });
+
+  it("shows no Draw again for seeded pairs and singles (ruling 2)", async () => {
+    const user = userEvent.setup();
+    renderAt(at(paths.startKnockout, MONSTER));
+
+    const modes = await screen.findByRole("radiogroup", {
+      name: "How are the knockout teams formed?",
+    });
+    expect(
+      screen.queryByRole("button", { name: "Draw again" }),
+    ).not.toBeInTheDocument();
+    await user.click(within(modes).getByRole("radio", { name: /^Singles/ }));
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: "Quarterfinals" }),
+      ).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByRole("button", { name: "Draw again" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("draws the knockout and opens it", async () => {
     const user = userEvent.setup();
     renderAt(at(paths.startKnockout, MONSTER));

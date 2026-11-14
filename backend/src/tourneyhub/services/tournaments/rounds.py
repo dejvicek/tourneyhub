@@ -350,9 +350,8 @@ def set_tiebreakers(
 def _require_group_only(tournament: Tournament) -> TournamentPhase:
     """The round robin, Swiss or Monster DYP of a tournament without a knockout (FR-040).
 
-    A knockout finishes by itself (FR-037): 422 `format_not_supported`. A
-    Monster DYP has no knockout yet, so `PLAYED_GROUP_FORMATS`, which the
-    knockout reads, stays as it is and the Monster DYP is accepted here.
+    A knockout finishes by itself (FR-037): 422 `format_not_supported`. The
+    shared `PLAYED_GROUP_FORMATS` leaves Monster DYP out, so it is added here.
     """
     group = _group_phase(tournament)
     last = tournament.phases[-1]

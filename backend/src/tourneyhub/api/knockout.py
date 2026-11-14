@@ -14,7 +14,7 @@ from pydantic import Field, JsonValue
 
 from tourneyhub.api.deps import ClockDep, CurrentUserDep, SessionDep
 from tourneyhub.api.public_headers import PUBLIC_PREFIX
-from tourneyhub.api.schemas import ErrorResponse, RequestModel, ResponseModel
+from tourneyhub.api.schemas import INT_MAX, ErrorResponse, RequestModel, ResponseModel
 from tourneyhub.api.tournament_models import TournamentRead
 from tourneyhub.engine.knockout import MAX_KNOCKOUT_ENTRIES, RoundName
 from tourneyhub.engine.tournaments import (
@@ -84,11 +84,13 @@ class KnockoutPreviewRead(ResponseModel):
     the seeds of each first-round match, null for a bye (BR-041), top of the
     bracket first. `locks_round_no` is the last group round, whose results
     the draw locks (BR-053). `is_cut_by_lot` says the cut fell inside a
-    shared place, so the lot chose who goes through (BR-074).
+    shared place, so the lot chose who goes through (BR-074). `draw_counter` is
+    the tournament's; the start names it as `expected_draw_counter` (ADR-008).
     """
 
     can_start: bool
     problem: KnockoutProblemRead | None
+    draw_counter: int
     max_qualifiers: int
     qualifiers: int
     entries: list[KnockoutPreviewEntryRead]
@@ -103,10 +105,13 @@ class KnockoutWrite(RequestModel):
     """Draw the knockout and start it (FR-045, BR-080, BR-120).
 
     `expected_current_phase_id` is the phase the screen saw as current, the
-    group phase (ADR-008). `expected_qualifier_ids` are the group-phase
-    entries the preview showed going through, in seed order (`entries` of the
-    preview, by their members' `entry_id`): a group result that changed the cut
-    or the seeds since is 409 `qualifiers_changed`. `match_format` null takes
+    group phase (ADR-008). `expected_draw_counter` is the preview's
+    `draw_counter`: a stale one is 409 `draw_counter_changed`.
+    `expected_qualifier_ids` are the group-phase entries the preview showed
+    going through, in seed order (`entries` of the preview, by their members'
+    `entry_id`). After Monster DYP rounds it lists every member of each pair,
+    in seed order, and `qualifiers` counts players. A group result that changed
+    the cut or the seeds since is 409 `qualifiers_changed`. `match_format` null takes
     the league's default; `final_match_format` null lets the final play
     `match_format` (BR-120).
     BO2 is never a knockout's (BR-121). `mode` is how the teams are formed
@@ -116,14 +121,30 @@ class KnockoutWrite(RequestModel):
     """
 
     expected_current_phase_id: UUID
+    expected_draw_counter: Annotated[int, Field(ge=0, le=INT_MAX)]
     expected_qualifier_ids: Annotated[
-        list[UUID], Field(max_length=MAX_KNOCKOUT_ENTRIES)
+        list[UUID], Field(max_length=2 * MAX_KNOCKOUT_ENTRIES)
     ]
     qualifiers: Qualifiers
     third_place_match: bool
     match_format: KnockoutMatchFormat | None
     final_match_format: KnockoutMatchFormat | None
     mode: MonsterKnockoutMode | None
+
+
+class KnockoutDrawWrite(RequestModel):
+    """Draw the knockout's pairs again (FR-045, ADR-010).
+
+    `expected_draw_counter` is the preview's `draw_counter`.
+    """
+
+    expected_draw_counter: Annotated[int, Field(ge=0, le=INT_MAX)]
+
+
+class KnockoutDrawRead(ResponseModel):
+    """The draw counter after drawing again; preview again to see the new pairs."""
+
+    draw_counter: int
 
 
 class FinalFormatWrite(RequestModel):
@@ -270,9 +291,12 @@ def read_knockout_preview(
     Writes nothing. A knockout that cannot start is still 200, with the
     `problem` its start would answer: `tournament_not_in_progress`,
     `current_phase_changed` (the knockout exists), `season_closed`,
-    `format_not_supported` (Monster DYP, no group phase),
+    `format_not_supported` (no group phase, or Lord have mercy),
+    `knockout_mode_required` (Monster DYP rounds without a `mode`),
     `group_phase_not_done` or `knockout_mode_not_applicable` (a `mode` after a
-    round robin or a Swiss).
+    round robin or a Swiss). After Monster DYP rounds `qualifiers` counts
+    players and a pair mode shows an even count of at least twice the fewest
+    entries (BR-080).
     """
     preview = knockout_service.preview_knockout(
         session,
@@ -287,6 +311,7 @@ def read_knockout_preview(
         {
             "can_start": preview.problem is None,
             "problem": preview.problem,
+            "draw_counter": preview.draw_counter,
             "max_qualifiers": preview.max_qualifiers,
             "qualifiers": preview.qualifiers,
             "entries": preview.entries,
@@ -317,12 +342,16 @@ def start_knockout(
 
     409: `tournament_not_in_progress` (detail `state`), `current_phase_changed`
     (the knockout already exists, detail `current_phase_id`),
+    `draw_counter_changed` (detail `draw_counter`, the current one),
     `qualifiers_changed` (the cut or the seeds are not the previewed ones,
     detail `entry_ids`, the current ones) or `season_closed`. 422:
-    `format_not_supported` (Monster DYP, or no group phase; detail
-    `format`), `group_phase_not_done` (detail `matches_left`),
-    `qualifiers_out_of_range` (detail `minimum`, `maximum`, `given`) or
-    `knockout_mode_not_applicable` (detail `format`).
+    `format_not_supported` (no group phase, or Lord have mercy; detail
+    `format`, and `mode` for Lord have mercy), `knockout_mode_required`
+    (Monster DYP rounds without a `mode`; detail `format`),
+    `group_phase_not_done` (detail `matches_left`), `qualifiers_odd` (a pair
+    mode with an odd number; detail `given`), `qualifiers_out_of_range`
+    (detail `minimum`, `maximum`, `given`) or `knockout_mode_not_applicable`
+    (detail `format`).
     """
     tournament = knockout_service.start_knockout(
         session,
@@ -331,6 +360,7 @@ def start_knockout(
         user_id=user.id,
         start=KnockoutStart(
             expected_current_phase_id=body.expected_current_phase_id,
+            expected_draw_counter=body.expected_draw_counter,
             expected_qualifier_ids=tuple(body.expected_qualifier_ids),
             qualifiers=body.qualifiers,
             third_place_match=body.third_place_match,
@@ -341,6 +371,35 @@ def start_knockout(
         clock=clock,
     )
     return TournamentRead.model_validate(tournament)
+
+
+@router.post("/knockout/draw", responses=_WRITE_ERRORS)
+def draw_knockout_again(
+    league_id: UUID,
+    tournament_id: UUID,
+    body: KnockoutDrawWrite,
+    session: SessionDep,
+    user: CurrentUserDep,
+    clock: ClockDep,
+) -> KnockoutDrawRead:
+    """Draw the knockout's pairs again after Monster DYP rounds (FR-045, BR-083).
+
+    Counts the draw counter up; the next preview shows the new lots (ADR-010).
+    Accepted in every Monster DYP mode. A stale `expected_draw_counter` is 409
+    `draw_counter_changed` with the current `draw_counter`. 409 `season_closed`,
+    `tournament_not_in_progress` (detail `state`) or `current_phase_changed`
+    once the knockout exists; 422 `knockout_mode_not_applicable` when the group
+    phase is not Monster DYP.
+    """
+    draw_counter = knockout_service.draw_knockout_again(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user.id,
+        expected_draw_counter=body.expected_draw_counter,
+        clock=clock,
+    )
+    return KnockoutDrawRead(draw_counter=draw_counter)
 
 
 @router.put("/knockout/final-format", responses=_WRITE_ERRORS)
@@ -384,10 +443,10 @@ def delete_knockout(
 ) -> None:
     """Delete the knockout that follows the group phase, with its results (FR-046).
 
-    The group phase unlocks, all of a round robin's results or a Swiss's
-    newest round, and the organizer chooses again what comes next (BR-087,
-    BR-065: a Swiss can then also add a round); a finished tournament is back in progress. The
-    phase is named by its id: a repeat is 404 `phase_not_found` (ADR-008).
+    The group phase unlocks, all of a round robin's results or the newest
+    round of a Swiss or Monster DYP, and the organizer chooses again what
+    comes next (BR-087, BR-065: a Swiss can then also add a round); a
+    finished tournament is back in progress. The phase is named by its id: a repeat is 404 `phase_not_found` (ADR-008).
     409 `season_closed`. 422 `phase_not_deletable` for a group phase or a
     knockout without a group phase (detail `kind`).
     """

@@ -22,6 +22,8 @@ export const finals: CsMessages<Messages["finals"]> = {
     byLot: "Losem",
   },
   errors: {
+    modeRequired: "Vyberte, jak se utvoří týmy.",
+    qualifiersOdd: "Dvojice potřebují sudý počet hráčů.",
     groupNotDone:
       "Před losem vyřazovací fáze musí mít výsledek každý zápas skupiny.",
     qualifiers:
@@ -342,6 +344,7 @@ export const finals: CsMessages<Messages["finals"]> = {
     lockBody:
       "Po rozlosování vyřazovací části už nejde měnit výsledky kola {{round}}. Smažte vyřazovací část a výsledky se odemknou.",
     draw: "Rozlosovat vyřazovací část",
+    drawAgain: "Losovat znovu",
     tooFew: "Pro tuto vyřazovací část je málo účastníků.",
     etc: "a tak dále",
   },

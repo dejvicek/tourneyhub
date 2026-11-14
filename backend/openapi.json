@@ -546,11 +546,13 @@
           "result_locked",
           "current_phase_changed",
           "qualifiers_out_of_range",
+          "qualifiers_odd",
           "qualifiers_changed",
           "phase_not_found",
           "phase_not_deletable",
           "knockout_not_found",
           "knockout_mode_not_applicable",
+          "knockout_mode_required",
           "round_not_found",
           "round_number_changed",
           "round_not_complete",
@@ -831,6 +833,37 @@
         "type": "object"
       },
       "JsonValue": {},
+      "KnockoutDrawRead": {
+        "description": "The draw counter after drawing again; preview again to see the new pairs.",
+        "properties": {
+          "draw_counter": {
+            "title": "Draw Counter",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "draw_counter"
+        ],
+        "title": "KnockoutDrawRead",
+        "type": "object"
+      },
+      "KnockoutDrawWrite": {
+        "additionalProperties": false,
+        "description": "Draw the knockout's pairs again (FR-045, ADR-010).\n\n`expected_draw_counter` is the preview's `draw_counter`.",
+        "properties": {
+          "expected_draw_counter": {
+            "maximum": 2147483647.0,
+            "minimum": 0.0,
+            "title": "Expected Draw Counter",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expected_draw_counter"
+        ],
+        "title": "KnockoutDrawWrite",
+        "type": "object"
+      },
       "KnockoutMatchFormat": {
         "description": "A match format a knockout and its final can play: never BO2 (BR-121).",
         "enum": [
@@ -889,7 +922,7 @@
         "type": "object"
       },
       "KnockoutPreviewRead": {
-        "description": "What starting the knockout would draw, writing nothing (FR-045, BR-080).\n\n`can_start` is false exactly when `problem` is set: the code and detail\nof the error `PUT \u2026/knockout` would answer. `qualifiers` is the number\nasked for, kept between the fewest a knockout takes (2, or 4 with a\nthird-place match) and `max_qualifiers`, the entries that can go through;\nwhen fewer than the fewest can, `entries` is empty. `first_round` pairs\nthe seeds of each first-round match, null for a bye (BR-041), top of the\nbracket first. `locks_round_no` is the last group round, whose results\nthe draw locks (BR-053). `is_cut_by_lot` says the cut fell inside a\nshared place, so the lot chose who goes through (BR-074).",
+        "description": "What starting the knockout would draw, writing nothing (FR-045, BR-080).\n\n`can_start` is false exactly when `problem` is set: the code and detail\nof the error `PUT \u2026/knockout` would answer. `qualifiers` is the number\nasked for, kept between the fewest a knockout takes (2, or 4 with a\nthird-place match) and `max_qualifiers`, the entries that can go through;\nwhen fewer than the fewest can, `entries` is empty. `first_round` pairs\nthe seeds of each first-round match, null for a bye (BR-041), top of the\nbracket first. `locks_round_no` is the last group round, whose results\nthe draw locks (BR-053). `is_cut_by_lot` says the cut fell inside a\nshared place, so the lot chose who goes through (BR-074). `draw_counter` is\nthe tournament's; the start names it as `expected_draw_counter` (ADR-008).",
         "properties": {
           "bracket_size": {
             "anyOf": [
@@ -905,6 +938,10 @@
           "can_start": {
             "title": "Can Start",
             "type": "boolean"
+          },
+          "draw_counter": {
+            "title": "Draw Counter",
+            "type": "integer"
           },
           "entries": {
             "items": {
@@ -982,6 +1019,7 @@
         "required": [
           "can_start",
           "problem",
+          "draw_counter",
           "max_qualifiers",
           "qualifiers",
           "entries",
@@ -1017,19 +1055,25 @@
       },
       "KnockoutWrite": {
         "additionalProperties": false,
-        "description": "Draw the knockout and start it (FR-045, BR-080, BR-120).\n\n`expected_current_phase_id` is the phase the screen saw as current, the\ngroup phase (ADR-008). `expected_qualifier_ids` are the group-phase\nentries the preview showed going through, in seed order (`entries` of the\npreview, by their members' `entry_id`): a group result that changed the cut\nor the seeds since is 409 `qualifiers_changed`. `match_format` null takes\nthe league's default; `final_match_format` null lets the final play\n`match_format` (BR-120).\nBO2 is never a knockout's (BR-121). `mode` is how the teams are formed\nafter Monster DYP rounds (BR-081 to BR-084) and null after any other\ngroup phase; a mode after a round robin or a Swiss is 422\n`knockout_mode_not_applicable`.",
+        "description": "Draw the knockout and start it (FR-045, BR-080, BR-120).\n\n`expected_current_phase_id` is the phase the screen saw as current, the\ngroup phase (ADR-008). `expected_draw_counter` is the preview's\n`draw_counter`: a stale one is 409 `draw_counter_changed`.\n`expected_qualifier_ids` are the group-phase entries the preview showed\ngoing through, in seed order (`entries` of the preview, by their members'\n`entry_id`). After Monster DYP rounds it lists every member of each pair,\nin seed order, and `qualifiers` counts players. A group result that changed\nthe cut or the seeds since is 409 `qualifiers_changed`. `match_format` null takes\nthe league's default; `final_match_format` null lets the final play\n`match_format` (BR-120).\nBO2 is never a knockout's (BR-121). `mode` is how the teams are formed\nafter Monster DYP rounds (BR-081 to BR-084) and null after any other\ngroup phase; a mode after a round robin or a Swiss is 422\n`knockout_mode_not_applicable`.",
         "properties": {
           "expected_current_phase_id": {
             "format": "uuid",
             "title": "Expected Current Phase Id",
             "type": "string"
           },
+          "expected_draw_counter": {
+            "maximum": 2147483647.0,
+            "minimum": 0.0,
+            "title": "Expected Draw Counter",
+            "type": "integer"
+          },
           "expected_qualifier_ids": {
             "items": {
               "format": "uuid",
               "type": "string"
             },
-            "maxItems": 256,
+            "maxItems": 512,
             "title": "Expected Qualifier Ids",
             "type": "array"
           },
@@ -1073,6 +1117,7 @@
         },
         "required": [
           "expected_current_phase_id",
+          "expected_draw_counter",
           "expected_qualifier_ids",
           "qualifiers",
           "third_place_match",
@@ -1814,7 +1859,7 @@
         "type": "string"
       },
       "PlaceReasonRead": {
-        "description": "Why an entry has its place (\u00a77.13).\n\nAn entry that did not go through to the knockout, or every entry of a\ngroup phase without one, has `group_place`: its place in the standings\nand the phase's format (BR-103). A knockout entry has the final, the\nthird-place match or `lost_in_round` with the `round` it went out in, the\n`score` of that match (the entry's first: a BO1 game's goals, else the\ngames won; null for a walkover or a game without a score) and the\nopponent (BR-102); its `group_place` is that of the entry it continues.",
+        "description": "Why an entry has its place (\u00a77.13).\n\nAn entry that did not go through to the knockout, or every entry of a\ngroup phase without one, has `group_place`: its place in the standings\nand the phase's format (BR-103). A knockout entry has the final, the\nthird-place match or `lost_in_round` with the `round` it went out in, the\n`score` of that match (the entry's first: a BO1 game's goals, else the\ngames won; null for a walkover or a game without a score) and the\nopponent (BR-102); its `group_place` is that of the entry it continues,\nnull for a pair after Monster DYP rounds, which continues no single entry.",
         "properties": {
           "group_format": {
             "anyOf": [
@@ -7264,7 +7309,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout": {
       "put": {
-        "description": "Draw the knockout after the round robin or the Swiss and start it (FR-045).\n\nThe best entries of the standings go through as they are, seeded by their\nplace; entries still level are ordered by lot (BR-074, BR-080, BR-085).\nThe byes go to the top seeds (BR-040 to BR-042); the first matches take\nthe free fields, and the group phase's results lock (BR-053, BR-065).\n\n409: `tournament_not_in_progress` (detail `state`), `current_phase_changed`\n(the knockout already exists, detail `current_phase_id`),\n`qualifiers_changed` (the cut or the seeds are not the previewed ones,\ndetail `entry_ids`, the current ones) or `season_closed`. 422:\n`format_not_supported` (Monster DYP, or no group phase; detail\n`format`), `group_phase_not_done` (detail `matches_left`),\n`qualifiers_out_of_range` (detail `minimum`, `maximum`, `given`) or\n`knockout_mode_not_applicable` (detail `format`).",
+        "description": "Draw the knockout after the round robin or the Swiss and start it (FR-045).\n\nThe best entries of the standings go through as they are, seeded by their\nplace; entries still level are ordered by lot (BR-074, BR-080, BR-085).\nThe byes go to the top seeds (BR-040 to BR-042); the first matches take\nthe free fields, and the group phase's results lock (BR-053, BR-065).\n\n409: `tournament_not_in_progress` (detail `state`), `current_phase_changed`\n(the knockout already exists, detail `current_phase_id`),\n`draw_counter_changed` (detail `draw_counter`, the current one),\n`qualifiers_changed` (the cut or the seeds are not the previewed ones,\ndetail `entry_ids`, the current ones) or `season_closed`. 422:\n`format_not_supported` (no group phase, or Lord have mercy; detail\n`format`, and `mode` for Lord have mercy), `knockout_mode_required`\n(Monster DYP rounds without a `mode`; detail `format`),\n`group_phase_not_done` (detail `matches_left`), `qualifiers_odd` (a pair\nmode with an odd number; detail `given`), `qualifiers_out_of_range`\n(detail `minimum`, `maximum`, `given`) or `knockout_mode_not_applicable`\n(detail `format`).",
         "operationId": "start_knockout",
         "parameters": [
           {
@@ -7356,6 +7401,105 @@
           }
         ],
         "summary": "Start Knockout",
+        "tags": [
+          "knockout"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout/draw": {
+      "post": {
+        "description": "Draw the knockout's pairs again after Monster DYP rounds (FR-045, BR-083).\n\nCounts the draw counter up; the next preview shows the new lots (ADR-010).\nAccepted in every Monster DYP mode. A stale `expected_draw_counter` is 409\n`draw_counter_changed` with the current `draw_counter`. 409 `season_closed`,\n`tournament_not_in_progress` (detail `state`) or `current_phase_changed`\nonce the knockout exists; 422 `knockout_mode_not_applicable` when the group\nphase is not Monster DYP.",
+        "operationId": "draw_knockout_again",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KnockoutDrawWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnockoutDrawRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Draw Knockout Again",
         "tags": [
           "knockout"
         ]
@@ -7462,7 +7606,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout/preview": {
       "get": {
-        "description": "Return the cut, the seeds and the byes the knockout would get (FR-045).\n\nWrites nothing. A knockout that cannot start is still 200, with the\n`problem` its start would answer: `tournament_not_in_progress`,\n`current_phase_changed` (the knockout exists), `season_closed`,\n`format_not_supported` (Monster DYP, no group phase),\n`group_phase_not_done` or `knockout_mode_not_applicable` (a `mode` after a\nround robin or a Swiss).",
+        "description": "Return the cut, the seeds and the byes the knockout would get (FR-045).\n\nWrites nothing. A knockout that cannot start is still 200, with the\n`problem` its start would answer: `tournament_not_in_progress`,\n`current_phase_changed` (the knockout exists), `season_closed`,\n`format_not_supported` (no group phase, or Lord have mercy),\n`knockout_mode_required` (Monster DYP rounds without a `mode`),\n`group_phase_not_done` or `knockout_mode_not_applicable` (a `mode` after a\nround robin or a Swiss). After Monster DYP rounds `qualifiers` counts\nplayers and a pair mode shows an even count of at least twice the fewest\nentries (BR-080).",
         "operationId": "read_knockout_preview",
         "parameters": [
           {
@@ -7686,7 +7830,7 @@
     },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/phases/{phase_id}": {
       "delete": {
-        "description": "Delete the knockout that follows the group phase, with its results (FR-046).\n\nThe group phase unlocks, all of a round robin's results or a Swiss's\nnewest round, and the organizer chooses again what comes next (BR-087,\nBR-065: a Swiss can then also add a round); a finished tournament is back in progress. The\nphase is named by its id: a repeat is 404 `phase_not_found` (ADR-008).\n409 `season_closed`. 422 `phase_not_deletable` for a group phase or a\nknockout without a group phase (detail `kind`).",
+        "description": "Delete the knockout that follows the group phase, with its results (FR-046).\n\nThe group phase unlocks, all of a round robin's results or the newest\nround of a Swiss or Monster DYP, and the organizer chooses again what\ncomes next (BR-087, BR-065: a Swiss can then also add a round); a\nfinished tournament is back in progress. The phase is named by its id: a repeat is 404 `phase_not_found` (ADR-008).\n409 `season_closed`. 422 `phase_not_deletable` for a group phase or a\nknockout without a group phase (detail `kind`).",
         "operationId": "delete_knockout",
         "parameters": [
           {

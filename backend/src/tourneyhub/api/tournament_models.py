@@ -747,7 +747,8 @@ class PlaceReasonRead(ResponseModel):
     third-place match or `lost_in_round` with the `round` it went out in, the
     `score` of that match (the entry's first: a BO1 game's goals, else the
     games won; null for a walkover or a game without a score) and the
-    opponent (BR-102); its `group_place` is that of the entry it continues.
+    opponent (BR-102); its `group_place` is that of the entry it continues,
+    null for a pair after Monster DYP rounds, which continues no single entry.
     """
 
     kind: PlaceReasonKind

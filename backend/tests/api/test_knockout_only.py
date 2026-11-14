@@ -658,11 +658,20 @@ def test_fr045_a_knockout_without_a_group_phase_draws_no_second_knockout(
     started: Callable[..., Json],
 ) -> None:
     tournament = started(4)
+    shown = client.get(
+        _t_url(
+            league_id,
+            tournament["id"],
+            "/knockout/preview?qualifiers=2&third_place_match=false",
+        ),
+        headers=headers,
+    )
 
     response = client.put(
         _t_url(league_id, tournament["id"], "/knockout"),
         json={
             "expected_current_phase_id": tournament["current_phase_id"],
+            "expected_draw_counter": shown.json()["draw_counter"],
             "expected_qualifier_ids": [],
             "qualifiers": 2,
             "third_place_match": False,

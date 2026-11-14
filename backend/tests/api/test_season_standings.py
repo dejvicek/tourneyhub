@@ -181,6 +181,7 @@ class Evening:
             self.url(f"/tournaments/{tournament_id}/knockout"),
             json={
                 "expected_current_phase_id": group_done["current_phase_id"],
+                "expected_draw_counter": shown["draw_counter"],
                 "expected_qualifier_ids": [
                     e["members"][0]["entry_id"] for e in shown["entries"]
                 ],

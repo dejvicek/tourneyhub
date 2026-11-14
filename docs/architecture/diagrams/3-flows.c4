@@ -510,17 +510,22 @@ views "III. Flows" {
 
   dynamic view knockoutAfterRoundRobin {
     variant sequence
-    title "22. Knockout after a round robin or a Swiss"
+    title "22. Knockout after a round robin, a Swiss or Monster DYP rounds"
     order 26
-    description "FR-037, FR-045, FR-046, FR-054, BR-040 to BR-044, BR-053, BR-074, BR-080, BR-085, BR-087, BR-094, BR-102, BR-103, BR-120, ADR-008 and DATA-MODEL D4: the preview shows the cut, the seeds and the byes; the start carries the phase the screen saw as current. Knockout entries continue the qualifiers, every bracket match is created, and only the first round stores its sides; later sides are derived from the winners on every read. The final's own format can change while the final has no result. A result is locked while a later match it feeds has one; the last result finishes the tournament. Deleting the knockout by its phase id unlocks the round robin, or a Swiss's newest round."
+    description "FR-037, FR-045, FR-046, FR-054, BR-040 to BR-044, BR-053, BR-074, BR-080, BR-085, BR-087, BR-094, BR-102, BR-103, BR-120, ADR-008 and DATA-MODEL D4: the preview shows the cut, the seeds and the byes; the start carries the phase the screen saw as current. Knockout entries continue the qualifiers or are pairs of two qualifying players after Monster DYP rounds, every bracket match is created, and only the first round stores its sides; later sides are derived from the winners on every read. After Monster DYP rounds the organizer picks a mode and in the lot modes (A little mercy, Lord have mercy) the pairs are drawn by lot with the draw counter (ADR-010); the start carries the expected counter. The final's own format can change while the final has no result. A result is locked while a later match it feeds has one; the last result finishes the tournament. Deleting the knockout by its phase id unlocks the round robin, or the newest round of a Swiss or Monster DYP (BR-087)."
     organizer -> tourneyhub.spa.organizerUi "group phase done: Draw the knockout, picks the number, the third-place match and the formats"
     tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "GET …/knockout/preview"
     tourneyhub.api.tournamentsApi -> tourneyhub.api.engine "standings, the cut with the lot knockout-seeding for a tie, byes for the top seeds"
     tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: seeds, first round, bracket size, or the start's problem"
-    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "PUT …/knockout expecting the group phase as current"
-    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the league, then the tournament: another current phase 409; Monster DYP or matches left 422"
+    tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "PUT …/knockout expecting the group phase as current and the draw counter"
+    tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the league, then the tournament: another current phase 409; a stale draw counter 409; no mode, Lord have mercy or matches left 422"
     tourneyhub.api.tournamentsApi -> tourneyhub.db.play "the knockout phase, its entries, every match, the first round's sides; free fields take the playable matches"
     tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: the tournament"
+    opt "draw again" {
+      tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "POST …/knockout/draw expecting the draw counter"
+      tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the league, then the tournament: a stale counter 409 draw_counter_changed; increments the counter"
+      tourneyhub.spa.organizerUi <- tourneyhub.api.tournamentsApi "200: the new draw counter; the screen reads the preview again"
+    }
     opt "the organizer changes the final's format" {
       tourneyhub.spa.organizerUi -> tourneyhub.api.tournamentsApi "PUT …/knockout/final-format, null for the knockout's format"
       tourneyhub.api.tournamentsApi -> tourneyhub.db.tournaments "locks the league, then the tournament: a final with a result 409 match_has_result; stores the phase's final_match_format"

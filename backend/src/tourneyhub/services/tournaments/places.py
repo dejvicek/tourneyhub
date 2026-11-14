@@ -144,7 +144,8 @@ class PlaceView:
     entry's side and the `opponent_entry_id`), or, for an entry that did not
     go through, its place in the group phase (BR-102, BR-103). `group_place`
     is the entry's place in the group-phase standings, a knockout entry's
-    that of the entry it continues; null without a group phase.
+    that of the entry it continues; null without a group phase, and for a
+    pair after Monster DYP rounds, which continues no single entry (BR-081).
     """
 
     place: int
@@ -169,8 +170,8 @@ class PlacesView:
 def _require_played_group(tournament: Tournament) -> TournamentPhase:
     """The round robin, Swiss or Monster DYP of a tournament, with or without a knockout.
 
-    A knockout after a Monster DYP is not served yet, so the shared
-    `PLAYED_GROUP_FORMATS` leaves Monster DYP out and it is accepted here.
+    The shared `PLAYED_GROUP_FORMATS` leaves Monster DYP out, so it is
+    added here.
     """
     group = _group_phase(tournament)
     if group is None or group.format not in PLAYED_GROUP_FORMATS | {

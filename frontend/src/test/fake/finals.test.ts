@@ -61,6 +61,7 @@ async function playOut(id: string): Promise<void> {
 /** A knockout start; the demo does not check the expected phase or qualifiers. */
 const KNOCKOUT = {
   expected_current_phase_id: "",
+  expected_draw_counter: 0,
   expected_qualifier_ids: [] as string[],
   qualifiers: 8,
   third_place_match: false,
@@ -69,6 +70,36 @@ const KNOCKOUT = {
 } as const;
 
 describe("the finals in the fake API", () => {
+  it("counts the knockout draws and refuses a stale one with 409 (ADR-008, FR-045)", async () => {
+    const draw = (expected: number) =>
+      dataOf(
+        api.POST(
+          "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout/draw",
+          {
+            params: { path: base(MONSTER) },
+            body: { expected_draw_counter: expected },
+          },
+        ),
+      );
+    expect(await draw(0)).toEqual({ draw_counter: 1 });
+    await expect(draw(0)).rejects.toMatchObject({
+      status: 409,
+      code: "draw_counter_changed",
+    });
+    expect(await draw(1)).toEqual({ draw_counter: 2 });
+    const stale = api.PUT(
+      "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout",
+      {
+        params: { path: base(MONSTER) },
+        body: { ...KNOCKOUT, mode: "singles", expected_draw_counter: 0 },
+      },
+    );
+    await expect(dataOf(stale)).rejects.toMatchObject({
+      status: 409,
+      code: "draw_counter_changed",
+    });
+  });
+
   it.each([
     [DYP_EVENING, 4, 0],
     [SPRING_CUP, 8, 2],
