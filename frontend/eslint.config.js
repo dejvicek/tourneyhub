@@ -75,6 +75,23 @@ const testInternals = {
   message:
     "App code imports nothing from src/test; the fake API and the test helpers are for tests.",
 };
+// The files directly in src/ (main.tsx, App.tsx, routes.tsx) are the app's
+// entry; testInternals above matches "../test" and "@/test", this matches the
+// "./test" they would write.
+const testFromRoot = {
+  regex: "^\\./test(/|$)",
+  message:
+    "App code imports nothing from src/test; the fake API and the test helpers are for tests.",
+};
+// A dynamic import() is not an import declaration, so the import patterns
+// miss it. esquery has no escaped "/" in a regex, hence \x2F.
+const testImportSyntax = [
+  {
+    selector: "ImportExpression[source.value=/^(\\.|@)\\x2Ftest(\\x2F|$)/]",
+    message:
+      "App code imports nothing from src/test; the fake API and the test helpers are for tests.",
+  },
+];
 // Imports flow one way: shared code → features → the app (guide §11).
 const appFromShared = {
   regex: "^(@/|(\\.\\./)+)(App|main|routes|pages|features)(/|$)",
@@ -432,6 +449,26 @@ export default defineConfig([
     rules: { "no-restricted-imports": restrictImports() },
   },
   {
+    // The files directly in src/ may not import src/test, static or dynamic;
+    // their tests may. main.tsx and routes.tsx add the syntax rule below.
+    files: ["src/*.{ts,tsx}"],
+    ignores: ["src/*.test.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": restrictImports(
+        apiClient,
+        testInternals,
+        testFromRoot,
+      ),
+      "no-restricted-syntax": [
+        "error",
+        ...appSyntax,
+        ...assertionSyntax,
+        ...queryClientSyntax,
+        ...testImportSyntax,
+      ],
+    },
+  },
+  {
     files: ["src/routes.tsx"],
     rules: {
       "no-restricted-syntax": [
@@ -440,13 +477,19 @@ export default defineConfig([
         ...assertionSyntax,
         ...queryClientSyntax,
         ...routerDataSyntax,
+        ...testImportSyntax,
       ],
     },
   },
   {
     files: ["src/main.tsx"],
     rules: {
-      "no-restricted-syntax": ["error", ...appSyntax, ...assertionSyntax],
+      "no-restricted-syntax": [
+        "error",
+        ...appSyntax,
+        ...assertionSyntax,
+        ...testImportSyntax,
+      ],
     },
   },
   {
