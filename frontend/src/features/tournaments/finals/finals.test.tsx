@@ -1470,6 +1470,41 @@ describe("Monster DYP between rounds on the real response shapes (screen 11)", (
     ).toBeInTheDocument();
   });
 
+  it("FR-040, ADR-008: says the tournament changed on a 409 tournament_not_in_progress", async () => {
+    server.use(
+      http.post(
+        "*/api/v1/leagues/:leagueId/tournaments/:tournamentId/finish",
+        () =>
+          HttpResponse.json(
+            {
+              code: "tournament_not_in_progress",
+              detail: { state: "finished" },
+            },
+            { status: 409 },
+          ),
+      ),
+    );
+    const user = userEvent.setup();
+    const id = await monsterOfNine();
+    await playAllMatches(id);
+    renderAt(at(paths.betweenRounds, id));
+
+    await user.click(
+      await screen.findByRole("button", { name: "Finish the tournament" }),
+    );
+    const dialog = await screen.findByRole("alertdialog");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Finish the tournament" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The tournament changed elsewhere. It was reloaded.",
+    );
+    expect(
+      screen.queryByRole("region", { name: "Final places" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("ADR-008: says the rounds changed on a 409 round_number_changed", async () => {
     server.use(
       http.post(
