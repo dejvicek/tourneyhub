@@ -28,7 +28,7 @@ from tourneyhub.errors import ErrorCode
 from tourneyhub.services import knockout as knockout_service
 from tourneyhub.services import remix as remix_service
 from tourneyhub.services.knockout import KnockoutStart
-from tourneyhub.services.remix import RemixMatchState
+from tourneyhub.services.remix import RemixMatchState, RemixPlayerStatus
 
 router = APIRouter(
     prefix="/leagues/{league_id}/tournaments/{tournament_id}",
@@ -283,18 +283,31 @@ class PublicBracketRead(ResponseModel):
     rounds: list[PublicBracketRoundRead]
 
 
+class RemixReplacementRead(ResponseModel):
+    """A player who came into a draw in place of a player who left (BR-148, BR-155).
+
+    `player_id` came in; `replaced_player_id` left and was replaced.
+    """
+
+    player_id: UUID
+    replaced_player_id: UUID
+
+
 class RemixSideRead(ResponseModel):
     """A side of a Lord have mercy match: a pair of players, or a bye (BR-041).
 
     `entry_id` is the round-1 pair entry; a later round's pair has none (D4).
     `player_ids` is empty for a bye. `left_player_ids` are the pair's players
-    who have left but stay in the draw (BR-147, BR-149).
+    who have left but stay in the draw (BR-147, BR-149). `replacements` are the
+    pair's players who came in for a player who left, and for whom (BR-155);
+    empty in round 1.
     """
 
     player_ids: list[UUID]
     entry_id: UUID | None
     is_bye: bool
     left_player_ids: list[UUID]
+    replacements: list[RemixReplacementRead]
 
 
 class RemixMatchRead(ResponseModel):
@@ -332,6 +345,36 @@ class RemixRoundRead(ResponseModel):
     matches: list[RemixMatchRead]
 
 
+class RemixNextDrawRead(ResponseModel):
+    """What drawing the next round would do now (FR-049, BR-148, BR-149).
+
+    `replacements` would come in for players who left, the replaced player
+    with the best group-phase standing first; `staying_player_ids` have left
+    but would stay in the draw without one, since nobody is available, and
+    their pair loses by walkover (BR-149). Disabling or re-enabling a player
+    changes it; the draw makes exactly this plan.
+    """
+
+    replacements: list[RemixReplacementRead]
+    staying_player_ids: list[UUID]
+
+
+class RemixPlayerRead(ResponseModel):
+    """A player of the knockout, for the disable switch (FR-044, BR-147).
+
+    `entry_id` is the player's main entry, which `PUT …/entries/{entry_id}/
+    disabled` takes. `status`: `still_in` (their latest pair won, had a bye or
+    has no result yet, or waits for the third-place match), `knocked_out`, or
+    `replaced` once a replacement came in for them (BR-153). `is_disabled` is
+    the main entry's flag; a disabled player who is still in has left.
+    """
+
+    player_id: UUID
+    entry_id: UUID
+    status: RemixPlayerStatus
+    is_disabled: bool
+
+
 class RemixKnockoutRead(ResponseModel):
     """A Lord have mercy knockout round by round, computed on read (D4, BR-155).
 
@@ -339,7 +382,10 @@ class RemixKnockoutRead(ResponseModel):
     knockout will have; `rounds` holds those drawn so far. `can_draw_next` says
     the next round can be drawn (BR-140). `left_player_ids` are all the players
     who have left but stay in (FR-049). The final plays `final_match_format`,
-    or `match_format` when it is null (BR-120).
+    or `match_format` when it is null (BR-120). `next_draw` previews the next
+    draw's replacements, null unless the tournament is in progress and the
+    next round can be drawn (FR-049). `players` lists the knockout's players by
+    group-phase standing.
     """
 
     phase_id: UUID
@@ -351,15 +397,18 @@ class RemixKnockoutRead(ResponseModel):
     can_draw_next: bool
     left_player_ids: list[UUID]
     rounds: list[RemixRoundRead]
+    next_draw: RemixNextDrawRead | None
+    players: list[RemixPlayerRead]
 
 
 class PublicRemixSideRead(ResponseModel):
-    """A side of a Lord have mercy match for viewers (FR-070, FR-049)."""
+    """A side of a Lord have mercy match for viewers (FR-070, FR-049, BR-155)."""
 
     player_ids: list[UUID]
     entry_id: UUID | None
     is_bye: bool
     left_player_ids: list[UUID]
+    replacements: list[RemixReplacementRead]
 
 
 class PublicRemixMatchRead(ResponseModel):
@@ -389,8 +438,9 @@ class PublicRemixKnockoutRead(ResponseModel):
     """A Lord have mercy knockout round by round through the share link (FR-070).
 
     A separate allowlist, like `PublicBracketRead`: it leaves out what is the
-    organizer's, `can_draw_next`, `result_count` and `winner_locked` (BR-140,
-    BR-146), and keeps `left_player_ids` (FR-049).
+    organizer's, `can_draw_next`, `result_count`, `winner_locked`, `next_draw`
+    and `players` (BR-140, BR-146, FR-049), and keeps `left_player_ids` and the
+    sides' `replacements` (BR-155).
     """
 
     phase_id: UUID

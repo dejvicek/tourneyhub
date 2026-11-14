@@ -169,15 +169,25 @@ _TOURNAMENT_INVARIANTS = {
                 ELSE 'main'
             END
     """,
-    "side players of another league": """
+    "side players or replaced players of another league": """
         SELECT sp.match_id, sp.player_id FROM match_side_players sp
         JOIN matches m ON m.id = sp.match_id
         JOIN rounds r ON r.id = m.round_id
         JOIN tournament_phases ph ON ph.id = r.phase_id
         JOIN tournaments t ON t.id = ph.tournament_id
         JOIN seasons s ON s.id = t.season_id
-        JOIN players p ON p.id = sp.player_id
+        JOIN players p ON p.id = sp.player_id OR p.id = sp.replaced_player_id
         WHERE p.league_id <> s.league_id
+    """,
+    "a replacement outside a later Lord have mercy round (BR-148, D4)": """
+        SELECT sp.match_id, sp.player_id FROM match_side_players sp
+        JOIN matches m ON m.id = sp.match_id
+        JOIN rounds r ON r.id = m.round_id
+        JOIN tournament_phases ph ON ph.id = r.phase_id
+        WHERE sp.replaced_player_id IS NOT NULL AND (
+            ph.monster_knockout_mode IS DISTINCT FROM 'lord_have_mercy'
+            OR r.round_no = 1
+        )
     """,
     "side players that differ from the side's entry (D2)": """
         SELECT s.match_id, s.side FROM match_sides s

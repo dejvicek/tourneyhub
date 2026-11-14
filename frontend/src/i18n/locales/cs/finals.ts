@@ -163,6 +163,31 @@ export const finals: CsMessages<Messages["finals"]> = {
     left: "Už nehraje",
     drawnAfter: "Losuje se po: {{previous}}",
     drawnLater: "Losuje se později",
+    cameIn: "{{in}} hraje za hráče {{out}}",
+    nextDrawLead: "V tomto losování:",
+    comesIn: "Za hráče {{out}} nastoupí {{in}}",
+    staysIn:
+      "Za hráče {{name}} nemá kdo nastoupit, takže jeho dvojice prohraje kontumačně",
+    notHere: "Není tu",
+    notHereFor: "{{name}} tu není",
+    skipped: "{{name}} se jako náhradník přeskočí.",
+    players: {
+      title: "Hráči ve vyřazovací části",
+      help: "Vyřaďte ze hry hráče, který odešel. Pokud je ještě ve hře, při dalším losování za něj nastoupí náhradník. Pokud už vypadl, jako náhradník se přeskočí.",
+      helpLast:
+        "Vyřaďte ze hry hráče, který odešel. Další losování už nebude, takže za něj nikdo nenastoupí.",
+      stillIn: "Ve hře.",
+      knockedOut: "Vypadl. Může nastoupit jako náhradník.",
+      leftOpen: "Odešel. Jeho dvojice prohraje zápas tohoto kola kontumačně.",
+      leftNext:
+        "Odešel. Při dalším losování za něj nastoupí náhradník, pokud nějaký je.",
+      notHere: "Není tu. Jako náhradník se přeskočí.",
+      knockedOutLast: "Vypadl.",
+      notHereLast: "Není tu.",
+      leftLast: "Odešel.",
+      replaced:
+        "Místo něj hraje {{name}} (kolo: {{round}}). Vrátit se může, jen když to kolo smažete.",
+    },
   },
   finished: {
     title: "Dohráno",
@@ -198,6 +223,23 @@ export const finals: CsMessages<Messages["finals"]> = {
       group_round_robin: "{{place}} místo ve hře každý s každým",
       group_standings: "{{place}} místo v tabulce",
       shared: "Společné místo. {{reason}}.",
+      replacedIn: {
+        round_of_256:
+          "Nahrazen náhradníkem, umístěn jako při konci v 1/128 finále",
+        round_of_128:
+          "Nahrazen náhradníkem, umístěn jako při konci v 1/64 finále",
+        round_of_64:
+          "Nahrazen náhradníkem, umístěn jako při konci v 1/32 finále",
+        round_of_32:
+          "Nahrazen náhradníkem, umístěn jako při konci v šestnáctifinále",
+        round_of_16:
+          "Nahrazen náhradníkem, umístěn jako při konci v osmifinále",
+        quarterfinal:
+          "Nahrazen náhradníkem, umístěn jako při konci ve čtvrtfinále",
+        semifinal: "Nahrazen náhradníkem, umístěn jako při konci v semifinále",
+        final: "Nahrazen náhradníkem, umístěn jako při konci ve finále",
+      },
+      named: "{{name}}: {{reason}}",
     },
     pointsEach: "+{{points}} každý",
     pointsOwn: "+{{points}}",

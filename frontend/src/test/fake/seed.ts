@@ -56,6 +56,15 @@ export interface StoredTournament extends Omit<
   league_id: string;
   /** The knockout's draw counter; 0 when unset (ADR-008, ADR-010). */
   knockout_draw_counter?: number;
+  /**
+   * Lord have mercy: the players who came into a drawn match as replacements,
+   * by match id (BR-148, BR-155); stored with the draw like the backend's
+   * `match_side_players.replaced_player_id`.
+   */
+  remix_replacements?: Record<
+    string,
+    { player_id: string; replaced_player_id: string }[]
+  >;
 }
 
 export interface FakeState {

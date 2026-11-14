@@ -406,7 +406,13 @@ describe("Knockout in Lord have mercy (screen 9, BR-155)", () => {
       state: "bye" as const,
       sides: [
         kept,
-        { entry_id: null, player_ids: [], is_bye: true, left_player_ids: [] },
+        {
+          entry_id: null,
+          player_ids: [],
+          is_bye: true,
+          left_player_ids: [],
+          replacements: [],
+        },
       ],
     };
     const bye = { ...read.rounds.at(-1), matches: [first, byeMatch] };
@@ -781,6 +787,359 @@ describe("Knockout in Lord have mercy (screen 9, BR-155)", () => {
       expect(view.state.location.pathname).toBe(at(paths.tournament, LHM));
     });
   });
+
+  describe("players who left and replacements (FR-044, FR-049, BR-147 to BR-155)", () => {
+    const nameOf = (playerId: string) =>
+      shortName(db().players.find((p) => p.id === playerId)?.name ?? "");
+    /** 4 pairs without a third-place match: the semifinal losers are knocked out. */
+    const withoutThirdPlace = () => {
+      const knockout = db()
+        .tournaments.find((t) => t.id === LHM)
+        ?.phases.find((p) => p.kind === "knockout");
+      if (knockout === undefined) throw new Error("The seed has a knockout.");
+      knockout.third_place_match = false;
+    };
+    const setDisabled = (entryId: string, disabled = true) => {
+      const queryClient = new QueryClient();
+      return new MutationObserver(
+        queryClient,
+        finalsMutations.setDisabled(queryClient, TEST_LEAGUE_ID, LHM),
+      ).mutate({ entryId, disabled });
+    };
+    const openPlayers = async (user: ReturnType<typeof userEvent.setup>) => {
+      const toggle = await screen.findByRole("button", {
+        name: "Players in the knockout",
+      });
+      await user.click(toggle);
+      return toggle;
+    };
+
+    it("lists the knockout's players collapsed, each with what the flag means (FR-044, BR-147)", async () => {
+      withoutThirdPlace();
+      const user = userEvent.setup();
+      renderAt(knockoutPath());
+
+      const toggle = await screen.findByRole("button", {
+        name: "Players in the knockout",
+      });
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+      expect(screen.queryByRole("button", { name: /^Disable / })).toBeNull();
+      await user.click(toggle);
+
+      expect(toggle).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getAllByRole("button", { name: /^Disable / })).toHaveLength(
+        8,
+      );
+      expect(screen.getAllByText("Still in.")).toHaveLength(6);
+      expect(
+        screen.getAllByText("Knocked out. Can come in as a replacement."),
+      ).toHaveLength(2);
+    });
+
+    it("disables a player who left and enables them again, announced, the rounds reloaded (FR-044, BR-147, BR-149)", async () => {
+      const read = await readRounds();
+      const open = read.rounds[0]?.matches.find((m) => m.state === "on_field");
+      const playerId = open?.sides[0]?.player_ids[0] ?? "";
+      const name = nameOf(playerId);
+      const user = userEvent.setup();
+      renderAt(knockoutPath());
+      await openPlayers(user);
+
+      await user.click(screen.getByRole("button", { name: `Disable ${name}` }));
+
+      expect(
+        await screen.findByText(
+          "Has left. Their pair loses this round's match by walkover.",
+        ),
+      ).toBeInTheDocument();
+      // The announcement comes once the change and the reload have settled.
+      expect(
+        await screen.findByText(`${name} is disabled.`),
+      ).toBeInTheDocument();
+      // The rounds reloaded: the card marks the player who left (BR-155).
+      expect(await screen.findAllByText("No longer playing")).toHaveLength(1);
+
+      await user.click(screen.getByRole("button", { name: `Enable ${name}` }));
+
+      expect(
+        await screen.findByText(`${name} is enabled.`),
+      ).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.queryByText("No longer playing")).toBeNull();
+      });
+    });
+
+    it("says a disabled knocked-out player is skipped as a replacement (BR-147)", async () => {
+      withoutThirdPlace();
+      const out = (await readRounds()).players.find(
+        (p) => p.status === "knocked_out",
+      );
+      await setDisabled(out?.entry_id ?? "");
+      const user = userEvent.setup();
+      renderAt(knockoutPath());
+      await openPlayers(user);
+
+      expect(
+        screen.getByText("Not here. Skipped as a replacement."),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", {
+          name: `Enable ${nameOf(out?.player_id ?? "")}`,
+        }),
+      ).toBeInTheDocument();
+    });
+
+    it("previews who comes in, skips one who is not here, and draws the plan shown (FR-049, BR-148, BR-155)", async () => {
+      withoutThirdPlace();
+      await finishNewestRound();
+      const before = await readRounds();
+      const leaving = before.players.find((p) => p.status === "still_in");
+      const [first, second] = before.players.filter(
+        (p) => p.status === "knocked_out",
+      );
+      if (
+        leaving === undefined ||
+        first === undefined ||
+        second === undefined
+      ) {
+        throw new Error("The knockout has players in and out.");
+      }
+      await setDisabled(leaving.entry_id);
+      const out = nameOf(leaving.player_id);
+      const user = userEvent.setup();
+      renderAt(knockoutPath());
+
+      expect(await screen.findByText("At this draw:")).toBeInTheDocument();
+      expect(
+        screen.getByText(`${nameOf(first.player_id)} comes in for ${out}`),
+      ).toBeInTheDocument();
+      // The plan replaces the general "stays in the draw" notice.
+      expect(screen.queryByText(/stays in the draw/)).toBeNull();
+
+      await user.click(
+        screen.getByRole("button", {
+          name: `${nameOf(first.player_id)} is not here`,
+        }),
+      );
+
+      expect(
+        await screen.findByText(
+          `${nameOf(second.player_id)} comes in for ${out}`,
+        ),
+      ).toBeInTheDocument();
+      expect(
+        await screen.findByText(
+          `${nameOf(first.player_id)} is skipped as a replacement.`,
+        ),
+      ).toBeInTheDocument();
+      await user.click(
+        await screen.findByRole("button", { name: "Draw the final" }),
+      );
+
+      expect(
+        await screen.findByText(`${nameOf(second.player_id)} in for ${out}`),
+      ).toBeInTheDocument();
+      await openPlayers(user);
+      expect(
+        screen.getByText(
+          `Replaced by ${nameOf(second.player_id)} in the final. Can come back only if you delete that round.`,
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("says who stays in the draw with nobody to come in (BR-149)", async () => {
+      await finishNewestRound();
+      const leaving = (await readRounds()).players.find(
+        (p) => p.status === "still_in",
+      );
+      await setDisabled(leaving?.entry_id ?? "");
+      const user = userEvent.setup();
+      renderAt(knockoutPath());
+
+      expect(
+        await screen.findByText(
+          `${nameOf(leaving?.player_id ?? "")} has left and nobody can come in, so their pair loses by walkover`,
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/stays in the draw/)).toBeNull();
+      await openPlayers(user);
+      expect(
+        screen.getByText(
+          "Has left. A replacement comes in at the next draw if anyone can.",
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("previews a replacement in Czech (FR-049)", async () => {
+      await i18n.changeLanguage("cs");
+      withoutThirdPlace();
+      await finishNewestRound();
+      const before = await readRounds();
+      const leaving = before.players.find((p) => p.status === "still_in");
+      const first = before.players.find((p) => p.status === "knocked_out");
+      await setDisabled(leaving?.entry_id ?? "");
+      renderAt(knockoutPath());
+
+      expect(
+        await screen.findByText(
+          `Za hráče ${nameOf(leaving?.player_id ?? "")} nastoupí ${nameOf(first?.player_id ?? "")}`,
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", {
+          name: `${nameOf(first?.player_id ?? "")} tu není`,
+        }),
+      ).toBeInTheDocument();
+    });
+
+    it("has no axe violations with the plan and the players shown", async () => {
+      withoutThirdPlace();
+      await finishNewestRound();
+      const leaving = (await readRounds()).players.find(
+        (p) => p.status === "still_in",
+      );
+      await setDisabled(leaving?.entry_id ?? "");
+      const user = userEvent.setup();
+      renderAt(knockoutPath());
+      await screen.findByText("At this draw:");
+      await openPlayers(user);
+
+      expect(await violations()).toEqual([]);
+    });
+
+    it("says plain statuses once the final's round is drawn, as nobody comes in any more (BR-147, BR-148)", async () => {
+      withoutThirdPlace();
+      await finishNewestRound();
+      await drawRound(2);
+      const out = (await readRounds()).players.filter(
+        (p) => p.status === "knocked_out",
+      );
+      expect(out).toHaveLength(4);
+      await setDisabled(out[0]?.entry_id ?? "");
+      const user = userEvent.setup();
+      renderAt(knockoutPath());
+      await openPlayers(user);
+
+      expect(screen.getAllByText("Knocked out.")).toHaveLength(3);
+      expect(screen.getByText("Not here.")).toBeInTheDocument();
+      expect(screen.queryByText(/as a replacement/)).toBeNull();
+      expect(screen.queryByText(/next draw/)).toBeNull();
+    });
+
+    it("says a final winner who left has left, with no next draw (BR-147)", async () => {
+      await finishNewestRound();
+      const drawn = await drawRound(2);
+      const final = drawn.rounds[1]?.matches.find((m) => m.kind === "standard");
+      await enterResult(final?.match_id ?? "", true);
+      const winner = final?.sides[0]?.player_ids[0] ?? "";
+      const entry = (await readRounds()).players.find(
+        (p) => p.player_id === winner,
+      );
+      await setDisabled(entry?.entry_id ?? "");
+      const user = userEvent.setup();
+      renderAt(knockoutPath());
+      await openPlayers(user);
+
+      expect(screen.getByText("Has left.")).toBeInTheDocument();
+      expect(screen.queryByText(/next draw/)).toBeNull();
+    });
+
+    /** Holds every disable or enable request until the returned function runs. */
+    function holdDisableRequests(): () => void {
+      let release = (): void => undefined;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      server.use(
+        http.put(
+          "/api/v1/leagues/:leagueId/tournaments/:tournamentId/entries/:entryId/disabled",
+          // An empty resolver falls through to the fake API.
+          async () => {
+            await gate;
+          },
+        ),
+      );
+      return release;
+    }
+
+    it("takes one change at a time: every row waits while one is saved (FR-044)", async () => {
+      const release = holdDisableRequests();
+      const user = userEvent.setup();
+      renderAt(knockoutPath());
+      await openPlayers(user);
+      const [first] = screen.getAllByRole("button", { name: /^Disable / });
+      if (first === undefined) throw new Error("The list has players.");
+
+      await user.click(first);
+
+      await waitFor(() => {
+        for (const button of screen.getAllByRole("button", {
+          name: /^(Disable|Enable) /,
+        })) {
+          expect(button).toBeDisabled();
+        }
+      });
+      release();
+      await waitFor(() => {
+        for (const button of screen.getAllByRole("button", {
+          name: /^(Disable|Enable) /,
+        })) {
+          expect(button).toBeEnabled();
+        }
+      });
+    });
+
+    it("holds the draw and the not-here buttons while a change is saved (FR-049)", async () => {
+      withoutThirdPlace();
+      await finishNewestRound();
+      const leaving = (await readRounds()).players.find(
+        (p) => p.status === "still_in",
+      );
+      await setDisabled(leaving?.entry_id ?? "");
+      const release = holdDisableRequests();
+      const user = userEvent.setup();
+      renderAt(knockoutPath());
+      const draw = await screen.findByRole("button", {
+        name: "Draw the final",
+      });
+      expect(draw).toBeEnabled();
+      await openPlayers(user);
+
+      const [first] = screen.getAllByRole("button", { name: /^Disable / });
+      if (first === undefined) throw new Error("The list has players.");
+      await user.click(first);
+
+      await waitFor(() => {
+        expect(draw).toBeDisabled();
+      });
+      expect(
+        screen.getByRole("button", { name: / is not here$/ }),
+      ).toBeDisabled();
+      release();
+      await waitFor(() => {
+        expect(
+          screen.getByRole("button", { name: "Draw the final" }),
+        ).toBeEnabled();
+      });
+    });
+
+    it("has no Players section once the tournament is finished (FR-044)", async () => {
+      await finishNewestRound();
+      const drawn = await drawRound(2);
+      // The final is best of 3, the third-place match one game.
+      for (const match of drawn.rounds[1]?.matches ?? []) {
+        await enterResult(match.match_id, match.kind === "standard");
+      }
+      renderAt(knockoutPath());
+
+      expect(
+        await screen.findByText("The knockout is finished"),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Players in the knockout" }),
+      ).toBeNull();
+    });
+  });
 });
 
 describe("Changing a knockout result (FR-053, BR-094)", () => {
@@ -932,7 +1291,7 @@ describe("Lots in the bracket (BR-074, ADR-009)", () => {
 
 describe("Finished in Lord have mercy (screen 10, BR-145)", () => {
   /** Per-player place rows, partners sharing a place, as the backend sends them. */
-  function lordHaveMercyPlaces() {
+  function lordHaveMercyPlaces(replacedSeventh = false) {
     const tournament = db().tournaments.find((t) => t.id === LHM);
     const singles = (tournament?.entries ?? []).filter(
       (e) => e.player_ids.length === 1,
@@ -946,14 +1305,17 @@ describe("Finished in Lord have mercy (screen 10, BR-145)", () => {
       index: number,
       place: number,
       partner: number,
-      kind: "won_final" | "lost_final" | "lost_in_round",
+      kind: "won_final" | "lost_final" | "lost_in_round" | "replaced",
     ) => ({
       entry_id: singles[index]?.id ?? "",
       place,
       points_per_player: 10 - place,
       reason: {
         kind,
-        round: kind === "lost_in_round" ? "semifinal" : "final",
+        round:
+          kind === "lost_in_round" || kind === "replaced"
+            ? "semifinal"
+            : "final",
         score: kind === "won_final" ? [10, 3] : null,
         opponent_entry_id: null,
         partner_entry_id: singles[partner]?.id ?? null,
@@ -979,7 +1341,7 @@ describe("Finished in Lord have mercy (screen 10, BR-145)", () => {
             row(3, 2, 2, "lost_final"),
             row(4, 3, 5, "lost_in_round"),
             row(5, 3, 4, "lost_in_round"),
-            row(6, 3, 7, "lost_in_round"),
+            row(6, 3, 7, replacedSeventh ? "replaced" : "lost_in_round"),
             row(7, 3, 6, "lost_in_round"),
           ],
         }),
@@ -1014,6 +1376,32 @@ describe("Finished in Lord have mercy (screen 10, BR-145)", () => {
     expect(rows[2]).toHaveTextContent(`${name(4)} / ${name(5)}`);
     expect(rows[2]).toHaveTextContent(`${name(6)} / ${name(7)}`);
     expect(rows[2]).toHaveTextContent("Shared. Lost in the semifinals.");
+  });
+
+  it("says a replaced player is placed as knocked out in the round of the seat they took (BR-151)", async () => {
+    const { name } = lordHaveMercyPlaces(true);
+    renderAt(at(paths.finished, LHM));
+
+    const places = await screen.findByRole("region", { name: "Final places" });
+    const third = within(places).getAllByRole("listitem")[2];
+    expect(third).toHaveTextContent(`${name(6)} / ${name(7)}`);
+    // The place reads by the others' reason; the replaced player has a line.
+    expect(third).toHaveTextContent("Shared. Lost in the semifinals.");
+    expect(third).toHaveTextContent(
+      `${name(6)}: Replaced, placed as knocked out in the semifinals`,
+    );
+  });
+
+  it("says it in Czech (BR-151)", async () => {
+    await i18n.changeLanguage("cs");
+    const { name } = lordHaveMercyPlaces(true);
+    renderAt(at(paths.finished, LHM));
+
+    expect(
+      await screen.findByText(
+        `${name(6)}: Nahrazen náhradníkem, umístěn jako při konci v semifinále`,
+      ),
+    ).toBeInTheDocument();
   });
 });
 

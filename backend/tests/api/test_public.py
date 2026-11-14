@@ -556,7 +556,13 @@ _PUBLIC_PROPERTIES: dict[str, set[str]] = {
         "state",
     },
     "PublicRemixRoundRead": {"matches", "name", "round_id", "round_no"},
-    "PublicRemixSideRead": {"entry_id", "is_bye", "left_player_ids", "player_ids"},
+    "PublicRemixSideRead": {
+        "entry_id",
+        "is_bye",
+        "left_player_ids",
+        "player_ids",
+        "replacements",
+    },
     "PublicSeasonStandingRow": {
         "place",
         "player_id",
@@ -594,6 +600,7 @@ _PUBLIC_PROPERTIES: dict[str, set[str]] = {
         "type",
         "waiting",
     },
+    "RemixReplacementRead": {"player_id", "replaced_player_id"},
     "RoundRead": {"id", "matches", "phase_id", "round_no", "sitting_out"},
     "SeasonRead": {
         "closed_at",

@@ -5,6 +5,9 @@
 // round 1 only and the organizer draws each next round once the round before
 // is complete. Minimal: the draw is a seeded shuffle per round number, so the
 // same round always gives the same pairs; tests assert structure, not pairs.
+// Replacements (BR-147 to BR-154) follow the backend's rules; where the
+// backend draws a lot between players of the same standing, this stand-in
+// orders them by player id.
 import type {
   MatchRead,
   MatchSideRead,
@@ -14,6 +17,7 @@ import type {
   PublicRemixRead,
   RemixMatch,
   RemixRead,
+  RemixReplacement,
   RemixRound,
   RemixSide,
   RoundRead,
@@ -149,23 +153,178 @@ function matchOf(args: {
   };
 }
 
+/** The replacements stored with the drawn matches, by match id (BR-148). */
+function replacementsOf(t: StoredTournament): Map<string, RemixReplacement[]> {
+  const stored = t.remix_replacements ?? {};
+  return new Map(
+    remixRounds(t)
+      .flatMap((round) => round.matches)
+      .flatMap((match) => {
+        const list = stored[match.id];
+        return list === undefined ? [] : [[match.id, list] as const];
+      }),
+  );
+}
+
+/** BR-153: the players a replacement was drawn in place of. */
+function replacedPlayers(t: StoredTournament): Set<string> {
+  return new Set(
+    [...replacementsOf(t).values()]
+      .flat()
+      .map((replacement) => replacement.replaced_player_id),
+  );
+}
+
+/** Every player of the knockout: the players of round 1. */
+function knockoutPlayers(t: StoredTournament): string[] {
+  return (remixRounds(t)[0]?.matches ?? []).flatMap((match) =>
+    match.sides.flatMap((s) => s.player_ids),
+  );
+}
+
+/** Each player's group-phase place (BR-074); lower is better. */
+function standingOf(t: StoredTournament): Map<string, number> {
+  const playersOfEntry = new Map(
+    t.entries.map((entry) => [entry.id, entry.player_ids] as const),
+  );
+  return new Map(
+    rankingOf(t).rows.flatMap((row) =>
+      (playersOfEntry.get(row.entry_id) ?? []).map(
+        (player) => [player, row.place] as const,
+      ),
+    ),
+  );
+}
+
+/** The round of each player's latest match. */
+function latestRoundOf(t: StoredTournament): Map<string, number> {
+  const latest = new Map<string, number>();
+  for (const round of remixRounds(t)) {
+    for (const match of round.matches) {
+      for (const player of match.sides.flatMap((s) => s.player_ids)) {
+        latest.set(player, round.round_no);
+      }
+    }
+  }
+  return latest;
+}
+
+/** Ids in code-point order, the stand-in for the backend's lot. */
+const byId = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
+/** Who comes into the next draw for whom, and who stays in without one (FR-049). */
+export interface ReplacementPlan {
+  replacements: RemixReplacement[];
+  staying: string[];
+}
+
 /**
- * BR-141 to BR-144, BR-156: draws the next round from the players who went
- * through, by a seeded shuffle of the round number: players 1 and 2 form the
- * first pair, 3 and 4 the second, and pairs 1 and 2 play the first match. The
- * final's round also gets the third-place match between the semifinal losers.
- * The caller has checked that the round can be drawn.
+ * BR-148, BR-149: the replacement plan of the next draw, as a pure function.
+ * `leaving` are the disabled players of the next draw's pool; `candidates`
+ * are the knockout's players who are knocked out, not disabled and never
+ * replaced. Candidates come best-placed first: last knocked out in a later
+ * round, then the better group-phase standing, then (the backend's lot) the
+ * player id. The players leaving are ordered by standing the same way; with
+ * too few candidates those with the best standing stay in the draw, and the
+ * others are replaced in that order, the better standing getting the better
+ * replacement.
+ */
+export function planReplacements(args: {
+  leaving: Iterable<string>;
+  candidates: Iterable<string>;
+  standing: ReadonlyMap<string, number>;
+  knockedOutIn: ReadonlyMap<string, number>;
+}): ReplacementPlan {
+  const rank = (player: string) =>
+    args.standing.get(player) ?? Number.MAX_SAFE_INTEGER;
+  const byStanding = (players: Iterable<string>) =>
+    [...players].sort((a, b) => rank(a) - rank(b) || byId(a, b));
+  const leaving = byStanding(args.leaving);
+  const candidates = byStanding(args.candidates).sort(
+    (a, b) => (args.knockedOutIn.get(b) ?? 0) - (args.knockedOutIn.get(a) ?? 0),
+  );
+  const leftIn = Math.max(leaving.length - candidates.length, 0);
+  return {
+    replacements: leaving.slice(leftIn).flatMap((player, index) => {
+      const candidate = candidates[index];
+      return candidate === undefined
+        ? []
+        : [{ player_id: candidate, replaced_player_id: player }];
+    }),
+    staying: leaving.slice(0, leftIn),
+  };
+}
+
+/**
+ * BR-141, BR-144, BR-156: the players of the next draw before replacements:
+ * those going through, and the semifinal losers for the third-place match
+ * when the next round is the final's.
+ */
+function nextPools(t: StoredTournament): [string[], string[]] {
+  const rounds = remixRounds(t);
+  const newest = rounds.at(-1);
+  const through = (newest?.matches ?? [])
+    .filter((match) => match.kind === "standard")
+    .flatMap((match) => playersOf(winnerOf(match)));
+  const third =
+    need(knockoutPhase(t)).third_place_match &&
+    rounds.length + 1 === remixRoundCount(t)
+      ? standardLosers(newest)
+      : [];
+  return [through, third];
+}
+
+function disabledPlayers(t: StoredTournament): Set<string> {
+  return new Set(
+    t.entries
+      .filter((entry) => entry.stage === "main" && entry.is_disabled)
+      .flatMap((entry) => entry.player_ids),
+  );
+}
+
+/** FR-049: the plan of the next draw, or null when it cannot be drawn now. */
+export function remixPlan(t: StoredTournament): ReplacementPlan | null {
+  if (!canDrawNext(t)) {
+    return null;
+  }
+  const disabled = disabledPlayers(t);
+  const [through, third] = nextPools(t);
+  const stillIn = playersStillIn(t);
+  const replaced = replacedPlayers(t);
+  return planReplacements({
+    leaving: [...through, ...third].filter((player) => disabled.has(player)),
+    candidates: knockoutPlayers(t).filter(
+      (player) =>
+        !stillIn.has(player) && !replaced.has(player) && !disabled.has(player),
+    ),
+    standing: standingOf(t),
+    knockedOutIn: latestRoundOf(t),
+  });
+}
+
+/**
+ * BR-141 to BR-144, BR-148, BR-156: draws the next round from the players who
+ * went through, each replacement in place of the player who left, by a seeded
+ * shuffle of the round number: players 1 and 2 form the first pair, 3 and 4
+ * the second, and pairs 1 and 2 play the first match. The final's round also
+ * gets the third-place match between the semifinal losers. Each match keeps
+ * its replacements (BR-155). The caller has checked that the round can be
+ * drawn.
  */
 export function drawRemixRound(t: StoredTournament, ids: Ids): RoundRead {
   const phase = need(knockoutPhase(t));
   const rounds = remixRounds(t);
-  const newest = need(rounds.at(-1));
   const roundNo = rounds.length + 1;
-  const through = newest.matches
-    .filter((match) => match.kind === "standard")
-    .flatMap((match) => playersOf(winnerOf(match)))
-    .sort();
-  const teams = pairsOf(shuffled(through, createRng(roundNo * 7919 + 11)));
+  const plan = need(remixPlan(t));
+  const cameIn = new Map(
+    plan.replacements.map((r) => [r.replaced_player_id, r.player_id] as const),
+  );
+  const swapped = (pool: readonly string[]) =>
+    pool.map((player) => cameIn.get(player) ?? player).sort();
+  const [through, third] = nextPools(t);
+  const teams = pairsOf(
+    shuffled(swapped(through), createRng(roundNo * 7919 + 11)),
+  );
   const round: RoundRead = {
     id: ids(),
     phase_id: phase.id,
@@ -184,12 +343,9 @@ export function drawRemixRound(t: StoredTournament, ids: Ids): RoundRead {
       }),
     );
   }
-  if (phase.third_place_match && roundNo === remixRoundCount(t)) {
+  if (third.length > 0) {
     const [first, second] = pairsOf(
-      shuffled(
-        standardLosers(rounds.at(-1)).sort(),
-        createRng(roundNo * 104729 + 13),
-      ),
+      shuffled(swapped(third), createRng(roundNo * 104729 + 13)),
     );
     round.matches.push(
       matchOf({
@@ -201,8 +357,28 @@ export function drawRemixRound(t: StoredTournament, ids: Ids): RoundRead {
       }),
     );
   }
+  const stored = { ...t.remix_replacements };
+  for (const match of round.matches) {
+    const players = match.sides.flatMap((s) => s.player_ids);
+    const own = plan.replacements.filter((r) => players.includes(r.player_id));
+    if (own.length > 0) {
+      stored[match.id] = own;
+    }
+  }
+  t.remix_replacements = stored;
   t.rounds.push(round);
   return round;
+}
+
+/** BR-154: deleting a round undoes the replacements drawn with it. */
+export function forgetReplacements(
+  t: StoredTournament,
+  matchIds: Iterable<string>,
+): void {
+  const gone = new Set(matchIds);
+  t.remix_replacements = Object.fromEntries(
+    Object.entries(t.remix_replacements ?? {}).filter(([id]) => !gone.has(id)),
+  );
 }
 
 /**
@@ -243,7 +419,10 @@ export function remixLocked(
   );
 }
 
-/** BR-147: the players still in, whose latest pair won, had a bye or has no result yet. */
+/**
+ * BR-147: the players still in, whose latest pair won, had a bye or has no
+ * result yet, without the players who were replaced (BR-153).
+ */
 function playersStillIn(t: StoredTournament): Set<string> {
   const rounds = remixRounds(t);
   const count = remixRoundCount(t);
@@ -260,6 +439,8 @@ function playersStillIn(t: StoredTournament): Set<string> {
       ? standardLosers(rounds[count - 2])
       : [],
   );
+  // BR-153: a player who was replaced is not still in, whatever their pair did.
+  const replaced = replacedPlayers(t);
   return new Set(
     [...latest]
       .filter(
@@ -268,18 +449,54 @@ function playersStillIn(t: StoredTournament): Set<string> {
           playersOf(winnerOf(match)).includes(player) ||
           waiting.has(player),
       )
-      .map(([player]) => player),
+      .map(([player]) => player)
+      .filter((player) => !replaced.has(player)),
   );
 }
 
 /** FR-049: the disabled players who stay in the draw. */
 function leftPlayers(t: StoredTournament): string[] {
-  const disabled = new Set(
-    t.entries
-      .filter((entry) => entry.stage === "main" && entry.is_disabled)
-      .flatMap((entry) => entry.player_ids),
-  );
+  const disabled = disabledPlayers(t);
   return [...playersStillIn(t)].filter((player) => disabled.has(player)).sort();
+}
+
+/** FR-049: what the next draw would do now, while it can be drawn. */
+function nextDrawOf(t: StoredTournament): RemixRead["next_draw"] {
+  const plan = t.state === "in_progress" ? remixPlan(t) : null;
+  return plan === null
+    ? null
+    : { replacements: plan.replacements, staying_player_ids: plan.staying };
+}
+
+/** FR-044, BR-147, BR-153: the knockout's players by group-phase standing. */
+function knockoutPlayerViews(t: StoredTournament): RemixRead["players"] {
+  const standing = standingOf(t);
+  const stillIn = playersStillIn(t);
+  const replaced = replacedPlayers(t);
+  const entryOf = new Map(
+    t.entries
+      .filter((entry) => entry.stage === "main")
+      .flatMap((entry) =>
+        entry.player_ids.map((player) => [player, entry] as const),
+      ),
+  );
+  const rank = (player: string) =>
+    standing.get(player) ?? Number.MAX_SAFE_INTEGER;
+  return knockoutPlayers(t)
+    .sort((a, b) => rank(a) - rank(b) || byId(a, b))
+    .map((player) => {
+      const entry = need(entryOf.get(player));
+      return {
+        player_id: player,
+        entry_id: entry.id,
+        status: replaced.has(player)
+          ? "replaced"
+          : stillIn.has(player)
+            ? "still_in"
+            : "knocked_out",
+        is_disabled: entry.is_disabled,
+      };
+    });
 }
 
 /** The knockout round by round (BR-155), as the organizer reads it. */
@@ -304,9 +521,14 @@ export function remixRead(t: StoredTournament): RemixRead {
       numbers.set(match.id, next);
     }
   }
-  const sideView = (s: MatchSideRead): RemixSide => ({
+  const replacements = replacementsOf(t);
+  const sideView = (match: MatchRead, s: MatchSideRead): RemixSide => ({
     ...s,
     left_player_ids: s.player_ids.filter((player) => left.has(player)),
+    // BR-155: who came in for whom.
+    replacements: (replacements.get(match.id) ?? []).filter((r) =>
+      s.player_ids.includes(r.player_id),
+    ),
   });
   const viewOf = (round: RoundRead, match: MatchRead): RemixMatch => {
     const format = formatOf(phase, match, round.round_no === count);
@@ -324,7 +546,7 @@ export function remixRead(t: StoredTournament): RemixRead {
           : field !== null
             ? "on_field"
             : "ready",
-      sides: [sideView(match.sides[0]), sideView(match.sides[1])],
+      sides: [sideView(match, match.sides[0]), sideView(match, match.sides[1])],
       outcome: bye ? null : match.outcome,
       is_walkover: match.is_walkover,
       score: scoreOf(match, format),
@@ -344,6 +566,8 @@ export function remixRead(t: StoredTournament): RemixRead {
     final_match_format: phase.final_match_format,
     can_draw_next: canDrawNext(t),
     left_player_ids: [...left].sort(),
+    next_draw: nextDrawOf(t),
+    players: knockoutPlayerViews(t),
     rounds: rounds.map((round): RemixRound => ({
       round_id: round.id,
       round_no: round.round_no,
@@ -444,6 +668,34 @@ export function remixPlaces(
   const rankOf = (player: string): number =>
     groupPlace.get(entryOf.get(player)?.id ?? "") ?? Number.MAX_SAFE_INTEGER;
 
+  // BR-151: a replaced player takes the seat their replacement gave up, in the
+  // match the replacement was last knocked out in before coming in.
+  const seats = new Map<string, string>();
+  const seatRound = new Map<string, number>();
+  const stored = replacementsOf(t);
+  rounds.forEach((round, index) => {
+    const before = new Map<string, MatchRead>();
+    for (const earlier of rounds.slice(0, index)) {
+      for (const match of inOrder(earlier)) {
+        for (const player of match.sides.flatMap((s) => s.player_ids)) {
+          before.set(player, match);
+        }
+      }
+    }
+    for (const match of round.matches) {
+      for (const r of stored.get(match.id) ?? []) {
+        const givenUp = need(before.get(r.player_id));
+        seats.set(`${givenUp.id}:${r.player_id}`, r.replaced_player_id);
+        seatRound.set(
+          r.replaced_player_id,
+          need(rounds.find((x) => x.id === givenUp.round_id)).round_no,
+        );
+      }
+    }
+  });
+  const seated = (match: MatchRead, team: readonly string[]): string[] =>
+    team.map((player) => seats.get(`${match.id}:${player}`) ?? player);
+
   const blocks: string[][][] = inOrder(finalRound).flatMap((match) =>
     [winnerOf(match), loserOf(match)].flatMap((team) =>
       team ? [[team.player_ids]] : [],
@@ -454,7 +706,7 @@ export function remixPlaces(
     blocks.push(
       round.matches.flatMap((match) => {
         const loser = loserOf(match);
-        return loser ? [loser.player_ids] : [];
+        return loser ? [seated(match, loser.player_ids)] : [];
       }),
     );
   }
@@ -479,6 +731,17 @@ export function remixPlaces(
       group_place: place,
       group_format: group?.format ?? null,
     };
+    const seat = seatRound.get(player);
+    if (seat !== undefined) {
+      // BR-151: placed as if knocked out in the round of the seat they took.
+      return reasonOf("replaced", {
+        ...base,
+        round: roundNameOf(seat, count),
+        score: null,
+        partner_entry_id:
+          partner === null ? null : need(entryOf.get(partner)).id,
+      });
+    }
     if (!last) {
       return reasonOf("group_place", base);
     }

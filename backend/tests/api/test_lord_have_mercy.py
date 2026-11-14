@@ -871,7 +871,7 @@ def test_br130_a_drawn_round_takes_free_fields_third_place_after_final(
     assert [f["match_id"] for f in after["fields"]] == [third["match_id"]]
 
 
-def test_br147_br149_a_disabled_player_still_in_stays_in_the_draw(
+def test_br147_br149_with_nobody_available_a_disabled_player_stays_in_the_draw(
     client: TestClient,
     league_id: UUID,
     headers: dict[str, str],
@@ -1743,6 +1743,7 @@ def test_br155_share_link_shows_the_rounds(
                     "entry_id",
                     "is_bye",
                     "left_player_ids",
+                    "replacements",
                 }
     # The same rounds and matches as the organizer sees.
     assert [[m["match_id"] for m in r["matches"]] for r in shown["rounds"]] == [

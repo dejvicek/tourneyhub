@@ -1,15 +1,16 @@
-"""The Lord have mercy re-mix: later rounds, the lock, who is still in, places.
+"""The Lord have mercy re-mix: later rounds, replacements, the lock, places.
 
 In a Lord have mercy knockout (BR-084) the pairs change every round. Round 1
 is drawn when the knockout starts (`monster_dyp.select_monster_knockout`);
 every later round is drawn here, once the round before is complete, from the
-players who went through (BR-140, BR-141). Places are per player (BR-145).
+players who went through (BR-140, BR-141). A disabled player who is still in
+has left and is replaced in the next draw by the best-placed player who is
+knocked out (BR-147, BR-148), or stays in the draw when nobody is available
+(BR-149); `plan_replacements` decides who, for the organizer's preview and
+for the draw alike. Places are per player, and a player who was replaced
+takes the place their replacement gave up (BR-145, BR-151).
 
-Replacements of players who left (BR-148, BR-151, BR-153, BR-154) are not
-covered: a disabled player who is still in stays in the draw, and the
-organizer records a walkover (BR-149).
-
-BR-140 to BR-147, BR-149, BR-155 to BR-157, FR-037.
+BR-140 to BR-149, BR-151 to BR-157, FR-037, FR-049.
 """
 
 from collections import Counter, defaultdict
@@ -38,6 +39,16 @@ always give the same pairs.
 """
 
 
+REPLACEMENT_PURPOSE = f"{MonsterKnockoutMode.LORD_HAVE_MERCY.value}:replacement"
+"""The lot of the replacements' ties (BR-148, BR-074, ADR-010).
+
+It orders the candidates level on the round they were knocked out in and on
+their group-phase standing, and the players who left level on their
+standing. It holds no draw counter and no round, so the same knockout and
+the same disabled players always give the same plan (BR-156).
+"""
+
+
 def remix_purpose(round_no: int) -> str:
     """Name the lot of round `round_no`'s draw, `lord_have_mercy:round-<r>` (BR-156).
 
@@ -56,6 +67,19 @@ def remix_purpose(round_no: int) -> str:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class Replacement:
+    """A player who came into a draw in place of a player who left (BR-148).
+
+    Attributes:
+        player_id: The replacement, a player who was knocked out.
+        replaced_player_id: The player who left and was replaced.
+    """
+
+    player_id: PlayerId
+    replaced_player_id: PlayerId
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class RemixMatch:
     """A stored match of a Lord have mercy knockout.
 
@@ -65,12 +89,16 @@ class RemixMatch:
         side_1: The pair on side 1, or None for a bye (round 1 only, BR-041).
         side_2: The pair on side 2, the same.
         outcome: The stored result, None without one; a bye has none.
+        replacements: The match's players who came in as replacements, and
+            for whom (BR-148, BR-155), by the replacement's id; never in
+            round 1 (BR-152).
     """
 
     key: MatchKey
     side_1: Team | None
     side_2: Team | None
     outcome: Outcome | None = None
+    replacements: tuple[Replacement, ...] = ()
 
     @property
     def has_bye(self) -> bool:
@@ -200,18 +228,27 @@ class RemixState:
         return _losers(self.rounds[semifinal - 1])
 
     @property
+    def replaced(self) -> frozenset[PlayerId]:
+        """The players a replacement was drawn in place of (BR-148, BR-153)."""
+        return frozenset(
+            replacement.replaced_player_id
+            for match in self.matches
+            for replacement in match.replacements
+        )
+
+    @property
     def still_in(self) -> frozenset[PlayerId]:
         """The players still in the knockout (BR-147).
 
         A player is still in when their latest pair won its match or had a
         bye, or its match has no result yet. With a third-place match, the
-        semifinal losers are also still in until that match has a result.
-        Every other player of the knockout is knocked out.
+        semifinal losers are also still in until that match has a result. A
+        player who was replaced is not still in, whatever their pair did
+        (BR-153). Every other player of the knockout is knocked out.
 
         A pair that won the final or the third-place match also "won its
         match" and so counts as still in; nothing is drawn after those
-        matches, so this decides nothing. Replacements (BR-153) are not
-        covered here.
+        matches, so this decides nothing.
         """
         latest = _last_matches(self.matches)
         waiting = (
@@ -219,13 +256,41 @@ class RemixState:
             if self.third_place_match and self.rounds_drawn < self.round_count
             else frozenset()
         )
-        return frozenset(
-            player_id
-            for player_id, match in latest.items()
-            if match.outcome is None
-            or player_id in (match.winner or ())
-            or player_id in waiting
+        return (
+            frozenset(
+                player_id
+                for player_id, match in latest.items()
+                if match.outcome is None
+                or player_id in (match.winner or ())
+                or player_id in waiting
+            )
+            - self.replaced
         )
+
+    @property
+    def knocked_out(self) -> frozenset[PlayerId]:
+        """The knockout's players who are knocked out and were never replaced.
+
+        These are the players a replacement can be picked from (BR-147,
+        BR-148, BR-153); a player who was replaced is neither still in nor
+        here.
+        """
+        return self.players - self.still_in - self.replaced
+
+    @property
+    def next_pools(self) -> tuple[frozenset[PlayerId], frozenset[PlayerId]]:
+        """The players of the next draw before replacements (BR-141, BR-144, BR-156).
+
+        The players going through, and the semifinal losers for the
+        third-place match when the next round is the final's; the second
+        set is empty otherwise.
+        """
+        third = (
+            self.semifinal_losers
+            if self.third_place_match and self.rounds_drawn + 1 == self.round_count
+            else frozenset()
+        )
+        return self.going_through, third
 
     def match(self, key: MatchKey) -> RemixMatch:
         """The drawn match at `key`.
@@ -276,8 +341,9 @@ def remix_state(
     positions 1 to n, n a power of two, with byes only there (BR-041). Round
     r has `size >> r` standard matches, and the final's round also holds the
     third-place match when the knockout has one (BR-144). Each later round
-    must be drawn from the players who went through (BR-141), and only once
-    the round before is complete (BR-140).
+    must be drawn from the players who went through (BR-141), with each
+    replacement in place of the player who left (BR-148, BR-156), and only
+    once the round before is complete (BR-140).
 
     Args:
         matches: Every stored match of the knockout, in any order.
@@ -293,7 +359,12 @@ def remix_state(
             before the round before is complete, or not from the players who
             went through; a third-place match outside the final's round,
             against the flag, missing, or not between the semifinal losers;
-            a round 1 larger than its pairs need (#96).
+            a round 1 larger than its pairs need (#96); a replacement in
+            round 1 or on a match they do not play; a replacement who was not
+            knocked out at the draw (still in, already replaced, or not in
+            the knockout), a replaced player outside their match's pool, or
+            a player coming in or replaced twice in one round (BR-148,
+            BR-153).
     """
     matches = tuple(matches)
     repeated = [
@@ -339,10 +410,9 @@ def remix_state(
         round_ = _check_round(
             by_round[round_no],
             round_no=round_no,
-            size=size,
-            third_place_match=third_place_match,
-            before=rounds[-1] if rounds else (),
-            semifinal=rounds[-1] if round_no == round_count and rounds else (),
+            before=RemixState(
+                size=size, third_place_match=third_place_match, rounds=tuple(rounds)
+            ),
         )
         rounds.append(round_)
     return RemixState(
@@ -368,19 +438,23 @@ def _check_match(match: RemixMatch) -> None:
         if side is not None and side[0] == side[1]:
             msg = f"match {match.key} has a pair that is not two different players"
             raise ValueError(msg)
+    if match.replacements and match.key.round_no == 1:
+        msg = f"match {match.key} has a replacement in round 1 (BR-152)"
+        raise ValueError(msg)
+    if any(r.player_id not in match.players for r in match.replacements):
+        msg = f"match {match.key} marks a replacement who does not play in it"
+        raise ValueError(msg)
 
 
 def _check_round(
-    matches: Sequence[RemixMatch],
-    *,
-    round_no: int,
-    size: int,
-    third_place_match: bool,
-    before: Sequence[RemixMatch],
-    semifinal: Sequence[RemixMatch],
+    matches: Sequence[RemixMatch], *, round_no: int, before: RemixState
 ) -> tuple[RemixMatch, ...]:
-    """Check one round against the round before and return it in schedule order."""
-    round_count = size.bit_length() - 1
+    """Check one round against the rounds before and return it in schedule order.
+
+    `before` holds the rounds already checked, none for round 1.
+    """
+    size = before.size
+    round_count = before.round_count
     standard = sorted(
         (match for match in matches if not match.key.is_third_place),
         key=lambda match: match.key.position,
@@ -400,22 +474,60 @@ def _check_round(
         msg = f"the third-place matches {stray} are not in the final's round"
         raise ValueError(msg)
     ensure_distinct(player_id for match in matches for player_id in match.players)
+    if round_count == round_no and bool(third) != before.third_place_match:
+        msg = "the third-place match does not match the knockout's setting"
+        raise ValueError(msg)
     if round_no > 1:
-        if not all(match.is_decided for match in before):
+        if not all(match.is_decided for match in before.newest_round):
             msg = f"round {round_no} is drawn before round {round_no - 1} is complete"
             raise ValueError(msg)
-        players = {player_id for match in standard for player_id in match.players}
-        if players != _going_through(before):
+        _check_replacements(matches, before=before)
+        going_through, semifinal_losers = before.next_pools
+        if _players_after(standard) != going_through:
             msg = f"round {round_no} is not drawn from the players who went through"
             raise ValueError(msg)
-    if round_no == round_count:
-        if bool(third) != third_place_match:
-            msg = "the third-place match does not match the knockout's setting"
-            raise ValueError(msg)
-        if third and set(third[0].players) != _losers(semifinal):
+        if third and _players_after(third) != semifinal_losers:
             msg = "the third-place match is not between the semifinal losers"
             raise ValueError(msg)
     return (*standard, *third)
+
+
+def _check_replacements(matches: Sequence[RemixMatch], *, before: RemixState) -> None:
+    """Check a later round's replacements against the rounds before (BR-148, BR-153).
+
+    Each replacement was knocked out and never replaced when the round was
+    drawn, and each replaced player was in the pool of their match: the
+    players going through for a standard match, the semifinal losers for the
+    third-place match. Nobody comes in or is replaced twice in a round.
+    """
+    replacements = [r for match in matches for r in match.replacements]
+    ensure_distinct(r.player_id for r in replacements)
+    ensure_distinct(r.replaced_player_id for r in replacements)
+    not_out = {r.player_id for r in replacements} - before.knocked_out
+    if not_out:
+        msg = f"replacements {sorted(not_out)} were not knocked out at the draw"
+        raise ValueError(msg)
+    going_through, semifinal_losers = before.next_pools
+    for match in matches:
+        pool = semifinal_losers if match.key.is_third_place else going_through
+        outside = {r.replaced_player_id for r in match.replacements} - pool
+        if outside:
+            msg = (
+                f"match {match.key} replaces {sorted(outside)}, who are not in its pool"
+            )
+            raise ValueError(msg)
+
+
+def _players_after(matches: Iterable[RemixMatch]) -> frozenset[PlayerId]:
+    """The players of `matches`, each replacement swapped back for the player they replaced.
+
+    Equal to a pool exactly when the matches were drawn from it (BR-156).
+    """
+    swapped_back: set[PlayerId] = set()
+    for match in matches:
+        came_in = {r.player_id: r.replaced_player_id for r in match.replacements}
+        swapped_back.update(came_in.get(p, p) for p in match.players)
+    return frozenset(swapped_back)
 
 
 def _draw(
@@ -427,25 +539,55 @@ def _draw(
     return [(teams[i], teams[i + 1]) for i in range(0, len(teams), 2)]
 
 
-def draw_next_round(state: RemixState, *, rng_seed: bytes) -> tuple[RemixMatch, ...]:
-    """Draw the next round of a Lord have mercy knockout (BR-141 to BR-144, BR-156).
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ReplacementPlan:
+    """Who comes into the next draw for whom, and who stays in without one (FR-049).
 
-    The players who went through (`RemixState.going_through`) are ordered by
-    the lot `remix_purpose(r)`: players 1 and 2 form the first pair, 3 and 4
-    the second, and so on, and pairs 1 and 2 play the round's first match
-    (pair 1 on side 1), pairs 3 and 4 the second, and so on. Partners from
-    earlier rounds are not avoided (BR-143). The final is re-mixed too
-    (BR-142). With a third-place match, the final's round also gets that
-    match: the four semifinal losers ordered by the lot `THIRD_PLACE_PURPOSE`,
-    1 and 2 against 3 and 4 (BR-144). Neither lot holds a draw counter, so
-    the same players always give the same matches (BR-146, BR-156).
+    Attributes:
+        replacements: The replacements of the next draw, the replaced player
+            with the best group-phase standing first (BR-148).
+        staying: The players who left and stay in the draw without a
+            replacement, best group-phase standing first (BR-149).
+    """
+
+    replacements: tuple[Replacement, ...]
+    staying: tuple[PlayerId, ...]
+
+
+def plan_replacements(
+    state: RemixState,
+    *,
+    disabled: Iterable[PlayerId],
+    standing: Iterable[Iterable[PlayerId]],
+    rng_seed: bytes,
+) -> ReplacementPlan:
+    """Plan the replacements of the next draw (BR-147 to BR-149, BR-153).
+
+    The players to replace are the disabled players of the next draw's pool:
+    the players going through and, when the next round is the final's with a
+    third-place match, the semifinal losers, whose replacement comes into the
+    third-place match. The candidates are the knockout's players who are
+    knocked out, not disabled and never replaced; semifinal losers waiting
+    for the third-place match are still in, so before the final of a
+    4-pair knockout with one there are none. Best-placed candidates come
+    first: last knocked out in a later round, then the better group-phase
+    standing, then the lot `REPLACEMENT_PURPOSE` (BR-074). The players to
+    replace are ordered by their standing, then the same lot. With too few
+    candidates, those with the best standing stay in the draw without one
+    (BR-149) and the others are replaced in that order, the better standing
+    getting the better replacement (BR-148).
+
+    The organizer's preview and the draw (`draw_next_round`) both use this
+    plan. Its lot holds no draw counter, so the same state always gives the
+    same plan (BR-156, ADR-010).
 
     Args:
         state: The knockout as it stands.
+        disabled: The players whose main entry is disabled now (FR-044);
+            others outside the next draw's pool are ignored.
+        standing: The group phase's tie groups of players, best first; a
+            player missing from it ranks after every player in it.
         rng_seed: The tournament's seed (ADR-010).
-
-    Returns:
-        The new round's matches without results, in schedule order.
 
     Raises:
         ValueError: The next round cannot be drawn (`can_draw_next`).
@@ -453,33 +595,114 @@ def draw_next_round(state: RemixState, *, rng_seed: bytes) -> tuple[RemixMatch, 
     if not state.can_draw_next:
         msg = "the next round cannot be drawn"
         raise ValueError(msg)
+    disabled = frozenset(disabled)
+    rank = {
+        player_id: index for index, group in enumerate(standing) for player_id in group
+    }
+    knocked_out_in = {
+        player_id: match.key.round_no
+        for player_id, match in _last_matches(state.matches).items()
+    }
+    going_through, semifinal_losers = state.next_pools
+    leaving = _by_standing(
+        (going_through | semifinal_losers) & disabled, rank=rank, rng_seed=rng_seed
+    )
+    candidates = sorted(
+        _by_standing(state.knocked_out - disabled, rank=rank, rng_seed=rng_seed),
+        key=lambda player_id: -knocked_out_in[player_id],
+    )
+    left_in = max(len(leaving) - len(candidates), 0)
+    return ReplacementPlan(
+        replacements=tuple(
+            Replacement(player_id=candidate, replaced_player_id=player_id)
+            for player_id, candidate in zip(leaving[left_in:], candidates, strict=False)
+        ),
+        staying=leaving[:left_in],
+    )
+
+
+def _by_standing(
+    players: Iterable[PlayerId], *, rank: dict[PlayerId, int], rng_seed: bytes
+) -> tuple[PlayerId, ...]:
+    """Players by group-phase standing, ties by the lot (BR-148, BR-074)."""
+    ordered = order_by_lot(
+        sorted(players), rng_seed=rng_seed, purpose=REPLACEMENT_PURPOSE
+    )
+    return tuple(sorted(ordered, key=lambda player_id: rank.get(player_id, len(rank))))
+
+
+def draw_next_round(
+    state: RemixState,
+    *,
+    rng_seed: bytes,
+    disabled: Iterable[PlayerId] = (),
+    standing: Iterable[Iterable[PlayerId]] = (),
+) -> tuple[RemixMatch, ...]:
+    """Draw the next round of a Lord have mercy knockout (BR-141 to BR-144, BR-148, BR-156).
+
+    The pool is the players who went through (`RemixState.going_through`),
+    with each replacement that `plan_replacements` plans in place of the
+    player who left (BR-148, BR-149). It is ordered by the lot
+    `remix_purpose(r)`: players 1 and 2 form the first pair, 3 and 4 the
+    second, and so on, and pairs 1 and 2 play the round's first match (pair 1
+    on side 1), pairs 3 and 4 the second, and so on. Partners from earlier
+    rounds are not avoided (BR-143). The final is re-mixed too (BR-142). With
+    a third-place match, the final's round also gets that match: the four
+    semifinal losers, with their replacements, ordered by the lot
+    `THIRD_PLACE_PURPOSE`, 1 and 2 against 3 and 4 (BR-144). Neither lot
+    holds a draw counter, so the same players always give the same matches
+    (BR-146, BR-156). Each drawn match lists its replacements (BR-155).
+
+    Args:
+        state: The knockout as it stands.
+        rng_seed: The tournament's seed (ADR-010).
+        disabled: The players whose main entry is disabled now (FR-044).
+        standing: The group phase's tie groups of players, best first.
+
+    Returns:
+        The new round's matches without results, in schedule order.
+
+    Raises:
+        ValueError: The next round cannot be drawn (`can_draw_next`).
+    """
+    plan = plan_replacements(
+        state, disabled=disabled, standing=standing, rng_seed=rng_seed
+    )
+    came_in = {r.replaced_player_id: r for r in plan.replacements}
+    going_through, semifinal_losers = state.next_pools
     round_no = state.rounds_drawn + 1
-    drawn = [
-        RemixMatch(
-            key=MatchKey(round_no=round_no, is_third_place=False, position=index + 1),
-            side_1=side_1,
-            side_2=side_2,
-        )
-        for index, (side_1, side_2) in enumerate(
-            _draw(
-                state.going_through,
-                rng_seed=rng_seed,
-                purpose=remix_purpose(round_no),
-            )
-        )
-    ]
-    if state.third_place_match and round_no == state.round_count:
-        ((side_1, side_2),) = _draw(
-            state.semifinal_losers, rng_seed=rng_seed, purpose=THIRD_PLACE_PURPOSE
-        )
-        drawn.append(
+
+    def drawn(
+        pool: frozenset[PlayerId], *, purpose: str, third: bool
+    ) -> list[RemixMatch]:
+        players = [came_in[p].player_id if p in came_in else p for p in pool]
+        return [
             RemixMatch(
-                key=MatchKey(round_no=round_no, is_third_place=True, position=1),
+                key=MatchKey(
+                    round_no=round_no, is_third_place=third, position=index + 1
+                ),
                 side_1=side_1,
                 side_2=side_2,
+                replacements=tuple(
+                    sorted(
+                        (
+                            r
+                            for r in plan.replacements
+                            if r.player_id in (*side_1, *side_2)
+                        ),
+                        key=lambda r: r.player_id,
+                    )
+                ),
             )
-        )
-    return tuple(drawn)
+            for index, (side_1, side_2) in enumerate(
+                _draw(players, rng_seed=rng_seed, purpose=purpose)
+            )
+        ]
+
+    matches = drawn(going_through, purpose=remix_purpose(round_no), third=False)
+    if semifinal_losers:
+        matches += drawn(semifinal_losers, purpose=THIRD_PLACE_PURPOSE, third=True)
+    return tuple(matches)
 
 
 def allows_result(state: RemixState, key: MatchKey, outcome: Outcome | None) -> bool:
@@ -509,12 +732,14 @@ def allows_result(state: RemixState, key: MatchKey, outcome: Outcome | None) -> 
 def players_who_left(
     state: RemixState, disabled: Iterable[PlayerId]
 ) -> frozenset[PlayerId]:
-    """The players who have left but stay in the draw (BR-147, BR-149, BR-155).
+    """The players who have left and are still in (BR-147, BR-149, BR-155).
 
-    A disabled player who is still in has left. Without replacements they
-    stay in the draw, and their pair loses by walkover, which the organizer
-    records (BR-149); both pairs of a match can have one (BR-157). Disabled
-    players outside the knockout or knocked out are ignored.
+    A disabled player who is still in has left. Once the round they play is
+    drawn they stay in it, and their pair loses by walkover, which the
+    organizer records (BR-149, BR-152); both pairs of a match can have one
+    (BR-157). Before the next draw they are replaced, or stay in the draw
+    when nobody is available (`plan_replacements`, BR-148, BR-149). Disabled
+    players outside the knockout, knocked out or replaced are ignored.
     """
     return state.still_in & frozenset(disabled)
 
@@ -529,13 +754,20 @@ class RemixPlace:
         place: 1 for the winners; players of a pair, and pairs or entries
             sharing a place, have the same number (BR-104).
         partner_id: The partner of the player's last knockout match; None
-            for a player who did not qualify.
+            for a player who did not qualify. For a player who was replaced,
+            and for the partner of the seat they took, the player now in the
+            other seat of that pair (BR-151).
+        seat_round_no: For a player who was replaced, the round in which
+            their replacement was last knocked out before coming in: they
+            are placed as if knocked out in it (BR-151). None for everyone
+            else.
     """
 
     entry_id: EntryId
     player_id: PlayerId
     place: int
     partner_id: PlayerId | None
+    seat_round_no: int | None = None
 
 
 def place_remix_players(
@@ -551,7 +783,10 @@ def place_remix_players(
     (BR-102): the final's winners 1st and losers 2nd; with a third-place
     match its winners 3rd and losers 4th; the pairs losing the same earlier
     round share a place, the semifinal losers 3rd without a third-place
-    match. The players who did not qualify follow in `standing` order,
+    match. A player who was replaced takes the seat their replacement gave
+    up, in the pair the replacement was last knocked out with before coming
+    in, so every place keeps its number of players (BR-151). The players who
+    did not qualify follow in `standing` order,
     numbered after the knockout pairs, each counting as one, tie groups
     sharing a place (BR-103). Places count pairs, not players: after 4
     knockout pairs the best non-qualifier is 5th.
@@ -604,9 +839,11 @@ def place_remix_players(
         entry = by_player[player_id]
         return (rank.get(entry.entry_id, len(groups)), *_order(entry))
 
+    seats = _seats(state)
+    seat_round = {player_id: key.round_no for (key, _), player_id in seats.items()}
     rows: list[RemixPlace] = []
     place = 1
-    for block in _pair_blocks(state):
+    for block in _pair_blocks(state, seats):
         for team in block:
             first, second = sorted(team, key=player_order)
             rows.extend(
@@ -615,6 +852,7 @@ def place_remix_players(
                     player_id=player_id,
                     place=place,
                     partner_id=partner_id,
+                    seat_round_no=seat_round.get(player_id),
                 )
                 for player_id, partner_id in ((first, second), (second, first))
             )
@@ -638,6 +876,7 @@ def place_remix_players(
             for entry in rest
         )
         place += len(rest)
+    ensure_distinct(row.player_id for row in rows)
     unplaced = set(by_player) - {row.player_id for row in rows}
     if unplaced:
         msg = f"players {sorted(unplaced)} are left without a place"
@@ -651,13 +890,39 @@ def _order(entry: PlacingEntry) -> tuple[bool, int, int]:
     return (seed is None, 0 if seed is None else seed, entry.entry_id.int)
 
 
-def _pair_blocks(state: RemixState) -> list[list[Team]]:
+type _Seat = tuple[MatchKey, PlayerId]
+
+
+def _seats(state: RemixState) -> dict[_Seat, PlayerId]:
+    """The seats replacements gave up, each with the replaced player who takes it (BR-151).
+
+    A seat is a player's place in the pair of one match. A replacement gave
+    up their seat in the match they were last knocked out in before coming
+    in; the player they replaced takes it.
+    """
+    seats: dict[_Seat, PlayerId] = {}
+    for index, round_ in enumerate(state.rounds):
+        latest = _last_matches(state.matches[: sum(map(len, state.rounds[:index]))])
+        for match in round_:
+            for replacement in match.replacements:
+                given_up = latest[replacement.player_id].key
+                seats[given_up, replacement.player_id] = replacement.replaced_player_id
+    return seats
+
+
+def _pair_blocks(state: RemixState, seats: dict[_Seat, PlayerId]) -> list[list[Team]]:
     """The knockout's pairs by their last match, sharing a place, best first (BR-102).
 
-    Each block lists its pairs by the position of their last match. Pairs
-    sharing a place are listed in lot order (#94 option A); this is the one
-    place to change.
+    Each block lists its pairs by the position of their last match, with a
+    replaced player in each seat a replacement gave up (`_seats`, BR-151).
+    Pairs sharing a place are listed in lot order (#94 option A); this is
+    the one place to change.
     """
+
+    def seated(key: MatchKey, team: Team) -> Team:
+        first, second = (seats.get((key, player_id), player_id) for player_id in team)
+        return first, second
+
     # The final, then the third-place match: each has a winner and a loser.
     blocks = [
         [team]
@@ -665,10 +930,12 @@ def _pair_blocks(state: RemixState) -> list[list[Team]]:
         for team in (match.winner, match.loser)
         if team is not None
     ]
-    # With a third-place match, the semifinal losers are placed by it.
+    # With a third-place match, the semifinal losers are placed by it. No
+    # replacement comes in after the final's round, so only earlier seats
+    # can be given up.
     earlier = state.rounds[: -2 if state.third_place_match else -1]
     blocks.extend(
-        [match.loser for match in round_ if match.loser is not None]
+        [seated(match.key, match.loser) for match in round_ if match.loser is not None]
         for round_ in reversed(earlier)
     )
     return blocks

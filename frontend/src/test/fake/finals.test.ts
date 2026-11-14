@@ -13,6 +13,7 @@ import {
   tournamentOf,
 } from "../setupTestHelpers";
 import { TEST_LEAGUE_ID, TEST_SHARE_TOKEN, testId } from "./ids";
+import { planReplacements } from "./remixEngine";
 import { db } from "./store";
 
 // Ids of the finals seed (seedFinals.ts).
@@ -1112,5 +1113,301 @@ describe("the Lord have mercy knockout in the fake API", () => {
     expect(read).not.toHaveProperty("can_draw_next");
     expect(read.rounds[0]).not.toHaveProperty("result_count");
     expect(read.rounds[0]?.matches[0]).not.toHaveProperty("winner_locked");
+  });
+
+  describe("replacements (BR-147 to BR-155)", () => {
+    /** Starts 4 pairs without a third-place match, so the semifinal losers are knocked out. */
+    const startPlain = () =>
+      dataOf(
+        provisionalApi.PUT(`${root}/knockout`, {
+          params: { path: remixBase },
+          body: { ...KNOCKOUT, mode: "lord_have_mercy" },
+        }),
+      );
+    const setDisabled = (entryId: string, disabled: boolean) =>
+      dataOf(
+        api.PUT(`${root}/entries/{entry_id}/disabled`, {
+          params: { path: { ...remixBase, entry_id: entryId } },
+          body: { disabled },
+        }),
+      );
+    type Read = Awaited<ReturnType<typeof readRounds>>;
+    const withStatus = (read: Read, status: string) =>
+      read.players.filter((p) => p.status === status && !p.is_disabled);
+    const entryOf = (read: Read, playerId: string) =>
+      read.players.find((p) => p.player_id === playerId)?.entry_id ?? "";
+    const statusOf = (read: Read, playerId: string) =>
+      read.players.find((p) => p.player_id === playerId)?.status;
+    const sidesOf = (read: Read) =>
+      read.rounds.flatMap((r) => r.matches).flatMap((m) => m.sides);
+
+    it("lists the knockout's players with their status and no plan while a round is open (FR-044, BR-147)", async () => {
+      await startPlain();
+      const read = await readRounds();
+      expect(read.players).toHaveLength(8);
+      expect(read.players.every((p) => p.status === "still_in")).toBe(true);
+      expect(read.next_draw).toBeNull();
+      expect(sidesOf(read).every((s) => s.replacements.length === 0)).toBe(
+        true,
+      );
+      await playNewest();
+      const done = await readRounds();
+      expect(withStatus(done, "still_in")).toHaveLength(4);
+      expect(withStatus(done, "knocked_out")).toHaveLength(4);
+      expect(done.next_draw).toEqual({
+        replacements: [],
+        staying_player_ids: [],
+      });
+    });
+
+    it("plans the best-standing knocked-out player for a player who left, and draws them in (BR-148, FR-049, BR-155)", async () => {
+      await startPlain();
+      await playNewest();
+      const before = await readRounds();
+      const [leaving] = withStatus(before, "still_in");
+      const [best] = withStatus(before, "knocked_out");
+      if (leaving === undefined || best === undefined) {
+        throw new Error("The knockout has players in and out.");
+      }
+      await setDisabled(leaving.entry_id, true);
+      const planned = await readRounds();
+      expect(planned.next_draw).toEqual({
+        replacements: [
+          { player_id: best.player_id, replaced_player_id: leaving.player_id },
+        ],
+        staying_player_ids: [],
+      });
+      expect(planned.left_player_ids).toEqual([leaving.player_id]);
+
+      const drawn = await drawRound(2);
+      const final = drawn.rounds[1]?.matches[0];
+      const players = final?.sides.flatMap((s) => s.player_ids) ?? [];
+      expect(players).toContain(best.player_id);
+      expect(players).not.toContain(leaving.player_id);
+      expect(final?.sides.flatMap((s) => s.replacements)).toEqual([
+        { player_id: best.player_id, replaced_player_id: leaving.player_id },
+      ]);
+      expect(statusOf(drawn, leaving.player_id)).toBe("replaced");
+      expect(statusOf(drawn, best.player_id)).toBe("still_in");
+      // BR-153: a replaced player is not still in, so they have not "left".
+      expect(drawn.left_player_ids).toEqual([]);
+      expect(drawn.next_draw).toBeNull();
+    });
+
+    it("keeps a replaced player out when re-enabled, until the round is deleted (BR-153, BR-154)", async () => {
+      await startPlain();
+      await playNewest();
+      const before = await readRounds();
+      const [leaving] = withStatus(before, "still_in");
+      if (leaving === undefined) throw new Error("Nobody is still in.");
+      await setDisabled(leaving.entry_id, true);
+      const drawn = await drawRound(2);
+      await setDisabled(leaving.entry_id, false);
+      expect(statusOf(await readRounds(), leaving.player_id)).toBe("replaced");
+
+      await dataOf(
+        api.DELETE(`${remixRoot}/{round_id}`, {
+          params: {
+            path: { ...remixBase, round_id: drawn.rounds[1]?.round_id ?? "" },
+          },
+        }),
+      );
+      const after = await readRounds();
+      expect(statusOf(after, leaving.player_id)).toBe("still_in");
+      expect(after.next_draw?.replacements).toEqual([]);
+      const again = await drawRound(2);
+      expect(
+        again.rounds[1]?.matches[0]?.sides.flatMap((s) => s.player_ids),
+      ).toContain(leaving.player_id);
+      expect(sidesOf(again).every((s) => s.replacements.length === 0)).toBe(
+        true,
+      );
+    });
+
+    it("skips a disabled knocked-out player as a replacement (BR-147, FR-049)", async () => {
+      await startPlain();
+      await playNewest();
+      const before = await readRounds();
+      const [leaving] = withStatus(before, "still_in");
+      const [best, next] = withStatus(before, "knocked_out");
+      if (leaving === undefined || best === undefined || next === undefined) {
+        throw new Error("The knockout has players in and out.");
+      }
+      await setDisabled(leaving.entry_id, true);
+      await setDisabled(best.entry_id, true);
+      const read = await readRounds();
+      expect(read.next_draw?.replacements).toEqual([
+        { player_id: next.player_id, replaced_player_id: leaving.player_id },
+      ]);
+      // Disabling a knocked-out player leaves their status as it is.
+      expect(statusOf(read, best.player_id)).toBe("knocked_out");
+    });
+
+    it("leaves the best-standing leavers in the draw when too few can come in (BR-148, BR-149)", async () => {
+      await startPlain();
+      await playNewest();
+      const before = await readRounds();
+      const [first, second] = withStatus(before, "still_in");
+      const out = withStatus(before, "knocked_out");
+      if (first === undefined || second === undefined) {
+        throw new Error("Two players are still in.");
+      }
+      for (const player of out.slice(1)) {
+        await setDisabled(player.entry_id, true);
+      }
+      await setDisabled(first.entry_id, true);
+      await setDisabled(second.entry_id, true);
+      const read = await readRounds();
+      expect(read.next_draw).toEqual({
+        replacements: [
+          {
+            player_id: out[0]?.player_id,
+            replaced_player_id: second.player_id,
+          },
+        ],
+        staying_player_ids: [first.player_id],
+      });
+      const drawn = await drawRound(2);
+      expect(drawn.left_player_ids).toEqual([first.player_id]);
+      expect(statusOf(drawn, second.player_id)).toBe("replaced");
+    });
+
+    it("has nobody to come in before the final with a third-place match (BR-147, BR-149)", async () => {
+      await startRemix();
+      await playNewest();
+      const before = await readRounds();
+      const [leaving] = withStatus(before, "still_in");
+      if (leaving === undefined) throw new Error("Nobody is still in.");
+      // The semifinal losers wait for the third-place match: still in.
+      expect(withStatus(before, "knocked_out")).toEqual([]);
+      await setDisabled(leaving.entry_id, true);
+      expect((await readRounds()).next_draw).toEqual({
+        replacements: [],
+        staying_player_ids: [leaving.player_id],
+      });
+    });
+
+    it("places a replaced player in the seat their replacement gave up (BR-145, BR-151)", async () => {
+      await startPlain();
+      await playNewest();
+      const before = await readRounds();
+      const [leaving] = withStatus(before, "still_in");
+      const [best] = withStatus(before, "knocked_out");
+      if (leaving === undefined || best === undefined) {
+        throw new Error("The knockout has players in and out.");
+      }
+      // The replacement's partner in the semifinal they lost.
+      const lost = before.rounds[0]?.matches.find((m) =>
+        m.sides.some((s) => s.player_ids.includes(best.player_id)),
+      );
+      const partner =
+        lost?.sides
+          .find((s) => s.player_ids.includes(best.player_id))
+          ?.player_ids.find((p) => p !== best.player_id) ?? "";
+      await setDisabled(leaving.entry_id, true);
+      const drawn = await drawRound(2);
+      await enter(drawn.rounds[1]?.matches[0]?.match_id ?? "");
+      const result = await places(MONSTER);
+
+      const main = (
+        await dataOf(provisionalApi.GET(root, { params: { path: remixBase } }))
+      ).entries.filter((e) => e.stage === "main");
+      expect(result.rows).toHaveLength(main.length);
+      const byEntry = new Map(result.rows.map((r) => [r.entry_id, r]));
+      const replaced = byEntry.get(entryOf(drawn, leaving.player_id));
+      expect(replaced?.reason).toMatchObject({
+        kind: "replaced",
+        round: "semifinal",
+        score: null,
+        opponent_entry_id: null,
+        partner_entry_id: entryOf(drawn, partner),
+      });
+      expect(replaced?.place).toBe(3);
+      expect(byEntry.get(entryOf(drawn, partner))?.reason).toMatchObject({
+        kind: "lost_in_round",
+        partner_entry_id: entryOf(drawn, leaving.player_id),
+      });
+      // Every place keeps its number of players: 2, 2 and 4.
+      const knockout = result.rows.filter(
+        (r) => r.reason.kind !== "group_place",
+      );
+      expect(knockout.map((r) => r.place)).toEqual([1, 1, 2, 2, 3, 3, 3, 3]);
+    });
+
+    it("shows the share link who came in for whom, without the plan (FR-070, BR-155)", async () => {
+      await startPlain();
+      await playNewest();
+      const before = await readRounds();
+      const [leaving] = withStatus(before, "still_in");
+      if (leaving === undefined) throw new Error("Nobody is still in.");
+      await setDisabled(leaving.entry_id, true);
+      await drawRound(2);
+      const read = await dataOf(
+        api.GET(
+          "/api/v1/public/{share_token}/tournaments/{tournament_id}/knockout/rounds",
+          {
+            params: {
+              path: { share_token: TEST_SHARE_TOKEN, tournament_id: MONSTER },
+            },
+          },
+        ),
+      );
+      expect(read).not.toHaveProperty("next_draw");
+      expect(read).not.toHaveProperty("players");
+      const replacements = read.rounds
+        .flatMap((r) => r.matches)
+        .flatMap((m) => m.sides)
+        .flatMap((s) => s.replacements);
+      expect(replacements.map((r) => r.replaced_player_id)).toEqual([
+        leaving.player_id,
+      ]);
+    });
+  });
+});
+
+describe("planReplacements (BR-148, BR-149)", () => {
+  const standing = new Map([
+    ["a", 1],
+    ["b", 2],
+    ["c", 3],
+    ["d", 4],
+    ["e", 5],
+    ["f", 6],
+  ]);
+
+  it("takes the player last knocked out in a later round first, then the better standing", () => {
+    const plan = planReplacements({
+      leaving: ["b"],
+      candidates: ["c", "e", "f"],
+      standing,
+      knockedOutIn: new Map([
+        ["c", 1],
+        ["e", 2],
+        ["f", 2],
+      ]),
+    });
+    expect(plan).toEqual({
+      replacements: [{ player_id: "e", replaced_player_id: "b" }],
+      staying: [],
+    });
+  });
+
+  it("gives the better standing the better replacement and leaves the best without one", () => {
+    const plan = planReplacements({
+      leaving: ["d", "a", "b"],
+      candidates: ["f", "e"],
+      standing,
+      knockedOutIn: new Map([
+        ["e", 1],
+        ["f", 1],
+      ]),
+    });
+    expect(plan).toEqual({
+      replacements: [
+        { player_id: "e", replaced_player_id: "b" },
+        { player_id: "f", replaced_player_id: "d" },
+      ],
+      staying: ["a"],
+    });
   });
 });

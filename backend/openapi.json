@@ -1960,12 +1960,13 @@
           "won_third_place",
           "lost_third_place",
           "lost_in_round",
-          "group_place"
+          "group_place",
+          "replaced"
         ],
         "type": "string"
       },
       "PlaceReasonRead": {
-        "description": "Why an entry has its place (\u00a77.13).\n\nAn entry that did not go through to the knockout, or every entry of a\ngroup phase without one, has `group_place`: its place in the standings\nand the phase's format (BR-103). A knockout entry has the final, the\nthird-place match or `lost_in_round` with the `round` it went out in, the\n`score` of that match (the entry's first: a BO1 game's goals, else the\ngames won; null for a walkover or a game without a score) and the\nopponent (BR-102); its `group_place` is that of the entry it continues,\nnull for a pair after Monster DYP rounds, which continues no single entry.\n\nAfter a Lord have mercy knockout every row is one player's, by their main\nentry (BR-145): `partner_entry_id` is the main entry of the partner of\nthe player's last knockout match, null for a player who did not qualify\nand everywhere else; `opponent_entry_id` is null; `group_place` is the\nplayer's own.",
+        "description": "Why an entry has its place (\u00a77.13).\n\nAn entry that did not go through to the knockout, or every entry of a\ngroup phase without one, has `group_place`: its place in the standings\nand the phase's format (BR-103). A knockout entry has the final, the\nthird-place match or `lost_in_round` with the `round` it went out in, the\n`score` of that match (the entry's first: a BO1 game's goals, else the\ngames won; null for a walkover or a game without a score) and the\nopponent (BR-102); its `group_place` is that of the entry it continues,\nnull for a pair after Monster DYP rounds, which continues no single entry.\n\nAfter a Lord have mercy knockout every row is one player's, by their main\nentry (BR-145): `partner_entry_id` is the main entry of the partner of\nthe player's last knockout match, null for a player who did not qualify\nand everywhere else; `opponent_entry_id` is null; `group_place` is the\nplayer's own. A player who was replaced (BR-151) has `replaced`: placed as\nif knocked out in `round`, the round of the seat their replacement gave\nup, with `partner_entry_id` the other player of that pair now and no\n`score`.",
         "properties": {
           "group_format": {
             "anyOf": [
@@ -2954,7 +2955,7 @@
         "type": "object"
       },
       "PublicRemixKnockoutRead": {
-        "description": "A Lord have mercy knockout round by round through the share link (FR-070).\n\nA separate allowlist, like `PublicBracketRead`: it leaves out what is the\norganizer's, `can_draw_next`, `result_count` and `winner_locked` (BR-140,\nBR-146), and keeps `left_player_ids` (FR-049).",
+        "description": "A Lord have mercy knockout round by round through the share link (FR-070).\n\nA separate allowlist, like `PublicBracketRead`: it leaves out what is the\norganizer's, `can_draw_next`, `result_count`, `winner_locked`, `next_draw`\nand `players` (BR-140, BR-146, FR-049), and keeps `left_player_ids` and the\nsides' `replacements` (BR-155).",
         "properties": {
           "final_match_format": {
             "anyOf": [
@@ -3156,7 +3157,7 @@
         "type": "object"
       },
       "PublicRemixSideRead": {
-        "description": "A side of a Lord have mercy match for viewers (FR-070, FR-049).",
+        "description": "A side of a Lord have mercy match for viewers (FR-070, FR-049, BR-155).",
         "properties": {
           "entry_id": {
             "anyOf": [
@@ -3189,13 +3190,21 @@
             },
             "title": "Player Ids",
             "type": "array"
+          },
+          "replacements": {
+            "items": {
+              "$ref": "#/components/schemas/RemixReplacementRead"
+            },
+            "title": "Replacements",
+            "type": "array"
           }
         },
         "required": [
           "player_ids",
           "entry_id",
           "is_bye",
-          "left_player_ids"
+          "left_player_ids",
+          "replacements"
         ],
         "title": "PublicRemixSideRead",
         "type": "object"
@@ -3454,7 +3463,7 @@
         "type": "object"
       },
       "RemixKnockoutRead": {
-        "description": "A Lord have mercy knockout round by round, computed on read (D4, BR-155).\n\n`size` is twice the round-1 matches and `round_count` the rounds the\nknockout will have; `rounds` holds those drawn so far. `can_draw_next` says\nthe next round can be drawn (BR-140). `left_player_ids` are all the players\nwho have left but stay in (FR-049). The final plays `final_match_format`,\nor `match_format` when it is null (BR-120).",
+        "description": "A Lord have mercy knockout round by round, computed on read (D4, BR-155).\n\n`size` is twice the round-1 matches and `round_count` the rounds the\nknockout will have; `rounds` holds those drawn so far. `can_draw_next` says\nthe next round can be drawn (BR-140). `left_player_ids` are all the players\nwho have left but stay in (FR-049). The final plays `final_match_format`,\nor `match_format` when it is null (BR-120). `next_draw` previews the next\ndraw's replacements, null unless the tournament is in progress and the\nnext round can be drawn (FR-049). `players` lists the knockout's players by\ngroup-phase standing.",
         "properties": {
           "can_draw_next": {
             "title": "Can Draw Next",
@@ -3481,10 +3490,27 @@
           "match_format": {
             "$ref": "#/components/schemas/MatchFormat"
           },
+          "next_draw": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RemixNextDrawRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "phase_id": {
             "format": "uuid",
             "title": "Phase Id",
             "type": "string"
+          },
+          "players": {
+            "items": {
+              "$ref": "#/components/schemas/RemixPlayerRead"
+            },
+            "title": "Players",
+            "type": "array"
           },
           "round_count": {
             "title": "Round Count",
@@ -3515,7 +3541,9 @@
           "final_match_format",
           "can_draw_next",
           "left_player_ids",
-          "rounds"
+          "rounds",
+          "next_draw",
+          "players"
         ],
         "title": "RemixKnockoutRead",
         "type": "object"
@@ -3643,6 +3671,91 @@
         ],
         "type": "string"
       },
+      "RemixNextDrawRead": {
+        "description": "What drawing the next round would do now (FR-049, BR-148, BR-149).\n\n`replacements` would come in for players who left, the replaced player\nwith the best group-phase standing first; `staying_player_ids` have left\nbut would stay in the draw without one, since nobody is available, and\ntheir pair loses by walkover (BR-149). Disabling or re-enabling a player\nchanges it; the draw makes exactly this plan.",
+        "properties": {
+          "replacements": {
+            "items": {
+              "$ref": "#/components/schemas/RemixReplacementRead"
+            },
+            "title": "Replacements",
+            "type": "array"
+          },
+          "staying_player_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Staying Player Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "replacements",
+          "staying_player_ids"
+        ],
+        "title": "RemixNextDrawRead",
+        "type": "object"
+      },
+      "RemixPlayerRead": {
+        "description": "A player of the knockout, for the disable switch (FR-044, BR-147).\n\n`entry_id` is the player's main entry, which `PUT \u2026/entries/{entry_id}/\ndisabled` takes. `status`: `still_in` (their latest pair won, had a bye or\nhas no result yet, or waits for the third-place match), `knocked_out`, or\n`replaced` once a replacement came in for them (BR-153). `is_disabled` is\nthe main entry's flag; a disabled player who is still in has left.",
+        "properties": {
+          "entry_id": {
+            "format": "uuid",
+            "title": "Entry Id",
+            "type": "string"
+          },
+          "is_disabled": {
+            "title": "Is Disabled",
+            "type": "boolean"
+          },
+          "player_id": {
+            "format": "uuid",
+            "title": "Player Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RemixPlayerStatus"
+          }
+        },
+        "required": [
+          "player_id",
+          "entry_id",
+          "status",
+          "is_disabled"
+        ],
+        "title": "RemixPlayerRead",
+        "type": "object"
+      },
+      "RemixPlayerStatus": {
+        "enum": [
+          "still_in",
+          "knocked_out",
+          "replaced"
+        ],
+        "type": "string"
+      },
+      "RemixReplacementRead": {
+        "description": "A player who came into a draw in place of a player who left (BR-148, BR-155).\n\n`player_id` came in; `replaced_player_id` left and was replaced.",
+        "properties": {
+          "player_id": {
+            "format": "uuid",
+            "title": "Player Id",
+            "type": "string"
+          },
+          "replaced_player_id": {
+            "format": "uuid",
+            "title": "Replaced Player Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "player_id",
+          "replaced_player_id"
+        ],
+        "title": "RemixReplacementRead",
+        "type": "object"
+      },
       "RemixRoundRead": {
         "description": "A drawn round; `result_count` counts the matches with a result in it.",
         "properties": {
@@ -3681,7 +3794,7 @@
         "type": "object"
       },
       "RemixSideRead": {
-        "description": "A side of a Lord have mercy match: a pair of players, or a bye (BR-041).\n\n`entry_id` is the round-1 pair entry; a later round's pair has none (D4).\n`player_ids` is empty for a bye. `left_player_ids` are the pair's players\nwho have left but stay in the draw (BR-147, BR-149).",
+        "description": "A side of a Lord have mercy match: a pair of players, or a bye (BR-041).\n\n`entry_id` is the round-1 pair entry; a later round's pair has none (D4).\n`player_ids` is empty for a bye. `left_player_ids` are the pair's players\nwho have left but stay in the draw (BR-147, BR-149). `replacements` are the\npair's players who came in for a player who left, and for whom (BR-155);\nempty in round 1.",
         "properties": {
           "entry_id": {
             "anyOf": [
@@ -3714,13 +3827,21 @@
             },
             "title": "Player Ids",
             "type": "array"
+          },
+          "replacements": {
+            "items": {
+              "$ref": "#/components/schemas/RemixReplacementRead"
+            },
+            "title": "Replacements",
+            "type": "array"
           }
         },
         "required": [
           "player_ids",
           "entry_id",
           "is_bye",
-          "left_player_ids"
+          "left_player_ids",
+          "replacements"
         ],
         "title": "RemixSideRead",
         "type": "object"
