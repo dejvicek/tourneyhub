@@ -462,7 +462,7 @@ describe("Knockout in Lord have mercy (screen 9, BR-155)", () => {
     renderAt(knockoutPath(), queryClient);
 
     expect(
-      await screen.findByText("Round 1 is in progress"),
+      await screen.findByText("In progress: the semifinals"),
     ).toBeInTheDocument();
     expect(screen.getByText("1 match has no result yet.")).toBeInTheDocument();
     expect(
@@ -616,9 +616,47 @@ describe("Knockout in Lord have mercy (screen 9, BR-155)", () => {
     renderAt(knockoutPath());
 
     expect(
-      await screen.findByText(/no longer play but stay in the draw/),
+      await screen.findByText(/no longer plays but stays in the draw/),
     ).toBeInTheDocument();
     expect(screen.getAllByText("No longer playing")).toHaveLength(1);
+  });
+
+  /** The rounds with the first `count` players marked as having left (BR-149). */
+  async function withLeft(count: number): Promise<void> {
+    const read = await readRounds();
+    const players = read.rounds
+      .flatMap((round) => round.matches)
+      .flatMap((match) => match.sides)
+      .flatMap((side) => side.player_ids);
+    server.use(
+      http.get(
+        "/api/v1/leagues/:leagueId/tournaments/:tournamentId/knockout/rounds",
+        () =>
+          HttpResponse.json({
+            ...read,
+            left_player_ids: players.slice(0, count),
+          }),
+      ),
+    );
+  }
+
+  it("says several players who left no longer play (BR-149)", async () => {
+    await withLeft(2);
+    renderAt(knockoutPath());
+
+    expect(
+      await screen.findByText(/ no longer play but stay in the draw$/),
+    ).toBeInTheDocument();
+  });
+
+  it("says in Czech that one player left, and the plural for two (BR-149)", async () => {
+    await i18n.changeLanguage("cs");
+    await withLeft(1);
+    renderAt(knockoutPath());
+
+    expect(
+      await screen.findByText(/^Už nehraje, ale zůstává v losování: /),
+    ).toBeInTheDocument();
   });
 
   it("marks fixed winners (BR-146)", async () => {
@@ -642,6 +680,85 @@ describe("Knockout in Lord have mercy (screen 9, BR-155)", () => {
     renderAt(knockoutPath());
     await screen.findByText("Semifinal 1");
     expect(await violations()).toEqual([]);
+  });
+
+  it("has no axe violations in the desktop columns", async () => {
+    stubViewport(1280);
+    renderAt(knockoutPath());
+    await screen.findByRole("region", { name: "Rounds of the knockout" });
+    expect(await violations()).toEqual([]);
+  });
+
+  it("deletes a later round and stays on the screen, its winners no longer fixed (BR-146, FR-046)", async () => {
+    const user = userEvent.setup();
+    await finishNewestRound();
+    await drawRound(2);
+    const view = renderAt(knockoutPath());
+
+    const rounds = await screen.findByRole("radiogroup", {
+      name: "Rounds of the knockout",
+    });
+    await user.click(within(rounds).getByRole("radio", { name: "Semifinals" }));
+    expect(await screen.findAllByText("Winner fixed")).toHaveLength(2);
+
+    await user.click(screen.getByRole("button", { name: "Delete the final" }));
+    const dialog = await screen.findByRole("alertdialog", {
+      name: "Delete the final?",
+    });
+    await user.click(
+      within(dialog).getByRole("button", { name: "Delete the final" }),
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("radio", { name: "Final" }),
+      ).not.toBeInTheDocument();
+    });
+    expect(view.state.location.pathname).toBe(knockoutPath());
+    expect(await screen.findByText("Semifinals complete")).toBeInTheDocument();
+    expect(screen.queryByText("Winner fixed")).not.toBeInTheDocument();
+  });
+
+  it("opens the tournament after deleting round 1 even when the tournament reloads first (BR-087)", async () => {
+    const user = userEvent.setup();
+    const view = renderAt(knockoutPath());
+
+    await user.click(
+      await screen.findByRole("button", { name: "Delete the semifinals" }),
+    );
+    const dialog = await screen.findByRole("alertdialog");
+    // Every reload but the tournament's own waits for the gate, so the
+    // tournament arrives first and the screen swaps to "no knockout" while the
+    // delete is still settling. An empty resolver falls through to the fake API.
+    let open = (): void => undefined;
+    const gate = new Promise<void>((resolve) => {
+      open = resolve;
+    });
+    server.use(
+      http.get("/api/v1/*", async ({ request }) => {
+        if (!new URL(request.url).pathname.endsWith(`/tournaments/${LHM}`)) {
+          await gate;
+        }
+      }),
+    );
+    await user.click(
+      within(dialog).getByRole("button", { name: "Delete the semifinals" }),
+    );
+    // The rounds view is gone: the tournament no longer has a knockout.
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("button", {
+          name: "Delete the semifinals",
+          hidden: true,
+        }),
+      ).not.toBeInTheDocument();
+    });
+    expect(view.state.location.pathname).toBe(knockoutPath());
+    open();
+
+    await waitFor(() => {
+      expect(view.state.location.pathname).toBe(at(paths.tournament, LHM));
+    });
   });
 });
 

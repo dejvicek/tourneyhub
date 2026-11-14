@@ -142,7 +142,9 @@ export const finals = {
       "The drawn pairs and {{count}} result are removed. This deletes the knockout and unlocks the group phase.",
     deleteBodyFirst_other:
       "The drawn pairs and {{count}} results are removed. This deletes the knockout and unlocks the group phase.",
-    leftNotice: "{{names}} no longer play but stay in the draw",
+    leftNotice_one: "{{names}} no longer plays but stays in the draw",
+    leftNotice_other: "{{names}} no longer play but stay in the draw",
+    inProgressTitle: "In progress: the {{round}}",
     winnerFixed: "Winner fixed",
     left: "No longer playing",
     drawnAfter: "Drawn after the {{previous}}",

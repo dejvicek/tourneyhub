@@ -138,6 +138,7 @@ export function RemixKnockout({
         <Notice
           tone="info"
           title={t("finals.remix.leftNotice", {
+            count: data.left_player_ids.length,
             names: list.format(data.left_player_ids.map(roster.player)),
           })}
         />
@@ -170,8 +171,8 @@ export function RemixKnockout({
         open > 0 && (
           <Notice
             tone="info"
-            title={t("finals.rounds.inProgressTitle", {
-              round: newest.round_no,
+            title={t("finals.remix.inProgressTitle", {
+              round: inSentence(newest.name),
             })}
           >
             {t("finals.remix.inProgressBody", { count: open })}

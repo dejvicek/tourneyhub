@@ -151,7 +151,11 @@ export const finals: CsMessages<Messages["finals"]> = {
       "Vylosované dvojice a {{count}} výsledku se odstraní. Tím se smaže celá vyřazovací část a základní část se odemkne.",
     deleteBodyFirst_other:
       "Vylosované dvojice a {{count}} výsledků se odstraní. Tím se smaže celá vyřazovací část a základní část se odemkne.",
-    leftNotice: "Už nehrají, ale zůstávají v losování: {{names}}",
+    leftNotice_one: "Už nehraje, ale zůstává v losování: {{names}}",
+    leftNotice_few: "Už nehrají, ale zůstávají v losování: {{names}}",
+    leftNotice_many: "Už nehrají, ale zůstávají v losování: {{names}}",
+    leftNotice_other: "Už nehrají, ale zůstávají v losování: {{names}}",
+    inProgressTitle: "Hraje se: {{round}}",
     winnerFixed: "Vítěz je už určený",
     left: "Už nehraje",
     drawnAfter: "Losuje se po: {{previous}}",
