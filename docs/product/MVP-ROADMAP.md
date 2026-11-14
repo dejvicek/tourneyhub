@@ -56,10 +56,10 @@ The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. 
 - [ ] **P13 Monster DYP** (FR-041, FR-045; BR-060 – BR-063, BR-081 – BR-084; ADR-010, ADR-011)
   - [x] Engine: round draws, standings, knockout entries ([#41](https://github.com/dejvicek/tourneyhub/pull/41)).
   - [x] Services and API: start, rounds, top players (`entries.is_top_player`) ([#103](https://github.com/dejvicek/tourneyhub/pull/103)).
-  - [x] Knockout modes: seeded pairs, singles, A little mercy, Lord have mercy.
+  - [x] Knockout modes: seeded pairs, singles, A little mercy, Lord have mercy ([#105](https://github.com/dejvicek/tourneyhub/pull/105), [#108](https://github.com/dejvicek/tourneyhub/pull/108)).
   - [ ] Lord have mercy re-mix ([#63](https://github.com/dejvicek/tourneyhub/issues/63)):
     - [x] Step 1, data model and engine: a stored draw per knockout round (DATA-MODEL D4 and D5, ADR-009, ADR-010); the draw of later rounds, the result lock and places per player in the engine ([#93](https://github.com/dejvicek/tourneyhub/pull/93)).
-    - [x] Step 1, services, API and screens: drawing and deleting a knockout round, finishing, the round-by-round view on the organizer's screen and on the share link, and the option on the start-knockout screen.
+    - [x] Step 1, services, API and screens: drawing and deleting a knockout round, finishing, the round-by-round view on the organizer's screen and on the share link, and the option on the start-knockout screen ([#107](https://github.com/dejvicek/tourneyhub/pull/107), [#108](https://github.com/dejvicek/tourneyhub/pull/108)).
     - [ ] Step 1, disabling a player in the knockout: needs P14's disable route (decision A; FR-044, BR-147).
     - [ ] Step 2: replacements.
     - [ ] Order of re-mixed pairs sharing a place ([#94](https://github.com/dejvicek/tourneyhub/issues/94), waiting for an answer).
