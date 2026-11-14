@@ -32,6 +32,7 @@ from tourneyhub.engine.tournaments import (
     MatchKind,
     MonsterKnockoutMode,
     Outcome,
+    ParticipantState,
     PhaseFormat,
     PhaseKind,
     SeedingMethod,
@@ -224,6 +225,30 @@ class TopPlayersWrite(RequestModel):
     """
 
     player_ids: PlayerIds
+
+
+class DisabledWrite(RequestModel):
+    """Disable or enable an entry, the target state (FR-044, BR-064, ADR-008)."""
+
+    disabled: bool
+
+
+class ParticipantRead(ResponseModel):
+    """A main entry of a running tournament and where it stands (FR-044, BR-064).
+
+    `state` is `disabled` for a disabled entry, else `sat_out` when it sat out
+    the latest group round, else `playing`. The round numbers refer to the group
+    phase, also during a knockout. `disabled_since_round` is the first round the
+    entry was left out of, or will be: set only while it is disabled.
+    `joined_round` is set only for a late player. `sat_out_round` is the latest
+    group round, set only when the entry sat it out.
+    """
+
+    entry_id: UUID
+    state: ParticipantState
+    joined_round: int | None
+    disabled_since_round: int | None
+    sat_out_round: int | None
 
 
 class SeedingWrite(RequestModel):

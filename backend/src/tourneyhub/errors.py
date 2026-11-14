@@ -97,6 +97,11 @@ class ErrorCode(StrEnum):
     ROUND_NOT_NEWEST = "round_not_newest"  # only the newest round can be deleted
     # a result of a round before the newest (BR-065) or of a locked Lord have mercy round (BR-146)
     ROUND_LOCKED = "round_locked"
+    # Participants (FR-044)
+    ENTRY_NOT_FOUND = "entry_not_found"
+    DISABLE_NOT_ALLOWED = (
+        "disable_not_allowed"  # the current phase allows none (BR-064)
+    )
     # Fields (FR-090 to FR-094)
     FIELD_NOT_FOUND = "field_not_found"
     FIELD_NUMBER_CHANGED = "field_number_changed"  # the expected new number is stale

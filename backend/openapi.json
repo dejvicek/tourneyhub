@@ -319,6 +319,21 @@
         "title": "DefaultMatchFormat",
         "type": "string"
       },
+      "DisabledWrite": {
+        "additionalProperties": false,
+        "description": "Disable or enable an entry, the target state (FR-044, BR-064, ADR-008).",
+        "properties": {
+          "disabled": {
+            "title": "Disabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "disabled"
+        ],
+        "title": "DisabledWrite",
+        "type": "object"
+      },
       "DisplayName": {
         "maxLength": 100,
         "minLength": 1,
@@ -558,6 +573,8 @@
           "round_not_complete",
           "round_not_newest",
           "round_locked",
+          "entry_not_found",
+          "disable_not_allowed",
           "field_not_found",
           "field_number_changed",
           "field_not_free",
@@ -1589,6 +1606,71 @@
         ],
         "title": "PairsWrite",
         "type": "object"
+      },
+      "ParticipantRead": {
+        "description": "A main entry of a running tournament and where it stands (FR-044, BR-064).\n\n`state` is `disabled` for a disabled entry, else `sat_out` when it sat out\nthe latest group round, else `playing`. The round numbers refer to the group\nphase, also during a knockout. `disabled_since_round` is the first round the\nentry was left out of, or will be: set only while it is disabled.\n`joined_round` is set only for a late player. `sat_out_round` is the latest\ngroup round, set only when the entry sat it out.",
+        "properties": {
+          "disabled_since_round": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disabled Since Round"
+          },
+          "entry_id": {
+            "format": "uuid",
+            "title": "Entry Id",
+            "type": "string"
+          },
+          "joined_round": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Joined Round"
+          },
+          "sat_out_round": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sat Out Round"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ParticipantState"
+          }
+        },
+        "required": [
+          "entry_id",
+          "state",
+          "joined_round",
+          "disabled_since_round",
+          "sat_out_round"
+        ],
+        "title": "ParticipantRead",
+        "type": "object"
+      },
+      "ParticipantState": {
+        "description": "What an entry does now in the group phase, as the organizer sees it (FR-044).",
+        "enum": [
+          "playing",
+          "sat_out",
+          "disabled"
+        ],
+        "title": "ParticipantState",
+        "type": "string"
       },
       "PasswordChange": {
         "additionalProperties": false,
@@ -7447,6 +7529,115 @@
         ]
       }
     },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/entries/{entry_id}/disabled": {
+      "put": {
+        "description": "Disable or enable an entry, the target state (FR-044, BR-064, BR-147).\n\nA disabled entry is not drawn into new rounds, its results stay, and once\nenabled it is back in the draw from the next round; a round in play is\nunaffected. Allowed in a Swiss or Monster DYP group phase, also with a\nknockout configured, and in a Lord have mercy knockout, where a disabled\nplayer has left. An unknown entry is 404 `entry_not_found`; a tournament\nthat is not in progress is 409 `tournament_not_in_progress`; any other\nphase is 422 `disable_not_allowed`. A repeat changes nothing.",
+        "operationId": "set_entry_disabled",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entry_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Entry Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisabledWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParticipantRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Entry Disabled",
+        "tags": [
+          "tournaments"
+        ]
+      }
+    },
     "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/fields": {
       "post": {
         "description": "Add a field while the tournament runs (FR-090, BR-132).\n\nThe body carries the number the field expects to get, the lowest free\none. The new field takes the next waiting match at once; `match_id` is\nnull when no waiting match can be played.\n\nA tournament in setup or finished is 409 `tournament_not_in_progress`\n(detail `state`); setup sets the number of fields with the format. Any\nother number, a repeat included, is 409 `field_number_changed` with the\n`number` a new field would get now, null when all 32 are taken.",
@@ -8719,6 +8910,89 @@
           }
         ],
         "summary": "Set Match Result",
+        "tags": [
+          "tournaments"
+        ]
+      }
+    },
+    "/api/v1/leagues/{league_id}/tournaments/{tournament_id}/participants": {
+      "get": {
+        "description": "List the tournament's main entries with their state, seed first (FR-044).\n\nAnother league's tournament is 404 `tournament_not_found`.",
+        "operationId": "list_participants",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tournament_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Tournament Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ParticipantRead"
+                  },
+                  "title": "Response List Participants",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Participants",
         "tags": [
           "tournaments"
         ]

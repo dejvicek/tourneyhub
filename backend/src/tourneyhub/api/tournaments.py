@@ -7,6 +7,7 @@ from tourneyhub.api.deps import ClockDep, CurrentUserDep, SessionDep
 from tourneyhub.api.schemas import ErrorResponse
 from tourneyhub.api.tournament_models import (
     BackToSetupWrite,
+    DisabledWrite,
     DrawWrite,
     FieldCreate,
     FieldRead,
@@ -14,6 +15,7 @@ from tourneyhub.api.tournament_models import (
     HalvesWrite,
     MatchRead,
     PairsWrite,
+    ParticipantRead,
     PlacementsWrite,
     PlaceRead,
     PlaceReasonRead,
@@ -859,3 +861,52 @@ def _format_request(body: TournamentFormatWrite | TournamentCreate) -> FormatReq
         goals_per_game=body.goals_per_game,
         field_count=body.field_count,
     )
+
+
+@router.get("/tournaments/{tournament_id}/participants")
+def list_participants(
+    league_id: UUID, tournament_id: UUID, session: SessionDep, user: CurrentUserDep
+) -> list[ParticipantRead]:
+    """List the tournament's main entries with their state, seed first (FR-044).
+
+    Another league's tournament is 404 `tournament_not_found`.
+    """
+    participants = tournament_service.list_participants(
+        session, league_id=league_id, tournament_id=tournament_id, user_id=user.id
+    )
+    return [ParticipantRead.model_validate(p) for p in participants]
+
+
+@router.put(
+    "/tournaments/{tournament_id}/entries/{entry_id}/disabled",
+    responses=_WRITE_ERRORS,
+)
+def set_entry_disabled(
+    league_id: UUID,
+    tournament_id: UUID,
+    entry_id: UUID,
+    body: DisabledWrite,
+    session: SessionDep,
+    user: CurrentUserDep,
+    clock: ClockDep,
+) -> ParticipantRead:
+    """Disable or enable an entry, the target state (FR-044, BR-064, BR-147).
+
+    A disabled entry is not drawn into new rounds, its results stay, and once
+    enabled it is back in the draw from the next round; a round in play is
+    unaffected. Allowed in a Swiss or Monster DYP group phase, also with a
+    knockout configured, and in a Lord have mercy knockout, where a disabled
+    player has left. An unknown entry is 404 `entry_not_found`; a tournament
+    that is not in progress is 409 `tournament_not_in_progress`; any other
+    phase is 422 `disable_not_allowed`. A repeat changes nothing.
+    """
+    participant = tournament_service.set_entry_disabled(
+        session,
+        league_id=league_id,
+        tournament_id=tournament_id,
+        user_id=user.id,
+        entry_id=entry_id,
+        disabled=body.disabled,
+        clock=clock,
+    )
+    return ParticipantRead.model_validate(participant)

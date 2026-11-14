@@ -141,6 +141,14 @@ class Outcome(StrEnum):
     DRAW = "draw"
 
 
+class ParticipantState(StrEnum):
+    """What an entry does now in the group phase, as the organizer sees it (FR-044)."""
+
+    PLAYING = "playing"
+    SAT_OUT = "sat_out"
+    DISABLED = "disabled"
+
+
 class Participation(StrEnum):
     """Why an entry did or did not play a group-phase round (D5, BR-064, BR-067)."""
 
