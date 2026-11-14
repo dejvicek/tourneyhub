@@ -563,9 +563,11 @@ function StartKnockoutForm({ leagueId, tournamentId, data, group }: FormProps) {
           {errorText(t, drawAgain.error)}
         </p>
       )}
-      {plan.problem !== null && (
-        <Notice tone="warning" title={problemText(t, plan.problem)} />
-      )}
+      {plan.problem !== null &&
+        // The unfinished round is already said above; do not warn twice.
+        !(!roundDone && plan.problem.code === "group_phase_not_done") && (
+          <Notice tone="warning" title={problemText(t, plan.problem)} />
+        )}
       {drawKnockout.isError && (
         <p role="alert" className="text-body-sm">
           {errorText(t, drawKnockout.error)}
