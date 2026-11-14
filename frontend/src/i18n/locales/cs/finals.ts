@@ -161,6 +161,18 @@ export const finals: CsMessages<Messages["finals"]> = {
     drawnAfter: "Losuje se po: {{previous}}",
     drawnLater: "Losuje se později",
     cameIn: "{{in}} hraje za hráče {{out}}",
+    players: {
+      title: "Hráči ve vyřazovací části",
+      help: "Vyřaďte ze hry hráče, který odešel. Pokud je ještě ve hře, při dalším losování za něj nastoupí náhradník. Pokud už vypadl, jako náhradník se přeskočí.",
+      stillIn: "Ve hře.",
+      knockedOut: "Vypadl. Může nastoupit jako náhradník.",
+      leftOpen: "Odešel. Jeho dvojice prohraje zápas tohoto kola kontumačně.",
+      leftNext:
+        "Odešel. Při dalším losování za něj nastoupí náhradník, pokud nějaký je.",
+      notHere: "Není tu. Jako náhradník se přeskočí.",
+      replaced:
+        "Místo něj hraje {{name}} (kolo: {{round}}). Vrátit se může, jen když to kolo smažete.",
+    },
   },
   finished: {
     title: "Dohráno",

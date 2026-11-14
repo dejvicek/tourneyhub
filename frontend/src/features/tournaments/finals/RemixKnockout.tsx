@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { generatePath, Link, useNavigate } from "react-router";
 
@@ -27,6 +28,7 @@ import { Notice } from "./Notice";
 import { PlacesSoFar } from "./PlacesSoFar";
 import { nextRoundName } from "./remix";
 import type { RemixMatch } from "./RemixMatchCard";
+import { RemixPlayers } from "./RemixPlayers";
 import { RemixRounds } from "./RemixRounds";
 import { LoadError, Loading } from "./StateMessage";
 
@@ -41,7 +43,9 @@ interface RemixKnockoutProps {
  * Screen 9 for a Lord have mercy knockout (BR-155): the rounds drawn so far,
  * the draw of the next round once the round before is complete (BR-140), the
  * places so far, the final's format and the deletion of the newest round
- * (FR-046, BR-146). It never asks for the bracket, which this mode has none of.
+ * (FR-046, BR-146). While the tournament runs, the organizer disables
+ * players who left (FR-044, BR-147). It never asks for the bracket, which
+ * this mode has none of.
  */
 export function RemixKnockout({
   leagueId,
@@ -62,6 +66,11 @@ export function RemixKnockout({
   const removal = useMutation(
     finalsMutations.deleteKnockoutRound(queryClient, leagueId, tournamentId),
   );
+  // Its settling reloads the whole league, the knockout rounds included.
+  const setDisabled = useMutation(
+    finalsMutations.setDisabled(queryClient, leagueId, tournamentId),
+  );
+  const [announcement, setAnnouncement] = useState("");
 
   // Deleting round 1 deletes the knockout, so a reload then finds none (404).
   if (knockout.error instanceof ApiError && knockout.error.status === 404) {
@@ -114,6 +123,20 @@ export function RemixKnockout({
         : newest.result_count === 0
           ? t("finals.remix.deleteBodyNone")
           : t("finals.remix.deleteBody", { count: newest.result_count });
+
+  const pendingEntryId = setDisabled.isPending
+    ? setDisabled.variables.entryId
+    : null;
+  const change = (entryId: string, disabled: boolean, done: string) => {
+    setDisabled.mutate(
+      { entryId, disabled },
+      {
+        onSuccess: () => {
+          setAnnouncement(done);
+        },
+      },
+    );
+  };
 
   const resultHref = (match: RemixMatch): string | null =>
     match.state === "bye"
@@ -182,6 +205,31 @@ export function RemixKnockout({
         <p role="alert" className="text-body-sm">
           {errorText(t, draw.error)}
         </p>
+      )}
+      {setDisabled.isError && (
+        <p role="alert" className="text-body-sm">
+          {errorText(t, setDisabled.error)}
+        </p>
+      )}
+      <p role="status" className="sr-only">
+        {announcement}
+      </p>
+      {tournament.state === "in_progress" && (
+        <RemixPlayers
+          knockout={data}
+          playerName={roster.player}
+          pendingEntryId={pendingEntryId}
+          onChange={(player, disabled) => {
+            const name = roster.player(player.player_id);
+            change(
+              player.entry_id,
+              disabled,
+              disabled
+                ? t("finals.players.disabledDone", { name })
+                : t("finals.players.enabledDone", { name }),
+            );
+          }}
+        />
       )}
       <RemixRounds
         knockout={data}

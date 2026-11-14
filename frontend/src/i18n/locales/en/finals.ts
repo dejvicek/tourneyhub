@@ -150,6 +150,18 @@ export const finals = {
     drawnAfter: "Drawn after the {{previous}}",
     drawnLater: "Drawn later",
     cameIn: "{{in}} in for {{out}}",
+    players: {
+      title: "Players in the knockout",
+      help: "Disable a player who has left. If they are still in, a replacement comes in at the next draw. If they are knocked out, they are skipped as a replacement.",
+      stillIn: "Still in.",
+      knockedOut: "Knocked out. Can come in as a replacement.",
+      leftOpen: "Has left. Their pair loses this round's match by walkover.",
+      leftNext:
+        "Has left. A replacement comes in at the next draw if anyone can.",
+      notHere: "Not here. Skipped as a replacement.",
+      replaced:
+        "Replaced by {{name}} in the {{round}}. Can come back only if you delete that round.",
+    },
   },
   finished: {
     title: "Finished",

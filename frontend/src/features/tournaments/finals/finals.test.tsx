@@ -787,6 +787,105 @@ describe("Knockout in Lord have mercy (screen 9, BR-155)", () => {
       expect(view.state.location.pathname).toBe(at(paths.tournament, LHM));
     });
   });
+
+  describe("players who left and replacements (FR-044, FR-049, BR-147 to BR-155)", () => {
+    const nameOf = (playerId: string) =>
+      shortName(db().players.find((p) => p.id === playerId)?.name ?? "");
+    /** 4 pairs without a third-place match: the semifinal losers are knocked out. */
+    const withoutThirdPlace = () => {
+      const knockout = db()
+        .tournaments.find((t) => t.id === LHM)
+        ?.phases.find((p) => p.kind === "knockout");
+      if (knockout === undefined) throw new Error("The seed has a knockout.");
+      knockout.third_place_match = false;
+    };
+    const setDisabled = (entryId: string, disabled = true) => {
+      const queryClient = new QueryClient();
+      return new MutationObserver(
+        queryClient,
+        finalsMutations.setDisabled(queryClient, TEST_LEAGUE_ID, LHM),
+      ).mutate({ entryId, disabled });
+    };
+    const openPlayers = async (user: ReturnType<typeof userEvent.setup>) => {
+      const toggle = await screen.findByRole("button", {
+        name: "Players in the knockout",
+      });
+      await user.click(toggle);
+      return toggle;
+    };
+
+    it("lists the knockout's players collapsed, each with what the flag means (FR-044, BR-147)", async () => {
+      withoutThirdPlace();
+      const user = userEvent.setup();
+      renderAt(knockoutPath());
+
+      const toggle = await screen.findByRole("button", {
+        name: "Players in the knockout",
+      });
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+      expect(screen.queryByRole("button", { name: /^Disable / })).toBeNull();
+      await user.click(toggle);
+
+      expect(toggle).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getAllByRole("button", { name: /^Disable / })).toHaveLength(
+        8,
+      );
+      expect(screen.getAllByText("Still in.")).toHaveLength(6);
+      expect(
+        screen.getAllByText("Knocked out. Can come in as a replacement."),
+      ).toHaveLength(2);
+    });
+
+    it("disables a player who left and enables them again, announced, the rounds reloaded (FR-044, BR-147, BR-149)", async () => {
+      const read = await readRounds();
+      const open = read.rounds[0]?.matches.find((m) => m.state === "on_field");
+      const playerId = open?.sides[0]?.player_ids[0] ?? "";
+      const name = nameOf(playerId);
+      const user = userEvent.setup();
+      renderAt(knockoutPath());
+      await openPlayers(user);
+
+      await user.click(screen.getByRole("button", { name: `Disable ${name}` }));
+
+      expect(
+        await screen.findByText(
+          "Has left. Their pair loses this round's match by walkover.",
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getByText(`${name} is disabled.`)).toBeInTheDocument();
+      // The rounds reloaded: the card marks the player who left (BR-155).
+      expect(await screen.findAllByText("No longer playing")).toHaveLength(1);
+
+      await user.click(screen.getByRole("button", { name: `Enable ${name}` }));
+
+      expect(
+        await screen.findByText(`${name} is enabled.`),
+      ).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.queryByText("No longer playing")).toBeNull();
+      });
+    });
+
+    it("says a disabled knocked-out player is skipped as a replacement (BR-147)", async () => {
+      withoutThirdPlace();
+      const out = (await readRounds()).players.find(
+        (p) => p.status === "knocked_out",
+      );
+      await setDisabled(out?.entry_id ?? "");
+      const user = userEvent.setup();
+      renderAt(knockoutPath());
+      await openPlayers(user);
+
+      expect(
+        screen.getByText("Not here. Skipped as a replacement."),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", {
+          name: `Enable ${nameOf(out?.player_id ?? "")}`,
+        }),
+      ).toBeInTheDocument();
+    });
+  });
 });
 
 describe("Changing a knockout result (FR-053, BR-094)", () => {
