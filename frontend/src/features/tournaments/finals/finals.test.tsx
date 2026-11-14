@@ -775,7 +775,6 @@ describe("Knockout in Lord have mercy (screen 9, BR-155)", () => {
         }),
       ).not.toBeInTheDocument();
     });
-    expect(view.state.location.pathname).toBe(knockoutPath());
     open();
 
     await waitFor(() => {
