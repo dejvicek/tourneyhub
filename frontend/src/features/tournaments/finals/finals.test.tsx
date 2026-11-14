@@ -885,6 +885,117 @@ describe("Knockout in Lord have mercy (screen 9, BR-155)", () => {
         }),
       ).toBeInTheDocument();
     });
+
+    it("previews who comes in, skips one who is not here, and draws the plan shown (FR-049, BR-148, BR-155)", async () => {
+      withoutThirdPlace();
+      await finishNewestRound();
+      const before = await readRounds();
+      const leaving = before.players.find((p) => p.status === "still_in");
+      const [first, second] = before.players.filter(
+        (p) => p.status === "knocked_out",
+      );
+      if (
+        leaving === undefined ||
+        first === undefined ||
+        second === undefined
+      ) {
+        throw new Error("The knockout has players in and out.");
+      }
+      await setDisabled(leaving.entry_id);
+      const out = nameOf(leaving.player_id);
+      const user = userEvent.setup();
+      renderAt(knockoutPath());
+
+      expect(await screen.findByText("At this draw:")).toBeInTheDocument();
+      expect(
+        screen.getByText(`${nameOf(first.player_id)} comes in for ${out}`),
+      ).toBeInTheDocument();
+      // The plan replaces the general "stays in the draw" notice.
+      expect(screen.queryByText(/stays in the draw/)).toBeNull();
+
+      await user.click(
+        screen.getByRole("button", {
+          name: `${nameOf(first.player_id)} is not here`,
+        }),
+      );
+
+      expect(
+        await screen.findByText(
+          `${nameOf(second.player_id)} comes in for ${out}`,
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          `${nameOf(first.player_id)} is skipped as a replacement.`,
+        ),
+      ).toBeInTheDocument();
+      await user.click(
+        await screen.findByRole("button", { name: "Draw the final" }),
+      );
+
+      expect(
+        await screen.findByText(`${nameOf(second.player_id)} in for ${out}`),
+      ).toBeInTheDocument();
+      await openPlayers(user);
+      expect(
+        screen.getByText(
+          `Replaced by ${nameOf(second.player_id)} in the final. Can come back only if you delete that round.`,
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("says who stays in the draw with nobody to come in (BR-149)", async () => {
+      await finishNewestRound();
+      const leaving = (await readRounds()).players.find(
+        (p) => p.status === "still_in",
+      );
+      await setDisabled(leaving?.entry_id ?? "");
+      renderAt(knockoutPath());
+
+      expect(
+        await screen.findByText(
+          `${nameOf(leaving?.player_id ?? "")} has left and nobody can come in, so their pair loses by walkover`,
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/stays in the draw/)).toBeNull();
+    });
+
+    it("previews a replacement in Czech (FR-049)", async () => {
+      await i18n.changeLanguage("cs");
+      withoutThirdPlace();
+      await finishNewestRound();
+      const before = await readRounds();
+      const leaving = before.players.find((p) => p.status === "still_in");
+      const first = before.players.find((p) => p.status === "knocked_out");
+      await setDisabled(leaving?.entry_id ?? "");
+      renderAt(knockoutPath());
+
+      expect(
+        await screen.findByText(
+          `Za hráče ${nameOf(leaving?.player_id ?? "")} nastoupí ${nameOf(first?.player_id ?? "")}`,
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", {
+          name: `${nameOf(first?.player_id ?? "")} tu není`,
+        }),
+      ).toBeInTheDocument();
+    });
+
+    it("has no axe violations with the plan and the players shown", async () => {
+      withoutThirdPlace();
+      await finishNewestRound();
+      const leaving = (await readRounds()).players.find(
+        (p) => p.status === "still_in",
+      );
+      await setDisabled(leaving?.entry_id ?? "");
+      const user = userEvent.setup();
+      renderAt(knockoutPath());
+      await screen.findByText("At this draw:");
+      await openPlayers(user);
+
+      expect(await violations()).toEqual([]);
+    });
   });
 });
 

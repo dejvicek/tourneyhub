@@ -44,8 +44,9 @@ interface RemixKnockoutProps {
  * the draw of the next round once the round before is complete (BR-140), the
  * places so far, the final's format and the deletion of the newest round
  * (FR-046, BR-146). While the tournament runs, the organizer disables
- * players who left (FR-044, BR-147). It never asks for the bracket, which
- * this mode has none of.
+ * players who left (FR-044, BR-147) and sees who comes in at the next draw
+ * before it is stored (FR-049, BR-148, BR-149). It never asks for the
+ * bracket, which this mode has none of.
  */
 export function RemixKnockout({
   leagueId,
@@ -124,6 +125,9 @@ export function RemixKnockout({
           ? t("finals.remix.deleteBodyNone")
           : t("finals.remix.deleteBody", { count: newest.result_count });
 
+  const nextDraw = data.next_draw;
+  const entryOf = (playerId: string) =>
+    data.players.find((player) => player.player_id === playerId)?.entry_id;
   const pendingEntryId = setDisabled.isPending
     ? setDisabled.variables.entryId
     : null;
@@ -137,6 +141,9 @@ export function RemixKnockout({
       },
     );
   };
+  // FR-049: the draw stores the plan as it stands, so it waits for a change
+  // to be saved and the plan shown to be reloaded.
+  const settling = setDisabled.isPending || knockout.isFetching;
 
   const resultHref = (match: RemixMatch): string | null =>
     match.state === "bye"
@@ -156,8 +163,9 @@ export function RemixKnockout({
           </Link>
         </Notice>
       )}
-      {data.left_player_ids.length > 0 && (
-        // FR-049, BR-149: a player who left stays in the draw.
+      {data.left_player_ids.length > 0 && nextDraw === null && (
+        // BR-149: a player who left stays in the drawn round. Before the
+        // next draw the plan below says who is replaced and who stays.
         <Notice
           tone="info"
           title={t("finals.remix.leftNotice", {
@@ -174,11 +182,68 @@ export function RemixKnockout({
           })}
           className="space-y-3"
         >
+          {nextDraw !== null &&
+            (nextDraw.replacements.length > 0 ||
+              nextDraw.staying_player_ids.length > 0) && (
+              // FR-049: who comes in and who stays, before the draw is stored.
+              <div className="mb-3 space-y-2">
+                <p className="font-bold">{t("finals.remix.nextDrawLead")}</p>
+                <ul className="space-y-2">
+                  {nextDraw.replacements.map((replacement) => {
+                    const incoming = roster.player(replacement.player_id);
+                    const entryId = entryOf(replacement.player_id);
+                    return (
+                      // Keyed by the player who left, so the button keeps
+                      // focus when the next candidate takes the row.
+                      <li
+                        key={replacement.replaced_player_id}
+                        className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1"
+                      >
+                        <span className="min-w-0 flex-1 basis-48">
+                          {t("finals.remix.comesIn", {
+                            in: incoming,
+                            out: roster.player(replacement.replaced_player_id),
+                          })}
+                        </span>
+                        {entryId !== undefined && (
+                          // BR-147, BR-148: disabling the replacement skips them.
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={settling}
+                            aria-label={t("finals.remix.notHereFor", {
+                              name: incoming,
+                            })}
+                            onClick={() => {
+                              change(
+                                entryId,
+                                true,
+                                t("finals.remix.skipped", { name: incoming }),
+                              );
+                            }}
+                          >
+                            {t("finals.remix.notHere")}
+                          </Button>
+                        )}
+                      </li>
+                    );
+                  })}
+                  {nextDraw.staying_player_ids.map((playerId) => (
+                    // BR-149: nobody can come in, so the pair loses by walkover.
+                    <li key={playerId}>
+                      {t("finals.remix.staysIn", {
+                        name: roster.player(playerId),
+                      })}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           <Button
             type="button"
             size="lg"
             className="w-full md:w-auto"
-            disabled={draw.isPending}
+            disabled={draw.isPending || settling}
             onClick={() => {
               // ADR-008: the draw expects the round number it is looking at.
               draw.mutate({ expected_round_no: data.rounds.length + 1 });

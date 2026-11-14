@@ -161,6 +161,13 @@ export const finals: CsMessages<Messages["finals"]> = {
     drawnAfter: "Losuje se po: {{previous}}",
     drawnLater: "Losuje se později",
     cameIn: "{{in}} hraje za hráče {{out}}",
+    nextDrawLead: "V tomto losování:",
+    comesIn: "Za hráče {{out}} nastoupí {{in}}",
+    staysIn:
+      "Za hráče {{name}} nemá kdo nastoupit, takže jeho dvojice prohraje kontumačně",
+    notHere: "Není tu",
+    notHereFor: "{{name}} tu není",
+    skipped: "{{name}} se jako náhradník přeskočí.",
     players: {
       title: "Hráči ve vyřazovací části",
       help: "Vyřaďte ze hry hráče, který odešel. Pokud je ještě ve hře, při dalším losování za něj nastoupí náhradník. Pokud už vypadl, jako náhradník se přeskočí.",
