@@ -280,7 +280,7 @@ test.describe("the share link (FR-070)", () => {
       await expect(
         shared
           .getByRole("region", { name: "Results" })
-          .getByRole("region", { name: "Round 1", exact: true })
+          .getByRole("group", { name: "Round 1", exact: true })
           .getByRole("listitem"),
       ).toHaveCount(MATCHES_PER_ROUND);
       await expect(shared).not.toHaveURL(/\/login/);
