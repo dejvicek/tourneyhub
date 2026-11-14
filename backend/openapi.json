@@ -6495,6 +6495,89 @@
         ]
       }
     },
+    "/api/v1/leagues/{league_id}/players/{player_id}/tournaments": {
+      "get": {
+        "description": "List the tournaments that block removing a player (BR-002, FR-012).\n\nThe tournaments the player is picked for that are not finished, setup\nincluded, oldest date first. An empty list means the player can be removed.\nA player of another league is 404 `player_not_found`.",
+        "operationId": "list_unfinished_tournaments",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "league_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "League Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "player_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Player Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TournamentSummary"
+                  },
+                  "title": "Response List Unfinished Tournaments",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Unfinished Tournaments",
+        "tags": [
+          "players"
+        ]
+      }
+    },
     "/api/v1/leagues/{league_id}/seasons": {
       "post": {
         "description": "Close the active season and start the next one (FR-021).\n\n409 `season_number_changed`, with the active season's `current_number`,\nwhen `expected_current_number` is stale, for example on a repeat: reload.",

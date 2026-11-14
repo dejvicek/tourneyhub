@@ -12,6 +12,7 @@ from tourneyhub.api.schemas import (
     RequestModel,
     ResponseModel,
 )
+from tourneyhub.api.tournament_models import TournamentSummary
 from tourneyhub.services import players as player_service
 
 router = APIRouter(
@@ -128,6 +129,22 @@ def rename_player(
         clock=clock,
     )
     return PlayerRead.model_validate(player)
+
+
+@router.get("/{player_id}/tournaments")
+def list_unfinished_tournaments(
+    league_id: UUID, player_id: UUID, session: SessionDep, user: CurrentUserDep
+) -> list[TournamentSummary]:
+    """List the tournaments that block removing a player (BR-002, FR-012).
+
+    The tournaments the player is picked for that are not finished, setup
+    included, oldest date first. An empty list means the player can be removed.
+    A player of another league is 404 `player_not_found`.
+    """
+    tournaments = player_service.list_unfinished_tournaments(
+        session, league_id=league_id, player_id=player_id, user_id=user.id
+    )
+    return [TournamentSummary.model_validate(t) for t in tournaments]
 
 
 @router.put("/{player_id}/removed")
