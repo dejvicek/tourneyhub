@@ -5,7 +5,6 @@ import {
 } from "@tanstack/react-query";
 
 import { api, dataOf } from "@/api/client";
-import { provisionalApi } from "@/api/provisional";
 
 export const playerQueries = {
   list: (leagueId: string) =>
@@ -42,7 +41,7 @@ export const playerQueries = {
       ],
       queryFn: ({ signal }) =>
         dataOf(
-          provisionalApi.GET(
+          api.GET(
             "/api/v1/leagues/{league_id}/players/{player_id}/tournaments",
             {
               params: { path: { league_id: leagueId, player_id: playerId } },

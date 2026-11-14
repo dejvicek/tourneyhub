@@ -17,7 +17,6 @@ import type { components, paths as GeneratedPaths } from "@/api/schema";
 type Uuid = string;
 
 type ErrorResponse = components["schemas"]["ErrorResponse"];
-type TournamentSummary = components["schemas"]["TournamentSummary"];
 type TournamentRead = components["schemas"]["TournamentRead"];
 
 /** Never in the backend: the seeded account the login shows in demo mode. */
@@ -76,11 +75,6 @@ type TournamentEntry = Params<{
 
 /** Routes the fake API serves that the generated schema does not have yet. */
 export interface ProvisionalPaths {
-  // players: the unfinished tournaments a player is in, which block a removal (BR-002)
-  "/api/v1/leagues/{league_id}/players/{player_id}/tournaments": {
-    get: Get<Params<{ league_id: Uuid; player_id: Uuid }>, TournamentSummary[]>;
-  };
-
   // public: every share-link route is generated (P11, P10a, P10b, P12).
 
   // demo only: the backend never has this route
