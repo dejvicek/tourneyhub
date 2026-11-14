@@ -2,6 +2,7 @@
 BR-064, BR-080, BR-147, ADR-008).
 """
 
+import re
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Any
@@ -9,7 +10,7 @@ from uuid import UUID, uuid7
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select, update
+from sqlalchemy import Engine, event, select, update
 from sqlalchemy.orm import Session
 
 from tourneyhub.db.models.entries import Entry
@@ -415,6 +416,83 @@ def test_br080_fr044_a_started_knockout_that_is_not_lord_have_mercy_refuses(
     status, body = disable(tournament_id, entry_id)
 
     assert (status, body["code"]) == (422, "disable_not_allowed")
+
+
+def test_fr044_adr008_disabling_locks_the_league_before_the_tournament(
+    engine: Engine,
+    create: Callable[..., str],
+    start: Callable[[str], Json],
+    disable: Callable[..., tuple[int, Json]],
+) -> None:
+    tournament_id = create(6)
+    entry_id = _entry_ids(start(tournament_id))[0]
+    seen: list[str] = []
+
+    def record(*args: object) -> None:  # the statement is the third argument
+        statement = args[2]
+        assert isinstance(statement, str)
+        seen.append(statement)
+
+    event.listen(engine, "before_cursor_execute", record)
+    try:
+        status, _ = disable(tournament_id, entry_id)
+    finally:
+        event.remove(engine, "before_cursor_execute", record)
+
+    locked = [
+        m.group(1)
+        for s in seen
+        if re.search(r"\bFOR UPDATE\b", s, re.IGNORECASE)
+        and (m := re.search(r"\bFROM\s+(\w+)", s, re.IGNORECASE))
+    ]
+    assert status == 200
+    assert locked[:2] == ["leagues", "tournaments"]
+
+
+def test_br080_fr044_a_disabled_entry_does_not_qualify_for_the_knockout(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    create: Callable[..., str],
+    start: Callable[[str], Json],
+    play_round: Callable[[str, int], None],
+    get: Callable[[str, str], Json],
+    disable: Callable[..., tuple[int, Json]],
+) -> None:
+    tournament_id = create(6)
+    start(tournament_id)
+    play_round(tournament_id, 1)
+    url = "/knockout/preview?qualifiers=2&third_place_match=false"
+    before = [e["members"][0]["entry_id"] for e in get(tournament_id, url)["entries"]]
+    status, _ = disable(tournament_id, before[0])
+    assert status == 200
+    shown = get(tournament_id, url)
+    qualifiers = [e["members"][0]["entry_id"] for e in shown["entries"]]
+    tournament = get(tournament_id, "")
+
+    started = client.put(
+        f"/api/v1/leagues/{league_id}/tournaments/{tournament_id}/knockout",
+        json={
+            "expected_current_phase_id": tournament["current_phase_id"],
+            "expected_draw_counter": shown["draw_counter"],
+            "expected_qualifier_ids": qualifiers,
+            "qualifiers": 2,
+            "third_place_match": False,
+            "match_format": None,
+            "final_match_format": None,
+            "mode": None,
+        },
+        headers=headers,
+    )
+
+    assert started.status_code == 200, started.text
+    assert before[0] not in qualifiers
+    assert len(qualifiers) == 2
+    assert qualifiers[0] == before[1]
+    knockout = [
+        e for e in get(tournament_id, "")["entries"] if e["stage"] == "knockout"
+    ]
+    assert len(knockout) == 2
 
 
 def test_fr044_a_tournament_in_setup_is_409(
