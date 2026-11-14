@@ -255,8 +255,9 @@ def delete_round(
     is found on every write. Deleting round 1 takes the tournament back to
     setup, as "back to setup" does but with results allowed (FR-036, FR-046):
     every round goes, the entries, seeds, draws and top-player marks stay, and
-    every disabled flag is cleared. Late entries, which would become ordinary entries of the
-    setup and be drawn again (DATA-MODEL §4.5), come with P14.
+    every disabled flag is cleared. A late entry stays as an ordinary entry of
+    the setup, with its pick, and is seeded again at the next start
+    (DATA-MODEL §4.5, FR-047).
     """
     league, tournament = _lock_tournament(
         session,

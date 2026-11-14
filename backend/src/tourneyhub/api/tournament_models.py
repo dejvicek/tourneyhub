@@ -233,6 +233,17 @@ class DisabledWrite(RequestModel):
     disabled: bool
 
 
+class LateEntryWrite(RequestModel):
+    """Add a late player to a running Swiss or Monster DYP (FR-047, BR-067).
+
+    `from_round_no` is the round the player is expected to start in: the
+    newest group round's number plus one (ADR-008).
+    """
+
+    player_id: UUID
+    from_round_no: Annotated[int, Field(ge=1)]
+
+
 class ParticipantRead(ResponseModel):
     """A main entry of a running tournament and where it stands (FR-044, BR-064).
 
