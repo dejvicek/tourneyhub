@@ -1088,6 +1088,57 @@ describe("Knockout in Lord have mercy (screen 9, BR-155)", () => {
         }
       });
     });
+
+    it("holds the draw and the not-here buttons while a change is saved (FR-049)", async () => {
+      withoutThirdPlace();
+      await finishNewestRound();
+      const leaving = (await readRounds()).players.find(
+        (p) => p.status === "still_in",
+      );
+      await setDisabled(leaving?.entry_id ?? "");
+      const release = holdDisableRequests();
+      const user = userEvent.setup();
+      renderAt(knockoutPath());
+      const draw = await screen.findByRole("button", {
+        name: "Draw the final",
+      });
+      expect(draw).toBeEnabled();
+      await openPlayers(user);
+
+      const [first] = screen.getAllByRole("button", { name: /^Disable / });
+      if (first === undefined) throw new Error("The list has players.");
+      await user.click(first);
+
+      await waitFor(() => {
+        expect(draw).toBeDisabled();
+      });
+      expect(
+        screen.getByRole("button", { name: / is not here$/ }),
+      ).toBeDisabled();
+      release();
+      await waitFor(() => {
+        expect(
+          screen.getByRole("button", { name: "Draw the final" }),
+        ).toBeEnabled();
+      });
+    });
+
+    it("has no Players section once the tournament is finished (FR-044)", async () => {
+      await finishNewestRound();
+      const drawn = await drawRound(2);
+      // The final is best of 3, the third-place match one game.
+      for (const match of drawn.rounds[1]?.matches ?? []) {
+        await enterResult(match.match_id, match.kind === "standard");
+      }
+      renderAt(knockoutPath());
+
+      expect(
+        await screen.findByText("The knockout is finished"),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Players in the knockout" }),
+      ).toBeNull();
+    });
   });
 });
 
