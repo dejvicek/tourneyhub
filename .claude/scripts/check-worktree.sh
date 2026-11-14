@@ -12,6 +12,8 @@
 # Speed: the two areas run side by side, and the backend tests run as several pytest
 #        processes (check-backend.sh, check_shard.py). Both files are mounted from this
 #        script's directory, so the checked worktree needs no copy of them.
+# Lock:  backend checks of several worktrees queue on a lock, because they share the
+#        tourneyhub_check databases. Frontend-only runs need no lock and run side by side.
 # Exit:  0 all checks passed, 1 a check failed, 2 usage or environment error.
 set -uo pipefail
 
@@ -30,10 +32,6 @@ common=$(git -C "$wt" rev-parse --path-format=absolute --git-common-dir 2>/dev/n
 main=$(dirname "$common")
 [ -f "$main/compose.yaml" ] || fail "$wt is not a worktree of the TourneyHub repository"
 
-# Test runs share the tourneyhub_check databases, so only one may run at a time.
-lock="$common/check-worktree.lock"
-mkdir "$lock" 2>/dev/null \
-  || fail "another check is running (lock $lock). Wait for it. Remove the lock only if no check runs."
 # The one-off containers get names of this run. Killing `docker compose run` (Ctrl-C,
 # a timeout) does not stop its container, so the cleanup removes them: an interrupted
 # run must not keep testing against the databases or the worktree of the next run.
@@ -43,7 +41,6 @@ frontend_pid=
 cleanup() {
   docker rm -fv "$run_id-api" "$run_id-frontend" >/dev/null 2>&1
   [ -z "$frontend_log" ] || rm -f "$frontend_log"
-  rmdir "$lock"
 }
 trap cleanup EXIT
 
@@ -90,6 +87,28 @@ if $check_backend; then
   cpus=$(docker info --format '{{.NCPU}}' 2>/dev/null) || fail "could not read Docker's CPU count"
   shards=$((cpus / 2))
   [ "$shards" -ge 1 ] || shards=1
+  # Backend runs share the tourneyhub_check databases, so only one may use them at a
+  # time. A run that finds the lock taken waits for its turn. The lock is held on
+  # file descriptor 9 while this script or a child that inherited it is alive. The
+  # kernel releases it when they end, even after kill -9, so it never goes stale.
+  lock_file="$common/check-worktree-backend.lock"
+  exec 9<>"$lock_file" || fail "could not open the lock file $lock_file"
+  /usr/bin/perl -e '
+    use Fcntl qw(:flock);
+    open(my $f, "+<&=", 9) or die "open: $!\n";
+    if (!flock($f, LOCK_EX | LOCK_NB)) {
+      my $holder = <$f>;
+      $holder = "" unless defined $holder;
+      chomp $holder;
+      print STDERR "Waiting for the backend check of another worktree",
+        ($holder ne "" ? " (PID $holder)" : ""), " to finish...\n";
+      flock($f, LOCK_EX) or die "flock: $!\n";
+    }
+    truncate($f, 0) or die "truncate: $!\n";
+    seek($f, 0, 0) or die "seek: $!\n";
+    select((select($f), $| = 1)[0]);
+    print $f "$ARGV[0]\n" or die "write: $!\n";
+  ' "$$" || fail "could not take the backend lock $lock_file"
   # Fresh test databases for every run, as in CI, one pair per pytest process. The
   # tests migrate their database to the branch's head and leave it there, so a
   # database shared between branches ends at a revision other branches don't know.
@@ -121,7 +140,7 @@ run_frontend() {
     -v /src/frontend/node_modules \
     -v "$wt/backend/openapi.json:/src/backend/openapi.json:ro" \
     frontend sh -c 'pnpm install --frozen-lockfile && pnpm lint && pnpm format:check &&
-      pnpm typecheck && pnpm test && pnpm build'
+      pnpm typecheck && pnpm test && pnpm build' 9>&-
 }
 
 result=0
