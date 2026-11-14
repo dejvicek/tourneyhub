@@ -40,7 +40,7 @@ The demo mode (`pnpm dev:demo`, `frontend/src/demo/`) answers the API with MSW. 
   - [x] P14:
     - [x] `GET …/participants` and `PUT …/entries/{entry_id}/disabled`. ([#113](https://github.com/dejvicek/tourneyhub/pull/113))
     - [x] `POST …/entries` (late players).
-- [ ] D5 Delete the demo: `src/demo/`, `src/api/provisional.ts` and `src/api/provisionalPaths.ts`, what is left in `src/api/provisionalTypes.ts`, the exports of `src/lib/rules.ts` only the demo read, the `dev:demo` script, the demo settings in `vite.config.ts`, `main.tsx` and CI, and the mentions in `CLAUDE.md` and `docs/style/frontend-style.md`. Done when no demo code is left and lint, typecheck, unit tests, build and e2e pass.
+- [ ] D5 Delete the demo: `src/demo/`, `src/api/provisional.ts` and `src/api/provisionalPaths.ts`, the exports of `src/lib/rules.ts` only the demo read, the `dev:demo` script, the demo settings in `vite.config.ts`, `main.tsx` and CI, and the mentions in `CLAUDE.md` and `docs/style/frontend-style.md`. Done when no demo code is left and lint, typecheck, unit tests, build and e2e pass.
   - [ ] ESLint also stops `./test/…` and `./demo/…` imports from files directly in `src/`, and dynamic `import()` of them.
   - [ ] Comments in `src/test/fake/` that still say "demo", and the ESLint globs and comments for the demo's tests, which match nothing since D2.
   - [ ] Tests that call `provisionalApi` (six files) and the two tests of `providesProvisionalRoutes()` (`src/lib/demoMode.ts`) move to `api` once D3 and D4 switch their routes.
