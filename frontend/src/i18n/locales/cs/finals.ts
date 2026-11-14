@@ -43,6 +43,8 @@ export const finals: CsMessages<Messages["finals"]> = {
     roundNotNewest: "Smazat jde jen poslední kolo. Kola jsme načetli znovu.",
     notEnoughEntries:
       "Další kolo potřebuje aspoň 2 hráče nebo dvojice, kteří nejsou vyřazeni ze hry.",
+    notEnoughPlayers:
+      "Další kolo potřebuje aspoň {{minimum}} hráče, kteří nejsou vyřazeni ze hry.",
     groupPhaseLocked:
       "Vyřazovací fáze je vylosovaná, takže kola i rozhodující pravidla jsou pevná. Nejdřív vyřazovací fázi smažte.",
   },

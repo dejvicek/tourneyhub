@@ -926,7 +926,11 @@ export interface DrawnRound {
  * demo only: the next round of a Swiss (BR-055–BR-058) or Monster DYP
  * (BR-060–BR-063), from the active entries and the current standings.
  */
-export function drawNextRound(t: StoredTournament): DrawnRound {
+export function drawNextRound(
+  t: StoredTournament,
+  /** The league ranking by player id; the seed has none, so it draws by standing. */
+  leagueRank: ReadonlyMap<string, number> = new Map(),
+): DrawnRound {
   const group = groupPhase(t);
   if (!group) {
     return { matches: [], sitting_out: [] };
@@ -991,10 +995,24 @@ export function drawNextRound(t: StoredTournament): DrawnRound {
 
   // Monster DYP.
   const groups = Math.floor(ordered.length / 4);
+  // BR-061: the marked players first, then the league ranking (Monster DYP
+  // entries have no seed), at most one per match.
+  // The seed data has no league ranking and orders by the stored seeds.
+  const rankOfEntry = (id: string) =>
+    leagueRank.size === 0
+      ? (seedOf.get(id) ?? 0)
+      : (leagueRank.get(entryById.get(id)?.player_ids[0] ?? "") ?? Infinity);
+  const leagueOrder = [...ordered].sort(
+    (a, b) => rankOfEntry(a) - rankOfEntry(b),
+  );
+  const pickTops = (pool: readonly string[]) => {
+    const inPool = leagueOrder.filter((id) => pool.includes(id));
+    const marked = inPool.filter((id) => entryById.get(id)?.is_top_player);
+    const rest = inPool.filter((id) => !entryById.get(id)?.is_top_player);
+    return [...marked, ...rest].slice(0, groups);
+  };
   const tops = new Set(
-    roundNo <= 2 && rules.topPlayersSitOutExempt
-      ? ordered.slice(0, groups)
-      : [],
+    roundNo <= 2 && rules.topPlayersSitOutExempt ? pickTops(ordered) : [],
   );
   const sitting = chooseSitOuts({
     ordered,
@@ -1008,8 +1026,10 @@ export function drawNextRound(t: StoredTournament): DrawnRound {
   const buckets: string[][] = [];
   if (roundNo <= 2) {
     // BR-061: the top players lead different groups.
-    const leaders = playing.slice(0, groups);
-    const rest = playing.slice(groups, groups * 4);
+    const leaders = pickTops(playing);
+    const rest = playing
+      .filter((id) => !leaders.includes(id))
+      .slice(0, groups * 3);
     leaders.forEach((leader, g) => {
       buckets.push([leader, ...rest.slice(g * 3, g * 3 + 3)]);
     });

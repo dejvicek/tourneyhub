@@ -44,6 +44,8 @@ export const finals = {
       "Only the newest round can be deleted. The rounds were reloaded.",
     notEnoughEntries:
       "Another round needs at least 2 players or pairs who are not disabled.",
+    notEnoughPlayers:
+      "Another round needs at least {{minimum}} players who are not disabled.",
     groupPhaseLocked:
       "The knockout is drawn, so the rounds and the tie-breakers are fixed. Delete the knockout first.",
   },

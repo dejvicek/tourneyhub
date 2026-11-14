@@ -346,6 +346,8 @@ export const tournamentsSetup = {
       br032LeftOut: "Only one player can be left out.",
       br032Incomplete: "Put every player in a half first.",
       fr036: "Going back to setup is possible only until the first result.",
+      fr041Max:
+        "Too many top players: at most {{max}}, one per match of the first round.",
     },
   },
 };
