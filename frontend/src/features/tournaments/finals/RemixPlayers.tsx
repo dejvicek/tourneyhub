@@ -2,10 +2,9 @@ import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
+import { ChevronDownIcon } from "@/components/ui/icons";
 import type { RemixKnockoutData, RemixPlayerData } from "@/features/finals/api";
 import { cn } from "@/lib/utils";
-
-import { ChevronDownIcon } from "./icons";
 
 interface RemixPlayersProps {
   knockout: RemixKnockoutData;

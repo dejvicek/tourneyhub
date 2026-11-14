@@ -852,7 +852,10 @@ describe("Knockout in Lord have mercy (screen 9, BR-155)", () => {
           "Has left. Their pair loses this round's match by walkover.",
         ),
       ).toBeInTheDocument();
-      expect(screen.getByText(`${name} is disabled.`)).toBeInTheDocument();
+      // The announcement comes once the change and the reload have settled.
+      expect(
+        await screen.findByText(`${name} is disabled.`),
+      ).toBeInTheDocument();
       // The rounds reloaded: the card marks the player who left (BR-155).
       expect(await screen.findAllByText("No longer playing")).toHaveLength(1);
 
@@ -925,7 +928,7 @@ describe("Knockout in Lord have mercy (screen 9, BR-155)", () => {
         ),
       ).toBeInTheDocument();
       expect(
-        screen.getByText(
+        await screen.findByText(
           `${nameOf(first.player_id)} is skipped as a replacement.`,
         ),
       ).toBeInTheDocument();
@@ -950,6 +953,7 @@ describe("Knockout in Lord have mercy (screen 9, BR-155)", () => {
         (p) => p.status === "still_in",
       );
       await setDisabled(leaving?.entry_id ?? "");
+      const user = userEvent.setup();
       renderAt(knockoutPath());
 
       expect(
@@ -958,6 +962,12 @@ describe("Knockout in Lord have mercy (screen 9, BR-155)", () => {
         ),
       ).toBeInTheDocument();
       expect(screen.queryByText(/stays in the draw/)).toBeNull();
+      await openPlayers(user);
+      expect(
+        screen.getByText(
+          "Has left. A replacement comes in at the next draw if anyone can.",
+        ),
+      ).toBeInTheDocument();
     });
 
     it("previews a replacement in Czech (FR-049)", async () => {
