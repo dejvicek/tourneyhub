@@ -429,6 +429,18 @@ describe("share-link views outside demo mode", () => {
     ).toEqual([]);
   });
 
+  it("names the share-link rounds by phase when there is a knockout, and plainly when there is not", async () => {
+    renderAt(pageOf("Lord have mercy night"));
+    const results = await screen.findByRole("region", { name: "Results" });
+    const labels = within(results)
+      .getAllByRole("heading", { level: 3 })
+      .map((heading) => heading.textContent);
+
+    expect(labels).toContain("Group phase, round 1");
+    expect(labels.some((l) => l.startsWith("Knockout, round"))).toBe(true);
+    expect(labels).not.toContain("Round 1");
+  });
+
   describe("Lord have mercy knockout (BR-155, FR-070)", () => {
     it("shows a Lord have mercy knockout round by round, read-only (BR-155, FR-070)", async () => {
       const asked: string[] = [];

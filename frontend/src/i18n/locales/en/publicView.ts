@@ -26,6 +26,8 @@ export const publicView = {
     standingsHeading: "Standings",
     resultsHeading: "Results",
     round: "Round {{number}}",
+    groupRound: "Group phase, round {{number}}",
+    knockoutRound: "Knockout, round {{number}}",
     placesHeading: "Final places",
     pointsEach: "+{{count}} each",
     knockoutHeading: "Knockout",

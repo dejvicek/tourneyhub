@@ -27,6 +27,8 @@ export const publicView: CsMessages<Messages["publicView"]> = {
     standingsHeading: "Pořadí",
     resultsHeading: "Výsledky",
     round: "{{number}}. kolo",
+    groupRound: "Skupinová fáze, {{number}}. kolo",
+    knockoutRound: "Vyřazovací část, {{number}}. kolo",
     placesHeading: "Konečné pořadí",
     pointsEach: "+{{count}} každý",
     knockoutHeading: "Vyřazovací část",

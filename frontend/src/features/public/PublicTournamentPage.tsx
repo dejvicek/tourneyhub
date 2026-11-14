@@ -422,6 +422,20 @@ function Results({
 }) {
   const { t } = useTranslation();
   const names = useNames(players, tournament);
+  // Both phases count rounds from 1, so with a knockout each label names its
+  // phase.
+  const hasKnockout = tournament.phases.some(
+    (phase) => phase.kind === "knockout",
+  );
+  const labelOf = (round: PublicTournament["rounds"][number]): string => {
+    const kind = tournament.phases.find((p) => p.id === round.phase_id)?.kind;
+    if (!hasKnockout || kind === undefined) {
+      return t("publicView.tournament.round", { number: round.round_no });
+    }
+    return kind === "knockout"
+      ? t("publicView.tournament.knockoutRound", { number: round.round_no })
+      : t("publicView.tournament.groupRound", { number: round.round_no });
+  };
   const rounds = tournament.rounds
     .map((round) => ({
       ...round,
@@ -453,7 +467,7 @@ function Results({
               id={round.id}
               className="text-body-sm font-bold text-muted-foreground"
             >
-              {t("publicView.tournament.round", { number: round.round_no })}
+              {labelOf(round)}
             </h3>
             <ul className="rounded-lg border border-border-surface bg-card px-4 text-card-foreground">
               {round.played.map((match) => {
