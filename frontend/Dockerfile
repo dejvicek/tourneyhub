@@ -8,7 +8,7 @@
 # is copied; Compose passes it, by hand it is
 # `docker build --build-context backend=backend frontend`.
 
-FROM node:26.13.0-trixie-slim AS node
+FROM node:26.13.1-trixie-slim AS node
 # Node 25 and later ship no Corepack, so pnpm is installed explicitly, at the
 # version pinned in package.json's packageManager (ADR-003).
 RUN --mount=type=cache,target=/root/.npm \
