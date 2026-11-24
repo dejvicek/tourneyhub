@@ -22,10 +22,10 @@ The MVP is split into 16 packages, P1 to P16. The critical path is P1 → P5 →
 
 - [x] Sit-out order: not the round before, then fewest sit-outs (BR-058, BR-063) ([#60](https://github.com/dejvicek/tourneyhub/issues/60), [#87](https://github.com/dejvicek/tourneyhub/pull/87)).
 - [x] Game difference in round-robin standings, column only in best of 3 and best of 5 (BR-101) ([#61](https://github.com/dejvicek/tourneyhub/issues/61), [#85](https://github.com/dejvicek/tourneyhub/pull/85)).
-- [ ] Code for the answers from issue #48 ([#75](https://github.com/dejvicek/tourneyhub/issues/75)); its 19 items Q1–Q46 are ticked there. Q2 now only lowers the limit from 64 to 16: a round robin takes no late entries.
+- [ ] Code for the answers from issue #48 ([#75](https://github.com/dejvicek/tourneyhub/issues/75)); its 19 items Q1–Q46 are ticked there. Q2 is done: a round robin takes at most 16 entries and no late entries ([#131](https://github.com/dejvicek/tourneyhub/pull/131)).
 - [ ] [#106](https://github.com/dejvicek/tourneyhub/issues/106) (sit-out column in the standings, FR-060)
 - [x] [#109](https://github.com/dejvicek/tourneyhub/issues/109) (flaky fake test: Monster DYP round-2 top player by league ranking) ([#110](https://github.com/dejvicek/tourneyhub/pull/110))
-- [ ] [#128](https://github.com/dejvicek/tourneyhub/issues/128) (a shared 5th place earns 1 point with the default table, BR-111): the rule is in the PRD ([#130](https://github.com/dejvicek/tourneyhub/pull/130)); the engine's points and a test are still to do.
+- [x] [#128](https://github.com/dejvicek/tourneyhub/issues/128) (a shared 5th place earns 1 point with the default table, BR-111): the rule ([#130](https://github.com/dejvicek/tourneyhub/pull/130)) and the engine's points ([#132](https://github.com/dejvicek/tourneyhub/pull/132)).
 
 ## 3. Rest of the MVP
 
