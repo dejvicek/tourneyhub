@@ -812,7 +812,9 @@ class PlaceRead(ResponseModel):
     """An entry's final place and the season points each of its players earns.
 
     Entries sharing a place get the average of the places they cover,
-    rounded down; places beyond the season's table earn 0 (BR-110, BR-111).
+    rounded down; with the default table, each entry on a shared 5th place
+    gets 1 point instead (#128). Places beyond the season's table earn 0
+    (BR-110, BR-111).
     """
 
     place: int
