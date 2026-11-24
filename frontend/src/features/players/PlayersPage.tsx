@@ -196,6 +196,9 @@ function AddPlayer({
     (errorCodeOf(add.error) === "player_limit_reached"
       ? t("players.errors.limit")
       : undefined) ??
+    (errorCodeOf(restore.error) === "player_limit_reached"
+      ? t("players.errors.limit")
+      : undefined) ??
     fieldErrors(t, add.error).name ??
     (add.isError ? t("players.errors.generic") : undefined);
 
@@ -494,7 +497,7 @@ function RemovedRow({
   );
 
   return (
-    <li className="flex items-center justify-between gap-2 border-t border-border py-2 first:border-t-0">
+    <li className="flex flex-wrap items-center justify-between gap-2 border-t border-border py-2 first:border-t-0">
       <span className="min-w-0 text-body-md break-words text-muted-foreground">
         {player.name}
       </span>
@@ -505,6 +508,7 @@ function RemovedRow({
         disabled={restore.isPending}
         onClick={() => {
           onDone("");
+          restore.reset();
           // mutateAsync, not mutate's callbacks: the reload drops this row
           // before they would run, and the news is lost.
           restore.mutateAsync({ playerId: player.id, removed: false }).then(
@@ -517,6 +521,16 @@ function RemovedRow({
       >
         {t("players.removed.restore")}
       </Button>
+      {restore.isError && (
+        <p
+          role="alert"
+          className="w-full text-body-sm font-bold break-words text-destructive"
+        >
+          {errorCodeOf(restore.error) === "player_limit_reached"
+            ? t("players.errors.limit")
+            : t("players.errors.generic")}
+        </p>
+      )}
     </li>
   );
 }

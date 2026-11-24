@@ -261,7 +261,37 @@ describe("PlayersPage", () => {
         "A league holds at most 1000 active players. Removed ones do not count.",
       );
     });
-  });
+  }, 20_000);
+
+  it("BR-006: restoring a player in a league full of active players says so", async () => {
+    const filip = db().players.find((p) => p.name === "Filip Šimek");
+    if (filip === undefined) {
+      throw new Error("The seed has Filip Šimek");
+    }
+    filip.removed_at = "2026-10-01T18:00:00Z";
+    const count = db().players.filter(
+      (p) => p.league_id === TEST_LEAGUE_ID && p.removed_at === null,
+    ).length;
+    for (let i = count; i < 1000; i++) {
+      db().players.push({
+        id: newId(),
+        league_id: TEST_LEAGUE_ID,
+        name: `Filler ${String(i)}`,
+        removed_at: null,
+      });
+    }
+    const user = userEvent.setup();
+    renderAt(players);
+
+    await user.click(
+      await screen.findByRole("button", { name: "Restore Filip Šimek" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "A league holds at most 1000 active players. Removed ones do not count.",
+    );
+    expect(filip.removed_at).not.toBeNull();
+  }, 20_000);
 
   it("a name with an invisible character is refused at the field", async () => {
     const user = userEvent.setup();
