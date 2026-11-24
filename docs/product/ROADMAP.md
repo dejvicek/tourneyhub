@@ -35,6 +35,7 @@ The bigger version is a hosted platform where any club can run leagues and tourn
 | RM-11 | Accessibility | Every screen checked for accessibility (WCAG 2.2 Level AA). |
 | RM-33 | Knockouts by place range | After the group phase, each range of places gets its own knockout, e.g. places 1–8 and 9–16, so more entries play on. |
 | RM-34 | Pinned fields | The organizer pins a match to a field, and the field is kept free for it, even for a final whose sides are not known yet. In the MVP a match goes only onto a free field. |
+| RM-35 | Late entries in a round robin | A late entry plays every other entry as often as everyone else does, and the matches not yet played are rescheduled to fit its matches in (the rule drafted as [BR-054](https://github.com/dejvicek/tourneyhub/blob/cc20e68d/docs/product/PRD.md)). Not in the MVP: an exact search for the best reschedule is too slow for 16 entries (#62). In the MVP a round robin takes no late entries. |
 
 ## 3. Stage 2 — Players join in
 
