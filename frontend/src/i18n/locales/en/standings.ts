@@ -15,7 +15,7 @@ export const standings = {
       points: "Pts",
     },
     footnote:
-      "Points per place, 1st to {{last}}: {{points}}. Entries sharing a place split the points and round down. Players level on points are ranked by tournament wins.",
+      "Points per place, 1st to {{last}}: {{points}}. Entries sharing a place split the points and round down. With the default table, a shared 5th place earns 1 point each. Players level on points are ranked by tournament wins.",
     counted: "Tournaments counted",
   },
 };
