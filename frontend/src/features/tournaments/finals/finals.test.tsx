@@ -1569,6 +1569,30 @@ describe("Between rounds (screen 11)", () => {
     ]);
   });
 
+  it.each([
+    { active: 9, rounds: 4 },
+    { active: 8, rounds: 3 },
+  ])(
+    "recommends $rounds rounds for $active active players: a disabled one does not count, a late one does (BR-068)",
+    async ({ active, rounds }) => {
+      const monster = db().tournaments.find((t) => t.id === MONSTER);
+      const main = monster?.entries.filter((e) => e.stage === "main") ?? [];
+      // The fixture's 15 players include a late one; keep `active` enabled.
+      main.forEach((entry, index) => {
+        entry.is_disabled = index >= active;
+      });
+      renderAt(at(paths.betweenRounds, MONSTER));
+
+      expect(
+        await screen.findByText(
+          new RegExp(
+            `For ${String(active)} active players we recommend at least ${String(rounds)} rounds`,
+          ),
+        ),
+      ).toBeInTheDocument();
+    },
+  );
+
   it("recommends rounds from the active players and offers the next steps", async () => {
     renderAt(at(paths.betweenRounds, MONSTER));
 
