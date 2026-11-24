@@ -16,6 +16,7 @@ The MVP is split into 16 packages, P1 to P16. The critical path is P1 → P5 →
 - [x] P9 Fields ([#50](https://github.com/dejvicek/tourneyhub/pull/50)).
 - [x] P10 Knockout, finishing and season standings ([#57](https://github.com/dejvicek/tourneyhub/pull/57), [#58](https://github.com/dejvicek/tourneyhub/pull/58), [#66](https://github.com/dejvicek/tourneyhub/pull/66)).
 - [x] P11 Share link ([#44](https://github.com/dejvicek/tourneyhub/pull/44)) and milestone M1, the DYP evening end to end in e2e ([#47](https://github.com/dejvicek/tourneyhub/pull/47)).
+- [x] P12 Swiss: pairing, standings with BH1 and BH2, rounds, tie-breakers locked once the knockout is drawn ([#38](https://github.com/dejvicek/tourneyhub/pull/38), [#43](https://github.com/dejvicek/tourneyhub/pull/43), [#90](https://github.com/dejvicek/tourneyhub/pull/90), [#95](https://github.com/dejvicek/tourneyhub/pull/95), [#97](https://github.com/dejvicek/tourneyhub/pull/97), [#136](https://github.com/dejvicek/tourneyhub/pull/136)).
 - [x] Remove the demo mode, D1 to D5 ([#91](https://github.com/dejvicek/tourneyhub/pull/91), [#97](https://github.com/dejvicek/tourneyhub/pull/97), [#101](https://github.com/dejvicek/tourneyhub/pull/101), [#103](https://github.com/dejvicek/tourneyhub/pull/103), [#104](https://github.com/dejvicek/tourneyhub/pull/104), [#111](https://github.com/dejvicek/tourneyhub/pull/111), [#113](https://github.com/dejvicek/tourneyhub/pull/113), [#115](https://github.com/dejvicek/tourneyhub/pull/115), [#121](https://github.com/dejvicek/tourneyhub/pull/121)). The fake API of the frontend tests stays; [#120](https://github.com/dejvicek/tourneyhub/issues/120) tracks replacing its engines with fixtures.
 
 ## 2. Small follow-ups
@@ -29,13 +30,6 @@ The MVP is split into 16 packages, P1 to P16. The critical path is P1 → P5 →
 
 ## 3. Rest of the MVP
 
-- [ ] **P12 Swiss** (FR-040, FR-042, FR-043, FR-046; BR-055 – BR-058, BR-065, BR-066, BR-068, BR-072 – BR-074; ADR-011)
-  - [x] Engine: pairing, standings with BH1 and BH2, recommended number of rounds ([#38](https://github.com/dejvicek/tourneyhub/pull/38), [#43](https://github.com/dejvicek/tourneyhub/pull/43)).
-  - [x] Services and API: start a Swiss phase, add a round against an expected number, delete a round, the order of tie-breakers ([#90](https://github.com/dejvicek/tourneyhub/pull/90)).
-  - [x] Screen 11 (between rounds) on the real API ([#97](https://github.com/dejvicek/tourneyhub/pull/97)).
-  - [x] Property tests and the benchmark (ADR-011 Timing) ([#95](https://github.com/dejvicek/tourneyhub/pull/95)).
-  - [ ] Tie-breaker order after the knockout draw, and the game-difference column in a Swiss ([#92](https://github.com/dejvicek/tourneyhub/issues/92)): answered, the order is locked once the knockout is drawn (FR-043) and the Swiss table shows no game-difference column ([#130](https://github.com/dejvicek/tourneyhub/pull/130)); the code is still to be checked against it.
-  - [x] Cut line during the Swiss rounds, before the knockout is drawn ([#98](https://github.com/dejvicek/tourneyhub/issues/98)): answered, no change in the MVP; a planned number of qualifiers is on the roadmap (RM-36) ([#130](https://github.com/dejvicek/tourneyhub/pull/130)).
 - [ ] **P13 Monster DYP** (FR-041, FR-045; BR-060 – BR-063, BR-081 – BR-084; ADR-010, ADR-011)
   - [x] Engine: round draws, standings, knockout entries ([#41](https://github.com/dejvicek/tourneyhub/pull/41)).
   - [x] Services and API: start, rounds, top players (`entries.is_top_player`) ([#103](https://github.com/dejvicek/tourneyhub/pull/103)).

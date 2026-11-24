@@ -62,10 +62,13 @@ export function StandingsTable({
     signDisplay: "exceptZero",
   });
   const showSatOut = rows.some((row) => row.sat_out > 0);
-  // BR-101: game difference ranks in every format, but in BO1 and BO2 it
+  // BR-101: game difference ranks in a round robin, but in BO1 and BO2 it
   // follows from won and lost, so its column only costs width on a phone.
+  // A Swiss or Monster DYP never shows it (#92); the API still carries it.
   const format = model.group?.match_format;
-  const showGames = format === "bo3" || format === "bo5";
+  const showGames =
+    model.group?.format === "round_robin" &&
+    (format === "bo3" || format === "bo5");
   const columns = showGames ? 5 : 4;
 
   return (

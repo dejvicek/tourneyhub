@@ -325,6 +325,8 @@ export const finals: CsMessages<Messages["finals"]> = {
     footnoteNone: "Stejně bodů? Hráči se dělí o místo.",
     names: { bh1: "BH1", bh2: "BH2", score_difference: "Rozdíl skóre" },
     change: "Změnit rozhodující pravidla",
+    locked:
+      "Pořadí je pevné, dokud je vyřazovací část rozlosovaná. Chcete-li pořadí změnit, vyřazovací část smažte.",
     title: "Rozhodující pravidla",
     lead: "Každé zapněte nebo vypněte a seřaďte je. Tabulka se hned přepočítá.",
     on: "{{name}} zapnuto",
