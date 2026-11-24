@@ -74,7 +74,7 @@ def test_br111_shared_fifth_earns_one_point_with_default_table() -> None:
 
 def _fifth() -> list[EntryPlace]:
     places = [placed(n, n) for n in range(1, 5)]
-    return [*places, placed(9, 5), placed(10, 5)]
+    return [*places, *(placed(n, 5) for n in range(9, 13))]
 
 
 def test_br111_an_unshared_fifth_keeps_its_two_points() -> None:
@@ -228,8 +228,12 @@ tables = (
 )
 """Whole numbers, none above the place before it (FR-011), not the default table.
 
-The default table has its own shared-5th exception (BR-111, #128).
+The default table has its own shared-5th exception (BR-111, #128), so the
+properties about the plain average use these.
 """
+
+tables_with_default = st.one_of(st.just(DEFAULT_TABLE), tables)
+"""The same, plus the default table, for the properties the exception keeps."""
 
 
 @st.composite
@@ -271,7 +275,7 @@ def test_br111_each_entry_gets_the_floored_average_of_the_places_it_covers(
         assert row.points == exact_points(row.place, sharing[row.place], table)
 
 
-@given(places=results_of_a_tournament(), table=tables)
+@given(places=results_of_a_tournament(), table=tables_with_default)
 def test_br100_every_player_of_an_entry_gets_the_same_points(
     places: list[EntryPlace], table: list[int]
 ) -> None:
@@ -283,7 +287,7 @@ def test_br100_every_player_of_an_entry_gets_the_same_points(
         assert len(mine) == 1
 
 
-@given(places=results_of_a_tournament(), table=tables)
+@given(places=results_of_a_tournament(), table=tables_with_default)
 def test_br110_a_better_place_never_earns_fewer_points(
     places: list[EntryPlace], table: list[int]
 ) -> None:
@@ -311,7 +315,7 @@ def test_br111_a_block_hands_out_about_what_its_covered_places_are_worth(
         assert len(block) * points <= covered < len(block) * (points + 1)
 
 
-@given(places=results_of_a_tournament(), table=tables, data=st.data())
+@given(places=results_of_a_tournament(), table=tables_with_default, data=st.data())
 def test_br110_the_points_do_not_depend_on_the_order_of_the_entries(
     places: list[EntryPlace], table: list[int], data: st.DataObject
 ) -> None:
@@ -320,7 +324,7 @@ def test_br110_the_points_do_not_depend_on_the_order_of_the_entries(
     assert season_points(shuffled, table) == season_points(places, table)
 
 
-@given(places=results_of_a_tournament(), table=tables)
+@given(places=results_of_a_tournament(), table=tables_with_default)
 def test_br110_places_beyond_the_table_earn_zero(
     places: list[EntryPlace], table: list[int]
 ) -> None:
