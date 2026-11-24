@@ -44,9 +44,9 @@ export const finals: CsMessages<Messages["finals"]> = {
       "Než se vylosuje další kolo, musí mít výsledek každý zápas tohoto kola.",
     roundNotNewest: "Smazat jde jen poslední kolo. Kola jsme načetli znovu.",
     notEnoughEntries:
-      "Další kolo potřebuje aspoň 2 hráče nebo dvojice, kteří nejsou vyřazeni ze hry.",
+      "Další kolo potřebuje aspoň 2 hráče nebo dvojice, kteří nejsou mimo hru.",
     notEnoughPlayers:
-      "Další kolo potřebuje aspoň {{minimum}} hráče, kteří nejsou vyřazeni ze hry.",
+      "Další kolo potřebuje aspoň {{minimum}} hráče, kteří nejsou mimo hru.",
     groupPhaseLocked:
       "Vyřazovací fáze je vylosovaná, takže kola i rozhodující pravidla jsou pevná. Nejdřív vyřazovací fázi smažte.",
     lateEntryNotAllowed:
@@ -173,9 +173,9 @@ export const finals: CsMessages<Messages["finals"]> = {
     skipped: "{{name}} se jako náhradník přeskočí.",
     players: {
       title: "Hráči ve vyřazovací části",
-      help: "Vyřaďte ze hry hráče, který odešel. Pokud je ještě ve hře, při dalším losování za něj nastoupí náhradník. Pokud už vypadl, jako náhradník se přeskočí.",
+      help: "Vypněte hráče, který odešel. Pokud je ještě ve hře, při dalším losování za něj nastoupí náhradník. Pokud už vypadl, jako náhradník se přeskočí.",
       helpLast:
-        "Vyřaďte ze hry hráče, který odešel. Další losování už nebude, takže za něj nikdo nenastoupí.",
+        "Vypněte hráče, který odešel. Další losování už nebude, takže za něj nikdo nenastoupí.",
       stillIn: "Ve hře.",
       knockedOut: "Vypadl. Může nastoupit jako náhradník.",
       leftOpen: "Odešel. Jeho dvojice prohraje zápas tohoto kola kontumačně.",
@@ -268,7 +268,7 @@ export const finals: CsMessages<Messages["finals"]> = {
     noResult: "Zadat výsledek",
     noResultFor: "Zadat výsledek, {{match}}",
     satOut: "Odpočívali: {{names}}",
-    disabled: "Vyřazeni ze hry: {{names}}",
+    disabled: "Mimo hru: {{names}}",
     noMatches: "V tomto kole nejsou žádné zápasy.",
     decisionTitle: "Kolo {{round}} je hotové",
     decisionBody_one:
@@ -315,7 +315,7 @@ export const finals: CsMessages<Messages["finals"]> = {
       bh2: "BH2",
       score_difference: "Rozdíl",
     },
-    disabledLabel: "Vyřazen ze hry",
+    disabledLabel: "Mimo hru",
     joinedLabel: "Připojen v kole {{round}}",
     cutLine: "Hranice postupu",
   },
@@ -340,18 +340,17 @@ export const finals: CsMessages<Messages["finals"]> = {
     summary_few: "{{count}} hráči, {{active}} aktivních",
     summary_many: "{{count}} hráče, {{active}} aktivních",
     summary_other: "{{count}} hráčů, {{active}} aktivních",
-    help: "Vyřaďte ze hry toho, kdo musí na chvíli odejít. Jeho body zůstanou a po opětovném zapnutí hraje od dalšího kola.",
+    help: "Vypněte toho, kdo musí na chvíli odejít. Jeho body zůstanou a po opětovném zapnutí hraje od dalšího kola.",
     playing: "Hraje.",
     satOut: "Odpočíval v kole {{round}}.",
-    disabledSince:
-      "Vyřazen ze hry od kola {{round}}. Do nových kol se nelosuje.",
+    disabledSince: "Mimo hru od kola {{round}}. Do nových kol se nelosuje.",
     joined: "Přišel později, v kole {{round}}.",
-    disable: "Vyřadit",
+    disable: "Vypnout",
     enable: "Zapnout",
-    disableFor: "Vyřadit ze hry: {{name}}",
-    enableFor: "Zapnout do hry: {{name}}",
-    disabledDone: "{{name}} je vyřazen ze hry.",
-    enabledDone: "{{name}} je zpět ve hře.",
+    disableFor: "Vypnout hráče: {{name}}",
+    enableFor: "Zapnout hráče: {{name}}",
+    disabledDone: "{{name}} je mimo hru.",
+    enabledDone: "{{name}} je znovu zapnutý.",
     lateTitle: "Přidat pozdního hráče",
     lateLead:
       "Ze seznamu hráčů ligy. Začne s 0 body a hraje od kola {{round}}.",
@@ -402,7 +401,7 @@ export const finals: CsMessages<Messages["finals"]> = {
     skippedTitle_many: "{{names}} nemohou postoupit",
     skippedTitle_other: "{{names}} nemohou postoupit",
     skippedBody:
-      "Vyřazení hráči nepostupují, takže na jejich místo se posune další z tabulky. Pokud jsou zpět, nejdřív je zapněte do hry.",
+      "Hráči mimo hru nepostupují, takže na jejich místo se posune další z tabulky. Pokud jsou zpět, nejdřív je zapněte.",
     preview: "Náhled",
     pairExample: "{{a}} + {{b}}",
     pairNames: "{{first}} + {{second}}",

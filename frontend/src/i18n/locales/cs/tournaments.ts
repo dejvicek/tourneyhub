@@ -35,7 +35,7 @@ export const tournaments: CsMessages<Messages["tournaments"]> = {
   finished: { title: "Konec: pořadí a body do sezóny" },
   betweenRounds: { title: "Švýcarský systém a Monster DYP: mezi koly" },
   lateAndDisabled: {
-    title: "Švýcarský systém a Monster DYP: pozdní a pozastavení hráči",
+    title: "Švýcarský systém a Monster DYP: pozdní hráči a hráči mimo hru",
   },
   startKnockout: { title: "Monster DYP: start vyřazovací fáze" },
   state: {
