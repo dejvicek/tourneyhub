@@ -92,7 +92,8 @@ def add_player(
     holder is removed, the UI asks whether it is the same person and restores
     them (ADR-002). A parallel add of the same name that wins the race to the
     unique index makes this one 409 `player_name_taken`: reload. A league holds at
-    most 500 players, removed ones included: more is 422 `player_limit_reached`.
+    most 1000 active players, removed ones not counted: more is 422
+    `player_limit_reached`.
     """
     player = player_service.add_player(
         session, league_id=league_id, user_id=user.id, name=body.name, clock=clock
@@ -160,6 +161,8 @@ def set_player_removed(
 
     A removal keeps the player, their name and their history; a restored player
     is the same player. Both are target states, so repeating one changes nothing.
+    A restore counts the player again: with 1000 active players it is 422
+    `player_limit_reached` (BR-006).
     """
     player = player_service.set_player_removed(
         session,

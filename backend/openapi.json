@@ -426,7 +426,7 @@
           "format": "uuid",
           "type": "string"
         },
-        "maxItems": 500,
+        "maxItems": 1000,
         "type": "array"
       },
       "EntryKind": {
@@ -836,7 +836,7 @@
             "items": {
               "$ref": "#/components/schemas/DypHalfWrite"
             },
-            "maxItems": 500,
+            "maxItems": 1000,
             "title": "Halves",
             "type": "array"
           },
@@ -1620,7 +1620,7 @@
               ],
               "type": "array"
             },
-            "maxItems": 250,
+            "maxItems": 500,
             "title": "Pairs",
             "type": "array"
           }
@@ -2320,7 +2320,7 @@
           "format": "uuid",
           "type": "string"
         },
-        "maxItems": 500,
+        "maxItems": 1000,
         "type": "array"
       },
       "PlayerName": {
@@ -6447,7 +6447,7 @@
         ]
       },
       "post": {
-        "description": "Add a player to the league (FR-012).\n\nA name that another player has, in any case, is 422 `player_name_taken`\nwith the holder's `player_id`, `name` and `removed` (BR-001). When the\nholder is removed, the UI asks whether it is the same person and restores\nthem (ADR-002). A parallel add of the same name that wins the race to the\nunique index makes this one 409 `player_name_taken`: reload. A league holds at\nmost 500 players, removed ones included: more is 422 `player_limit_reached`.",
+        "description": "Add a player to the league (FR-012).\n\nA name that another player has, in any case, is 422 `player_name_taken`\nwith the holder's `player_id`, `name` and `removed` (BR-001). When the\nholder is removed, the UI asks whether it is the same person and restores\nthem (ADR-002). A parallel add of the same name that wins the race to the\nunique index makes this one 409 `player_name_taken`: reload. A league holds at\nmost 1000 active players, removed ones not counted: more is 422\n`player_limit_reached`.",
         "operationId": "add_player",
         "parameters": [
           {
@@ -6635,7 +6635,7 @@
     },
     "/api/v1/leagues/{league_id}/players/{player_id}/removed": {
       "put": {
-        "description": "Remove a player from the list, or restore them (FR-012, BR-002).\n\nA removal keeps the player, their name and their history; a restored player\nis the same player. Both are target states, so repeating one changes nothing.",
+        "description": "Remove a player from the list, or restore them (FR-012, BR-002).\n\nA removal keeps the player, their name and their history; a restored player\nis the same player. Both are target states, so repeating one changes nothing.\nA restore counts the player again: with 1000 active players it is 422\n`player_limit_reached` (BR-006).",
         "operationId": "set_player_removed",
         "parameters": [
           {

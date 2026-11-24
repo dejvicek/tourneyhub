@@ -7,7 +7,7 @@ from uuid import UUID, uuid7
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine, insert, select
 from sqlalchemy.orm import Session
 
 from tourneyhub.app import create_app
@@ -308,29 +308,100 @@ def test_fr012_post_accepts_a_name_of_exactly_100_characters(
     assert added["name"] == "x" * 100
 
 
-def test_fr012_post_refuses_the_player_over_the_cap_removed_ones_included(
+def _fill_league(session: Session, league: League, now: datetime, count: int) -> None:
+    """Put `count` active players on the league in one bulk insert."""
+    session.execute(
+        insert(Player),
+        [
+            {"league_id": league.id, "name": f"Filler {number}", "created_at": now}
+            for number in range(count)
+        ],
+    )
+
+
+def test_br006_the_1000th_active_player_is_added_and_the_1001st_refused(
     client: TestClient,
+    session: Session,
+    now: datetime,
     make_league: Callable[..., League],
     auth_header: Callable[..., dict[str, str]],
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(player_service, "MAX_PLAYERS_PER_LEAGUE", 2)
     league = make_league()
     headers = auth_header(league.owner_user_id)
-    ana = _add(client, league, "Ana", headers)
-    _put(client, league, ana["id"], "removed", {"removed": True}, headers)
-    _add(client, league, "Bob", headers)  # the 2nd of 2 is still accepted
+    _fill_league(session, league, now, 999)
 
+    _add(client, league, "The 1000th", headers)
     response = client.post(
-        _players_url(league), json={"name": "Cyril"}, headers=headers
+        _players_url(league), json={"name": "The 1001st"}, headers=headers
     )
 
     assert response.status_code == 422
-    assert response.json() == {"code": "player_limit_reached", "detail": {"limit": 2}}
-    listed = client.get(
-        _players_url(league), params={"include_removed": "true"}, headers=headers
-    ).json()
-    assert [player["name"] for player in listed] == ["Ana", "Bob"]
+    assert response.json() == {
+        "code": "player_limit_reached",
+        "detail": {"limit": 1000},
+    }
+
+
+def test_br006_removed_players_do_not_count_towards_the_limit(
+    client: TestClient,
+    session: Session,
+    now: datetime,
+    make_league: Callable[..., League],
+    auth_header: Callable[..., dict[str, str]],
+) -> None:
+    league = make_league()
+    headers = auth_header(league.owner_user_id)
+    _fill_league(session, league, now, 999)
+    last = _add(client, league, "The 1000th", headers)
+    _put(client, league, last["id"], "removed", {"removed": True}, headers)
+
+    added = _add(client, league, "Replacement", headers)
+
+    assert added["name"] == "Replacement"
+
+
+def test_br006_restoring_a_player_over_the_limit_is_refused(
+    client: TestClient,
+    session: Session,
+    now: datetime,
+    make_league: Callable[..., League],
+    auth_header: Callable[..., dict[str, str]],
+) -> None:
+    league = make_league()
+    headers = auth_header(league.owner_user_id)
+    _fill_league(session, league, now, 999)
+    last = _add(client, league, "The 1000th", headers)
+    _put(client, league, last["id"], "removed", {"removed": True}, headers)
+    _add(client, league, "Replacement", headers)
+
+    status, body = _put(
+        client, league, last["id"], "removed", {"removed": False}, headers
+    )
+
+    assert status == 422
+    assert body == {"code": "player_limit_reached", "detail": {"limit": 1000}}
+    listed = client.get(_players_url(league), headers=headers).json()
+    assert last["id"] not in [player["id"] for player in listed]
+
+
+def test_br006_restoring_a_player_below_the_limit_works(
+    client: TestClient,
+    session: Session,
+    now: datetime,
+    make_league: Callable[..., League],
+    auth_header: Callable[..., dict[str, str]],
+) -> None:
+    league = make_league()
+    headers = auth_header(league.owner_user_id)
+    _fill_league(session, league, now, 998)
+    last = _add(client, league, "The 999th", headers)
+    _put(client, league, last["id"], "removed", {"removed": True}, headers)
+
+    status, body = _put(
+        client, league, last["id"], "removed", {"removed": False}, headers
+    )
+
+    assert (status, body["removed_at"]) == (200, None)
 
 
 def test_fr012_the_player_cap_is_per_league(

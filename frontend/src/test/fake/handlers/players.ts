@@ -11,11 +11,8 @@ import { db, findLeague, tournamentSummary } from "../store";
 
 type PlayerRead = components["schemas"]["PlayerRead"];
 
-/**
- * A league holds at most this many players, removed ones included. BR-006 now says
- * 1000 active players; the change is the #48 follow-up (issue to open after approval).
- */
-const MAX_PLAYERS = 500;
+/** A league holds at most this many active players; removed ones do not count (BR-006). */
+const MAX_PLAYERS = 1000;
 
 /** NFC, then whitespace runs collapsed to one space and the ends trimmed. */
 function tidyName(name: string): string {
@@ -132,7 +129,8 @@ export const playerHandlers = [
       }
       const players = db().players;
       const count = players.filter(
-        (player) => player.league_id === params.league_id,
+        (player) =>
+          player.league_id === params.league_id && player.removed_at === null,
       ).length;
       if (count >= MAX_PLAYERS) {
         return apiError(422, "player_limit_reached", { limit: MAX_PLAYERS });
@@ -209,7 +207,15 @@ export const playerHandlers = [
       // The flag is the target state: a repeat keeps the first removed_at.
       if (removed && player.removed_at === null) {
         player.removed_at = new Date().toISOString();
-      } else if (!removed) {
+      } else if (!removed && player.removed_at !== null) {
+        // BR-006: a restore counts the player again.
+        const active = db().players.filter(
+          (other) =>
+            other.league_id === params.league_id && other.removed_at === null,
+        ).length;
+        if (active >= MAX_PLAYERS) {
+          return apiError(422, "player_limit_reached", { limit: MAX_PLAYERS });
+        }
         player.removed_at = null;
       }
       return toRead(player);

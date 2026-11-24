@@ -61,7 +61,8 @@ def _distinct_players(pairs: list[tuple[UUID, UUID]]) -> list[tuple[UUID, UUID]]
     return pairs
 
 
-# A league holds at most 500 players, so no list of its players or entries is longer.
+# A league holds at most 1000 active players (BR-006) and only active players can be
+# picked (BR-002), so no list of its players or entries is longer.
 type PlayerIds = Annotated[
     list[UUID], Field(max_length=MAX_PLAYERS_PER_LEAGUE), AfterValidator(_distinct)
 ]

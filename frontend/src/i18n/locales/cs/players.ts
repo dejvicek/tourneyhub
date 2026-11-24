@@ -53,7 +53,7 @@ export const players: CsMessages<Messages["players"]> = {
     taken: "{{name}} už na seznamu je.",
     takenRemoved: "{{name}} je odebraný hráč. Vraťte ho na seznam.",
     takenUnknown: "Toto jméno právě někdo použil. Seznam se znovu načetl.",
-    limit: "Liga může mít nejvýš 500 hráčů včetně odebraných.",
+    limit: "Liga může mít nejvýš 1000 aktivních hráčů. Odebraní se nepočítají.",
     generic: "Nepovedlo se. Zkontrolujte připojení a zkuste to znovu.",
   },
 };

@@ -376,7 +376,7 @@ def test_owasp_api1_a_removal_in_another_organizers_league_leaves_the_row_unchan
     assert (ana.name, ana.removed_at, ana.updated_at) == ("Ana", None, None)
 
 
-def test_fr012_the_league_holds_at_most_the_cap_removed_players_included(
+def test_br006_the_league_holds_at_most_the_cap_active_players(
     session: Session,
     make_league: Callable[..., League],
     now: datetime,
@@ -385,16 +385,20 @@ def test_fr012_the_league_holds_at_most_the_cap_removed_players_included(
     monkeypatch.setattr(player_service, "MAX_PLAYERS_PER_LEAGUE", 2)
     league, other = make_league(), make_league()
     ana = _add(session, league, "Ana", now)
-    _set_removed(session, league, ana, now, removed=True)
     _add(session, league, "Bob", now)
 
     with pytest.raises(RuleViolationError) as raised:
         _add(session, league, "Cyril", now)
     _add(session, other, "Cyril", now)
+    _set_removed(session, league, ana, now, removed=True)
+    _add(session, league, "Cyril", now)  # a removed player does not count
+    with pytest.raises(RuleViolationError) as restore:
+        _set_removed(session, league, ana, now, removed=False)
 
     assert raised.value.code is ErrorCode.PLAYER_LIMIT_REACHED
     assert raised.value.detail == {"limit": 2}
-    assert _names(session, league, include_removed=True) == ["Ana", "Bob"]
+    assert restore.value.code is ErrorCode.PLAYER_LIMIT_REACHED
+    assert _names(session, league, include_removed=True) == ["Ana", "Bob", "Cyril"]
 
 
 def test_adr008_the_clock_is_read_after_the_league_lock(

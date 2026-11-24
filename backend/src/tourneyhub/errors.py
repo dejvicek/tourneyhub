@@ -39,7 +39,7 @@ class ErrorCode(StrEnum):
     PLAYER_NOT_FOUND = "player_not_found"
     # Also a removed player's name (BR-001, FR-012).
     PLAYER_NAME_TAKEN = "player_name_taken"
-    # BR-006: 1000 active players (#48 follow-up); today 500, removed included.
+    # BR-006: at most 1000 active players; add and restore.
     PLAYER_LIMIT_REACHED = "player_limit_reached"
     PLAYER_IN_UNFINISHED_TOURNAMENT = "player_in_unfinished_tournament"  # BR-002
     # Tournaments
