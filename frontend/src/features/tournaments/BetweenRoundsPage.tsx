@@ -257,7 +257,7 @@ function RoundsContent() {
           <p className="text-body-md">
             {t("finals.rounds.decisionBody", {
               count: recommendedRounds(active),
-              active,
+              active: entryCount(data.type, active),
               played: rounds.length,
             })}
           </p>
