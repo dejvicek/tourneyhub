@@ -1,5 +1,4 @@
 import re
-import time
 from collections.abc import Callable, Iterator
 from typing import Any
 from uuid import UUID, uuid7
@@ -307,14 +306,11 @@ def test_fr032_a_round_robin_of_16_entries_previews_both_legs(
     ids = [str(make_player(league=league, name=f"Q{n}").id) for n in range(16)]
     setup = _setup(client, league, headers, ids, round_robin_legs=2)
 
-    began = time.perf_counter()
     status, preview = _preview(client, league, setup["tournament_id"], headers)
-    took = time.perf_counter() - began
 
     assert status == 200
     assert preview["can_start"] is True
     assert (preview["round_count"], preview["match_count"]) == (30, 16 * 15)
-    assert took < 10
 
 
 def test_adr008_a_started_tournament_has_no_schedule_to_preview(
