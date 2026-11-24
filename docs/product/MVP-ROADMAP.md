@@ -25,7 +25,7 @@ The MVP is split into 16 packages, P1 to P16. The critical path is P1 → P5 →
 - [ ] Code for the answers from issue #48 ([#75](https://github.com/dejvicek/tourneyhub/issues/75)); its 19 items Q1–Q46 are ticked there. Q2 now only lowers the limit from 64 to 16: a round robin takes no late entries.
 - [ ] [#106](https://github.com/dejvicek/tourneyhub/issues/106) (sit-out column in the standings, FR-060)
 - [x] [#109](https://github.com/dejvicek/tourneyhub/issues/109) (flaky fake test: Monster DYP round-2 top player by league ranking) ([#110](https://github.com/dejvicek/tourneyhub/pull/110))
-- [ ] [#128](https://github.com/dejvicek/tourneyhub/issues/128) (a shared 5th place earns 1 point with the default table, BR-111): the rule is in the PRD ([#TBD](https://github.com/dejvicek/tourneyhub/pull/TBD)); the engine's points and a test are still to do.
+- [ ] [#128](https://github.com/dejvicek/tourneyhub/issues/128) (a shared 5th place earns 1 point with the default table, BR-111): the rule is in the PRD ([#130](https://github.com/dejvicek/tourneyhub/pull/130)); the engine's points and a test are still to do.
 
 ## 3. Rest of the MVP
 
@@ -34,8 +34,8 @@ The MVP is split into 16 packages, P1 to P16. The critical path is P1 → P5 →
   - [x] Services and API: start a Swiss phase, add a round against an expected number, delete a round, the order of tie-breakers ([#90](https://github.com/dejvicek/tourneyhub/pull/90)).
   - [x] Screen 11 (between rounds) on the real API ([#97](https://github.com/dejvicek/tourneyhub/pull/97)).
   - [x] Property tests and the benchmark (ADR-011 Timing) ([#95](https://github.com/dejvicek/tourneyhub/pull/95)).
-  - [ ] Tie-breaker order after the knockout draw, and the game-difference column in a Swiss ([#92](https://github.com/dejvicek/tourneyhub/issues/92)): answered, the order is locked once the knockout is drawn (FR-043) and the Swiss table shows no game-difference column ([#TBD](https://github.com/dejvicek/tourneyhub/pull/TBD)); the code is still to be checked against it.
-  - [x] Cut line during the Swiss rounds, before the knockout is drawn ([#98](https://github.com/dejvicek/tourneyhub/issues/98)): answered, no change in the MVP; a planned number of qualifiers is on the roadmap (RM-36) ([#TBD](https://github.com/dejvicek/tourneyhub/pull/TBD)).
+  - [ ] Tie-breaker order after the knockout draw, and the game-difference column in a Swiss ([#92](https://github.com/dejvicek/tourneyhub/issues/92)): answered, the order is locked once the knockout is drawn (FR-043) and the Swiss table shows no game-difference column ([#130](https://github.com/dejvicek/tourneyhub/pull/130)); the code is still to be checked against it.
+  - [x] Cut line during the Swiss rounds, before the knockout is drawn ([#98](https://github.com/dejvicek/tourneyhub/issues/98)): answered, no change in the MVP; a planned number of qualifiers is on the roadmap (RM-36) ([#130](https://github.com/dejvicek/tourneyhub/pull/130)).
 - [ ] **P13 Monster DYP** (FR-041, FR-045; BR-060 – BR-063, BR-081 – BR-084; ADR-010, ADR-011)
   - [x] Engine: round draws, standings, knockout entries ([#41](https://github.com/dejvicek/tourneyhub/pull/41)).
   - [x] Services and API: start, rounds, top players (`entries.is_top_player`) ([#103](https://github.com/dejvicek/tourneyhub/pull/103)).
@@ -45,8 +45,8 @@ The MVP is split into 16 packages, P1 to P16. The critical path is P1 → P5 →
     - [x] Step 1, services, API and screens: drawing and deleting a knockout round, finishing, the round-by-round view on the organizer's screen and on the share link, and the option on the start-knockout screen ([#107](https://github.com/dejvicek/tourneyhub/pull/107), [#108](https://github.com/dejvicek/tourneyhub/pull/108)).
     - [x] Step 1, disabling a player in the knockout: the control on the knockout screen, through P14's disable route (decision A; FR-044, BR-147) ([#118](https://github.com/dejvicek/tourneyhub/pull/118)).
     - [x] Step 2: replacements ([#118](https://github.com/dejvicek/tourneyhub/pull/118)).
-    - [ ] Order of re-mixed pairs sharing a place ([#94](https://github.com/dejvicek/tourneyhub/issues/94)): answered, by the better group-phase place of their players (BR-145) ([#TBD](https://github.com/dejvicek/tourneyhub/pull/TBD)); the order in `engine/remix.py` is still to do.
-    - [ ] Decisions of the replacements PR ([#119](https://github.com/dejvicek/tourneyhub/issues/119)): answered, the organizer picks each replacement and a spot's points are split (BR-148, BR-151) ([#TBD](https://github.com/dejvicek/tourneyhub/pull/TBD)). Still to do: the organizer's pick on the draw's preview, the BR-151 split, the help line on the knockout screen (FR-049) and the Czech labels "Vypnout" / "Zapnout" / "Mimo hru". The e2e spec is part of P16's Monster DYP evening.
+    - [ ] Order of re-mixed pairs sharing a place ([#94](https://github.com/dejvicek/tourneyhub/issues/94)): answered, by the better group-phase place of their players (BR-145) ([#130](https://github.com/dejvicek/tourneyhub/pull/130)); the order in `engine/remix.py` is still to do.
+    - [ ] Decisions of the replacements PR ([#119](https://github.com/dejvicek/tourneyhub/issues/119)): answered, the organizer picks each replacement and a spot's points are split (BR-148, BR-151) ([#130](https://github.com/dejvicek/tourneyhub/pull/130)). Still to do: the organizer's pick on the draw's preview, the BR-151 split, the help line on the knockout screen (FR-049) and the Czech labels "Vypnout" / "Zapnout" / "Mimo hru". The e2e spec is part of P16's Monster DYP evening.
     - [ ] A non-qualifier who comes in, and a leaver without a replacement ([#129](https://github.com/dejvicek/tourneyhub/issues/129), waiting for an answer).
     - [x] Check the bracket size of round 1 in `remix_state` ([#96](https://github.com/dejvicek/tourneyhub/issues/96)) ([#107](https://github.com/dejvicek/tourneyhub/pull/107)).
   - [x] Screen 13 and marking top players on the real API ([#104](https://github.com/dejvicek/tourneyhub/pull/104), [#105](https://github.com/dejvicek/tourneyhub/pull/105)).
@@ -55,7 +55,7 @@ The MVP is split into 16 packages, P1 to P16. The critical path is P1 → P5 →
   - [x] Disable and enable a participant (written as a target state, ADR-008). ([#113](https://github.com/dejvicek/tourneyhub/pull/113))
   - [x] Late entries in Swiss and Monster DYP. ([#115](https://github.com/dejvicek/tourneyhub/pull/115))
   - [ ] A late pair in Doubles (FR-047).
-  - [x] Round robin with late entries: decided, none in the MVP (FR-047); BR-054 moves to the roadmap (RM-35), since an exact search of it is too slow for 16 entries ([#62](https://github.com/dejvicek/tourneyhub/issues/62)) ([#TBD](https://github.com/dejvicek/tourneyhub/pull/TBD)).
+  - [x] Round robin with late entries: decided, none in the MVP (FR-047); BR-054 moves to the roadmap (RM-35), since an exact search of it is too slow for 16 entries ([#62](https://github.com/dejvicek/tourneyhub/issues/62)) ([#130](https://github.com/dejvicek/tourneyhub/pull/130)).
   - [ ] Round robin: seeds 1 and 2 as the last match of the last round (BR-051) ([#116](https://github.com/dejvicek/tourneyhub/issues/116)).
   - [ ] A late entry takes a bye; warning about the Buchholz tie-breakers.
   - [x] Screen 12 on the real API. ([#115](https://github.com/dejvicek/tourneyhub/pull/115))
