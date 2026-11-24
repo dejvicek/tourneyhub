@@ -7,13 +7,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from tourneyhub.db.models.leagues import League, Season
-from tourneyhub.db.models.tournaments import Tournament
+from tourneyhub.db.models.tournaments import Tournament, TournamentPhase
 from tourneyhub.engine.leagues import (
     DEFAULT_PLACEMENT_POINTS,
     DefaultMatchFormat,
     SeasonState,
 )
-from tourneyhub.engine.tournaments import TournamentState
+from tourneyhub.engine.tournaments import MatchFormat, PhaseKind, TournamentState
 from tourneyhub.errors import (
     ConflictError,
     ErrorCode,
@@ -123,12 +123,30 @@ def update_league(
 
     Each value is a target state, so a repeated request changes nothing
     (ADR-008). Turning draws off affects only results entered afterwards
-    (BR-013). BR-125 refuses it while the league has an unfinished tournament
-    whose group phase plays BO2; that check is the #48 follow-up (issue to open
-    after approval). A changed default never changes an existing tournament,
+    (BR-013). BR-125 refuses it, 422 `draws_needed_by_bo2` with the tournaments'
+    ids, while the league has an unfinished tournament (setup included) whose
+    group phase plays BO2. A changed default never changes an existing tournament,
     which copied it (DATA-MODEL §4.2).
     """
     league = lock_league(session, league_id=league_id, user_id=user_id)
+    if draws_allowed is False and league.draws_allowed:
+        needing_draws = session.scalars(
+            select(Tournament.id)
+            .join(TournamentPhase, TournamentPhase.tournament_id == Tournament.id)
+            .join(Season, Season.id == Tournament.season_id)
+            .where(
+                Season.league_id == league.id,
+                Tournament.state != TournamentState.FINISHED,
+                TournamentPhase.kind == PhaseKind.GROUP,
+                TournamentPhase.match_format == MatchFormat.BO2,
+            )
+            .order_by(Tournament.date, Tournament.id)
+        ).all()
+        if needing_draws:
+            raise RuleViolationError(
+                ErrorCode.DRAWS_NEEDED_BY_BO2,
+                tournament_ids=[str(tournament_id) for tournament_id in needing_draws],
+            )
     changes = {
         "name": name,
         "draws_allowed": draws_allowed,

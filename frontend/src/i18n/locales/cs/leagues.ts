@@ -29,6 +29,16 @@ export const leagues: CsMessages<Messages["leagues"]> = {
       name: "Název ligy",
       draws: "Remízy ve skupinové fázi povoleny",
       drawsHint: "Vypnutí remíz platí jen pro výsledky zadané potom.",
+      drawsNeededByBo2:
+        "Remízy zůstávají zapnuté, dokud některý nedokončený turnaj hraje ve skupinové fázi BO2. Turnaj dokončete nebo smažte, případně změňte jeho formát, a pak remízy vypněte.",
+      drawsNeededByBo2Named_one:
+        "Remízy zůstávají zapnuté, dokud se turnaj {{names}} nedokončí nebo nesmaže, nebo dokud se nezmění jeho formát: ve skupinové fázi hraje BO2.",
+      drawsNeededByBo2Named_few:
+        "Remízy zůstávají zapnuté, dokud se tyto turnaje nedokončí nebo nesmažou, nebo dokud se nezmění jejich formát: {{names}} hrají ve skupinové fázi BO2.",
+      drawsNeededByBo2Named_many:
+        "Remízy zůstávají zapnuté, dokud se tyto turnaje nedokončí nebo nesmažou, nebo dokud se nezmění jejich formát: {{names}} hrají ve skupinové fázi BO2.",
+      drawsNeededByBo2Named_other:
+        "Remízy zůstávají zapnuté, dokud se tyto turnaje nedokončí nebo nesmažou, nebo dokud se nezmění jejich formát: {{names}} hrají ve skupinové fázi BO2.",
       defaultsHeading: "Výchozí hodnoty nových turnajů",
       fields: "Hřiště",
       fieldsHint: "Hřiště, na kterých se hraje zároveň.",

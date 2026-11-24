@@ -148,6 +148,35 @@ describe("leagues", () => {
     });
   });
 
+  it("BR-125: draws stay on while an unfinished tournament plays BO2, and the message says what to do", async () => {
+    const league = db().leagues.find((row) => row.id === TEST_LEAGUE_ID);
+    if (league === undefined) {
+      throw new Error("The seed has the test league");
+    }
+    league.draws_allowed = true;
+    for (const tournament of db().tournaments) {
+      for (const phase of tournament.phases) {
+        if (phase.kind === "group") {
+          phase.match_format = "bo2";
+        }
+      }
+    }
+    const user = userEvent.setup();
+    renderAt(settings);
+
+    await user.click(
+      await screen.findByRole("switch", { name: /Draws allowed/ }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Save league settings" }),
+    );
+
+    const message = await screen.findByText(/Draws stay on until/);
+    expect(message).toHaveTextContent(/Thursday DYP/);
+    expect(league.draws_allowed).toBe(true);
+    expect(screen.getByRole("switch", { name: /Draws allowed/ })).toBeChecked();
+  });
+
   it("BR-010: a running tournament keeps the next season shut and says which", async () => {
     renderAt(settings);
 

@@ -29,6 +29,12 @@ export const leagues = {
       name: "League name",
       draws: "Draws allowed in group phases",
       drawsHint: "Turning draws off affects only results entered afterwards.",
+      drawsNeededByBo2:
+        "Draws stay on while a tournament that is not finished plays BO2 in its group phase. Finish or delete that tournament, or change its format, then turn draws off.",
+      drawsNeededByBo2Named_one:
+        "Draws stay on until {{names}} is finished or deleted, or its format changes: it plays BO2 in its group phase.",
+      drawsNeededByBo2Named_other:
+        "Draws stay on until these tournaments are finished or deleted, or their format changes: {{names}} play BO2 in their group phases.",
       defaultsHeading: "Defaults for new tournaments",
       fields: "Fields",
       fieldsHint: "Tables you play on at the same time.",
