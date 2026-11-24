@@ -2399,3 +2399,138 @@ def test_fr022_a_started_tournament_counts_the_players_of_its_entries(
     ).json()
 
     assert listed[0]["player_count"] == 4  # the left-out player does not play
+
+
+def _turn_draws(
+    client: TestClient, league: League, headers: dict[str, str], *, on: bool = False
+) -> tuple[int, Json]:
+    response = client.patch(_url(league), json={"draws_allowed": on}, headers=headers)
+    result: Json = response.json()
+    return response.status_code, result
+
+
+@pytest.mark.parametrize("state", [TournamentState.SETUP, TournamentState.IN_PROGRESS])
+def test_br125_draws_stay_on_while_an_unfinished_tournament_plays_bo2(
+    client: TestClient,
+    league: League,
+    headers: dict[str, str],
+    session: Session,
+    state: TournamentState,
+) -> None:
+    league.draws_allowed = True
+    session.flush()
+    created = _create(client, league, headers, group_match_format="bo2")
+    session.get_one(Tournament, UUID(created["tournament_id"])).state = state
+    session.flush()
+
+    status, body = _turn_draws(client, league, headers)
+
+    assert status == 422
+    assert body == {
+        "code": "draws_needed_by_bo2",
+        "detail": {"tournament_ids": [created["tournament_id"]]},
+    }
+    session.refresh(league)
+    assert league.draws_allowed is True
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        pytest.param({"group_match_format": "bo1"}, id="bo1"),
+        pytest.param({"group_match_format": "bo3"}, id="bo3"),
+        pytest.param({"group_match_format": "bo5"}, id="bo5"),
+        pytest.param(
+            {
+                "group_phase": "none",
+                "round_robin_legs": None,
+                "group_match_format": None,
+                "knockout_match_format": "bo3",
+                "third_place_match": False,
+            },
+            id="knockout-only",
+        ),
+    ],
+)
+def test_br125_other_unfinished_tournaments_do_not_keep_draws_on(
+    client: TestClient,
+    league: League,
+    headers: dict[str, str],
+    session: Session,
+    values: Json,
+) -> None:
+    league.draws_allowed = True
+    session.flush()
+    _create(client, league, headers, **values)
+
+    status, body = _turn_draws(client, league, headers)
+
+    assert status == 200, body
+    assert body["draws_allowed"] is False
+
+
+def test_br125_a_finished_bo2_tournament_does_not_keep_draws_on(
+    client: TestClient, league: League, headers: dict[str, str], session: Session
+) -> None:
+    league.draws_allowed = True
+    session.flush()
+    created = _create(client, league, headers, group_match_format="bo2")
+    session.get_one(
+        Tournament, UUID(created["tournament_id"])
+    ).state = TournamentState.FINISHED
+    session.flush()
+
+    status, body = _turn_draws(client, league, headers)
+
+    assert status == 200, body
+    assert body["draws_allowed"] is False
+
+
+def test_br125_draws_can_go_on_and_other_settings_change_with_a_bo2_tournament(
+    client: TestClient, league: League, headers: dict[str, str], session: Session
+) -> None:
+    league.draws_allowed = True
+    session.flush()
+    _create(client, league, headers, group_match_format="bo2")
+
+    status, _ = _turn_draws(client, league, headers, on=True)
+    renamed = client.patch(_url(league), json={"name": "New"}, headers=headers)
+
+    assert status == 200
+    assert renamed.status_code == 200
+    assert renamed.json()["draws_allowed"] is True
+
+
+def test_br125_another_leagues_bo2_tournament_does_not_keep_draws_on(
+    client: TestClient,
+    league: League,
+    headers: dict[str, str],
+    make_league: Callable[..., League],
+    auth_header: Callable[..., dict[str, str]],
+    session: Session,
+) -> None:
+    other = make_league()
+    other.draws_allowed = True
+    league.draws_allowed = True
+    session.flush()
+    _create(client, other, auth_header(other.owner_user_id), group_match_format="bo2")
+
+    status, body = _turn_draws(client, league, headers)
+
+    assert status == 200, body
+
+
+def test_br125_deleting_the_bo2_tournament_lets_draws_go_off(
+    client: TestClient, league: League, headers: dict[str, str], session: Session
+) -> None:
+    league.draws_allowed = True
+    session.flush()
+    created = _create(client, league, headers, group_match_format="bo2")
+    deleted = client.delete(
+        _tournament_url(league, created["tournament_id"]), headers=headers
+    )
+
+    status, body = _turn_draws(client, league, headers)
+
+    assert deleted.status_code == 204, deleted.text
+    assert status == 200, body

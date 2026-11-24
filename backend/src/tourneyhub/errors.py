@@ -50,6 +50,7 @@ class ErrorCode(StrEnum):
     SEASON_HAS_UNFINISHED_TOURNAMENTS = "season_has_unfinished_tournaments"  # BR-010
     # BO2 in a league without draws (BR-121), a drawn result there or in a knockout
     DRAWS_NOT_ALLOWED = "draws_not_allowed"
+    DRAWS_NEEDED_BY_BO2 = "draws_needed_by_bo2"  # BR-125: turning draws off
     # Setup
     PLAYER_REMOVED = "player_removed"  # a removed player cannot be picked (BR-002)
     PLAYER_NOT_PICKED = "player_not_picked"

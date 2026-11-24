@@ -146,7 +146,11 @@ def read_league(
 
 
 @router.patch(
-    "/{league_id}", responses={HTTPStatus.NOT_FOUND: {"model": ErrorResponse}}
+    "/{league_id}",
+    responses={
+        HTTPStatus.NOT_FOUND: {"model": ErrorResponse},
+        HTTPStatus.UNPROCESSABLE_CONTENT: {"model": ErrorResponse},
+    },
 )
 def update_league(
     league_id: UUID,
@@ -155,7 +159,12 @@ def update_league(
     user: CurrentUserDep,
     now: NowDep,
 ) -> LeagueRead:
-    """Change the league's settings (FR-011); allowed in any season (BR-011)."""
+    """Change the league's settings (FR-011); allowed in any season (BR-011).
+
+    Turning draws off while the league has an unfinished tournament, setup
+    included, whose group phase plays BO2 is 422 `draws_needed_by_bo2` with
+    the tournaments' ids as `tournament_ids` (BR-125).
+    """
     league = league_service.update_league(
         session,
         league_id=league_id,
