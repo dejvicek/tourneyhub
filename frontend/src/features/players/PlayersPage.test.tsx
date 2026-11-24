@@ -237,16 +237,16 @@ describe("PlayersPage", () => {
     expect(filip.removed_at).toBeNull();
   });
 
-  it("a league full at 500 players says so at the field", async () => {
+  it("a league full at 1000 active players says so at the field", async () => {
     const count = db().players.filter(
-      (p) => p.league_id === TEST_LEAGUE_ID,
+      (p) => p.league_id === TEST_LEAGUE_ID && p.removed_at === null,
     ).length;
-    for (let i = count; i < 500; i++) {
+    for (let i = count; i < 1000; i++) {
       db().players.push({
         id: newId(),
         league_id: TEST_LEAGUE_ID,
-        name: `Removed ${String(i)}`,
-        removed_at: "2026-10-01T18:00:00Z",
+        name: `Filler ${String(i)}`,
+        removed_at: null,
       });
     }
     const user = userEvent.setup();
@@ -258,7 +258,7 @@ describe("PlayersPage", () => {
 
     await waitFor(() => {
       expect(name).toHaveAccessibleDescription(
-        "A league holds at most 500 players, removed ones included.",
+        "A league holds at most 1000 active players. Removed ones do not count.",
       );
     });
   });

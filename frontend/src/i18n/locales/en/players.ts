@@ -48,7 +48,8 @@ export const players = {
     taken: "{{name}} is already on the list.",
     takenRemoved: "{{name}} is a removed player. Restore them instead.",
     takenUnknown: "This name was just taken. The list is reloaded.",
-    limit: "A league holds at most 500 players, removed ones included.",
+    limit:
+      "A league holds at most 1000 active players. Removed ones do not count.",
     generic: "That did not work. Check the connection and try again.",
   },
 };
