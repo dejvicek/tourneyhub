@@ -65,8 +65,26 @@ def test_br111_two_pairs_sharing_third_get_five_each() -> None:
     assert shared_place_points(place=3, entry_count=2, table=DEFAULT_TABLE) == 5
 
 
-def test_br111_four_entries_sharing_fifth_get_zero_after_rounding_down() -> None:
-    assert shared_place_points(place=5, entry_count=4, table=DEFAULT_TABLE) == 0
+def test_br111_shared_fifth_earns_one_point_with_default_table() -> None:
+    # #128: the average (2 + 0 + 0 + 0) / 4 = 0.5 would round down to 0
+    assert shared_place_points(place=5, entry_count=4, table=DEFAULT_TABLE) == 1
+    assert shared_place_points(place=5, entry_count=2, table=DEFAULT_TABLE) == 1
+    assert by_player(_fifth(), DEFAULT_TABLE)[9] == 1
+
+
+def _fifth() -> list[EntryPlace]:
+    places = [placed(n, n) for n in range(1, 5)]
+    return [*places, placed(9, 5), placed(10, 5)]
+
+
+def test_br111_an_unshared_fifth_keeps_its_two_points() -> None:
+    assert shared_place_points(place=5, entry_count=1, table=DEFAULT_TABLE) == 2
+
+
+def test_br111_shared_fifth_uses_the_plain_average_with_another_table() -> None:
+    assert shared_place_points(place=5, entry_count=4, table=[10, 8, 6, 4, 3]) == 0
+    assert shared_place_points(place=5, entry_count=2, table=[10, 8, 6, 4, 2, 2]) == 2
+    assert shared_place_points(place=5, entry_count=2, table=[10, 8, 6, 4]) == 0
 
 
 def test_br111_the_average_is_rounded_down_not_to_nearest() -> None:
@@ -203,10 +221,15 @@ def test_br111_a_block_needs_a_place_and_an_entry(place: int, entry_count: int) 
 
 # Properties
 
-tables = st.lists(st.integers(min_value=0, max_value=100), max_size=12).map(
-    lambda values: sorted(values, reverse=True)
+tables = (
+    st.lists(st.integers(min_value=0, max_value=100), max_size=12)
+    .map(lambda values: sorted(values, reverse=True))
+    .filter(lambda values: values != DEFAULT_TABLE)
 )
-"""Whole numbers, none above the place before it (FR-011)."""
+"""Whole numbers, none above the place before it (FR-011), not the default table.
+
+The default table has its own shared-5th exception (BR-111, #128).
+"""
 
 
 @st.composite

@@ -1260,11 +1260,12 @@ def test_br111_shared_place_splits_season_points(
     places = _get(client, league, tid, "/places", headers)
 
     # The four winners are level and share 1st, which covers places 1 to 4;
-    # the four losers share 5th, which covers 5 to 8 (BR-104, BR-111).
+    # the four losers share 5th, which covers 5 to 8 (BR-104, BR-111); with the
+    # default table each of them earns 1 point, not the average of 0 (#128).
     by_place: dict[int, set[int]] = {}
     for row in places["rows"]:
         by_place.setdefault(row["place"], set()).add(row["points_per_player"])
-    assert by_place == {1: {(10 + 8 + 6 + 4) // 4}, 5: {(2 + 0 + 0 + 0) // 4}}
+    assert by_place == {1: {(10 + 8 + 6 + 4) // 4}, 5: {1}}
 
 
 def test_br112_season_standings_count_a_finished_monster_dyp(
