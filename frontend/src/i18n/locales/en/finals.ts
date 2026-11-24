@@ -250,9 +250,9 @@ export const finals = {
     noMatches: "This round has no matches.",
     decisionTitle: "Round {{round}} is complete",
     decisionBody_one:
-      "For {{active}} active players we recommend at least {{count}} round, and you have played {{played}}. Add another round, or move on.",
+      "Active: {{active}}. We recommend at least {{count}} round, and you have played {{played}}. Add another round, or move on.",
     decisionBody_other:
-      "For {{active}} active players we recommend at least {{count}} rounds, and you have played {{played}}. Add another round, or move on.",
+      "Active: {{active}}. We recommend at least {{count}} rounds, and you have played {{played}}. Add another round, or move on.",
     notRounds: "This tournament has no rounds to add.",
     inProgressTitle: "Round {{round}} is in progress",
     inProgressBody_one: "{{count}} match has no result yet.",

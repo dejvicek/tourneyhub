@@ -1569,6 +1569,42 @@ describe("Between rounds (screen 11)", () => {
     ]);
   });
 
+  it.each([
+    // Disabling from the start keeps the late player (the last entry) counted.
+    { active: 9, rounds: 4 },
+    { active: 8, rounds: 3 },
+  ])(
+    "recommends $rounds rounds for $active active players: a disabled one does not count, a late one does (BR-068)",
+    async ({ active, rounds }) => {
+      const monster = db().tournaments.find((t) => t.id === MONSTER);
+      const main = monster?.entries.filter((e) => e.stage === "main") ?? [];
+      main.forEach((entry, index) => {
+        entry.is_disabled = index < main.length - active;
+      });
+      renderAt(at(paths.betweenRounds, MONSTER));
+
+      expect(
+        await screen.findByText(
+          new RegExp(
+            `Active: ${String(active)} players\\. We recommend at least ${String(rounds)} rounds`,
+          ),
+        ),
+      ).toBeInTheDocument();
+    },
+  );
+
+  it("counts pairs, not players, in a Swiss of pairs (BR-068)", async () => {
+    const swiss = db().tournaments.find((t) => t.id === SWISS);
+    if (swiss) {
+      swiss.type = "doubles";
+    }
+    renderAt(at(paths.betweenRounds, SWISS));
+
+    expect(
+      await screen.findByText(/Active: \d+ pairs?\. We recommend at least/),
+    ).toBeInTheDocument();
+  });
+
   it("recommends rounds from the active players and offers the next steps", async () => {
     renderAt(at(paths.betweenRounds, MONSTER));
 
@@ -1577,7 +1613,7 @@ describe("Between rounds (screen 11)", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        /For 14 active players we recommend at least 4 rounds, and you have played 5\./,
+        /Active: 14 players\. We recommend at least 4 rounds, and you have played 5\./,
       ),
     ).toBeInTheDocument();
     expect(
@@ -1728,7 +1764,7 @@ describe("Between rounds (screen 11)", () => {
 
     expect(await screen.findByText(/15 hráčů/)).toBeInTheDocument();
     expect(
-      screen.getByText(/doporučujeme alespoň 4 kola, odehráno máte 5/),
+      screen.getByText(/Doporučujeme alespoň 4 kola, odehráno máte 5/),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Přidat kolo 6" }),

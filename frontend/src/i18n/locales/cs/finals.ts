@@ -272,13 +272,13 @@ export const finals: CsMessages<Messages["finals"]> = {
     noMatches: "V tomto kole nejsou žádné zápasy.",
     decisionTitle: "Kolo {{round}} je hotové",
     decisionBody_one:
-      "Pro {{active}} aktivních hráčů doporučujeme alespoň {{count}} kolo, odehráno máte {{played}}. Přidejte další kolo, nebo pokračujte dál.",
+      "Aktivní: {{active}}. Doporučujeme alespoň {{count}} kolo, odehráno máte {{played}}. Přidejte další kolo, nebo pokračujte dál.",
     decisionBody_few:
-      "Pro {{active}} aktivních hráčů doporučujeme alespoň {{count}} kola, odehráno máte {{played}}. Přidejte další kolo, nebo pokračujte dál.",
+      "Aktivní: {{active}}. Doporučujeme alespoň {{count}} kola, odehráno máte {{played}}. Přidejte další kolo, nebo pokračujte dál.",
     decisionBody_many:
-      "Pro {{active}} aktivních hráčů doporučujeme alespoň {{count}} kola, odehráno máte {{played}}. Přidejte další kolo, nebo pokračujte dál.",
+      "Aktivní: {{active}}. Doporučujeme alespoň {{count}} kola, odehráno máte {{played}}. Přidejte další kolo, nebo pokračujte dál.",
     decisionBody_other:
-      "Pro {{active}} aktivních hráčů doporučujeme alespoň {{count}} kol, odehráno máte {{played}}. Přidejte další kolo, nebo pokračujte dál.",
+      "Aktivní: {{active}}. Doporučujeme alespoň {{count}} kol, odehráno máte {{played}}. Přidejte další kolo, nebo pokračujte dál.",
     notRounds: "Tento turnaj nemá kola, která by se přidávala.",
     inProgressTitle: "Kolo {{round}} běží",
     inProgressBody_one: "{{count}} zápas ještě nemá výsledek.",
