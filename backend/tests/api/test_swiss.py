@@ -518,6 +518,34 @@ def test_fr043_the_tiebreaker_order_changes_the_play_standings(
     assert (after[one]["place"], after[two]["place"]) == (1, 1)
 
 
+def test_fr043_tiebreakers_locked_after_the_knockout_draw_and_open_again_after_deleting_it(
+    client: TestClient,
+    league_id: UUID,
+    headers: dict[str, str],
+    swiss: Callable[..., Json],
+    play_round: Callable[..., Json],
+    start_knockout: Callable[..., tuple[int, Json]],
+    set_tiebreakers: Callable[[str, list[str]], tuple[int, Json]],
+) -> None:
+    tournament = swiss(6)
+    played = play_round(tournament["id"], 1)
+    status, drawn = start_knockout(played, qualifiers=4)
+    assert status == 200, drawn
+    knockout = next(p for p in drawn["phases"] if p["kind"] == "knockout")
+    locked = {"code": "group_phase_locked", "detail": {"phase_id": knockout["id"]}}
+
+    assert set_tiebreakers(tournament["id"], ["bh1"]) == (422, locked)
+    deleted = client.delete(
+        _t_url(league_id, tournament["id"], f"/phases/{knockout['id']}"),
+        headers=headers,
+    )
+    status, body = set_tiebreakers(tournament["id"], ["bh1"])
+
+    assert deleted.status_code == 204
+    assert status == 200, body
+    assert body["phases"][0]["tiebreakers"] == ["bh1"]
+
+
 def test_fr043_the_tiebreakers_can_be_set_in_setup(
     setup: Callable[..., Json],
     set_tiebreakers: Callable[[str, list[str]], tuple[int, Json]],
