@@ -67,8 +67,7 @@ class ErrorCode(StrEnum):
     # No group phase to follow, or the other kind of knockout for a bracket or rounds read or write
     FORMAT_NOT_SUPPORTED = "format_not_supported"
     PLAYERS_WITHOUT_PARTNER = "players_without_partner"  # Doubles (BR-030)
-    # FR-032: 64 entries today, 16 after the #48 follow-up (issue to open after
-    # approval).
+    # FR-032: 16 entries
     TOO_MANY_ENTRIES_FOR_ROUND_ROBIN = "too_many_entries_for_round_robin"
     TOO_MANY_ENTRIES_FOR_KNOCKOUT = "too_many_entries_for_knockout"  # 256
     # Results, standings and finishing

@@ -328,8 +328,9 @@ class _ScheduleRows:
 def _insert_schedule(session: Session, rows: _ScheduleRows) -> None:
     """Write the schedule's rows in bulk, parents first.
 
-    A 64-entry double round robin has 4,032 matches and some 20,000 to 30,000
-    other rows; one ORM object per row would be far too slow.
+    A 16-entry double round robin has 240 matches, each with rows of its own,
+    and a large knockout or Swiss schedule has more; one ORM object per row
+    would be slow.
     """
     for model, table_rows in (
         (Round, rows.rounds),
