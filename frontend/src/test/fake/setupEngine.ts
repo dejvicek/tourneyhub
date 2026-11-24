@@ -1120,9 +1120,8 @@ export function preview(t: StoredTournament): SchedulePreview {
 
 /**
  * The most entries a round robin is generated for; the backend's limit (FR-032).
- * FR-032 now says 16; the change is the #48 follow-up (issue to open after approval).
  */
-export const MAX_ROUND_ROBIN_ENTRIES = 64;
+export const MAX_ROUND_ROBIN_ENTRIES = 16;
 
 /** The most entries of a knockout without a group phase; the backend's limit (FR-032). */
 export const MAX_KNOCKOUT_ENTRIES = 256;

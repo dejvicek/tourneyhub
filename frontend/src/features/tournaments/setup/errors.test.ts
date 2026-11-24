@@ -27,13 +27,13 @@ describe("the texts for a refused start or back to setup", () => {
     ],
     [
       "en",
-      refused(422, "too_many_entries_for_round_robin", { limit: 64 }),
-      "A round robin takes at most 64 entries. Remove some, or pick another format.",
+      refused(422, "too_many_entries_for_round_robin", { limit: 16 }),
+      "A round robin takes at most 16 entries. Remove some, or pick another format.",
     ],
     [
       "cs",
-      refused(422, "too_many_entries_for_round_robin", { limit: 64 }),
-      "Každý s každým má nejvýše 64 účastníků. Odeberte některé, nebo zvolte jiný formát.",
+      refused(422, "too_many_entries_for_round_robin", { limit: 16 }),
+      "Každý s každým má nejvýše 16 účastníků. Odeberte některé, nebo zvolte jiný formát.",
     ],
     [
       "en",
