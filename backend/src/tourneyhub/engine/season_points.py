@@ -5,7 +5,13 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from tourneyhub.engine.ids import EntryId, PlayerId, ensure_distinct
+from tourneyhub.engine.leagues import DEFAULT_PLACEMENT_POINTS
 from tourneyhub.engine.places import EntryPlace
+
+SHARED_FIFTH_POINTS = 1
+"""Points each entry on a shared 5th place earns with the default table (BR-111, #128)."""
+
+FIFTH_PLACE = 5
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -31,8 +37,13 @@ def shared_place_points(*, place: int, entry_count: int, table: Sequence[int]) -
     The entries cover the places `place` to `place + entry_count - 1`. Each
     gets the average of those places' points in `table`, rounded down. A
     place beyond the table is worth 0 (BR-110). With the default table
-    10, 8, 6, 4, 2, two entries sharing 3rd get (6 + 4) / 2 = 5, and four
-    sharing 5th get (2 + 0 + 0 + 0) / 4 = 0.5, rounded down to 0.
+    10, 8, 6, 4, 2, two entries sharing 3rd get (6 + 4) / 2 = 5.
+
+    One exception, only with the default table (BR-111, #128): each entry on
+    a shared 5th place gets 1 point, not the rounded-down average (four
+    sharing 5th would get (2 + 0 + 0 + 0) / 4 = 0.5, rounded down to 0). An
+    unshared 5th gets its 2 points, and any other table uses the plain
+    average.
 
     `table` is the season's placement points table: whole numbers, none
     negative, none above the place before it (FR-011).
@@ -43,6 +54,9 @@ def shared_place_points(*, place: int, entry_count: int, table: Sequence[int]) -
     if place < 1 or entry_count < 1:
         msg = f"place {place} and entry count {entry_count} must be at least 1"
         raise ValueError(msg)
+    is_default = tuple(table) == DEFAULT_PLACEMENT_POINTS
+    if place == FIFTH_PLACE and entry_count > 1 and is_default:
+        return SHARED_FIFTH_POINTS
     covered = table[place - 1 : place - 1 + entry_count]
     return sum(covered) // entry_count
 

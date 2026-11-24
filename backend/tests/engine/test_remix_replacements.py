@@ -249,8 +249,8 @@ def test_br111_worked_case_step_6_points() -> None:
 
     assert points == {
         1: 10, 6: 10, 7: 8, 9: 8, 4: 6, 10: 6, 11: 4, 12: 4,
-        3: 0, 2: 0, 5: 0, 8: 0, 13: 0, 14: 0, 15: 0, 16: 0,
-    }  # fmt: skip
+        3: 1, 2: 1, 5: 1, 8: 1, 13: 1, 14: 1, 15: 1, 16: 1,
+    }  # fmt: skip  # shared 5th earns 1 each (BR-111, #128)
 
 
 # The four variants

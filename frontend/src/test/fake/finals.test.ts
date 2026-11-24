@@ -133,7 +133,7 @@ describe("the finals in the fake API", () => {
     expect(result.rounds[0]?.matches[0]?.match_format).toBe("bo1");
   });
 
-  it("shares places and rounds the split points down (BR-102, BR-104, BR-111)", async () => {
+  it("shares places and rounds the split points down, shared 5th earns 1 (BR-102, BR-104, BR-111)", async () => {
     await playOut(GRAND_PRIX);
     const result = await places(GRAND_PRIX);
 
@@ -145,9 +145,9 @@ describe("the finals in the fake API", () => {
     expect(byPlace(2)).toHaveLength(1);
     // The two semifinal losers share 3rd: (6 + 4) / 2 = 5 each.
     expect(byPlace(3).map((r) => r.points_per_player)).toEqual([5, 5]);
-    // Four quarterfinal losers share 5th: (2 + 0 + 0 + 0) / 4 = 0.5, down to 0.
+    // Four quarterfinal losers share 5th: 1 point each, not the 0 of (2 + 0 + 0 + 0) / 4 (BR-111, #128).
     expect(byPlace(5)).toHaveLength(4);
-    expect(byPlace(5).every((r) => r.points_per_player === 0)).toBe(true);
+    expect(byPlace(5).every((r) => r.points_per_player === 1)).toBe(true);
     // The numbering skips: no 4th, 6th, 7th or 8th (BR-104); round-of-16 losers share 9th.
     expect(byPlace(4)).toHaveLength(0);
     expect(byPlace(9)).toHaveLength(5);

@@ -223,7 +223,7 @@ export const finals = {
     pointsOwn: "+{{points}}",
     pointsNone: "0",
     pointsNote:
-      "Points come from the league table: {{points}}. Entries sharing a place split the points of the places they cover and round down.",
+      "Points come from the league table: {{points}}. Entries sharing a place split the points of the places they cover and round down. With the default table, a shared 5th place earns 1 point each.",
     seasonTitle: "{{season}} standings",
     seasonLead:
       "Updated with this tournament's points. Top {{shown}} of {{total}}.",

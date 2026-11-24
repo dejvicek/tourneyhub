@@ -578,7 +578,8 @@ def test_br145_br111_eight_pairs_losing_the_quarterfinals_share_5th() -> None:
 
     assert Counter(places_of(rows).values()) == {1: 2, 2: 2, 3: 2, 4: 2, 5: 8, 9: 1}
     assert {places_of(rows)[p] for p in quarterfinal_losers} == {5}
-    assert {points[p] for p in quarterfinal_losers} == {0}
+    # shared 5th earns 1 point each with the default table (BR-111, #128)
+    assert {points[p] for p in quarterfinal_losers} == {1}
     assert places_of(rows)[17] == 9
 
 
