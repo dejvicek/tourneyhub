@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { fieldErrors } from "@/features/auth/fieldErrors";
 import { FormField } from "@/features/auth/FormField";
 
-import { leagueMutations } from "./api";
+import { leagueMutations, leagueQueries } from "./api";
 import { SettingsSection } from "./SettingsSection";
 import { Stepper } from "./Stepper";
 
@@ -50,6 +50,13 @@ export function LeagueDetailsForm({
   const queryClient = useQueryClient();
   const update = useMutation(leagueMutations.update(queryClient, league.id));
   const [name, setName] = useState(league.name);
+  const activeSeasonId = league.seasons.find(
+    (season) => season.state === "active",
+  )?.id;
+  const tournaments = useQuery({
+    ...leagueQueries.tournaments(league.id, activeSeasonId ?? ""),
+    enabled: activeSeasonId !== undefined,
+  });
   const [draws, setDraws] = useState(league.draws_allowed);
   const [fields, setFields] = useState(String(league.default_field_count));
   const [format, setFormat] = useState(league.default_match_format);
@@ -100,16 +107,36 @@ export function LeagueDetailsForm({
         default_match_format: format,
         default_goals_per_game: goalCount,
       },
-      { onSuccess: onSaved },
+      {
+        onSuccess: onSaved,
+        onError: (error) => {
+          // BR-125: the refusal leaves draws on, so the switch goes back.
+          if (
+            error instanceof ApiError &&
+            error.code === "draws_needed_by_bo2"
+          ) {
+            setDraws(true);
+          }
+        },
+      },
     );
   }
 
   const server = fieldErrors(t, update.error);
   const errors = { ...server, ...local };
   // BR-125: draws stay on while an unfinished tournament plays BO2.
-  const drawsNeeded =
+  const refusal =
     update.error instanceof ApiError &&
-    update.error.code === "draws_needed_by_bo2";
+    update.error.code === "draws_needed_by_bo2"
+      ? update.error
+      : undefined;
+  const drawsNeeded = refusal !== undefined;
+  const blockingIds: unknown[] = Array.isArray(refusal?.detail.tournament_ids)
+    ? refusal.detail.tournament_ids
+    : [];
+  const blocking = (tournaments.data ?? []).filter((tournament) =>
+    blockingIds.includes(tournament.id),
+  );
   const failed =
     update.isError &&
     !drawsNeeded &&
@@ -209,7 +236,14 @@ export function LeagueDetailsForm({
         </fieldset>
         <p role="alert" className="text-body-md font-bold text-destructive">
           {drawsNeeded
-            ? t("leagues.settings.league.drawsNeededByBo2")
+            ? blocking.length > 0
+              ? t("leagues.settings.league.drawsNeededByBo2Named", {
+                  count: blocking.length,
+                  names: blocking
+                    .map((tournament) => tournament.name)
+                    .join(", "),
+                })
+              : t("leagues.settings.league.drawsNeededByBo2")
             : undefined}
           {failed ? t("leagues.settings.generic") : undefined}
         </p>

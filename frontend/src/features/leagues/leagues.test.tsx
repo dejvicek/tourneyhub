@@ -171,10 +171,10 @@ describe("leagues", () => {
       screen.getByRole("button", { name: "Save league settings" }),
     );
 
-    expect(
-      await screen.findByText(/Finish or delete that tournament/),
-    ).toBeInTheDocument();
+    const message = await screen.findByText(/Draws stay on until/);
+    expect(message).toHaveTextContent(/Thursday DYP/);
     expect(league.draws_allowed).toBe(true);
+    expect(screen.getByRole("switch", { name: /Draws allowed/ })).toBeChecked();
   });
 
   it("BR-010: a running tournament keeps the next season shut and says which", async () => {
