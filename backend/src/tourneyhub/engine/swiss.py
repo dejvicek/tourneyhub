@@ -161,9 +161,9 @@ def recommended_minimum_rounds(entry_count: int) -> int:
     """Return the recommended minimum number of rounds (BR-068, FR-040).
 
     It is log₂ of the number of entries, rounded up: 5 to 8 entries give 3
-    rounds, 9 to 16 give 4, 17 to 32 give 5. Count the entries the tournament has
-    now, late entries included once they have joined; the organizer may stop
-    earlier or play on.
+    rounds, 9 to 16 give 4, 17 to 32 give 5. Pass the active entries only: late
+    entries count once they have joined, disabled ones not while they are
+    disabled. The organizer may stop earlier or play on.
 
     Raises:
         ValueError: `entry_count` is negative.
