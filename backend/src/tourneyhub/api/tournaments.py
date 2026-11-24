@@ -165,7 +165,7 @@ def start_tournament(
     `dyp_halves_incomplete`, `dyp_halves_unequal`, `too_many_left_out` (DYP),
     `not_enough_entries` (FR-032: 2, 4 with a third-place match, 4 players
     in a Monster DYP),
-    `too_many_entries_for_round_robin` (detail `limit`: 64) or
+    `too_many_entries_for_round_robin` (detail `limit`: 16) or
     `too_many_entries_for_knockout` (detail `limit`: 256).
     """
     tournament = tournament_service.start_tournament(
@@ -411,7 +411,7 @@ def read_schedule_preview(
 
     A tournament that cannot start is still 200 with `can_start` false and the
     `problem`: `players_without_partner`, `not_enough_entries`,
-    `too_many_entries_for_round_robin` (detail `limit`: 64),
+    `too_many_entries_for_round_robin` (detail `limit`: 16),
     `too_many_entries_for_knockout` (detail `limit`: 256),
     the DYP codes of a draw that cannot be made, or
     `tournament_not_in_setup` for a started tournament. Another league's

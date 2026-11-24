@@ -471,9 +471,9 @@ describe("the fake API for tournament setup", () => {
     ]);
   });
 
-  it("starts a round robin of 64 entries and refuses one of 65 (FR-032)", async () => {
+  it("starts a round robin of 16 entries and refuses one of 17 (FR-032)", async () => {
     const existing = (await setupOf(await createDraft())).ranking.length;
-    for (let n = existing; n < 65; n += 1) {
+    for (let n = existing; n < 17; n += 1) {
       await dataOf(
         api.POST("/api/v1/leagues/{league_id}/players", {
           params: { path: league },
@@ -492,15 +492,15 @@ describe("the fake API for tournament setup", () => {
       );
     };
 
-    const refused = await failure(startWith(65));
-    const started = await startWith(64);
+    const refused = await failure(startWith(17));
+    const started = await startWith(16);
 
     expect([refused.status, refused.code, refused.detail]).toEqual([
       422,
       "too_many_entries_for_round_robin",
-      { limit: 64 },
+      { limit: 16 },
     ]);
-    expect(started.rounds).toHaveLength(63);
+    expect(started.rounds).toHaveLength(15);
   });
 
   it("generates the first round of a Monster DYP and a knockout bracket with byes", async () => {

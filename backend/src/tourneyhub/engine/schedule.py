@@ -21,13 +21,12 @@ MIN_ENTRIES_WITH_THIRD_PLACE = 4
 MIN_MONSTER_DYP_PLAYERS = 4
 """The fewest players of a Monster DYP, whose entries are players (FR-032)."""
 
-MAX_ROUND_ROBIN_ENTRIES = 64
+MAX_ROUND_ROBIN_ENTRIES = 16
 """The most entries a round robin is generated for.
 
-Everyone plays everyone, so 64 entries are 2,016 matches in one leg and 4,032 in
-two. FR-032 caps a round robin at 16 entries (a step of late entries that would
-take it past 16 is refused); lowering the limit is the #48 follow-up (issue to
-open after approval).
+Everyone plays everyone, so 16 entries are 120 matches in one leg and 240 in two
+(FR-032). A round robin takes no late entries (FR-047), so the limit holds for
+its whole run.
 """
 
 ROUND_ROBIN_LEGS = frozenset({1, 2})
