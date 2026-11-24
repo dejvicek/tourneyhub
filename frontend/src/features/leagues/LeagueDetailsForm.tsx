@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { ApiError } from "@/api/client";
 import type { components } from "@/api/schema";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -105,8 +106,14 @@ export function LeagueDetailsForm({
 
   const server = fieldErrors(t, update.error);
   const errors = { ...server, ...local };
+  // BR-125: draws stay on while an unfinished tournament plays BO2.
+  const drawsNeeded =
+    update.error instanceof ApiError &&
+    update.error.code === "draws_needed_by_bo2";
   const failed =
-    update.isError && Object.values(server).every((v) => v === undefined);
+    update.isError &&
+    !drawsNeeded &&
+    Object.values(server).every((v) => v === undefined);
 
   return (
     <SettingsSection
@@ -201,6 +208,9 @@ export function LeagueDetailsForm({
           </div>
         </fieldset>
         <p role="alert" className="text-body-md font-bold text-destructive">
+          {drawsNeeded
+            ? t("leagues.settings.league.drawsNeededByBo2")
+            : undefined}
           {failed ? t("leagues.settings.generic") : undefined}
         </p>
         {/* Rendered only with its message: the desktop sidebar has a status too. */}

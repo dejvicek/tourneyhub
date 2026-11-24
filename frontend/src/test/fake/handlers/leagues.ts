@@ -187,6 +187,20 @@ export const leagueHandlers = [
     if (problems.length > 0) {
       return validationFailed(problems);
     }
+    // BR-125: draws stay on while an unfinished tournament plays BO2.
+    if (body.draws_allowed === false && row.draws_allowed) {
+      const needing = db().tournaments.filter(
+        (t) =>
+          t.league_id === row.id &&
+          t.state !== "finished" &&
+          t.phases.some((p) => p.kind === "group" && p.match_format === "bo2"),
+      );
+      if (needing.length > 0) {
+        return apiError(422, "draws_needed_by_bo2", {
+          tournament_ids: needing.map((t) => t.id),
+        });
+      }
+    }
     const before = JSON.stringify(row);
     row.name = body.name?.trim() ?? row.name;
     row.draws_allowed = body.draws_allowed ?? row.draws_allowed;
