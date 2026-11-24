@@ -19,7 +19,7 @@ export const standings: CsMessages<Messages["standings"]> = {
       points: "Body",
     },
     footnote:
-      "Body za místa, 1. až {{last}}: {{points}}. Kdo sdílí místo, dělí se o body a zaokrouhluje se dolů. Hráče se stejným počtem bodů řadí počet vítězství v turnajích.",
+      "Body za místa, 1. až {{last}}: {{points}}. Kdo sdílí místo, dělí se o body a zaokrouhluje se dolů. S výchozí tabulkou dostane každý na sdíleném 5. místě 1 bod. Hráče se stejným počtem bodů řadí počet vítězství v turnajích.",
     counted: "Započtené turnaje",
   },
 };

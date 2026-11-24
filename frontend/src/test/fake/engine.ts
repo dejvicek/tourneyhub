@@ -4,7 +4,12 @@
 // ADR-009), so that the fake API returns schedules, draws, standings and
 // places that look plausible. They follow PRD.md loosely and src/lib/rules.ts
 // for the rules still open; none of this is the real behaviour.
-import { MATCH_POINTS, type RoundRobinOrder, rules } from "@/lib/rules";
+import {
+  DEFAULT_PLACEMENT_POINTS,
+  MATCH_POINTS,
+  type RoundRobinOrder,
+  rules,
+} from "@/lib/rules";
 
 import type {
   FieldRead,
@@ -301,12 +306,23 @@ export function roundRobinStandings(
   return result;
 }
 
-/** stand-in, the engine decides: the points of a place shared by several entries (BR-110, BR-111). */
+/**
+ * stand-in, the engine decides: the points of a place shared by several entries (BR-110, BR-111).
+ * With the default table, each entry on a shared 5th place earns 1 point (BR-111, #128).
+ */
 export function splitPlacementPoints(
   table: readonly number[],
   place: number,
   sharing: number,
 ): number {
+  if (
+    place === 5 &&
+    sharing > 1 &&
+    table.length === DEFAULT_PLACEMENT_POINTS.length &&
+    table.every((points, i) => points === DEFAULT_PLACEMENT_POINTS[i])
+  ) {
+    return 1;
+  }
   let total = 0;
   for (let p = place; p < place + sharing; p++) {
     total += table[p - 1] ?? 0;

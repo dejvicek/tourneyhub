@@ -245,7 +245,7 @@ export const finals: CsMessages<Messages["finals"]> = {
     pointsOwn: "+{{points}}",
     pointsNone: "0",
     pointsNote:
-      "Body jsou z tabulky ligy: {{points}}. Kdo sdílí místo, dělí se o body za místa, která zabírá, zaokrouhleno dolů.",
+      "Body jsou z tabulky ligy: {{points}}. Kdo sdílí místo, dělí se o body za místa, která zabírá, zaokrouhleno dolů. S výchozí tabulkou dostane každý na sdíleném 5. místě 1 bod.",
     seasonTitle: "Pořadí: {{season}}",
     seasonLead:
       "Doplněno o body z tohoto turnaje. Prvních {{shown}} z {{total}}.",
