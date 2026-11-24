@@ -109,6 +109,22 @@ def _refuse_a_taken_name(
         )
 
 
+def _refuse_a_full_league(session: Session, *, league_id: UUID) -> None:
+    """Refuse when the league already has the most active players (BR-006).
+
+    The caller holds the league lock, so the count cannot change under it.
+    """
+    active = session.scalar(
+        select(func.count())
+        .select_from(Player)
+        .where(Player.league_id == league_id, Player.removed_at.is_(None))
+    )
+    if active is not None and active >= MAX_PLAYERS_PER_LEAGUE:
+        raise RuleViolationError(
+            ErrorCode.PLAYER_LIMIT_REACHED, limit=MAX_PLAYERS_PER_LEAGUE
+        )
+
+
 def add_player(
     session: Session,
     *,
@@ -121,21 +137,15 @@ def add_player(
 
     A name that a player of the league has, in any case, is refused, and so is
     one that a removed player has: the organizer restores that player instead
-    (BR-001, ADR-002). A league holds at most `MAX_PLAYERS_PER_LEAGUE` players,
-    removed ones included, counted under the lock. `clock` is read after the
-    lock is held, so "order added" is the commit order. Two adds of one name race at the unique index only when
-    the league lock does not cover them, and the loser gets a 409 there
-    (`api/errors.py`).
+    (BR-001, ADR-002). A league holds at most `MAX_PLAYERS_PER_LEAGUE` active
+    players, counted under the lock; removed ones do not count (BR-006). `clock`
+    is read after the lock is held, so "order added" is the commit order. Two
+    adds of one name race at the unique index only when the league lock does not
+    cover them, and the loser gets a 409 there (`api/errors.py`).
     """
     league = lock_league(session, league_id=league_id, user_id=user_id)
     _refuse_a_taken_name(session, league_id=league.id, name=name, except_player_id=None)
-    count = session.scalar(
-        select(func.count()).select_from(Player).where(Player.league_id == league.id)
-    )
-    if count is not None and count >= MAX_PLAYERS_PER_LEAGUE:
-        raise RuleViolationError(
-            ErrorCode.PLAYER_LIMIT_REACHED, limit=MAX_PLAYERS_PER_LEAGUE
-        )
+    _refuse_a_full_league(session, league_id=league.id)
     player = Player(league_id=league.id, name=name, created_at=clock())
     session.add(player)
     session.flush()
@@ -191,7 +201,9 @@ def set_player_removed(
     never freed, and every add and rename checks against all players (BR-001).
     `clock` is read after the lock. A player picked for a tournament that is not
     finished cannot be removed (BR-002): 422 `player_in_unfinished_tournament`
-    with the tournaments' ids. Picking takes the same league lock (ADR-008).
+    with the tournaments' ids. Picking takes the same league lock (ADR-008). A
+    restore counts the player again: with the most active players already on
+    the list it is 422 `player_limit_reached` (BR-006).
     """
     player = _lock_player(
         session, league_id=league_id, player_id=player_id, user_id=user_id
@@ -205,6 +217,7 @@ def set_player_removed(
             )
         player.removed_at = now = clock()
     elif not removed and player.removed_at is not None:
+        _refuse_a_full_league(session, league_id=league_id)
         player.removed_at = None
         now = clock()
     else:
