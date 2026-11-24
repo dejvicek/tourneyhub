@@ -142,6 +142,8 @@ interface TiebreakerSheetProps {
   tournamentId: string;
   /** The group phase's enabled tie-breakers, in order. */
   tiebreakers: readonly SwissTiebreaker[];
+  /** The knockout is drawn: the order is fixed until it is deleted (FR-043). */
+  locked: boolean;
 }
 
 /** FR-043: switch each tie-breaker on or off and put them in order. */
@@ -149,9 +151,22 @@ export function TiebreakerSheet({
   leagueId,
   tournamentId,
   tiebreakers,
+  locked,
 }: TiebreakerSheetProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  if (locked) {
+    return (
+      <div className="space-y-2">
+        <Button type="button" variant="outline" disabled>
+          {t("finals.tiebreakers.change")}
+        </Button>
+        <p className="text-caption text-muted-foreground">
+          {t("finals.tiebreakers.locked")}
+        </p>
+      </div>
+    );
+  }
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>

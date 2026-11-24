@@ -425,6 +425,7 @@ function RoundsContent() {
         leagueId={leagueId}
         tournamentId={tournamentId}
         tiebreakers={tiebreakers}
+        locked={hasKnockout}
       />
     </section>
   );

@@ -1722,6 +1722,17 @@ describe("Between rounds (screen 11)", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("locks the tie-breakers while the knockout is drawn (FR-043)", async () => {
+    renderAt(at(paths.betweenRounds, LHM));
+
+    expect(
+      await screen.findByRole("button", { name: "Change the tie-breakers" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByText(/The order is fixed while the knockout is drawn/),
+    ).toBeInTheDocument();
+  });
+
   it("is written in Czech with Czech plurals", async () => {
     await i18n.changeLanguage("cs");
     renderAt(at(paths.betweenRounds, MONSTER));

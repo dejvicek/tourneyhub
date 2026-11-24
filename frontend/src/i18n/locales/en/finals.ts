@@ -295,6 +295,8 @@ export const finals = {
     footnoteNone: "Level on points? Entries share the place.",
     names: { bh1: "BH1", bh2: "BH2", score_difference: "Score difference" },
     change: "Change the tie-breakers",
+    locked:
+      "The order is fixed while the knockout is drawn. Delete the knockout to change it.",
     title: "Tie-breakers",
     lead: "Switch each one on or off and put them in order. The standings change at once.",
     on: "{{name}} on",
