@@ -537,6 +537,7 @@
           "tournament_type_changed",
           "season_has_unfinished_tournaments",
           "draws_not_allowed",
+          "draws_needed_by_bo2",
           "player_removed",
           "player_not_picked",
           "too_many_top_players",
@@ -6287,7 +6288,7 @@
         ]
       },
       "patch": {
-        "description": "Change the league's settings (FR-011); allowed in any season (BR-011).",
+        "description": "Change the league's settings (FR-011); allowed in any season (BR-011).\n\nTurning draws off while the league has an unfinished tournament, setup\nincluded, whose group phase plays BO2 is 422 `draws_needed_by_bo2` with\nthe tournaments' ids as `tournament_ids` (BR-125).",
         "operationId": "update_league",
         "parameters": [
           {
