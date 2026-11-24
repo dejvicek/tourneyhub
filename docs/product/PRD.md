@@ -361,7 +361,7 @@ After ten weeks of evenings like these, the organizer starts Season 2. Season 1 
 | ID | Rule |
 |---|---|
 | BR-110 | When a tournament finishes, each player in it earns the placement points for their place from the league's table. Places beyond the table earn 0. |
-| BR-111 | Entries sharing a place split the points of the places they cover: each gets the average, rounded down. With the default table, two pairs sharing 3rd cover 3rd and 4th, so each of their four players gets (6 + 4) / 2 = 5; four entries sharing 5th get (2 + 0 + 0 + 0) / 4 = 0.5, rounded down to 0. |
+| BR-111 | Entries sharing a place split the points of the places they cover: each gets the average, rounded down. With the default table, two pairs sharing 3rd cover 3rd and 4th, so each of their four players gets (6 + 4) / 2 = 5. With the default table, there is one exception: instead of the rounded average, each player on a shared 5th place earns 1 point. For example, when four pairs lose the quarterfinals, they share 5th and each of their players earns 1. |
 | BR-112 | Only finished tournaments count. Correcting a result in a finished tournament, putting it back in progress (BR-095) or deleting the tournament recalculates the season standings. |
 | BR-113 | Season standings rank players by total placement points, then tournament wins. Players still level share the place. |
 
